@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 class KisService {
   // 프록시 서버 주소 (배포용)
   final String _proxyUrl =
-      'https://stockwiki-76kkcsl2b-bermonts-projects.vercel.app/kis-stock-info';
+      'https://stockwiki-gw35etj6o-bermonts-projects.vercel.app/kis-stock-info';
 
   Future<String> fetchStockInfo(String keyword) async {
     // 종목코드인지 판단 (5~6자리 숫자)
