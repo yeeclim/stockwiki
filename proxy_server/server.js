@@ -1,5 +1,3 @@
-//const APP_KEY = 'PSkzcOJI9xwJeh1coKMwFAoMQfI0JxGORUkd';
-//const APP_SECRET = '5sy6hIoZBjMUHcHiPpHiPquntZAWM3FY3CGAxUCL3jLNG3fZl99LwD29glHGVXtKi/ORNGzuek+XOAQY8wCH5sIrmzPY0WCDX8E7jPvaVBIo7hHQKWzUfkGKwWlyIhJLlsdShXN712ScNBn/OY/44LOVdRm+MZggKq9q5SDm6PovqBBZTR4=';
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -32,8 +30,12 @@ async function fetchAccessToken() {
 }
 
 app.get('/kis-stock-info', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const pdno = req.query.pdno || req.query.code;
   const prdtTypeCd = req.query.prdt_type_cd || '300'; // 기본값: 국내주식
+
+  console.log(`[요청 수신] /kis-stock-info?pdno=${pdno}`);
+
   if (!pdno) {
     return res.status(400).json({ error: 'pdno 파라미터가 필요합니다' });
   }
