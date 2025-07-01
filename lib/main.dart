@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'services/fmp_service.dart';
 import 'services/kis_service.dart';
 
@@ -28,7 +30,8 @@ class StockSearchPage extends StatefulWidget {
 
 class _StockSearchPageState extends State<StockSearchPage> {
   final TextEditingController _controller = TextEditingController();
-  List<String> _results = [];
+  List<String> _results = []; // 미국 주식용
+  List<MapEntry<String, dynamic>> _krEntries = []; // 국내 주식용
   bool _isLoading = false;
   String _marketType = 'us';
 
@@ -41,30 +44,69 @@ class _StockSearchPageState extends State<StockSearchPage> {
     setState(() {
       _isLoading = true;
       _results.clear();
+      _krEntries.clear();
     });
 
     try {
-      List<String> result;
       if (_marketType == 'us') {
         final stocks = await FMPService.fetchStocks(keyword);
-        result = stocks.map((s) => '${s.name} (${s.symbol}) - \$${s.price}').toList();
+        final result = stocks.map((s) => '${s.name} (${s.symbol}) - \$${s.price}').toList();
+        setState(() {
+          _results = result;
+        });
       } else {
-        final stockInfo = await _kisService.fetchStockInfo(keyword);
-        result = [stockInfo];
+        final stockInfoMap = await _kisService.fetchStockInfo(keyword);
+        setState(() {
+          _krEntries = stockInfoMap.entries.toList();
+        });
       }
-
-      setState(() {
-        _results = result;
-      });
     } catch (e) {
       setState(() {
         _results = ['오류 발생: $e'];
+        _krEntries = [];
       });
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  String _getValue(String key) {
+    final match = _krEntries.firstWhere(
+      (e) => e.key == key,
+      orElse: () => const MapEntry('', 'N/A'),
+    );
+    return '${match.value}';
+  }
+
+  String _formatWon(String raw) {
+    if (raw == 'N/A' || raw.isEmpty) return 'N/A';
+    final num = int.tryParse(raw);
+    if (num == null) return 'N/A';
+    return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+  }
+
+  String _formatDate(String raw) {
+    if (raw.length != 8) return raw;
+    return '${raw.substring(0, 4)}-${raw.substring(4, 6)}-${raw.substring(6)}';
+  }
+
+  String _getCodeFromPdno(String raw) {
+    return raw.length >= 6 ? raw.substring(raw.length - 6) : raw;
+  }
+
+  Widget _infoRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 80, child: Text('$title:', style: const TextStyle(fontWeight: FontWeight.bold))),
+          const SizedBox(width: 10),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
   }
 
   @override
@@ -115,15 +157,39 @@ class _StockSearchPageState extends State<StockSearchPage> {
               onSubmitted: (_) => _searchStocks(),
             ),
             const SizedBox(height: 20),
-            if (_isLoading) const CircularProgressIndicator(),
-            if (!_isLoading)
+            if (_isLoading)
+              const CircularProgressIndicator()
+            else
               Expanded(
-                child: ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (context, index) => ListTile(
-                    title: Text(_results[index]),
-                  ),
-                ),
+                child: _marketType == 'us'
+                    ? ListView.builder(
+                        itemCount: _results.length,
+                        itemBuilder: (context, index) => ListTile(
+                          title: Text(_results[index]),
+                        ),
+                      )
+                    : _krEntries.isEmpty
+                        ? const Text('검색 결과 없음')
+                        : ListView(
+                            children: [
+                              Card(
+                                margin: const EdgeInsets.symmetric(vertical: 10),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _infoRow('종목명', _getValue('prdt_name')),
+                                      _infoRow('종목코드', _getCodeFromPdno(_getValue('pdno'))),
+                                      _infoRow('현재가', _formatWon(_getValue('thdt_clpr'))),
+                                      _infoRow('전일가', _formatWon(_getValue('bfdy_clpr'))),
+                                      _infoRow('시가총액', _formatWon(_getValue('cpta'))),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
               ),
           ],
         ),
