@@ -8,48 +8,43 @@ const TR_ID = 'CTPF1002R';
 let accessTokenCache = null;
 let lastTokenTime = 0;
 
-async function fetchAccessToken() {
-  const now = Date.now();
-  if (accessTokenCache && now - lastTokenTime < 1000 * 60 * 60) return accessTokenCache;
-
-  const res = await axios.post(`${BASE_URL}/oauth2/tokenP`, {
-    grant_type: 'client_credentials',
-    appkey: APP_KEY,
-    appsecret: APP_SECRET
-  }, {
-    headers: { 'Content-Type': 'application/json' }
-  });
-
-  accessTokenCache = res.data.access_token;
-  lastTokenTime = now;
-  return accessTokenCache;
-}
-
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  const pdno = req.query.pdno || req.query.code;
-  const prdtTypeCd = req.query.prdt_type_cd || '300';
-
-  if (!pdno) {
-    return res.status(400).json({ error: 'pdno 파라미터가 필요합니다' });
+async function getToken() {
+    const now = Date.now();
+    if (accessToken && now - tokenTimestamp < 60 * 60 * 1000) return accessToken;
+  
+    const res = await axios.post(`${BASE_URL}/oauth2/tokenP`, {
+      grant_type: 'client_credentials',
+      appkey: APP_KEY,
+      appsecret: APP_SECRET
+    }, { headers: { 'Content-Type': 'application/json' } });
+  
+    accessToken = res.data.access_token;
+    tokenTimestamp = now;
+    return accessToken;
   }
-
-  try {
-    const token = await fetchAccessToken();
-
-    const result = await axios.get(`${BASE_URL}/uapi/domestic-stock/v1/quotations/search-stock-info`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': `Bearer ${token}`,
-        'appkey': APP_KEY,
-        'appsecret': APP_SECRET,
-        'tr_id': TR_ID
-      },
-      params: { pdno, prdt_type_cd: prdtTypeCd }
-    });
-
-    res.status(200).json(result.data);
-  } catch (err) {
-    res.status(500).json({ error: 'Proxy Error', detail: err.response?.data || err.message });
+  
+  export default async function handler(req, res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  
+    const pdno = req.query.pdno || req.query.code;
+    if (!pdno) return res.status(400).json({ error: 'pdno required' });
+  
+    try {
+      const token = await getToken();
+  
+      const response = await axios.get(`${BASE_URL}/uapi/domestic-stock/v1/quotations/search-stock-info`, {
+        headers: {
+          'authorization': `Bearer ${token}`,
+          'appkey': APP_KEY,
+          'appsecret': APP_SECRET,
+          'tr_id': TR_ID,
+          'Content-Type': 'application/json'
+        },
+        params: { pdno, prdt_type_cd: '300' }
+      });
+  
+      res.status(200).json(response.data);
+    } catch (err) {
+      res.status(500).json({ error: 'Proxy error', detail: err.response?.data || err.message });
+    }
   }
-}
