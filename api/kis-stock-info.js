@@ -45,6 +45,12 @@ async function getToken() {
   
       res.status(200).json(response.data);
     } catch (err) {
-      res.status(500).json({ error: 'Proxy error', detail: err.response?.data || err.message });
+      console.error('❌ Proxy Error:', err.response?.data || err.message);
+      return res.status(500).json({
+        error: 'Proxy Error',
+        message: err.message,
+        detail: err.response?.data,
+        stack: err.stack
+      });
     }
   }
