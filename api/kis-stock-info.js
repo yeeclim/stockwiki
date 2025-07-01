@@ -5,23 +5,25 @@ const APP_KEY = 'PSkzcOJI9xwJeh1coKMwFAoMQfI0JxGORUkd';
 const APP_SECRET = '5sy6hIoZBjMUHcHiPpHiPquntZAWM3FY3CGAxUCL3jLNG3fZl99LwD29glHGVXtKi/ORNGzuek+XOAQY8wCH5sIrmzPY0WCDX8E7jPvaVBIo7hHQKWzUfkGKwWlyIhJLlsdShXN712ScNBn/OY/44LOVdRm+MZggKq9q5SDm6PovqBBZTR4=';
 const BASE_URL = 'https://openapi.koreainvestment.com:9443';
 const TR_ID = 'CTPF1002R';
-let accessTokenCache = null;
-let lastTokenTime = 0;
+let token = null;
+let tokenTime = 0;
 
 async function getToken() {
-    const now = Date.now();
-    if (accessToken && now - tokenTimestamp < 60 * 60 * 1000) return accessToken;
-  
-    const res = await axios.post(`${BASE_URL}/oauth2/tokenP`, {
-      grant_type: 'client_credentials',
-      appkey: APP_KEY,
-      appsecret: APP_SECRET
-    }, { headers: { 'Content-Type': 'application/json' } });
-  
-    accessToken = res.data.access_token;
-    tokenTimestamp = now;
-    return accessToken;
-  }
+  const now = Date.now();
+  if (token && now - tokenTime < 1000 * 60 * 60) return token;
+
+  const res = await axios.post(`${BASE_URL}/oauth2/tokenP`, {
+    grant_type: 'client_credentials',
+    appkey: APP_KEY,
+    appsecret: APP_SECRET
+  }, {
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  token = res.data.access_token;
+  tokenTime = now;
+  return token;  // ✅ 여기!
+}
   
   export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
