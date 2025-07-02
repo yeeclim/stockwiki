@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'services/fmp_service.dart';
 import 'services/krx_loader.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
