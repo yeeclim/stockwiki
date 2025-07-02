@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 
 class KrxLoader {
   static List<Map<String, dynamic>>? _mergedList;
 
   static Future<void> _loadData() async {
     if (_mergedList != null) return;
-    final basicJson = await rootBundle.loadString('assets/data/krx_basic_info.json');
-    final priceJson = await rootBundle.loadString('assets/data/krx_price_info.json');
-    
-    print("Json Length = ${basicJson.length}/${priceJson.length}");
+    final basicJson = await http.get(Uri.parse('assets/krx_basic_info.json')).then((res) => res.body);
+    final priceJson = await http.get(Uri.parse('assets/krx_price_info.json')).then((res) => res.body);
 
     final List<dynamic> basicList = json.decode(basicJson);
     final List<dynamic> priceList = json.decode(priceJson);
