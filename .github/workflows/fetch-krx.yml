@@ -20,9 +20,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        working-directory: stockwiki
 
       - name: Run fetch-krx script
         run: node scripts/fetch-krx.js
+        working-directory: stockwiki
 
       - name: Commit updated data
         run: |
@@ -31,3 +33,4 @@ jobs:
           git add data/krx_filtered_data.json
           git commit -m "📈 Update KRX data [auto]" || echo "No changes"
           git push
+        working-directory: stockwiki
