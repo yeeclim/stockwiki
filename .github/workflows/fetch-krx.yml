@@ -2,7 +2,7 @@ name: Fetch KRX Data Daily
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 00:00 UTC (한국 시간 09:00)
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
@@ -20,11 +20,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-        working-directory: stockwiki
 
       - name: Run fetch-krx script
         run: node scripts/fetch-krx.js
-        working-directory: stockwiki
 
       - name: Commit updated data
         run: |
@@ -33,4 +31,3 @@ jobs:
           git add data/krx_filtered_data.json
           git commit -m "📈 Update KRX data [auto]" || echo "No changes"
           git push
-        working-directory: stockwiki
