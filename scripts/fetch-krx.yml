@@ -3,7 +3,7 @@ name: Fetch KRX Data Daily
 on:
   schedule:
     - cron: '0 0 * * *'  # 매일 00:00 UTC (한국 시간 09:00)
-  workflow_dispatch:
+  workflow_dispatch:     # GitHub UI에서 수동 실행도 허용
 
 jobs:
   fetch-krx:
