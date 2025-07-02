@@ -1,0 +1,35 @@
+name: Fetch KRX Data Daily
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 매일 오전 10시 (KST, 한국시간 기준으로 오전 10시)
+  workflow_dispatch:     # 수동 실행도 가능
+
+jobs:
+  fetch-krx:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: scripts
+
+      - name: Run fetch script
+        run: node fetch-krx.js
+        working-directory: scripts
+
+      - name: Commit and push updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/krx-stocks.json
+          git commit -m "🔄 Update KRX stock data (automated)" || echo "No changes to commit"
+          git push
