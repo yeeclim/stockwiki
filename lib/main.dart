@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'services/fmp_service.dart';
-import 'services/kis_service.dart';
+import 'services/krx_loader.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,11 +36,30 @@ class _StockSearchPageState extends State<StockSearchPage> {
   bool _isLoading = false;
   String _marketType = 'us';
 
-  final KisService _kisService = KisService();
+  String? _validateKeyword(String keyword) {
+    final trimmed = keyword.trim();
+    final isKorean = RegExp(r'^[가-힣]{2,}$').hasMatch(trimmed);
+    final isNumber = RegExp(r'^\d{3,}$').hasMatch(trimmed);
+    
+    if (_marketType == 'kr') {
+      if (!isKorean && !isNumber) {
+        return '한글 2자 이상 또는 숫자 3자 이상 입력해주세요';
+      }
+    }
+    return null;
+  }
 
   void _searchStocks() async {
     final keyword = _controller.text.trim();
     if (keyword.isEmpty) return;
+
+    final validationMessage = _validateKeyword(keyword);
+    if (validationMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(validationMessage)),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -55,9 +75,9 @@ class _StockSearchPageState extends State<StockSearchPage> {
           _results = result;
         });
       } else {
-        final stockInfoMap = await _kisService.fetchStockInfo(keyword);
+        final stock = await KrxLoader.searchStock(keyword);
         setState(() {
-          _krEntries = stockInfoMap.entries.toList();
+          _krEntries = stock.entries.toList();
         });
       }
     } catch (e) {
@@ -85,11 +105,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
     final num = int.tryParse(raw);
     if (num == null) return 'N/A';
     return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
-  }
-
-  String _formatDate(String raw) {
-    if (raw.length != 8) return raw;
-    return '${raw.substring(0, 4)}-${raw.substring(4, 6)}-${raw.substring(6)}';
   }
 
   String _getCodeFromPdno(String raw) {
@@ -179,11 +194,11 @@ class _StockSearchPageState extends State<StockSearchPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _infoRow('종목명', _getValue('prdt_name')),
-                                      _infoRow('종목코드', _getCodeFromPdno(_getValue('pdno'))),
-                                      _infoRow('현재가', _formatWon(_getValue('thdt_clpr'))),
-                                      _infoRow('전일가', _formatWon(_getValue('bfdy_clpr'))),
-                                      _infoRow('시가총액', _formatWon(_getValue('cpta'))),
+                                      _infoRow('종목명', _getValue('한글 종목명')),
+                                      _infoRow('종목코드', _getCodeFromPdno(_getValue('단축코드'))),
+                                      _infoRow('현재가', _formatWon(_getValue('open_price'))),
+                                      _infoRow('전일가', _formatWon(_getValue('close_price'))),
+                                      _infoRow('시가총액', _formatWon(_getValue('volume'))),
                                     ],
                                   ),
                                 ),
