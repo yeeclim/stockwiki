@@ -20,11 +20,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-        working-directory: scripts
+        working-directory: ./
 
       - name: Run fetch script
         run: node fetch-krx.js
-        working-directory: scripts
+        working-directory: ./
 
       - name: Commit and push updated data
         run: |
