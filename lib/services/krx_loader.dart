@@ -1,51 +1,72 @@
 import 'dart:convert';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
+import 'dart:developer' as dev;
 
 class KrxLoader {
   static List<Map<String, dynamic>>? _mergedList;
 
+  // JSON 데이터를 한 번만 불러오고 병합
   static Future<void> _loadData() async {
     if (_mergedList != null) return;
-    final basicJson = await http.get(Uri.parse('assets/krx_basic_info.json')).then((res) => res.body);
-    final priceJson = await http.get(Uri.parse('assets/krx_price_info.json')).then((res) => res.body);
 
-    final List<dynamic> basicList = json.decode(basicJson);
-    final List<dynamic> priceList = json.decode(priceJson);
+    final basicRes = await http.get(Uri.base.resolve('assets/krx_basic_info.json'));
+    final priceRes = await http.get(Uri.base.resolve('assets/krx_price_info.json'));
 
-    // price json은 영어로 되어있음
+    final basicJson = utf8.decode(basicRes.bodyBytes);
+    final priceJson = utf8.decode(priceRes.bodyBytes);
+
+    final basicList = json.decode(basicJson) as List;
+    final priceList = json.decode(priceJson) as List;
+
     final Map<String, dynamic> priceMap = {
-      for (var item in priceList) item['name']: item
+      for (var item in priceList) item['code'].toString(): item,
     };
 
-    // basic json은 한글로 되어있음
     _mergedList = basicList.map<Map<String, dynamic>>((item) {
-      final code = item['단축코드'];
+      final code = item['단축코드']?.toString() ?? item['code']?.toString();
       final matchedPrice = priceMap[code] ?? {};
       return {...item, ...matchedPrice};
     }).toList();
   }
 
+  // ✅ 단일 결과 반환 (가장 정확히 일치하는 종목 1개만)
   static Future<Map<String, dynamic>> searchStock(String keyword) async {
     await _loadData();
     final q = keyword.trim();
+
     final isValid = RegExp(r'^[가-힣0-9]+$').hasMatch(q);
+    if (!isValid) throw Exception('잘못된 검색어 형식입니다.');
 
-    if (!isValid) {
-      throw Exception('잘못된 검색어 형식입니다.');
-    }
+    final exactMatch = _mergedList!.firstWhere(
+      (stock) => stock['한글 종목명'].toString() == q,
+      orElse: () => {},
+    );
 
+    if (exactMatch.isNotEmpty) return exactMatch;
 
-    final result = _mergedList!.where((stock) {
-      if (isValid) {
-        return (stock['한글 종목명'] ?? '').toString().contains(q);
-      } else {
-        return (stock['단축코드'] ?? '').toString().contains(q);
-      }
-    }).toList();
+    final fallbackMatch = _mergedList!.firstWhere(
+      (stock) => stock['한글 종목명'].toString().contains(q),
+      orElse: () => {},
+    );
 
-    if (result.isEmpty) throw Exception('검색 결과 없음');
+    if (fallbackMatch.isNotEmpty) return fallbackMatch;
 
-    return result.first;
+    throw Exception('검색 결과 없음');
+  }
+
+  // ✅ 다중 결과 반환 (ListView 등으로 표시할 때 사용)
+  static Future<List<Map<String, dynamic>>> searchStocks(String keyword) async {
+    await _loadData();
+    final q = keyword.trim();
+
+    final isValid = RegExp(r'^[가-힣0-9]+$').hasMatch(q);
+    if (!isValid) throw Exception('잘못된 검색어 형식입니다.');
+
+    final matches = _mergedList!.where((stock) =>
+      stock['한글 종목명'].toString().contains(q)).toList();
+
+    if (matches.isEmpty) throw Exception('검색 결과 없음');
+
+    return matches;
   }
 }
