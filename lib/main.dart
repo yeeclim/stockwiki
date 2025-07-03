@@ -1,10 +1,9 @@
-import 'dart:convert';
+// 📄 lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'services/fmp_service.dart';
-import 'services/krx_loader.dart';
-import 'package:http/http.dart' as http;
+import 'package:stockwiki/services/fmp_service.dart';
+import 'package:stockwiki/services/krx_loader.dart';
+import 'package:stockwiki/widgets/fed_watch_widget.dart';
+import 'package:stockwiki/widgets/fear_greed_widget.dart';
 
 void main() {
   runApp(const MyApp());
@@ -32,18 +31,20 @@ class StockSearchPage extends StatefulWidget {
 
 class _StockSearchPageState extends State<StockSearchPage> {
   final TextEditingController _controller = TextEditingController();
-  List<String> _results = []; // 미국 주식용
-  List<MapEntry<String, dynamic>> _krEntries = []; // 국내 주식용
+  List<String> _results = [];
+  List<Map<String, dynamic>> _krResults = [];
   bool _isLoading = false;
   String _marketType = 'us';
 
   String? _validateKeyword(String keyword) {
     final trimmed = keyword.trim();
-    final isKorean = RegExp(r'^[가-힣]{2,}$').hasMatch(trimmed);
-    final isNumber = RegExp(r'^\d{3,}$').hasMatch(trimmed);
-    
+    final containsKorean = RegExp(r'[\uac00-\ud7a3]').hasMatch(trimmed);
+    final containsNumber = RegExp(r'\d').hasMatch(trimmed);
+    if (trimmed.length < 2) {
+      return '한글 2자 이상 또는 숫자 3자 이상 입력해주세요';
+    }
     if (_marketType == 'kr') {
-      if (!isKorean && !isNumber) {
+      if (!containsKorean && !containsNumber) {
         return '한글 2자 이상 또는 숫자 3자 이상 입력해주세요';
       }
     }
@@ -65,7 +66,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
     setState(() {
       _isLoading = true;
       _results.clear();
-      _krEntries.clear();
+      _krResults.clear();
     });
 
     try {
@@ -76,40 +77,21 @@ class _StockSearchPageState extends State<StockSearchPage> {
           _results = result;
         });
       } else {
-        final stock = await KrxLoader.searchStock(keyword);
+        final list = await KrxLoader.searchStocks(keyword);
         setState(() {
-          _krEntries = stock.entries.toList();
+          _krResults = list;
         });
       }
     } catch (e) {
       setState(() {
         _results = ['오류 발생: $e'];
-        _krEntries = [];
+        _krResults = [];
       });
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
-  }
-
-  String _getValue(String key) {
-    final match = _krEntries.firstWhere(
-      (e) => e.key == key,
-      orElse: () => const MapEntry('', 'N/A'),
-    );
-    return '${match.value}';
-  }
-
-  String _formatWon(String raw) {
-    if (raw == 'N/A' || raw.isEmpty) return 'N/A';
-    final num = int.tryParse(raw);
-    if (num == null) return 'N/A';
-    return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
-  }
-
-  String _getCodeFromPdno(String raw) {
-    return raw.length >= 6 ? raw.substring(raw.length - 6) : raw;
   }
 
   Widget _infoRow(String title, String value) {
@@ -125,6 +107,14 @@ class _StockSearchPageState extends State<StockSearchPage> {
     );
   }
 
+  String _formatWon(dynamic raw) {
+    final str = raw.toString();
+    if (str.isEmpty || str == 'null') return 'N/A';
+    final num = int.tryParse(str);
+    if (num == null) return 'N/A';
+    return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,10 +125,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
           children: [
             const SizedBox(height: 60),
             const Center(
-              child: Text(
-                'StockWiki',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
+              child: Text('StockWiki', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 20),
             Row(
@@ -152,11 +139,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     DropdownMenuItem(value: 'us', child: Text('미국주식')),
                     DropdownMenuItem(value: 'kr', child: Text('국내주식')),
                   ],
-                  onChanged: (value) {
-                    setState(() {
-                      _marketType = value!;
-                    });
-                  },
+                  onChanged: (value) => setState(() => _marketType = value!),
                 ),
               ],
             ),
@@ -166,11 +149,18 @@ class _StockSearchPageState extends State<StockSearchPage> {
               decoration: InputDecoration(
                 hintText: 'Search keyword',
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onSubmitted: (_) => _searchStocks(),
+            ),
+            const SizedBox(height: 20),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(child: FedWatchWidget()),
+                SizedBox(width: 12),
+                Expanded(child: FearGreedWidget()),
+              ],
             ),
             const SizedBox(height: 20),
             if (_isLoading)
@@ -184,27 +174,29 @@ class _StockSearchPageState extends State<StockSearchPage> {
                           title: Text(_results[index]),
                         ),
                       )
-                    : _krEntries.isEmpty
+                    : _krResults.isEmpty
                         ? const Text('검색 결과 없음')
-                        : ListView(
-                            children: [
-                              Card(
+                        : ListView.builder(
+                            itemCount: _krResults.length,
+                            itemBuilder: (context, index) {
+                              final stock = _krResults[index];
+                              return Card(
                                 margin: const EdgeInsets.symmetric(vertical: 10),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _infoRow('종목명', _getValue('한글 종목명')),
-                                      _infoRow('종목코드', _getCodeFromPdno(_getValue('단축코드'))),
-                                      _infoRow('현재가', _formatWon(_getValue('open_price'))),
-                                      _infoRow('전일가', _formatWon(_getValue('close_price'))),
-                                      _infoRow('시가총액', _formatWon(_getValue('volume'))),
+                                      _infoRow('종목명', stock['한글 종목명'].toString()),
+                                      _infoRow('종목코드', stock['단축코드'].toString()),
+                                      _infoRow('현재가', _formatWon(stock['open_price'])),
+                                      _infoRow('전일가', _formatWon(stock['close_price'])),
+                                      _infoRow('시가총액', _formatWon(stock['market_cap'])),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
               ),
           ],
