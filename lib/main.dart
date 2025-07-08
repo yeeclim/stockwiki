@@ -1,9 +1,10 @@
-// 📄 lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:stockwiki/services/fmp_service.dart';
 import 'package:stockwiki/services/krx_loader.dart';
-import 'package:stockwiki/widgets/fed_watch_widget.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
+import 'package:stockwiki/widgets/usdkrw_widget.dart';
+import 'package:stockwiki/widgets/gold_widget.dart';
+import 'package:stockwiki/widgets/silver_widget.dart';
 
 void main() {
   runApp(const MyApp());
@@ -115,9 +116,33 @@ class _StockSearchPageState extends State<StockSearchPage> {
     return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
   }
 
+  Widget _buildInfoRowGroup() {
+    return Column(
+      children: const [
+        Row(
+          children: [
+            Expanded(child: GoldWidget()),
+            SizedBox(width: 12),
+            Expanded(child: SilverWidget()),
+          ],
+        ),
+        SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: UsdKrwWidget()),
+            SizedBox(width: 12),
+            Expanded(child: FearGreedWidget()),
+          ],
+        ),
+        SizedBox(height: 20),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -125,16 +150,18 @@ class _StockSearchPageState extends State<StockSearchPage> {
           children: [
             const SizedBox(height: 60),
             const Center(
-              child: Text('StockWiki', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              child: Text('StockWiki', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
             ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("종류: ", style: TextStyle(fontSize: 16)),
+                const Text("종류: ", style: TextStyle(fontSize: 16, color: Colors.white70)),
                 const SizedBox(width: 10),
                 DropdownButton<String>(
+                  dropdownColor: Colors.grey.shade900,
                   value: _marketType,
+                  style: const TextStyle(color: Colors.white),
                   items: const [
                     DropdownMenuItem(value: 'us', child: Text('미국주식')),
                     DropdownMenuItem(value: 'kr', child: Text('국내주식')),
@@ -146,23 +173,19 @@ class _StockSearchPageState extends State<StockSearchPage> {
             const SizedBox(height: 20),
             TextField(
               controller: _controller,
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search keyword',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: const TextStyle(color: Colors.white38),
+                prefixIcon: const Icon(Icons.search, color: Colors.white38),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                filled: true,
+                fillColor: Colors.grey.shade800,
               ),
               onSubmitted: (_) => _searchStocks(),
             ),
             const SizedBox(height: 20),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(child: FedWatchWidget()),
-                SizedBox(width: 12),
-                Expanded(child: FearGreedWidget()),
-              ],
-            ),
-            const SizedBox(height: 20),
+            _buildInfoRowGroup(),
             if (_isLoading)
               const CircularProgressIndicator()
             else

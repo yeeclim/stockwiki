@@ -2,41 +2,38 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-class FearGreedWidget extends StatefulWidget {
-  const FearGreedWidget({super.key});
+class SilverWidget extends StatefulWidget {
+  const SilverWidget({super.key});
 
   @override
-  State<FearGreedWidget> createState() => _FearGreedWidgetState();
+  State<SilverWidget> createState() => _SilverWidgetState();
 }
 
-class _FearGreedWidgetState extends State<FearGreedWidget> {
-  int? _indexValue;
-  String? _label;
+class _SilverWidgetState extends State<SilverWidget> {
+  double? _silverPrice;
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchIndex();
+    _fetchSilverPrice();
   }
 
-  Future<void> _fetchIndex() async {
+  Future<void> _fetchSilverPrice() async {
     try {
-      final uri = Uri.parse('https://api.alternative.me/fng/?limit=1');
-      final response = await http.get(uri);
+      final response = await http.get(Uri.parse(
+        'https://api.metalpriceapi.com/v1/latest?api_key=ed91a84eac666be02a62adf79c5a23b2&base=USD&currencies=XAG',
+      ));
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        final data = json['data'][0];
-        final value = int.parse(data['value']);
-        final classification = data['value_classification'];
+        final data = json.decode(response.body);
+        final price = data['rates']['USDXAG'];
         setState(() {
-          _indexValue = value;
-          _label = classification;
+          _silverPrice = price.toDouble();
           _isLoading = false;
         });
       } else {
-        throw Exception('Failed to fetch FNG');
+        throw Exception('Failed to load silver price');
       }
     } catch (e) {
       setState(() {
@@ -49,7 +46,7 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.deepPurple.shade700,
+      color: Colors.grey.shade800,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         height: 80,
@@ -61,9 +58,12 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('Fear & Greed', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        const Text(
+                          'Silver (USDXAG)',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
                         Text(
-                          '$_indexValue ($_label)',
+                          '\$${_silverPrice!.toStringAsFixed(2)} / oz',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
