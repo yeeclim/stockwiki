@@ -2,41 +2,45 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-class FearGreedWidget extends StatefulWidget {
-  const FearGreedWidget({super.key});
+class UsdKrwWidget extends StatefulWidget {
+  const UsdKrwWidget({super.key});
 
   @override
-  State<FearGreedWidget> createState() => _FearGreedWidgetState();
+  State<UsdKrwWidget> createState() => _UsdKrwWidgetState();
 }
 
-class _FearGreedWidgetState extends State<FearGreedWidget> {
-  int? _indexValue;
-  String? _label;
+class _UsdKrwWidgetState extends State<UsdKrwWidget> {
+  double? _usdKrw;
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchIndex();
+    _fetchUsdKrw();
   }
 
-  Future<void> _fetchIndex() async {
+  Future<void> _fetchUsdKrw() async {
+    const apiKey = 'f1767aef0a23b6402850f3d9';
+    final url = Uri.parse('https://v6.exchangerate-api.com/v6/$apiKey/latest/USD');
+
     try {
-      final uri = Uri.parse('https://api.alternative.me/fng/?limit=1');
-      final response = await http.get(uri);
+      final response = await http.get(url);
+
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        final data = json['data'][0];
-        final value = int.parse(data['value']);
-        final classification = data['value_classification'];
-        setState(() {
-          _indexValue = value;
-          _label = classification;
-          _isLoading = false;
-        });
+        final data = json.decode(response.body);
+        final rate = data['conversion_rates']?['KRW'];
+
+        if (rate != null && rate is num) {
+          setState(() {
+            _usdKrw = rate.toDouble();
+            _isLoading = false;
+          });
+        } else {
+          throw Exception('API 응답에 KRW 없음');
+        }
       } else {
-        throw Exception('Failed to fetch FNG');
+        throw Exception('HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
@@ -49,7 +53,7 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.deepPurple.shade700,
+      color: Colors.blueGrey.shade900,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         height: 80,
@@ -61,9 +65,9 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('Fear & Greed', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        const Text('USD/KRW', style: TextStyle(color: Colors.white70, fontSize: 14)),
                         Text(
-                          '$_indexValue ($_label)',
+                          '₩${_usdKrw!.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
