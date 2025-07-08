@@ -1,3 +1,4 @@
+// 📄 lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:stockwiki/services/fmp_service.dart';
 import 'package:stockwiki/services/krx_loader.dart';
@@ -36,6 +37,17 @@ class _StockSearchPageState extends State<StockSearchPage> {
   List<Map<String, dynamic>> _krResults = [];
   bool _isLoading = false;
   String _marketType = 'us';
+  bool _showWidgets = true;
+
+  void _refresh() {
+    setState(() {
+      _controller.clear();
+      _results.clear();
+      _krResults.clear();
+      _isLoading = false;
+      _showWidgets = true;
+    });
+  }
 
   String? _validateKeyword(String keyword) {
     final trimmed = keyword.trim();
@@ -68,6 +80,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
       _isLoading = true;
       _results.clear();
       _krResults.clear();
+      _showWidgets = false;
     });
 
     try {
@@ -116,52 +129,29 @@ class _StockSearchPageState extends State<StockSearchPage> {
     return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
   }
 
-  Widget _buildInfoRowGroup() {
-    return Column(
-      children: const [
-        Row(
-          children: [
-            Expanded(child: GoldWidget()),
-            SizedBox(width: 12),
-            Expanded(child: SilverWidget()),
-          ],
-        ),
-        SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: UsdKrwWidget()),
-            SizedBox(width: 12),
-            Expanded(child: FearGreedWidget()),
-          ],
-        ),
-        SizedBox(height: 20),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 60),
-            const Center(
-              child: Text('StockWiki', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+            GestureDetector(
+              onTap: _refresh,
+              child: const Center(
+                child: Text('StockWiki', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              ),
             ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("종류: ", style: TextStyle(fontSize: 16, color: Colors.white70)),
+                const Text("종류: ", style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 10),
                 DropdownButton<String>(
-                  dropdownColor: Colors.grey.shade900,
                   value: _marketType,
-                  style: const TextStyle(color: Colors.white),
                   items: const [
                     DropdownMenuItem(value: 'us', child: Text('미국주식')),
                     DropdownMenuItem(value: 'kr', child: Text('국내주식')),
@@ -173,19 +163,34 @@ class _StockSearchPageState extends State<StockSearchPage> {
             const SizedBox(height: 20),
             TextField(
               controller: _controller,
-              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search keyword',
-                hintStyle: const TextStyle(color: Colors.white38),
-                prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: Colors.grey.shade800,
               ),
               onSubmitted: (_) => _searchStocks(),
             ),
             const SizedBox(height: 20),
-            _buildInfoRowGroup(),
+            if (_showWidgets) ...[
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(child: GoldWidget()),
+                  SizedBox(width: 12),
+                  Expanded(child: SilverWidget()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(child: UsdKrwWidget()),
+                  SizedBox(width: 12),
+                  Expanded(child: FearGreedWidget()),
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
             if (_isLoading)
               const CircularProgressIndicator()
             else
