@@ -132,12 +132,82 @@ class _StockSearchPageState extends State<StockSearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('StockWiki'),
+        actions: [
+          Builder(
+            builder: (BuildContext innerContext) {
+              return IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () {
+                  Scaffold.of(innerContext).openEndDrawer();
+                },
+              );
+            },
+          ),
+        ],
+      ),
+      endDrawer: Drawer(
+        backgroundColor: Colors.grey[900],
+        child: Column(
+          children: [
+            Container(
+              color: Colors.grey[850],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('📊 StockWiki 메뉴', style: TextStyle(fontSize: 20, color: Colors.white)),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      Navigator.of(context).maybePop();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.auto_graph, color: Colors.white),
+                    title: const Text("AI 종목 추천", style: TextStyle(color: Colors.white)),
+                    onTap: () {},
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.newspaper, color: Colors.white),
+                    title: const Text("관심 뉴스", style: TextStyle(color: Colors.white)),
+                    onTap: () {},
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.layers, color: Colors.white),
+                    title: const Text("테마별 뉴스", style: TextStyle(color: Colors.white)),
+                    onTap: () {},
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.bar_chart, color: Colors.white),
+                    title: const Text("증시 시황", style: TextStyle(color: Colors.white)),
+                    onTap: () {},
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.settings, color: Colors.white),
+                    title: const Text("환경 설정", style: TextStyle(color: Colors.white)),
+                    onTap: () {},
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 60),
+            const SizedBox(height: 20),
             GestureDetector(
               onTap: _refresh,
               child: const Center(
@@ -203,7 +273,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
                         ),
                       )
                     : _krResults.isEmpty
-                        ? const Text('검색 결과 없음')
+                        ? const Text('')
                         : ListView.builder(
                             itemCount: _krResults.length,
                             itemBuilder: (context, index) {
