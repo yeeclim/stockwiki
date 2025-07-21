@@ -1,43 +1,41 @@
+// 📄 lib/widgets/vix_widget.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-class SilverWidget extends StatefulWidget {
-  const SilverWidget({super.key});
+class VixWidget extends StatefulWidget {
+  const VixWidget({super.key});
 
   @override
-  State<SilverWidget> createState() => _SilverWidgetState();
+  State<VixWidget> createState() => _VixWidgetState();
 }
 
-class _SilverWidgetState extends State<SilverWidget> {
-  double? _silverPrice;
+class _VixWidgetState extends State<VixWidget> {
+  double? _vixValue;
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchSilverPrice();
+    _fetchVix();
   }
 
-  Future<void> _fetchSilverPrice() async {
+  Future<void> _fetchVix() async {
     try {
       final response = await http.get(
-        Uri.parse('https://www.goldapi.io/api/XAG/USD'),
-        headers: {
-          'x-access-token': 'goldapi-1rjbsmdcfc6a2-io',
-          'Content-Type': 'application/json',
-        },
+        Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=1d'),
+        headers: {'User-Agent': 'Mozilla/5.0'},
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        final price = data['chart']['result'][0]['meta']['regularMarketPrice'];
         setState(() {
-          _silverPrice = data['price']?.toDouble();
+          _vixValue = price.toDouble();
           _isLoading = false;
         });
       } else {
-        throw Exception('HTTP 오류: ${response.statusCode}');
+        throw Exception('Yahoo 응답 오류');
       }
     } catch (e) {
       setState(() {
@@ -50,7 +48,7 @@ class _SilverWidgetState extends State<SilverWidget> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.grey.shade800,
+      color: Colors.deepPurple.shade400,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         height: 80,
@@ -62,14 +60,9 @@ class _SilverWidgetState extends State<SilverWidget> {
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Silver (XAG/USD)',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
+                        const Text('VIX (변동성지수)', style: TextStyle(color: Colors.white70, fontSize: 14)),
                         Text(
-                          _silverPrice != null
-                              ? '\$${_silverPrice!.toStringAsFixed(2)} / oz'
-                              : '데이터 없음',
+                          _vixValue?.toStringAsFixed(2) ?? '',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,

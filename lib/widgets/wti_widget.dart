@@ -2,42 +2,43 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-class SilverWidget extends StatefulWidget {
-  const SilverWidget({super.key});
+class WtiWidget extends StatefulWidget {
+  const WtiWidget({super.key});
 
   @override
-  State<SilverWidget> createState() => _SilverWidgetState();
+  State<WtiWidget> createState() => _WtiWidgetState();
 }
 
-class _SilverWidgetState extends State<SilverWidget> {
-  double? _silverPrice;
+class _WtiWidgetState extends State<WtiWidget> {
+  double? _wtiPrice;
+  String? _date;
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchSilverPrice();
+    _fetchWtiPrice();
   }
 
-  Future<void> _fetchSilverPrice() async {
+  Future<void> _fetchWtiPrice() async {
+    const apiKey = '4X0kMGDGQo7wdJ0BAtVJ3PygI15g8GdiVQsCpeGt';
+    const url = 'https://api.eia.gov/v2/seriesid/PET.RWTC.D?api_key=$apiKey';
+
     try {
-      final response = await http.get(
-        Uri.parse('https://www.goldapi.io/api/XAG/USD'),
-        headers: {
-          'x-access-token': 'goldapi-1rjbsmdcfc6a2-io',
-          'Content-Type': 'application/json',
-        },
-      );
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        final latest = data['response']['data'][0];
+
         setState(() {
-          _silverPrice = data['price']?.toDouble();
+          _wtiPrice = latest['value']?.toDouble();
+          _date = latest['period'];
           _isLoading = false;
         });
       } else {
-        throw Exception('HTTP 오류: ${response.statusCode}');
+        throw Exception('응답 코드: ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
@@ -50,7 +51,7 @@ class _SilverWidgetState extends State<SilverWidget> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.grey.shade800,
+      color: Colors.teal.shade700,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         height: 80,
@@ -63,19 +64,22 @@ class _SilverWidgetState extends State<SilverWidget> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          'Silver (XAG/USD)',
+                          'WTI 유가 (USD/bbl)',
                           style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                         Text(
-                          _silverPrice != null
-                              ? '\$${_silverPrice!.toStringAsFixed(2)} / oz'
-                              : '데이터 없음',
+                          _wtiPrice != null ? '\$${_wtiPrice!.toStringAsFixed(2)}' : 'N/A',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (_date != null)
+                          Text(
+                            _date!,
+                            style: const TextStyle(color: Colors.white60, fontSize: 12),
+                          ),
                       ],
                     ),
         ),
