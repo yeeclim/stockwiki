@@ -22,7 +22,8 @@ class _BtcWidgetState extends State<BtcWidget> {
 
   Future<void> _fetchPrice() async {
     try {
-      final res = await http.get(Uri.parse('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'));
+      final res = await http.get(Uri.parse(
+          'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         setState(() {
@@ -42,24 +43,33 @@ class _BtcWidgetState extends State<BtcWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.circular(8),
+    return Card(
+      color: Colors.black87,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SizedBox(
+        height: 80,
+        child: Center(
+          child: _isLoading
+              ? const CircularProgressIndicator()
+              : _error != null
+                  ? Text(_error!, style: const TextStyle(color: Colors.red))
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('BTC/USD',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${_btcPrice?.toStringAsFixed(2) ?? 'N/A'}',
+                          style: const TextStyle(
+                              fontSize: 16, color: Colors.white),
+                        ),
+                      ],
+                    ),
+        ),
       ),
-      child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Text(_error!, style: const TextStyle(color: Colors.red))
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('BTC/USD', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('\$${_btcPrice?.toStringAsFixed(2) ?? 'N/A'}', style: const TextStyle(fontSize: 16)),
-                  ],
-                ),
     );
   }
 }
