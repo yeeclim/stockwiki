@@ -22,18 +22,22 @@ class _SilverWidgetState extends State<SilverWidget> {
 
   Future<void> _fetchSilverPrice() async {
     try {
-      final response = await http.get(Uri.parse(
-        'https://api.metalpriceapi.com/v1/latest?api_key=ed91a84eac666be02a62adf79c5a23b2&base=USD&currencies=XAG',
-      ));
+      final response = await http.get(
+        Uri.parse('https://www.goldapi.io/api/XAG/USD'),
+        headers: {
+          'x-access-token': 'goldapi-1rjbsmdcfc6a2-io',
+          'Content-Type': 'application/json',
+        },
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final price = data['rates']['USDXAG'];
         setState(() {
-          _silverPrice = price.toDouble();
+          _silverPrice = data['price']?.toDouble();
           _isLoading = false;
         });
       } else {
-        throw Exception('Failed to load silver price');
+        throw Exception('HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
@@ -59,11 +63,13 @@ class _SilverWidgetState extends State<SilverWidget> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          'Silver (USDXAG)',
+                          'Silver (XAG/USD)',
                           style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                         Text(
-                          '\$${_silverPrice!.toStringAsFixed(2)} / oz',
+                          _silverPrice != null
+                              ? '\$${_silverPrice!.toStringAsFixed(2)} / oz'
+                              : '데이터 없음',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,

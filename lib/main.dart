@@ -6,6 +6,8 @@ import 'package:stockwiki/widgets/fear_greed_widget.dart';
 import 'package:stockwiki/widgets/usdkrw_widget.dart';
 import 'package:stockwiki/widgets/gold_widget.dart';
 import 'package:stockwiki/widgets/silver_widget.dart';
+import 'package:stockwiki/widgets/wti_widget.dart';
+import 'package:stockwiki/widgets/btc_widget.dart';
 
 void main() {
   runApp(const MyApp());
@@ -133,7 +135,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('StockWiki'),
         actions: [
           Builder(
             builder: (BuildContext innerContext) {
@@ -257,6 +258,15 @@ class _StockSearchPageState extends State<StockSearchPage> {
                   Expanded(child: UsdKrwWidget()),
                   SizedBox(width: 12),
                   Expanded(child: FearGreedWidget()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(child: WtiWidget()),
+                  SizedBox(width: 12),
+                  Expanded(child: BtcWidget()),
                 ],
               ),
             ],
