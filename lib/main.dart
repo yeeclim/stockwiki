@@ -8,6 +8,7 @@ import 'package:stockwiki/widgets/gold_widget.dart';
 import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
+import 'package:stockwiki/pages/interest_news_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,7 +21,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'StockWiki',
-      theme: ThemeData.dark(),
+      theme: ThemeData.dark().copyWith(
+        textTheme: ThemeData.dark().textTheme.apply(
+          fontFamily: 'NotoSansKR',
+        ),
+      ),
       home: const StockSearchPage(),
     );
   }
@@ -178,23 +183,17 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     onTap: () {},
                   ),
                   ListTile(
-                    leading: const Icon(Icons.newspaper, color: Colors.white),
-                    title: const Text("관심 뉴스", style: TextStyle(color: Colors.white)),
-                    onTap: () {},
-                  ),
-                  ListTile(
                     leading: const Icon(Icons.layers, color: Colors.white),
                     title: const Text("테마별 뉴스", style: TextStyle(color: Colors.white)),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const InterestNewsPage()),
+                      );
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.bar_chart, color: Colors.white),
                     title: const Text("증시 시황", style: TextStyle(color: Colors.white)),
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.settings, color: Colors.white),
-                    title: const Text("환경 설정", style: TextStyle(color: Colors.white)),
                     onTap: () {},
                   ),
                 ],

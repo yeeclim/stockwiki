@@ -49,6 +49,14 @@ class _SilverWidgetState extends State<SilverWidget> {
 
   @override
   Widget build(BuildContext context) {
+    const double krwPerUsd = 1383.66; // 환율
+    const double ozToDon = 1 / 7.5599; // 1 oz ≒ 7.5599 돈
+
+    double? krwPerDon;
+    if (_silverPrice != null) {
+      krwPerDon = _silverPrice! * krwPerUsd * ozToDon;
+    }
+
     return Card(
       color: Colors.grey.shade800,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -67,15 +75,22 @@ class _SilverWidgetState extends State<SilverWidget> {
                           style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                         Text(
-                          _silverPrice != null
-                              ? '\$${_silverPrice!.toStringAsFixed(2)} / oz'
-                              : '데이터 없음',
+                          '\$${_silverPrice!.toStringAsFixed(2)} / oz',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (krwPerDon != null)
+                          Text(
+                            '약 ${krwPerDon.toStringAsFixed(0)}KRW / 돈',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                       ],
                     ),
         ),
