@@ -14,6 +14,7 @@ dependencies:
   http: ^0.13.6
   html: ^0.15.4
   webview_flutter: ^4.4.2
+  url_launcher: ^6.2.4
 
 dev_dependencies:
   flutter_test:
@@ -26,3 +27,9 @@ flutter:
   assets:
     - assets/data/krx_basic_info.json
     - assets/data/krx_price_info.json
+    # 🔽 필요시 여기에 다른 asset 파일 추가 가능
+
+  fonts:
+    - family: NotoSansKR
+      fonts:
+        - asset: assets/fonts/NotoSansKR-VariableFont_wght.ttf

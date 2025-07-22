@@ -50,6 +50,15 @@ class _GoldWidgetState extends State<GoldWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // 고정 환율 사용 또는 외부에서 주입 가능
+    const double krwPerUsd = 1383.66; // USD to KRW
+    const double ozToDon = 1 / 7.5599; // 1 oz = 7.5599 돈
+
+    double? krwPerDon;
+    if (_goldPrice != null) {
+      krwPerDon = _goldPrice! * krwPerUsd * ozToDon;
+    }
+
     return Card(
       color: Colors.amber.shade700,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -68,15 +77,22 @@ class _GoldWidgetState extends State<GoldWidget> {
                           style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                         Text(
-                          _goldPrice != null
-                              ? '\$${_goldPrice!.toStringAsFixed(2)} / oz'
-                              : '데이터 없음',
+                          '\$${_goldPrice!.toStringAsFixed(2)} / oz',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (krwPerDon != null)
+                          Text(
+                            '약 ${krwPerDon.toStringAsFixed(0)} KRW / 돈',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                       ],
                     ),
         ),

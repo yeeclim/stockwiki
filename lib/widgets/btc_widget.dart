@@ -43,32 +43,42 @@ class _BtcWidgetState extends State<BtcWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.black87,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        height: 80,
-        child: Center(
-          child: _isLoading
-              ? const CircularProgressIndicator()
-              : _error != null
-                  ? Text(_error!, style: const TextStyle(color: Colors.red))
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('BTC/USD',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
-                        const SizedBox(height: 4),
-                        Text(
-                          '\$${_btcPrice?.toStringAsFixed(2) ?? 'N/A'}',
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.white),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      constraints: const BoxConstraints(minHeight: 80),
+      child: Center(
+        child: _isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : _error != null
+                ? Text(_error!, style: const TextStyle(color: Colors.red))
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'BTC/USD',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                      ],
-                    ),
-        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '\$${_btcPrice?.toStringAsFixed(2) ?? 'N/A'}',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
       ),
     );
   }
