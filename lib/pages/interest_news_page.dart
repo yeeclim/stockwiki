@@ -58,6 +58,7 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
     final newsdataUri = Uri.parse('https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$encodedKeyword',);
     final gnewsUri = Uri.parse('https://gnews.io/api/v4/search?q=$encodedKeyword&token=6c6fdfc93ae9225b3bd4210978798fc1',);
     final mediastackUri = Uri.parse('http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$encodedKeyword',);
+    final mkStockRssUri = Uri.parse('https://stockwiki.vercel.app/api/mk_stock_rss');
 
     List<Map<String, String>> allNews = [];
 
@@ -66,6 +67,7 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
         http.get(newsdataUri),
         http.get(gnewsUri),
         http.get(mediastackUri),
+        http.get(mkStockRssUri),
       ]);
 
       // NewsData.io
@@ -122,6 +124,24 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
         );
       }
 
+      // MK RSS
+      if (responses[3].statusCode == 200) {
+        final decoded = utf8.decode(responses[3].bodyBytes);
+        final jsonData = json.decode(decoded);
+        final results = jsonData['results'] ?? [];
+
+        allNews.addAll(
+          results
+              .map((item) => Map<String, String>.from({
+                    'title': item['title'] ?? '',
+                    'description': item['summary'] ?? '',
+                    'link': item['link'] ?? '',
+                  }))
+              .where((news) => _isAllowed(news))
+              .toList(),
+        );
+      }
+
       setState(() => _newsList = allNews);
     } catch (e) {
       debugPrint('예외 발생: $e');
@@ -133,7 +153,7 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('🔍 관심 뉴스 검색')),
+      appBar: AppBar(title: const Text('관심 뉴스 검색')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
