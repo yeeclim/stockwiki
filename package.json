@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "axios": "^1.10.0"
+    "axios": "^1.10.0",
+    "rss-parser": "^3.13.0"
   },
   "type": "module"
 }
