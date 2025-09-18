@@ -7,15 +7,5 @@
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
     { "src": "/(.*)", "dest": "/build/web/$1" }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron-update-prices",
-      "schedule": "0 18 * * *"
-    },
-    {
-      "path": "/api/cron-update-all-stocks",
-      "schedule": "0 19 * * *"
-    }
   ]
 }
