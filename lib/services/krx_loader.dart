@@ -35,9 +35,9 @@ class KrxLoader {
         return null;
       }
 
-      // 프로덕션 환경에서만 Vercel API 호출 (Yahoo Finance + 더미 데이터 폴백)
+      // 프로덕션 환경에서만 Vercel API 호출 (네이버 금융 스크래핑 + Yahoo Finance + 더미 데이터 폴백)
       final baseUrl = 'https://stockwiki.vercel.app';
-      final url = '$baseUrl/api/simple-stock?symbol=$symbol';
+      final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
       final response = await http.get(
         Uri.parse(url),
@@ -105,7 +105,7 @@ class KrxLoader {
       '000270': {'price': 120000, 'change': -2000, 'volume': 3000000, 'marketCap': 50000000000000}, // 기아
       
       // KOSDAQ 주요 종목
-      '096350': {'price': 25000, 'change': 500, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션
+      '096350': {'price': 476, 'change': 10, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션 (실제 가격)
       '086520': {'price': 180000, 'change': 5000, 'volume': 800000, 'marketCap': 15000000000000}, // 에코프로
       '247540': {'price': 220000, 'change': 8000, 'volume': 600000, 'marketCap': 18000000000000}, // 에코프로비엠
       '196170': {'price': 45000, 'change': -1000, 'volume': 1200000, 'marketCap': 8000000000000}, // 알테오젠
@@ -175,15 +175,15 @@ class KrxLoader {
 
     try {
       dev.log('KRX 기본 데이터 로딩 시작...');
-      final basicRes = await http.get(Uri.base.resolve('assets/krx_basic_info.json'));
-      
-      if (basicRes.statusCode == 200) {
-        final basicJson = utf8.decode(basicRes.bodyBytes);
-        final basicList = json.decode(basicJson) as List;
+    final basicRes = await http.get(Uri.base.resolve('assets/krx_basic_info.json'));
 
-        _mergedList = basicList.map<Map<String, dynamic>>((item) {
+      if (basicRes.statusCode == 200) {
+    final basicJson = utf8.decode(basicRes.bodyBytes);
+    final basicList = json.decode(basicJson) as List;
+
+    _mergedList = basicList.map<Map<String, dynamic>>((item) {
           return {...item};
-        }).toList();
+    }).toList();
         
         dev.log('KRX 기본 데이터 로딩 완료: ${_mergedList!.length}개 종목');
       } else {
