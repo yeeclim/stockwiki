@@ -129,11 +129,24 @@ class _StockSearchPageState extends State<StockSearchPage> {
   }
 
   String _formatWon(dynamic raw) {
+    if (raw == null) return 'N/A';
     final str = raw.toString();
     if (str.isEmpty || str == 'null') return 'N/A';
-    final num = int.tryParse(str);
-    if (num == null) return 'N/A';
-    return '₩${num.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+    
+    // double 값 처리
+    final doubleValue = double.tryParse(str);
+    if (doubleValue != null) {
+      final intValue = doubleValue.toInt();
+      return '₩${intValue.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+    }
+    
+    // int 값 처리
+    final intValue = int.tryParse(str);
+    if (intValue != null) {
+      return '₩${intValue.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+    }
+    
+    return 'N/A';
   }
 
   @override
@@ -296,9 +309,9 @@ class _StockSearchPageState extends State<StockSearchPage> {
                                     children: [
                                       _infoRow('종목명', stock['한글 종목명'].toString()),
                                       _infoRow('종목코드', stock['단축코드'].toString()),
-                                      _infoRow('현재가', _formatWon(stock['open_price'])),
-                                      _infoRow('전일가', _formatWon(stock['close_price'])),
-                                      _infoRow('시가총액', _formatWon(stock['market_cap'])),
+                                      _infoRow('현재가', _formatWon(stock['price'])),
+                                      _infoRow('전일가', _formatWon(stock['change'] != null ? (stock['price'] - stock['change']) : null)),
+                                      _infoRow('시가총액', _formatWon(stock['marketCap'])),
                                     ],
                                   ),
                                 ),

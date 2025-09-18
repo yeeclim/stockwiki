@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
+// import 'package:stockwiki/services/naver_news_service.dart'; // 임시 주석 처리
 
 class InterestNewsPage extends StatefulWidget {
   const InterestNewsPage({super.key});
@@ -19,8 +20,42 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
 
   Future<void> _fetchNews(String keyword) async {
     if (keyword.isEmpty) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _newsList = [];
+    });
 
+    try {
+      // 1) 네이버 뉴스 서비스 임시 비활성화
+      // try {
+      //   final naverNews = await NaverNewsService.searchNewsWithFallback(
+      //     keyword,
+      //     maxResults: 10,
+      //   );
+      //   if (naverNews.isNotEmpty) {
+      //     setState(() => _newsList = naverNews);
+      //     debugPrint('네이버 뉴스 우선 표시: ${naverNews.length}개');
+      //   }
+      // } catch (e) {
+      //   debugPrint('네이버 뉴스 우선 표시 실패: $e');
+      // }
+
+      // 2) 기존 API 결과 병합 (중복 제거)
+      await _fetchNewsFromAPIs(keyword);
+      if (_newsList.isNotEmpty) {
+        // _fetchNewsFromAPIs가 _newsList를 덮어쓸 수 있으므로 병합 처리
+        // 현재 _fetchNewsFromAPIs는 setState로 _newsList를 설정하므로, 다시 병합 수행
+        // 병합: 네이버 우선 리스트 + API 리스트 (제목 기준 중복 제거)
+        // 이미 setState로 API 결과가 들어가 있으니, 여기서는 별도 병합 로직 없이 유지
+      }
+    } catch (e) {
+      debugPrint('뉴스 검색 오류: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchNewsFromAPIs(String keyword) async {
     final lowerKeyword = keyword.toLowerCase();
     final String baseUrl = kReleaseMode
         ? 'https://stockwiki.vercel.app'
@@ -28,78 +63,118 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
     final mkStockRssUri = Uri.parse('$baseUrl/api/mk_stock_rss');
 
     final newsdataUri = Uri.parse(
-        'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=');
+        'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword');
     final gnewsUri = Uri.parse(
-        'https://gnews.io/api/v4/top-headlines?token=6c6fdfc93ae9225b3bd4210978798fc1');
+        'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword');
     final mediastackUri = Uri.parse(
-        'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4');
+        'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword');
 
     List<Map<String, String>> allNews = [];
 
     try {
-      final responses = await Future.wait([
-        http.get(newsdataUri),
-        http.get(gnewsUri),
-        http.get(mediastackUri),
-        http.get(mkStockRssUri),
-      ]);
-
-      // NewsData.io
-      if (responses[0].statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(responses[0].bodyBytes));
-        final results = jsonData['results'] as List<dynamic>? ?? [];
-        allNews.addAll(results.map((item) => {
-              'title': item['title'] ?? '',
-              'description': item['description'] ?? '',
-              'link': item['link'] ?? '',
-            }));
+      debugPrint('기존 API들 호출 시작: $keyword');
+      
+      // 각 API를 개별적으로 호출하여 오류 격리
+      final futures = [
+        _fetchFromNewsData(newsdataUri),
+        _fetchFromGNews(gnewsUri),
+        _fetchFromMediaStack(mediastackUri),
+        _fetchFromMkRss(mkStockRssUri),
+      ];
+      
+      final results = await Future.wait(futures, eagerError: false);
+      
+      for (final result in results) {
+        allNews.addAll(result);
       }
 
-      // GNews
-      if (responses[1].statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(responses[1].bodyBytes));
-        final results = jsonData['articles'] as List<dynamic>? ?? [];
-        allNews.addAll(results.map((item) => {
-              'title': item['title'] ?? '',
-              'description': item['description'] ?? '',
-              'link': item['url'] ?? '',
-            }));
-      }
-
-      // MediaStack
-      if (responses[2].statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(responses[2].bodyBytes));
-        final results = jsonData['data'] as List<dynamic>? ?? [];
-        allNews.addAll(results.map((item) => {
-              'title': item['title'] ?? '',
-              'description': item['description'] ?? '',
-              'link': item['url'] ?? '',
-            }));
-      }
-
-      // MK RSS
-      if (responses[3].statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(responses[3].bodyBytes));
-        final results = jsonData['results'] as List<dynamic>? ?? [];
-        allNews.addAll(results.map((item) => {
-              'title': item['title'] ?? '',
-              'description': item['summary'] ?? '',
-              'link': item['link'] ?? '',
-            }));
-      }
-
-      // 최종 필터링: keyword 포함 여부 확인
-      final filteredNews = allNews.where((news) {
-        final combined = '${news['title'] ?? ''} ${news['description'] ?? ''}'.toLowerCase();
-        return combined.contains(lowerKeyword);
-      }).toList();
-
-      setState(() => _newsList = filteredNews);
+      // 필터링 제거: API에서 받은 모든 뉴스 표시
+      setState(() => _newsList = allNews);
+      debugPrint('기존 API 결과: ${allNews.length}개 (필터링 없음)');
     } catch (e) {
-      debugPrint('예외 발생: $e');
-    } finally {
-      setState(() => _isLoading = false);
+      debugPrint('API 뉴스 검색 오류: $e');
     }
+  }
+
+  // 개별 API 호출 함수들
+  Future<List<Map<String, String>>> _fetchFromNewsData(Uri uri) async {
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        final results = jsonData['results'] as List<dynamic>? ?? [];
+        debugPrint('NewsData.io: ${results.length}개 결과');
+        return results.map<Map<String, String>>((item) => {
+              'title': item['title']?.toString() ?? '',
+              'description': item['description']?.toString() ?? '',
+              'link': item['link']?.toString() ?? '',
+              'source': 'NewsData.io',
+            }).toList();
+      }
+    } catch (e) {
+      debugPrint('NewsData.io 오류: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, String>>> _fetchFromGNews(Uri uri) async {
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        final results = jsonData['articles'] as List<dynamic>? ?? [];
+        debugPrint('GNews: ${results.length}개 결과');
+        return results.map<Map<String, String>>((item) => {
+              'title': item['title']?.toString() ?? '',
+              'description': item['description']?.toString() ?? '',
+              'link': item['url']?.toString() ?? '',
+              'source': 'GNews',
+            }).toList();
+      }
+    } catch (e) {
+      debugPrint('GNews 오류: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, String>>> _fetchFromMediaStack(Uri uri) async {
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        final results = jsonData['data'] as List<dynamic>? ?? [];
+        debugPrint('MediaStack: ${results.length}개 결과');
+        return results.map<Map<String, String>>((item) => {
+              'title': item['title']?.toString() ?? '',
+              'description': item['description']?.toString() ?? '',
+              'link': item['url']?.toString() ?? '',
+              'source': 'MediaStack',
+            }).toList();
+      }
+    } catch (e) {
+      debugPrint('MediaStack 오류: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, String>>> _fetchFromMkRss(Uri uri) async {
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        final results = jsonData['results'] as List<dynamic>? ?? [];
+        debugPrint('매일경제 RSS: ${results.length}개 결과');
+        return results.map<Map<String, String>>((item) => {
+              'title': item['title']?.toString() ?? '',
+              'description': item['summary']?.toString() ?? '',
+              'link': item['link']?.toString() ?? '',
+              'source': '매일경제',
+            }).toList();
+      }
+    } catch (e) {
+      debugPrint('매일경제 RSS 오류: $e');
+    }
+    return [];
   }
 
   @override
@@ -136,10 +211,53 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       child: ListTile(
                         title: Text(news['title'] ?? ''),
-                        subtitle: Text(
-                          news['description'] ?? '',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              news['description'] ?? '',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    news['source'] ?? '',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue[700],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                if (news['date']?.isNotEmpty == true) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      news['date'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
                         ),
                         onTap: () async {
                           final url = news['link'] ?? '';
