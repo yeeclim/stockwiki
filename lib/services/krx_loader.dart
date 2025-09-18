@@ -35,9 +35,9 @@ class KrxLoader {
         return null;
       }
 
-      // 프로덕션 환경에서만 Vercel API 호출 (다중 API 폴백 시스템)
+      // 프로덕션 환경에서만 Vercel API 호출 (Yahoo Finance + 더미 데이터 폴백)
       final baseUrl = 'https://stockwiki.vercel.app';
-      final url = '$baseUrl/api/realtime-stock?symbol=$symbol';
+      final url = '$baseUrl/api/simple-stock?symbol=$symbol';
       
       final response = await http.get(
         Uri.parse(url),
