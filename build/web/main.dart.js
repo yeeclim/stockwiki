@@ -23912,7 +23912,7 @@ q=f
 s=1
 break}}A.hf("\ub124\uc774\ubc84 \uae08\uc735 API \ud638\ucd9c \uc2dc\uc791: "+a4)
 m="https://stockwiki.vercel.app"
-l=A.l(m)+"/api/realtime-stock?symbol="+a4
+l=A.l(m)+"/api/simple-stock?symbol="+a4
 f=t.N
 s=7
 return A.V(A.fG(A.d_(l,0,null),A.a6(["Accept","application/json"],f,f)),$async$a2G)
