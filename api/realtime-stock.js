@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         success: true,
         data: stockData,
         source: 'investing.com',
-        timestamp: new Date().toISO8601String()
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         success: true,
         data: stockData,
         source: 'yahoo-finance',
-        timestamp: new Date().toISO8601String()
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
         success: true,
         data: stockData,
         source: 'alpha-vantage',
-        timestamp: new Date().toISO8601String()
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         data: stockData,
         source: 'dummy-data',
         note: '실시간 API 실패로 더미 데이터 사용',
-        timestamp: new Date().toISO8601String()
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -111,7 +111,7 @@ async function fetchFromInvesting(symbol) {
       changePercent: changePercent,
       volume: volume,
       marketCap: 0,
-      lastUpdate: new Date().toISO8601String()
+      lastUpdate: new Date().toISOString()
     };
 
   } catch (error) {
@@ -150,7 +150,7 @@ async function fetchFromYahoo(symbol) {
       changePercent: changePercent,
       volume: volume,
       marketCap: marketCap,
-      lastUpdate: new Date().toISO8601String()
+      lastUpdate: new Date().toISOString()
     };
 
   } catch (error) {
@@ -189,7 +189,7 @@ async function fetchFromAlphaVantage(symbol) {
       changePercent: changePercent,
       volume: volume,
       marketCap: 0,
-      lastUpdate: new Date().toISO8601String()
+      lastUpdate: new Date().toISOString()
     };
 
   } catch (error) {
