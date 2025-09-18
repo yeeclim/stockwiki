@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "jsdom": "^22.1.0"
   }
 }
