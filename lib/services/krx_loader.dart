@@ -19,13 +19,25 @@ class KrxLoader {
         }
       }
 
-      dev.log('Yahoo Finance API 호출 시작: $symbol');
+      dev.log('네이버 금융 API 호출 시작: $symbol');
       
-      // Vercel API를 통해 Yahoo Finance 데이터 가져오기
-      final baseUrl = kReleaseMode 
-          ? 'https://stockwiki.vercel.app' 
-          : 'http://localhost:3000';
-      final url = '$baseUrl/api/yahoo-finance?symbol=$symbol.KS';
+      // 로컬에서는 API 호출을 시도하지 않고 바로 더미 데이터 사용
+      if (!kReleaseMode) {
+        dev.log('로컬 환경: 더미 데이터 사용');
+        final dummyData = _generateDummyData(symbol);
+        if (dummyData != null) {
+          // 캐시 업데이트
+          _stockCache ??= {};
+          _stockCache![symbol] = dummyData;
+          _lastUpdate = DateTime.now();
+          return dummyData;
+        }
+        return null;
+      }
+
+      // 프로덕션 환경에서만 Vercel API 호출
+      final baseUrl = 'https://stockwiki.vercel.app';
+      final url = '$baseUrl/api/stock-price-updater?symbol=$symbol';
       
       final response = await http.get(
         Uri.parse(url),
@@ -80,12 +92,29 @@ class KrxLoader {
   static Map<String, dynamic>? _generateDummyData(String symbol) {
     // 실제 주식 코드에 따른 더미 데이터 생성 (2025년 1월 기준 대략적 가격)
     final dummyPrices = {
+      // KOSPI 주요 종목
       '005930': {'price': 75000, 'change': 1500, 'volume': 12000000, 'marketCap': 450000000000000}, // 삼성전자
       '000660': {'price': 45000, 'change': -800, 'volume': 8000000, 'marketCap': 32000000000000},  // SK하이닉스
       '035420': {'price': 180000, 'change': 2000, 'volume': 5000000, 'marketCap': 30000000000000}, // NAVER
-      '096350': {'price': 25000, 'change': 500, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션
       '035720': {'price': 420000, 'change': 5000, 'volume': 3000000, 'marketCap': 20000000000000}, // 카카오
       '207940': {'price': 280000, 'change': -3000, 'volume': 4000000, 'marketCap': 35000000000000}, // 삼성바이오로직스
+      '006400': {'price': 380000, 'change': 8000, 'volume': 2000000, 'marketCap': 28000000000000}, // 삼성SDI
+      '051910': {'price': 420000, 'change': -5000, 'volume': 1500000, 'marketCap': 30000000000000}, // LG화학
+      '068270': {'price': 180000, 'change': 3000, 'volume': 1000000, 'marketCap': 12000000000000}, // 셀트리온
+      '323410': {'price': 45000, 'change': 1000, 'volume': 5000000, 'marketCap': 20000000000000}, // 카카오뱅크
+      '000270': {'price': 120000, 'change': -2000, 'volume': 3000000, 'marketCap': 50000000000000}, // 기아
+      
+      // KOSDAQ 주요 종목
+      '131390': {'price': 25000, 'change': 500, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션
+      '086520': {'price': 180000, 'change': 5000, 'volume': 800000, 'marketCap': 15000000000000}, // 에코프로
+      '247540': {'price': 220000, 'change': 8000, 'volume': 600000, 'marketCap': 18000000000000}, // 에코프로비엠
+      '196170': {'price': 45000, 'change': -1000, 'volume': 1200000, 'marketCap': 8000000000000}, // 알테오젠
+      '066970': {'price': 320000, 'change': 10000, 'volume': 400000, 'marketCap': 25000000000000}, // 엘앤에프
+      '091990': {'price': 85000, 'change': 2000, 'volume': 800000, 'marketCap': 12000000000000}, // 셀트리온헬스케어
+      '196300': {'price': 65000, 'change': -1500, 'volume': 600000, 'marketCap': 9000000000000}, // 에이치엘비
+      '196490': {'price': 28000, 'change': 800, 'volume': 1500000, 'marketCap': 4000000000000}, // 다이나믹디자인
+      '196700': {'price': 15000, 'change': -300, 'volume': 2000000, 'marketCap': 3000000000000}, // 웹젠
+      '196800': {'price': 35000, 'change': 1200, 'volume': 1000000, 'marketCap': 6000000000000}, // 아이에이
     };
 
     final data = dummyPrices[symbol];
@@ -113,12 +142,29 @@ class KrxLoader {
   // 주식명 매핑
   static String _getStockName(String symbol) {
     final names = {
+      // KOSPI
       '005930': '삼성전자',
       '000660': 'SK하이닉스',
       '035420': 'NAVER',
-      '096350': '대창솔루션',
       '035720': '카카오',
       '207940': '삼성바이오로직스',
+      '006400': '삼성SDI',
+      '051910': 'LG화학',
+      '068270': '셀트리온',
+      '323410': '카카오뱅크',
+      '000270': '기아',
+      
+      // KOSDAQ
+      '131390': '대창솔루션',
+      '086520': '에코프로',
+      '247540': '에코프로비엠',
+      '196170': '알테오젠',
+      '066970': '엘앤에프',
+      '091990': '셀트리온헬스케어',
+      '196300': '에이치엘비',
+      '196490': '다이나믹디자인',
+      '196700': '웹젠',
+      '196800': '아이에이',
     };
     return names[symbol] ?? symbol;
   }
@@ -219,7 +265,7 @@ class KrxLoader {
     throw Exception('검색 결과 없음');
   }
 
-  // ✅ 다중 결과 반환 (실시간 데이터 포함, 최대 10개)
+  // ✅ 다중 결과 반환 (실시간 데이터 포함, 최대 50개)
   static Future<List<Map<String, dynamic>>> searchStocks(String keyword) async {
     await _loadData();
     final q = keyword.trim();
@@ -227,14 +273,55 @@ class KrxLoader {
     final isValid = RegExp(r'^[가-힣0-9]+$').hasMatch(q);
     if (!isValid) throw Exception('잘못된 검색어 형식입니다.');
 
-    final matches = _mergedList!.where((stock) =>
-      stock['한글 종목명'].toString().contains(q)).take(10).toList();
+    // 먼저 로컬 데이터에서 검색
+    final localMatches = _mergedList!.where((stock) =>
+      stock['한글 종목명'].toString().contains(q)).take(20).toList();
 
-    if (matches.isEmpty) throw Exception('검색 결과 없음');
+    // 전체 종목 API에서도 검색 (더 많은 결과)
+    try {
+      final baseUrl = kReleaseMode 
+          ? 'https://stockwiki.vercel.app' 
+          : 'http://localhost:3000';
+      final url = '$baseUrl/api/krx-all-stocks?limit=50';
+      
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final allStocks = List<Map<String, dynamic>>.from(data['data']);
+          final apiMatches = allStocks.where((stock) =>
+            stock['name'].toString().contains(q) ||
+            stock['symbol'].toString().contains(q)).take(30).toList();
+          
+          // 로컬 결과와 API 결과 병합
+          final allMatches = [...localMatches, ...apiMatches];
+          
+          // 중복 제거 (symbol 기준)
+          final uniqueMatches = <String, Map<String, dynamic>>{};
+          for (final match in allMatches) {
+            final symbol = match['symbol']?.toString() ?? match['단축코드']?.toString();
+            if (symbol != null && !uniqueMatches.containsKey(symbol)) {
+              uniqueMatches[symbol] = match;
+            }
+          }
+          
+          final results = uniqueMatches.values.take(50).toList();
+          
+          if (results.isNotEmpty) {
+            return results;
+          }
+        }
+      }
+    } catch (e) {
+      dev.log('전체 종목 API 호출 실패, 로컬 데이터만 사용: $e');
+    }
+
+    // API 실패시 로컬 데이터만 사용
+    if (localMatches.isEmpty) throw Exception('검색 결과 없음');
 
     // 실시간 데이터 병합 (병렬 처리)
     final List<Map<String, dynamic>> results = [];
-    for (final match in matches) {
+    for (final match in localMatches) {
       final symbol = match['단축코드']?.toString();
       if (symbol != null) {
         final realTimeData = await _fetchRealTimeStock(symbol);
