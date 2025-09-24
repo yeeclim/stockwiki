@@ -108,15 +108,42 @@ async function fetchFromNaver(symbol) {
 
     const html = await response.text();
     
-    // 전일 종가 정보 추출 (더 정확한 정규식)
-    const priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
+    // 디버깅: HTML 길이와 일부 내용 확인
+    console.log(`HTML 길이: ${html.length}`);
+    console.log(`HTML에 'no_today' 포함 여부: ${html.includes('no_today')}`);
+    console.log(`HTML에 '종목' 포함 여부: ${html.includes('종목')}`);
+    
+    // 여러 패턴으로 가격 정보 추출 시도
+    let priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
+    
+    // 대안 패턴들
+    if (!priceMatch) {
+      priceMatch = html.match(/<span class="no_today"[^>]*>([^<]+)<\/span>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<em class="no_today"[^>]*>([^<]+)<\/em>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<strong class="no_today"[^>]*>([^<]+)<\/strong>/);
+    }
+    
+    // 종목명 추출 (여러 패턴 시도)
+    let nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    if (!nameMatch) {
+      nameMatch = html.match(/<h2[^>]*>([^<]+)<\/h2>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<title>([^<]+)<\/title>/);
+    }
+    
+    // 변동 정보 추출
     const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
     const changePercentMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d.]+)%<\/span>/);
     const volumeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([\d,]+)<\/span>/);
-    const nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
     
     if (!priceMatch) {
       console.log('네이버에서 가격 정보를 찾을 수 없습니다');
+      console.log('HTML 샘플:', html.substring(0, 1000));
       return null;
     }
 
@@ -392,7 +419,8 @@ function getStockName(symbol) {
     '196300': '에이치엘비',
     '196490': '다이나믹디자인',
     '196700': '웹젠',
-    '196800': '아이에이'
+    '196800': '아이에이',
+    '036200': '유니셈'
   };
   return names[symbol] || symbol;
 }
