@@ -63,45 +63,35 @@ class StockCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isPositive ? Icons.trending_up : Icons.trending_down,
-                            color: isPositive ? Colors.red : Colors.blue,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${isPositive ? '+' : ''}${change.toStringAsFixed(0)} (${changePercent.toStringAsFixed(2)}%)',
-                            style: TextStyle(
-                              color: isPositive ? Colors.red : Colors.blue,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        '전일 종가',
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
                 ],
               ],
             ),
-            if (hasRealTimeData && stock.volume != null) ...[
+            if (hasRealTimeData) ...[
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '거래량: ${_formatVolume(stock.volume!)}',
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                    ),
-                  ),
-                  if (stock.lastUpdate != null)
+                  if (stock.volume != null)
                     Text(
-                      '업데이트: ${_formatTime(stock.lastUpdate!)}',
+                      '거래량: ${_formatVolume(stock.volume!)}',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                  if (stock.marketCap != null && stock.marketCap! > 0)
+                    Text(
+                      '시가총액: ${_formatMarketCap(stock.marketCap!)}',
                       style: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
@@ -109,6 +99,21 @@ class StockCard extends StatelessWidget {
                     ),
                 ],
               ),
+              if (stock.lastUpdate != null)
+                const SizedBox(height: 4),
+              if (stock.lastUpdate != null)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      '업데이트: ${_formatTime(stock.lastUpdate!)}',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ],
         ),
@@ -123,6 +128,17 @@ class StockCard extends StatelessWidget {
       return '${(volume / 1000).toStringAsFixed(1)}K';
     }
     return volume.toString();
+  }
+
+  String _formatMarketCap(int marketCap) {
+    if (marketCap >= 1000000000000) { // 1조 이상
+      return '${(marketCap / 1000000000000).toStringAsFixed(1)}조';
+    } else if (marketCap >= 100000000) { // 1억 이상
+      return '${(marketCap / 100000000).toStringAsFixed(1)}억';
+    } else if (marketCap >= 10000) { // 1만 이상
+      return '${(marketCap / 10000).toStringAsFixed(1)}만';
+    }
+    return marketCap.toString();
   }
 
   String _formatTime(String isoString) {
