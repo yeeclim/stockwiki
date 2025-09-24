@@ -202,7 +202,7 @@ function generateDummyData(symbol) {
     '000660': {'price': 45000, 'change': -800, 'volume': 8000000, 'marketCap': 32000000000000},
     '035420': {'price': 180000, 'change': 2000, 'volume': 5000000, 'marketCap': 30000000000000},
     '035720': {'price': 420000, 'change': 5000, 'volume': 3000000, 'marketCap': 20000000000000},
-    '096350': {'price': 430, 'change': 5, 'volume': 2000000, 'marketCap': 5000000000000}, // 2025년 9월 24일 기준 실제 가격
+    '096350': {'price': 437, 'change': 7, 'volume': 2000000, 'marketCap': 5000000000000}, // 2025년 9월 24일 현재 가격
     '207940': {'price': 280000, 'change': -3000, 'volume': 4000000, 'marketCap': 35000000000000},
     '006400': {'price': 380000, 'change': 8000, 'volume': 2000000, 'marketCap': 28000000000000},
     '051910': {'price': 420000, 'change': -5000, 'volume': 1500000, 'marketCap': 30000000000000},
