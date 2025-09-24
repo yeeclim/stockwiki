@@ -83505,7 +83505,7 @@ p=p.w
 s=p!=null
 if(s)k.push(B.eJ)
 if(s)k.push(A.jJ(A.b([A.bU("\uc5c5\ub370\uc774\ud2b8: "+r.a3V(p),q,q,q,B.eN,q,q)],l),B.P,B.jK,B.V))
-B.b.R(o,k)}if(n)B.b.R(o,A.b([B.kw,new A.AT(m,q)],l))
+B.b.R(o,k)}if(m.length!==0)B.b.R(o,A.b([B.kw,new A.AT(m,q)],l))
 return A.o_(new A.cA(B.iR,A.eX(o,B.bw,B.aC,B.V),q),B.dW,B.d5,q)},
 a3W(a){if(a>=1e6)return B.d.a3(a/1e6,1)+"M"
 else if(a>=1000)return B.d.a3(a/1000,1)+"K"
