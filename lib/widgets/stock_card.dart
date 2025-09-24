@@ -9,8 +9,9 @@ class StockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 실시간 데이터가 있는지 확인
+    // 실시간 데이터가 있는지 확인 (차트는 항상 표시)
     final hasRealTimeData = stock.price != null && stock.price! > 0;
+    final hasChartData = stock.symbol.isNotEmpty; // 종목코드가 있으면 차트 표시
     final change = stock.change ?? 0.0;
     final changePercent = stock.changePercent ?? 0.0;
     final isPositive = change >= 0;
@@ -116,8 +117,8 @@ class StockCard extends StatelessWidget {
                   ],
                 ),
             ],
-            // 차트 스냅샷 추가
-            if (hasRealTimeData) ...[
+            // 차트 스냅샷 추가 (종목코드가 있으면 항상 표시)
+            if (hasChartData) ...[
               const SizedBox(height: 16),
               StockChartWidget(symbol: stock.symbol),
             ],
