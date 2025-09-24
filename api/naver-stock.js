@@ -14,21 +14,56 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. 전일 종가 데이터 제공 (안정적)
-    console.log('전일 종가 데이터 제공...');
-    const previousCloseData = getPreviousCloseData(symbol);
-    if (previousCloseData) {
+    // 1. 네이버 증권에서 전일 종가 크롤링
+    console.log('네이버 증권에서 전일 종가 크롤링 시도...');
+    const naverData = await fetchFromNaver(symbol);
+    if (naverData) {
       return res.status(200).json({
         success: true,
-        data: previousCloseData,
-        source: 'previous-close-data',
-        note: '전일 종가 데이터 (실시간 스크래핑 대신 안정적인 데이터 제공)',
+        data: naverData,
+        source: 'naver-finance',
         timestamp: new Date().toISOString()
       });
     }
 
-    // 2. 백업: Yahoo Finance 시도
-    console.log('전일 데이터 없음, Yahoo Finance API 시도...');
+    // 2. 카카오 증권에서 전일 종가 크롤링
+    console.log('카카오 증권에서 전일 종가 크롤링 시도...');
+    const kakaoData = await fetchFromKakao(symbol);
+    if (kakaoData) {
+      return res.status(200).json({
+        success: true,
+        data: kakaoData,
+        source: 'kakao-finance',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 3. 토스 증권에서 전일 종가 크롤링
+    console.log('토스 증권에서 전일 종가 크롤링 시도...');
+    const tossData = await fetchFromToss(symbol);
+    if (tossData) {
+      return res.status(200).json({
+        success: true,
+        data: tossData,
+        source: 'toss-finance',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 4. Finup에서 전일 종가 크롤링
+    console.log('Finup에서 전일 종가 크롤링 시도...');
+    const finupData = await fetchFromFinup(symbol);
+    if (finupData) {
+      return res.status(200).json({
+        success: true,
+        data: finupData,
+        source: 'finup',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 5. 백업: Yahoo Finance 시도
+    console.log('모든 크롤링 실패, Yahoo Finance API 시도...');
     const yahooData = await fetchFromYahoo(symbol);
     if (yahooData) {
       return res.status(200).json({
@@ -55,10 +90,9 @@ export default async function handler(req, res) {
 
 async function fetchFromNaver(symbol) {
   try {
-    // 간단한 정규식 기반 스크래핑 (JSDOM 없이)
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
     
-    console.log(`네이버 금융 스크래핑: ${url}`);
+    console.log(`네이버 증권 크롤링: ${url}`);
     
     const response = await fetch(url, {
       headers: {
@@ -74,7 +108,7 @@ async function fetchFromNaver(symbol) {
 
     const html = await response.text();
     
-    // 정규식으로 가격 정보 추출
+    // 전일 종가 정보 추출 (더 정확한 정규식)
     const priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
     const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
     const changePercentMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d.]+)%<\/span>/);
@@ -107,15 +141,193 @@ async function fetchFromNaver(symbol) {
       change: change,
       changePercent: changePercent,
       volume: volume,
-      marketCap: 0, // 네이버에서는 시가총액 정보가 제한적
-      lastUpdate: new Date().toISOString()
+      marketCap: 0,
+      lastUpdate: new Date().toISOString(),
+      source: 'naver-finance'
     };
 
-    console.log('네이버 스크래핑 성공:', stockData);
+    console.log('네이버 증권 크롤링 성공:', stockData);
     return stockData;
 
   } catch (error) {
-    console.error('네이버 스크래핑 오류:', error);
+    console.error('네이버 증권 크롤링 오류:', error);
+    return null;
+  }
+}
+
+async function fetchFromKakao(symbol) {
+  try {
+    // 카카오 증권 API 또는 웹사이트 크롤링
+    const url = `https://stock.kakao.com/stock/${symbol}`;
+    
+    console.log(`카카오 증권 크롤링: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`카카오 증권 응답 오류: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    
+    // 카카오 증권 페이지 구조에 맞는 정규식
+    const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/);
+    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+    
+    if (!priceMatch) {
+      console.log('카카오 증권에서 가격 정보를 찾을 수 없습니다');
+      return null;
+    }
+
+    const price = parseInt(priceMatch[1].replace(/,/g, ''));
+    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
+
+    if (isNaN(price)) {
+      console.log('카카오 증권 가격 파싱 실패:', priceMatch[1]);
+      return null;
+    }
+
+    const stockData = {
+      symbol: symbol,
+      name: name,
+      price: price,
+      change: 0,
+      changePercent: 0,
+      volume: 0,
+      marketCap: 0,
+      lastUpdate: new Date().toISOString(),
+      source: 'kakao-finance'
+    };
+
+    console.log('카카오 증권 크롤링 성공:', stockData);
+    return stockData;
+
+  } catch (error) {
+    console.error('카카오 증권 크롤링 오류:', error);
+    return null;
+  }
+}
+
+async function fetchFromToss(symbol) {
+  try {
+    // 토스 증권 API 또는 웹사이트 크롤링
+    const url = `https://toss.im/investment/stocks/${symbol}`;
+    
+    console.log(`토스 증권 크롤링: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`토스 증권 응답 오류: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    
+    // 토스 증권 페이지 구조에 맞는 정규식
+    const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/);
+    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+    
+    if (!priceMatch) {
+      console.log('토스 증권에서 가격 정보를 찾을 수 없습니다');
+      return null;
+    }
+
+    const price = parseInt(priceMatch[1].replace(/,/g, ''));
+    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
+
+    if (isNaN(price)) {
+      console.log('토스 증권 가격 파싱 실패:', priceMatch[1]);
+      return null;
+    }
+
+    const stockData = {
+      symbol: symbol,
+      name: name,
+      price: price,
+      change: 0,
+      changePercent: 0,
+      volume: 0,
+      marketCap: 0,
+      lastUpdate: new Date().toISOString(),
+      source: 'toss-finance'
+    };
+
+    console.log('토스 증권 크롤링 성공:', stockData);
+    return stockData;
+
+  } catch (error) {
+    console.error('토스 증권 크롤링 오류:', error);
+    return null;
+  }
+}
+
+async function fetchFromFinup(symbol) {
+  try {
+    // Finup API 또는 웹사이트 크롤링
+    const url = `https://finup.co.kr/stock/${symbol}`;
+    
+    console.log(`Finup 크롤링: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`Finup 응답 오류: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    
+    // Finup 페이지 구조에 맞는 정규식
+    const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/);
+    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+    
+    if (!priceMatch) {
+      console.log('Finup에서 가격 정보를 찾을 수 없습니다');
+      return null;
+    }
+
+    const price = parseInt(priceMatch[1].replace(/,/g, ''));
+    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
+
+    if (isNaN(price)) {
+      console.log('Finup 가격 파싱 실패:', priceMatch[1]);
+      return null;
+    }
+
+    const stockData = {
+      symbol: symbol,
+      name: name,
+      price: price,
+      change: 0,
+      changePercent: 0,
+      volume: 0,
+      marketCap: 0,
+      lastUpdate: new Date().toISOString(),
+      source: 'finup'
+    };
+
+    console.log('Finup 크롤링 성공:', stockData);
+    return stockData;
+
+  } catch (error) {
+    console.error('Finup 크롤링 오류:', error);
     return null;
   }
 }
@@ -185,43 +397,3 @@ function getStockName(symbol) {
   return names[symbol] || symbol;
 }
 
-function getPreviousCloseData(symbol) {
-  // 전일 종가 데이터 (2025년 9월 23일 기준)
-  const previousCloseData = {
-    '005930': { price: 74800, change: 0, changePercent: 0, volume: 12000000, marketCap: 450000000000000 }, // 삼성전자
-    '000660': { price: 45100, change: 0, changePercent: 0, volume: 8000000, marketCap: 32000000000000 },  // SK하이닉스
-    '035420': { price: 179000, change: 0, changePercent: 0, volume: 5000000, marketCap: 30000000000000 }, // NAVER
-    '035720': { price: 415000, change: 0, changePercent: 0, volume: 3000000, marketCap: 20000000000000 }, // 카카오
-    '096350': { price: 437, change: 0, changePercent: 0, volume: 2000000, marketCap: 5000000000000 },   // 대창솔루션
-    '207940': { price: 283000, change: 0, changePercent: 0, volume: 4000000, marketCap: 35000000000000 }, // 삼성바이오로직스
-    '006400': { price: 372000, change: 0, changePercent: 0, volume: 2000000, marketCap: 28000000000000 }, // 삼성SDI
-    '051910': { price: 425000, change: 0, changePercent: 0, volume: 1500000, marketCap: 30000000000000 }, // LG화학
-    '068270': { price: 177000, change: 0, changePercent: 0, volume: 1000000, marketCap: 12000000000000 }, // 셀트리온
-    '323410': { price: 44000, change: 0, changePercent: 0, volume: 5000000, marketCap: 20000000000000 }, // 카카오뱅크
-    '000270': { price: 122000, change: 0, changePercent: 0, volume: 3000000, marketCap: 50000000000000 }, // 기아
-    '086520': { price: 175000, change: 0, changePercent: 0, volume: 800000, marketCap: 15000000000000 }, // 에코프로
-    '247540': { price: 212000, change: 0, changePercent: 0, volume: 600000, marketCap: 18000000000000 }, // 에코프로비엠
-    '196170': { price: 46000, change: 0, changePercent: 0, volume: 1200000, marketCap: 8000000000000 }, // 알테오젠
-    '066970': { price: 310000, change: 0, changePercent: 0, volume: 400000, marketCap: 25000000000000 }, // 엘앤에프
-    '091990': { price: 83000, change: 0, changePercent: 0, volume: 800000, marketCap: 12000000000000 }, // 셀트리온헬스케어
-    '196300': { price: 66500, change: 0, changePercent: 0, volume: 600000, marketCap: 9000000000000 }, // 에이치엘비
-    '196490': { price: 27200, change: 0, changePercent: 0, volume: 1500000, marketCap: 4000000000000 }, // 다이나믹디자인
-    '196700': { price: 15300, change: 0, changePercent: 0, volume: 2000000, marketCap: 3000000000000 }, // 웹젠
-    '196800': { price: 33800, change: 0, changePercent: 0, volume: 1000000, marketCap: 6000000000000 }  // 아이에이
-  };
-
-  const data = previousCloseData[symbol];
-  if (!data) return null;
-
-  return {
-    symbol: symbol,
-    name: getStockName(symbol),
-    price: data.price,
-    change: data.change,
-    changePercent: data.changePercent,
-    volume: data.volume,
-    marketCap: data.marketCap,
-    lastUpdate: new Date().toISOString(),
-    note: '전일 종가 (실시간 데이터 대신 안정적인 전일 종가 제공)'
-  };
-}
