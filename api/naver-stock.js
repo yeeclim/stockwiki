@@ -175,6 +175,27 @@ async function fetchFromNaver(symbol) {
     if (!priceMatch) {
       priceMatch = html.match(/<button[^>]*>([\d,]+)<\/button>/);
     }
+    if (!priceMatch) {
+      priceMatch = html.match(/<input[^>]*value="([\d,]+)"/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<meta[^>]*content="([\d,]+)"/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?value["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?amount["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?close["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?last["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?final["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
     
     // 종목명 추출 (여러 패턴 시도)
     let nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
@@ -580,7 +601,6 @@ function getStockName(symbol) {
     '000660': 'SK하이닉스',
     '035420': 'NAVER',
     '035720': '카카오',
-    '096350': '대창솔루션',
     '207940': '삼성바이오로직스',
     '006400': '삼성SDI',
     '051910': 'LG화학',
