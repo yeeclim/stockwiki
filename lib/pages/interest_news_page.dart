@@ -57,9 +57,7 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
 
   Future<void> _fetchNewsFromAPIs(String keyword) async {
     final lowerKeyword = keyword.toLowerCase();
-    final String baseUrl = kReleaseMode
-        ? 'https://stockwiki.vercel.app'
-        : 'http://localhost:3000';
+    final String baseUrl = Uri.base.origin;
     final mkStockRssUri = Uri.parse('$baseUrl/api/mk_stock_rss');
 
     final newsdataUri = Uri.parse(
