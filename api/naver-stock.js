@@ -112,6 +112,7 @@ async function fetchFromNaver(symbol) {
     console.log(`HTML 길이: ${html.length}`);
     console.log(`HTML에 'no_today' 포함 여부: ${html.includes('no_today')}`);
     console.log(`HTML에 '종목' 포함 여부: ${html.includes('종목')}`);
+    console.log(`HTML에 'wrap_company' 포함 여부: ${html.includes('wrap_company')}`);
     
     // 여러 패턴으로 가격 정보 추출 시도
     let priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
@@ -126,6 +127,12 @@ async function fetchFromNaver(symbol) {
     if (!priceMatch) {
       priceMatch = html.match(/<strong class="no_today"[^>]*>([^<]+)<\/strong>/);
     }
+    if (!priceMatch) {
+      priceMatch = html.match(/<p class="no_today"[^>]*>([^<]+)<\/p>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<span[^>]*class="[^"]*no_today[^"]*"[^>]*>([^<]+)<\/span>/);
+    }
     
     // 종목명 추출 (여러 패턴 시도)
     let nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
@@ -134,6 +141,18 @@ async function fetchFromNaver(symbol) {
     }
     if (!nameMatch) {
       nameMatch = html.match(/<title>([^<]+)<\/title>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<span class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<div class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<strong[^>]*>([^<]+)<\/strong>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<em[^>]*>([^<]+)<\/em>/);
     }
     
     // 변동 정보 추출
@@ -145,6 +164,13 @@ async function fetchFromNaver(symbol) {
       console.log('네이버에서 가격 정보를 찾을 수 없습니다');
       console.log('HTML 샘플:', html.substring(0, 1000));
       return null;
+    }
+
+    // 종목명 추출 실패 시 디버깅
+    if (!nameMatch) {
+      console.log('종목명 추출 실패 - getStockName 사용');
+      console.log('HTML에서 종목명 관련 부분:', html.match(/<h2[^>]*>.*?<\/h2>/g) || '없음');
+      console.log('HTML에서 wrap_company 관련 부분:', html.match(/<[^>]*wrap_company[^>]*>.*?<\/[^>]*>/g) || '없음');
     }
 
     const price = parseInt(priceMatch[1].replace(/,/g, ''));
