@@ -154,6 +154,27 @@ async function fetchFromNaver(symbol) {
     if (!nameMatch) {
       nameMatch = html.match(/<em[^>]*>([^<]+)<\/em>/);
     }
+    if (!nameMatch) {
+      nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<div class="company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<span class="company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<div class="stock_name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<span class="stock_name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<div class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<span class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+    }
     
     // 변동 정보 추출
     const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
@@ -171,6 +192,14 @@ async function fetchFromNaver(symbol) {
       console.log('종목명 추출 실패 - getStockName 사용');
       console.log('HTML에서 종목명 관련 부분:', html.match(/<h2[^>]*>.*?<\/h2>/g) || '없음');
       console.log('HTML에서 wrap_company 관련 부분:', html.match(/<[^>]*wrap_company[^>]*>.*?<\/[^>]*>/g) || '없음');
+      console.log('HTML에서 company 관련 부분:', html.match(/<[^>]*company[^>]*>.*?<\/[^>]*>/g) || '없음');
+      console.log('HTML에서 stock_name 관련 부분:', html.match(/<[^>]*stock_name[^>]*>.*?<\/[^>]*>/g) || '없음');
+      console.log('HTML에서 name 관련 부분:', html.match(/<[^>]*name[^>]*>.*?<\/[^>]*>/g) || '없음');
+      console.log('HTML에서 title 관련 부분:', html.match(/<title>.*?<\/title>/g) || '없음');
+      console.log('HTML에서 h1 관련 부분:', html.match(/<h1[^>]*>.*?<\/h1>/g) || '없음');
+      console.log('HTML에서 h2 관련 부분:', html.match(/<h2[^>]*>.*?<\/h2>/g) || '없음');
+      console.log('HTML에서 strong 관련 부분:', html.match(/<strong[^>]*>.*?<\/strong>/g) || '없음');
+      console.log('HTML에서 em 관련 부분:', html.match(/<em[^>]*>.*?<\/em>/g) || '없음');
     }
 
     const price = parseInt(priceMatch[1].replace(/,/g, ''));
