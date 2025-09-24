@@ -40,22 +40,9 @@ class _StockChartWidgetState extends State<StockChartWidget> {
         Future.delayed(Duration(milliseconds: 500)), // 로딩 시뮬레이션
       ]);
 
-      // 네이버 증권 차트 URL 생성 (실제 작동하는 URL들)
+      // 네이버 증권 일봉 캔들 차트만 생성
       _chartUrls = {
-        'daily': 'https://ssl.pstatic.net/imgfinance/chart/item/area/day/${widget.symbol}.png',
-        'weekly': 'https://ssl.pstatic.net/imgfinance/chart/item/area/week/${widget.symbol}.png',
-        'monthly': 'https://ssl.pstatic.net/imgfinance/chart/item/area/month/${widget.symbol}.png',
         'candle': 'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${widget.symbol}.png',
-        'candle_weekly': 'https://ssl.pstatic.net/imgfinance/chart/item/candle/week/${widget.symbol}.png',
-        'candle_monthly': 'https://ssl.pstatic.net/imgfinance/chart/item/candle/month/${widget.symbol}.png',
-        'volume': 'https://ssl.pstatic.net/imgfinance/chart/item/volume/day/${widget.symbol}.png',
-        'minute5': 'https://ssl.pstatic.net/imgfinance/chart/item/area/minute5/${widget.symbol}.png',
-        'minute15': 'https://ssl.pstatic.net/imgfinance/chart/item/area/minute15/${widget.symbol}.png',
-        'minute30': 'https://ssl.pstatic.net/imgfinance/chart/item/area/minute30/${widget.symbol}.png',
-        'minute60': 'https://ssl.pstatic.net/imgfinance/chart/item/area/minute60/${widget.symbol}.png',
-        'technical': 'https://ssl.pstatic.net/imgfinance/chart/item/technical/day/${widget.symbol}.png',
-        'line': 'https://ssl.pstatic.net/imgfinance/chart/item/line/day/${widget.symbol}.png',
-        'bar': 'https://ssl.pstatic.net/imgfinance/chart/item/bar/day/${widget.symbol}.png',
       };
 
       setState(() {
@@ -203,34 +190,8 @@ class _StockChartWidgetState extends State<StockChartWidget> {
 
   String _getChartTypeName(String type) {
     switch (type) {
-      case 'daily':
-        return '일봉(Area)';
-      case 'weekly':
-        return '주봉(Area)';
-      case 'monthly':
-        return '월봉(Area)';
       case 'candle':
-        return '일봉(캔들)';
-      case 'candle_weekly':
-        return '주봉(캔들)';
-      case 'candle_monthly':
-        return '월봉(캔들)';
-      case 'volume':
-        return '거래량';
-      case 'minute5':
-        return '5분봉';
-      case 'minute15':
-        return '15분봉';
-      case 'minute30':
-        return '30분봉';
-      case 'minute60':
-        return '60분봉';
-      case 'technical':
-        return '기술적지표';
-      case 'line':
-        return '라인차트';
-      case 'bar':
-        return '바차트';
+        return '일봉 캔들 차트';
       default:
         return type;
     }
