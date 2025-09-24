@@ -199,6 +199,18 @@ async function fetchFromNaver(symbol) {
     if (!nameMatch) {
       nameMatch = html.match(/<th[^>]*>([^<]+)<\/th>/);
     }
+    if (!nameMatch) {
+      nameMatch = html.match(/<label[^>]*>([^<]+)<\/label>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<button[^>]*>([^<]+)<\/button>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<input[^>]*value="([^"]+)"/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<meta[^>]*content="([^"]+)"/);
+    }
     
     // 변동 정보 추출
     const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
