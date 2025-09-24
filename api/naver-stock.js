@@ -60,18 +60,17 @@ export default async function handler(req, res) {
 
 async function fetchFromNaver(symbol) {
   try {
-    const url = `https://finance.naver.com/item/main.nhn?code=${symbol}`;
+    // JSDOM을 사용한 정확한 스크래핑
+    const { JSDOM } = await import('jsdom');
+    
+    const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
     
     console.log(`네이버 금융 스크래핑: ${url}`);
     
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
       }
     });
 
@@ -81,43 +80,38 @@ async function fetchFromNaver(symbol) {
     }
 
     const html = await response.text();
-    
-    // 네이버 금융 페이지에서 주가 정보 추출
-    const priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
-    const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
-    const changePercentMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d.]+)%<\/span>/);
-    const volumeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([\d,]+)<\/span>/);
-    
-    // 더 정확한 정규식으로 재시도
-    const priceMatch2 = html.match(/"no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
-    const changeMatch2 = html.match(/<span[^>]*class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
-    
-    if (!priceMatch && !priceMatch2) {
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+
+    // 네이버 금융 페이지의 정확한 셀렉터 사용
+    const priceElement = document.querySelector('#_nowVal');
+    const changeElement = document.querySelector('#_diff');
+    const changePercentElement = document.querySelector('#_rate');
+    const volumeElement = document.querySelector('#_volume');
+    const nameElement = document.querySelector('.wrap_company h2 a');
+
+    if (!priceElement) {
       console.log('네이버에서 가격 정보를 찾을 수 없습니다');
       return null;
     }
 
-    const priceText = (priceMatch ? priceMatch[1] : priceMatch2[1]).replace(/,/g, '');
-    const price = parseFloat(priceText);
-    
+    const price = parseInt(priceElement.textContent.replace(/,/g, ''));
+    const changeText = changeElement ? changeElement.textContent.trim() : '0';
+    const change = parseInt(changeText.replace(/,/g, '')) || 0;
+    const changePercentText = changePercentElement ? changePercentElement.textContent.trim() : '0';
+    const changePercent = parseFloat(changePercentText.replace('%', '')) || 0;
+    const volumeText = volumeElement ? volumeElement.textContent.trim() : '0';
+    const volume = parseInt(volumeText.replace(/,/g, '')) || 0;
+    const name = nameElement ? nameElement.textContent.trim() : getStockName(symbol);
+
     if (isNaN(price)) {
-      console.log('가격 파싱 실패:', priceText);
+      console.log('가격 파싱 실패:', priceElement.textContent);
       return null;
     }
 
-    // 등락 정보 추출 (더 간단한 방법)
-    const changeText = changeMatch ? changeMatch[1].replace(/,/g, '') : '0';
-    const change = parseFloat(changeText) || 0;
-    
-    const changePercentText = changePercentMatch ? changePercentMatch[1].replace('%', '') : '0';
-    const changePercent = parseFloat(changePercentText) || 0;
-    
-    const volumeText = volumeMatch ? volumeMatch[1].replace(/,/g, '') : '0';
-    const volume = parseInt(volumeText) || 0;
-
     const stockData = {
       symbol: symbol,
-      name: getStockName(symbol),
+      name: name,
       price: price,
       change: change,
       changePercent: changePercent,
