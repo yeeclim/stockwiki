@@ -148,6 +148,33 @@ async function fetchFromNaver(symbol) {
     if (!priceMatch) {
       priceMatch = html.match(/<span[^>]*>([\d,]+)<\/span>/);
     }
+    if (!priceMatch) {
+      priceMatch = html.match(/<div[^>]*>([\d,]+)<\/div>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<p[^>]*>([\d,]+)<\/p>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<em[^>]*>([\d,]+)<\/em>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<strong[^>]*>([\d,]+)<\/strong>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<b[^>]*>([\d,]+)<\/b>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<i[^>]*>([\d,]+)<\/i>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<font[^>]*>([\d,]+)<\/font>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<label[^>]*>([\d,]+)<\/label>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<button[^>]*>([\d,]+)<\/button>/);
+    }
     
     // 종목명 추출 (여러 패턴 시도)
     let nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
@@ -253,6 +280,8 @@ async function fetchFromNaver(symbol) {
     if (!priceMatch) {
       console.log('네이버에서 가격 정보를 찾을 수 없습니다');
       console.log('HTML 샘플:', html.substring(0, 1000));
+      console.log('HTML에서 숫자 패턴:', html.match(/[\d,]+/g) || '없음');
+      console.log('HTML에서 가격 관련 부분:', html.match(/<[^>]*>[\d,]+<\/[^>]*>/g) || '없음');
       return null;
     }
 
