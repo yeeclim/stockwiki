@@ -211,6 +211,12 @@ async function fetchFromNaver(symbol) {
     if (!nameMatch) {
       nameMatch = html.match(/<meta[^>]*content="([^"]+)"/);
     }
+    if (!nameMatch) {
+      nameMatch = html.match(/<script[^>]*>[\s\S]*?name["\s]*:["\s]*([^"']+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<script[^>]*>[\s\S]*?종목명["\s]*:["\s]*([^"']+)["\s]*[\s\S]*?<\/script>/);
+    }
     
     // 변동 정보 추출
     const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
