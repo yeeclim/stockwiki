@@ -21,21 +21,7 @@ class KrxLoader {
 
       dev.log('네이버 금융 API 호출 시작: $symbol');
       
-      // 로컬에서는 API 호출을 시도하지 않고 바로 더미 데이터 사용
-      if (!kReleaseMode) {
-        dev.log('로컬 환경: 더미 데이터 사용');
-        final dummyData = _generateDummyData(symbol);
-        if (dummyData != null) {
-          // 캐시 업데이트
-          _stockCache ??= {};
-          _stockCache![symbol] = dummyData;
-          _lastUpdate = DateTime.now();
-          return dummyData;
-        }
-        return null;
-      }
-
-      // 프로덕션 환경에서만 Vercel API 호출 (네이버 금융 스크래핑 + Yahoo Finance + 더미 데이터 폴백)
+      // 항상 API 호출 시도 (로컬/프로덕션 구분 없이)
       final baseUrl = 'https://stockwiki.vercel.app';
       final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
@@ -76,9 +62,15 @@ class KrxLoader {
           return result;
         } else {
           dev.log('API 응답에서 데이터를 찾을 수 없습니다: ${data['error']}');
+          // API 응답 실패 시 더미 데이터로 폴백
+          dev.log('더미 데이터로 폴백 시도');
+          return _generateDummyData(symbol);
         }
       } else {
         dev.log('API 호출 실패: ${response.statusCode}, ${response.body}');
+        // HTTP 오류 시 더미 데이터로 폴백
+        dev.log('더미 데이터로 폴백 시도');
+        return _generateDummyData(symbol);
       }
     } catch (e) {
       dev.log('실시간 주식 데이터 가져오기 실패: $e');
