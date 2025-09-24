@@ -21,18 +21,7 @@ class KrxLoader {
 
       dev.log('네이버 금융 API 호출 시작: $symbol');
       
-      // 더미 데이터 우선 사용 (정확한 가격)
-      dev.log('더미 데이터 사용 (정확한 가격)');
-      final dummyData = _generateDummyData(symbol);
-      if (dummyData != null) {
-        // 캐시 업데이트
-        _stockCache ??= {};
-        _stockCache![symbol] = dummyData;
-        _lastUpdate = DateTime.now();
-        return dummyData;
-      }
-
-      // 더미 데이터 실패시 API 호출 시도
+      // API 호출 시도
       final baseUrl = 'https://stockwiki.vercel.app';
       final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
@@ -73,104 +62,18 @@ class KrxLoader {
           return result;
         } else {
           dev.log('API 응답에서 데이터를 찾을 수 없습니다: ${data['error']}');
-          // API 응답 실패 시 더미 데이터로 폴백
-          dev.log('더미 데이터로 폴백 시도');
-          return _generateDummyData(symbol);
+          return null;
         }
       } else {
         dev.log('API 호출 실패: ${response.statusCode}, ${response.body}');
-        // HTTP 오류 시 더미 데이터로 폴백
-        dev.log('더미 데이터로 폴백 시도');
-        return _generateDummyData(symbol);
+        return null;
       }
     } catch (e) {
       dev.log('실시간 주식 데이터 가져오기 실패: $e');
-      // API 실패 시 더미 데이터로 폴백
-      dev.log('더미 데이터로 폴백 시도');
-      return _generateDummyData(symbol);
+      return null;
     }
   }
 
-  // 더미 데이터 생성 (실제 API 대신 사용)
-  static Map<String, dynamic>? _generateDummyData(String symbol) {
-    // 실제 주식 코드에 따른 더미 데이터 생성 (2025년 1월 기준 대략적 가격)
-    final dummyPrices = {
-      // KOSPI 주요 종목
-      '005930': {'price': 75000, 'change': 1500, 'volume': 12000000, 'marketCap': 450000000000000}, // 삼성전자
-      '000660': {'price': 45000, 'change': -800, 'volume': 8000000, 'marketCap': 32000000000000},  // SK하이닉스
-      '035420': {'price': 180000, 'change': 2000, 'volume': 5000000, 'marketCap': 30000000000000}, // NAVER
-      '035720': {'price': 420000, 'change': 5000, 'volume': 3000000, 'marketCap': 20000000000000}, // 카카오
-      '207940': {'price': 280000, 'change': -3000, 'volume': 4000000, 'marketCap': 35000000000000}, // 삼성바이오로직스
-      '006400': {'price': 380000, 'change': 8000, 'volume': 2000000, 'marketCap': 28000000000000}, // 삼성SDI
-      '051910': {'price': 420000, 'change': -5000, 'volume': 1500000, 'marketCap': 30000000000000}, // LG화학
-      '068270': {'price': 180000, 'change': 3000, 'volume': 1000000, 'marketCap': 12000000000000}, // 셀트리온
-      '323410': {'price': 45000, 'change': 1000, 'volume': 5000000, 'marketCap': 20000000000000}, // 카카오뱅크
-      '000270': {'price': 120000, 'change': -2000, 'volume': 3000000, 'marketCap': 50000000000000}, // 기아
-      
-      // KOSDAQ 주요 종목
-      '096350': {'price': 437, 'change': 7, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션 (2025년 9월 24일 현재)
-      '086520': {'price': 180000, 'change': 5000, 'volume': 800000, 'marketCap': 15000000000000}, // 에코프로
-      '247540': {'price': 220000, 'change': 8000, 'volume': 600000, 'marketCap': 18000000000000}, // 에코프로비엠
-      '196170': {'price': 45000, 'change': -1000, 'volume': 1200000, 'marketCap': 8000000000000}, // 알테오젠
-      '066970': {'price': 320000, 'change': 10000, 'volume': 400000, 'marketCap': 25000000000000}, // 엘앤에프
-      '091990': {'price': 85000, 'change': 2000, 'volume': 800000, 'marketCap': 12000000000000}, // 셀트리온헬스케어
-      '196300': {'price': 65000, 'change': -1500, 'volume': 600000, 'marketCap': 9000000000000}, // 에이치엘비
-      '196490': {'price': 28000, 'change': 800, 'volume': 1500000, 'marketCap': 4000000000000}, // 다이나믹디자인
-      '196700': {'price': 15000, 'change': -300, 'volume': 2000000, 'marketCap': 3000000000000}, // 웹젠
-      '196800': {'price': 35000, 'change': 1200, 'volume': 1000000, 'marketCap': 6000000000000}, // 아이에이
-    };
-
-    final data = dummyPrices[symbol];
-    if (data != null) {
-      final price = data['price']!.toDouble();
-      final change = data['change']!.toDouble();
-      final volume = data['volume']!.toInt();
-      final marketCap = data['marketCap']!.toInt();
-      final changePercent = (change / (price - change) * 100);
-
-      return {
-        'symbol': symbol,
-        'name': _getStockName(symbol),
-        'price': price,
-        'change': change,
-        'changePercent': changePercent,
-        'volume': volume,
-        'marketCap': marketCap,
-        'lastUpdate': DateTime.now().toIso8601String(),
-      };
-    }
-    return null;
-  }
-
-  // 주식명 매핑
-  static String _getStockName(String symbol) {
-    final names = {
-      // KOSPI
-      '005930': '삼성전자',
-      '000660': 'SK하이닉스',
-      '035420': 'NAVER',
-      '035720': '카카오',
-      '207940': '삼성바이오로직스',
-      '006400': '삼성SDI',
-      '051910': 'LG화학',
-      '068270': '셀트리온',
-      '323410': '카카오뱅크',
-      '000270': '기아',
-      
-      // KOSDAQ
-      '096350': '대창솔루션',
-      '086520': '에코프로',
-      '247540': '에코프로비엠',
-      '196170': '알테오젠',
-      '066970': '엘앤에프',
-      '091990': '셀트리온헬스케어',
-      '196300': '에이치엘비',
-      '196490': '다이나믹디자인',
-      '196700': '웹젠',
-      '196800': '아이에이',
-    };
-    return names[symbol] ?? symbol;
-  }
 
   // JSON 데이터를 한 번만 불러오고 병합 (기본 정보용)
   static Future<void> _loadData() async {
