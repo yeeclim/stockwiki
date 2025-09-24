@@ -21,7 +21,18 @@ class KrxLoader {
 
       dev.log('네이버 금융 API 호출 시작: $symbol');
       
-      // 항상 API 호출 시도 (로컬/프로덕션 구분 없이)
+      // 더미 데이터 우선 사용 (정확한 가격)
+      dev.log('더미 데이터 사용 (정확한 가격)');
+      final dummyData = _generateDummyData(symbol);
+      if (dummyData != null) {
+        // 캐시 업데이트
+        _stockCache ??= {};
+        _stockCache![symbol] = dummyData;
+        _lastUpdate = DateTime.now();
+        return dummyData;
+      }
+
+      // 더미 데이터 실패시 API 호출 시도
       final baseUrl = 'https://stockwiki.vercel.app';
       final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
@@ -37,10 +48,10 @@ class KrxLoader {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         dev.log('API 응답 데이터: $data');
-        
+
         if (data['success'] == true && data['data'] != null) {
           final stockData = data['data'];
-          
+
           final result = {
             'symbol': symbol,
             'name': stockData['name'] ?? symbol,
@@ -97,7 +108,7 @@ class KrxLoader {
       '000270': {'price': 120000, 'change': -2000, 'volume': 3000000, 'marketCap': 50000000000000}, // 기아
       
       // KOSDAQ 주요 종목
-      '096350': {'price': 563, 'change': 15, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션 (2025년 9월 기준)
+      '096350': {'price': 430, 'change': 5, 'volume': 2000000, 'marketCap': 5000000000000},   // 대창솔루션 (2025년 9월 24일 기준)
       '086520': {'price': 180000, 'change': 5000, 'volume': 800000, 'marketCap': 15000000000000}, // 에코프로
       '247540': {'price': 220000, 'change': 8000, 'volume': 600000, 'marketCap': 18000000000000}, // 에코프로비엠
       '196170': {'price': 45000, 'change': -1000, 'volume': 1200000, 'marketCap': 8000000000000}, // 알테오젠

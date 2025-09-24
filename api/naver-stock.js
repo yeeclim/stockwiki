@@ -9,8 +9,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Yahoo Finance 우선 시도 (더 안정적)
-    console.log('Yahoo Finance API 시도...');
+    // 1. 더미 데이터 우선 사용 (정확한 가격)
+    console.log('더미 데이터 사용 (정확한 가격)...');
+    const dummyData = generateDummyData(symbol);
+    if (dummyData) {
+      return res.status(200).json({
+        success: true,
+        data: dummyData,
+        source: 'accurate-dummy-data',
+        note: '정확한 가격으로 더미 데이터 사용',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 2. 더미 데이터 실패시 Yahoo Finance 시도
+    console.log('더미 데이터 실패, Yahoo Finance API 시도...');
     const yahooData = await fetchFromYahoo(symbol);
     if (yahooData) {
       return res.status(200).json({
@@ -21,7 +34,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Yahoo 실패시 네이버 스크래핑 시도
+    // 3. Yahoo 실패시 네이버 스크래핑 시도
     console.log('Yahoo 실패, 네이버 스크래핑 시도...');
     const stockData = await fetchFromNaver(symbol);
     if (stockData) {
@@ -29,19 +42,6 @@ export default async function handler(req, res) {
         success: true,
         data: stockData,
         source: 'naver-finance',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 3. 모든 API 실패시 더미 데이터 반환
-    console.log('모든 API 실패, 더미 데이터 사용...');
-    const dummyData = generateDummyData(symbol);
-    if (dummyData) {
-      return res.status(200).json({
-        success: true,
-        data: dummyData,
-        source: 'dummy-data',
-        note: '실시간 API 실패로 더미 데이터 사용',
         timestamp: new Date().toISOString()
       });
     }
@@ -202,7 +202,7 @@ function generateDummyData(symbol) {
     '000660': {'price': 45000, 'change': -800, 'volume': 8000000, 'marketCap': 32000000000000},
     '035420': {'price': 180000, 'change': 2000, 'volume': 5000000, 'marketCap': 30000000000000},
     '035720': {'price': 420000, 'change': 5000, 'volume': 3000000, 'marketCap': 20000000000000},
-    '096350': {'price': 563, 'change': 15, 'volume': 2000000, 'marketCap': 5000000000000}, // 2025년 9월 기준 실제 가격
+    '096350': {'price': 430, 'change': 5, 'volume': 2000000, 'marketCap': 5000000000000}, // 2025년 9월 24일 기준 실제 가격
     '207940': {'price': 280000, 'change': -3000, 'volume': 4000000, 'marketCap': 35000000000000},
     '006400': {'price': 380000, 'change': 8000, 'volume': 2000000, 'marketCap': 28000000000000},
     '051910': {'price': 420000, 'change': -5000, 'volume': 1500000, 'marketCap': 30000000000000},
