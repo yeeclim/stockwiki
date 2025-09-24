@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,62 +16,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. 네이버 증권에서 전일 종가 크롤링
-    console.log('네이버 증권에서 전일 종가 크롤링 시도...');
-    const naverData = await fetchFromNaver(symbol);
-    if (naverData) {
+    console.log(`종목 ${symbol} 크롤링 시작...`);
+    
+    // 네이버 증권에서 데이터 크롤링
+    const stockData = await fetchStockData(symbol);
+    
+    if (stockData) {
       return res.status(200).json({
         success: true,
-        data: naverData,
+        data: stockData,
         source: 'naver-finance',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 2. 카카오 증권에서 전일 종가 크롤링
-    console.log('카카오 증권에서 전일 종가 크롤링 시도...');
-    const kakaoData = await fetchFromKakao(symbol);
-    if (kakaoData) {
-      return res.status(200).json({
-        success: true,
-        data: kakaoData,
-        source: 'kakao-finance',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 3. 토스 증권에서 전일 종가 크롤링
-    console.log('토스 증권에서 전일 종가 크롤링 시도...');
-    const tossData = await fetchFromToss(symbol);
-    if (tossData) {
-      return res.status(200).json({
-        success: true,
-        data: tossData,
-        source: 'toss-finance',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 4. Finup에서 전일 종가 크롤링
-    console.log('Finup에서 전일 종가 크롤링 시도...');
-    const finupData = await fetchFromFinup(symbol);
-    if (finupData) {
-      return res.status(200).json({
-        success: true,
-        data: finupData,
-        source: 'finup',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 5. 백업: Yahoo Finance 시도
-    console.log('모든 크롤링 실패, Yahoo Finance API 시도...');
-    const yahooData = await fetchFromYahoo(symbol);
-    if (yahooData) {
-      return res.status(200).json({
-        success: true,
-        data: yahooData,
-        source: 'yahoo-finance',
         timestamp: new Date().toISOString()
       });
     }
@@ -88,7 +44,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function fetchFromNaver(symbol) {
+async function fetchStockData(symbol) {
   try {
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
     
@@ -97,7 +53,11 @@ async function fetchFromNaver(symbol) {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
       }
     });
 
@@ -107,492 +67,203 @@ async function fetchFromNaver(symbol) {
     }
 
     const html = await response.text();
-    
-    // 디버깅: HTML 길이와 일부 내용 확인
     console.log(`HTML 길이: ${html.length}`);
-    console.log(`HTML에 'no_today' 포함 여부: ${html.includes('no_today')}`);
-    console.log(`HTML에 '종목' 포함 여부: ${html.includes('종목')}`);
-    console.log(`HTML에 'wrap_company' 포함 여부: ${html.includes('wrap_company')}`);
     
-    // 여러 패턴으로 가격 정보 추출 시도
-    let priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
+    // 종목명 추출
+    const name = extractStockName(html, symbol);
     
-    // 대안 패턴들
-    if (!priceMatch) {
-      priceMatch = html.match(/<span class="no_today"[^>]*>([^<]+)<\/span>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<em class="no_today"[^>]*>([^<]+)<\/em>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<strong class="no_today"[^>]*>([^<]+)<\/strong>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<p class="no_today"[^>]*>([^<]+)<\/p>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<span[^>]*class="[^"]*no_today[^"]*"[^>]*>([^<]+)<\/span>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?price["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?현재가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?종가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<td[^>]*>([\d,]+)<\/td>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<span[^>]*>([\d,]+)<\/span>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<div[^>]*>([\d,]+)<\/div>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<p[^>]*>([\d,]+)<\/p>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<em[^>]*>([\d,]+)<\/em>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<strong[^>]*>([\d,]+)<\/strong>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<b[^>]*>([\d,]+)<\/b>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<i[^>]*>([\d,]+)<\/i>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<font[^>]*>([\d,]+)<\/font>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<label[^>]*>([\d,]+)<\/label>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<button[^>]*>([\d,]+)<\/button>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<input[^>]*value="([\d,]+)"/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<meta[^>]*content="([\d,]+)"/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?value["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?amount["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?close["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?last["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!priceMatch) {
-      priceMatch = html.match(/<script[^>]*>[\s\S]*?final["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
-    }
+    // 가격 정보 추출
+    const priceInfo = extractPriceInfo(html);
     
-    // 종목명 추출 (여러 패턴 시도)
-    let nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    if (!nameMatch) {
-      nameMatch = html.match(/<h2[^>]*>([^<]+)<\/h2>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<title>([^<]+)<\/title>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<span class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<div class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<strong[^>]*>([^<]+)<\/strong>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<em[^>]*>([^<]+)<\/em>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<div class="company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<span class="company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<div class="stock_name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<span class="stock_name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<div class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<span class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<a[^>]*href="[^"]*item[^"]*"[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<a[^>]*>([^<]+)<\/a>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<div[^>]*>([^<]+)<\/div>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<span[^>]*>([^<]+)<\/span>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<p[^>]*>([^<]+)<\/p>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<li[^>]*>([^<]+)<\/li>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<td[^>]*>([^<]+)<\/td>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<th[^>]*>([^<]+)<\/th>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<label[^>]*>([^<]+)<\/label>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<button[^>]*>([^<]+)<\/button>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<input[^>]*value="([^"]+)"/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<meta[^>]*content="([^"]+)"/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<script[^>]*>[\s\S]*?name["\s]*:["\s]*([^"']+)["\s]*[\s\S]*?<\/script>/);
-    }
-    if (!nameMatch) {
-      nameMatch = html.match(/<script[^>]*>[\s\S]*?종목명["\s]*:["\s]*([^"']+)["\s]*[\s\S]*?<\/script>/);
-    }
-    
-    // 변동 정보 추출
-    const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
-    const changePercentMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d.]+)%<\/span>/);
-    const volumeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([\d,]+)<\/span>/);
-    
-    // 시가총액 추출 (여러 패턴 시도)
-    let marketCapMatch = html.match(/시가총액[^>]*>([^<]+)<\/[^>]*>/);
-    if (!marketCapMatch) {
-      marketCapMatch = html.match(/시총[^>]*>([^<]+)<\/[^>]*>/);
-    }
-    if (!marketCapMatch) {
-      marketCapMatch = html.match(/<td[^>]*>([\d,]+억)<\/td>/);
-    }
-    if (!marketCapMatch) {
-      marketCapMatch = html.match(/<span[^>]*>([\d,]+억)<\/span>/);
-    }
-    
-    if (!priceMatch) {
-      console.log('네이버에서 가격 정보를 찾을 수 없습니다');
-      console.log('HTML 샘플:', html.substring(0, 1000));
-      console.log('HTML에서 숫자 패턴:', html.match(/[\d,]+/g) || '없음');
-      console.log('HTML에서 가격 관련 부분:', html.match(/<[^>]*>[\d,]+<\/[^>]*>/g) || '없음');
-      return null;
-    }
-
-    // 종목명 추출 실패 시 디버깅
-    if (!nameMatch) {
-      console.log('종목명 추출 실패 - getStockName 사용');
-      console.log('HTML에서 종목명 관련 부분:', html.match(/<h2[^>]*>.*?<\/h2>/g) || '없음');
-      console.log('HTML에서 wrap_company 관련 부분:', html.match(/<[^>]*wrap_company[^>]*>.*?<\/[^>]*>/g) || '없음');
-      console.log('HTML에서 company 관련 부분:', html.match(/<[^>]*company[^>]*>.*?<\/[^>]*>/g) || '없음');
-      console.log('HTML에서 stock_name 관련 부분:', html.match(/<[^>]*stock_name[^>]*>.*?<\/[^>]*>/g) || '없음');
-      console.log('HTML에서 name 관련 부분:', html.match(/<[^>]*name[^>]*>.*?<\/[^>]*>/g) || '없음');
-      console.log('HTML에서 title 관련 부분:', html.match(/<title>.*?<\/title>/g) || '없음');
-      console.log('HTML에서 h1 관련 부분:', html.match(/<h1[^>]*>.*?<\/h1>/g) || '없음');
-      console.log('HTML에서 h2 관련 부분:', html.match(/<h2[^>]*>.*?<\/h2>/g) || '없음');
-      console.log('HTML에서 strong 관련 부분:', html.match(/<strong[^>]*>.*?<\/strong>/g) || '없음');
-      console.log('HTML에서 em 관련 부분:', html.match(/<em[^>]*>.*?<\/em>/g) || '없음');
-      console.log('HTML에서 a 태그 관련 부분:', html.match(/<a[^>]*>.*?<\/a>/g) || '없음');
-      console.log('HTML에서 div 태그 관련 부분:', html.match(/<div[^>]*>.*?<\/div>/g) || '없음');
-      console.log('HTML에서 span 태그 관련 부분:', html.match(/<span[^>]*>.*?<\/span>/g) || '없음');
-    }
-
-    const price = parseInt(priceMatch[1].replace(/,/g, ''));
-    const changeText = changeMatch ? changeMatch[1].replace(/,/g, '') : '0';
-    const change = parseInt(changeText) || 0;
-    const changePercentText = changePercentMatch ? changePercentMatch[1].replace('%', '') : '0';
-    const changePercent = parseFloat(changePercentText) || 0;
-    const volumeText = volumeMatch ? volumeMatch[1].replace(/,/g, '') : '0';
-    const volume = parseInt(volumeText) || 0;
-    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
-    
-    // 시가총액 파싱
-    let marketCap = 0;
-    if (marketCapMatch) {
-      const marketCapText = marketCapMatch[1];
-      if (marketCapText.includes('억')) {
-        const value = parseFloat(marketCapText.replace(/[억,]/g, ''));
-        marketCap = Math.round(value * 100000000); // 억을 원으로 변환
-      } else if (marketCapText.includes('조')) {
-        const value = parseFloat(marketCapText.replace(/[조,]/g, ''));
-        marketCap = Math.round(value * 1000000000000); // 조를 원으로 변환
-      } else {
-        marketCap = parseInt(marketCapText.replace(/,/g, '')) || 0;
-      }
-    }
-
-    if (isNaN(price)) {
-      console.log('가격 파싱 실패:', priceMatch[1]);
+    if (!priceInfo.price) {
+      console.log('가격 정보를 찾을 수 없습니다');
       return null;
     }
 
     const stockData = {
       symbol: symbol,
       name: name,
-      price: price, // 전일 종가 (현재가 제거)
+      price: priceInfo.price,
       change: 0, // 변동가 제거
       changePercent: 0, // 변동률 제거
-      volume: volume,
-      marketCap: marketCap, // 시가총액 추가
+      volume: priceInfo.volume || 0,
+      marketCap: priceInfo.marketCap || 0,
       lastUpdate: new Date().toISOString(),
       source: 'naver-finance',
-      note: '전일 종가 기준 (현재가 제거)'
+      note: '전일 종가 기준 (실시간 크롤링)'
     };
 
-    console.log('네이버 증권 크롤링 성공:', stockData);
+    console.log('크롤링 성공:', stockData);
     return stockData;
 
   } catch (error) {
-    console.error('네이버 증권 크롤링 오류:', error);
+    console.error('크롤링 오류:', error);
     return null;
   }
 }
 
-async function fetchFromKakao(symbol) {
-  try {
-    // 카카오 증권 API 또는 웹사이트 크롤링
-    const url = `https://stock.kakao.com/stock/${symbol}`;
+function extractStockName(html, symbol) {
+  // 종목명 추출 - 여러 패턴 시도
+  const patterns = [
+    /<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<h2[^>]*>([^<]+)<\/h2>/,
+    /<title>([^<]+)<\/title>/,
+    /<span class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<div class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<strong[^>]*>([^<]+)<\/strong>/,
+    /<em[^>]*>([^<]+)<\/em>/,
+    /<h1[^>]*>([^<]+)<\/h1>/,
+    /<div class="company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<span class="company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<div class="stock_name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<span class="stock_name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<div class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<span class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
+    /<a[^>]*href="[^"]*item[^"]*"[^>]*>([^<]+)<\/a>/,
+    /<a[^>]*>([^<]+)<\/a>/,
+    /<div[^>]*>([^<]+)<\/div>/,
+    /<span[^>]*>([^<]+)<\/span>/,
+    /<p[^>]*>([^<]+)<\/p>/,
+    /<li[^>]*>([^<]+)<\/li>/,
+    /<td[^>]*>([^<]+)<\/td>/,
+    /<th[^>]*>([^<]+)<\/th>/,
+    /<label[^>]*>([^<]+)<\/label>/,
+    /<button[^>]*>([^<]+)<\/button>/,
+    /<input[^>]*value="([^"]+)"/,
+    /<meta[^>]*content="([^"]+)"/,
+    /<script[^>]*>[\s\S]*?name["\s]*:["\s]*([^"']+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?종목명["\s]*:["\s]*([^"']+)["\s]*[\s\S]*?<\/script>/
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && match[1] && match[1].trim() && match[1] !== '최근조회') {
+      const name = match[1].trim();
+      console.log(`종목명 추출 성공: ${name}`);
+      return name;
+    }
+  }
+
+  console.log('종목명 추출 실패 - 기본값 사용');
+  return getStockName(symbol);
+}
+
+function extractPriceInfo(html) {
+  // 가격 정보 추출 - 여러 패턴 시도
+  const pricePatterns = [
+    // 네이버 증권 기본 패턴
+    /<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/,
+    /<span class="no_today"[^>]*>([^<]+)<\/span>/,
+    /<em class="no_today"[^>]*>([^<]+)<\/em>/,
+    /<strong class="no_today"[^>]*>([^<]+)<\/strong>/,
+    /<p class="no_today"[^>]*>([^<]+)<\/p>/,
+    /<span[^>]*class="[^"]*no_today[^"]*"[^>]*>([^<]+)<\/span>/,
     
-    console.log(`카카오 증권 크롤링: ${url}`);
+    // 스크립트에서 가격 추출
+    /<script[^>]*>[\s\S]*?price["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?현재가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?종가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?value["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?amount["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?close["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?last["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?final["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+    // HTML 태그에서 가격 추출
+    /<td[^>]*>([\d,]+)<\/td>/,
+    /<span[^>]*>([\d,]+)<\/span>/,
+    /<div[^>]*>([\d,]+)<\/div>/,
+    /<p[^>]*>([\d,]+)<\/p>/,
+    /<em[^>]*>([\d,]+)<\/em>/,
+    /<strong[^>]*>([\d,]+)<\/strong>/,
+    /<b[^>]*>([\d,]+)<\/b>/,
+    /<i[^>]*>([\d,]+)<\/i>/,
+    /<font[^>]*>([\d,]+)<\/font>/,
+    /<label[^>]*>([\d,]+)<\/label>/,
+    /<button[^>]*>([\d,]+)<\/button>/,
+    /<input[^>]*value="([\d,]+)"/,
+    /<meta[^>]*content="([\d,]+)"/,
+    
+    // 테이블에서 가격 추출
+    /<tr[^>]*>[\s\S]*?<td[^>]*>([\d,]+)<\/td>[\s\S]*?<\/tr>/,
+    /<table[^>]*>[\s\S]*?<td[^>]*>([\d,]+)<\/td>[\s\S]*?<\/table>/,
+    
+    // 특정 클래스에서 가격 추출
+    /<span class="[^"]*price[^"]*"[^>]*>([\d,]+)<\/span>/,
+    /<div class="[^"]*price[^"]*"[^>]*>([\d,]+)<\/div>/,
+    /<span class="[^"]*amount[^"]*"[^>]*>([\d,]+)<\/span>/,
+    /<div class="[^"]*amount[^"]*"[^>]*>([\d,]+)<\/div>/,
+    /<span class="[^"]*value[^"]*"[^>]*>([\d,]+)<\/span>/,
+    /<div class="[^"]*value[^"]*"[^>]*>([\d,]+)<\/div>/
+  ];
+
+  let price = null;
+  let volume = 0;
+  let marketCap = 0;
+
+  // 가격 추출
+  for (const pattern of pricePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const priceStr = match[1].replace(/,/g, '');
+      const priceNum = parseInt(priceStr);
+      if (priceNum && priceNum > 0 && priceNum < 10000000) { // 합리적인 가격 범위
+        price = priceNum;
+        console.log(`가격 추출 성공: ${price}`);
+        break;
       }
-    });
-
-    if (!response.ok) {
-      console.log(`카카오 증권 응답 오류: ${response.status}`);
-      return null;
     }
-
-    const html = await response.text();
-    
-    // 카카오 증권 페이지 구조에 맞는 정규식
-    const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/);
-    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
-    
-    if (!priceMatch) {
-      console.log('카카오 증권에서 가격 정보를 찾을 수 없습니다');
-      return null;
-    }
-
-    const price = parseInt(priceMatch[1].replace(/,/g, ''));
-    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
-
-    if (isNaN(price)) {
-      console.log('카카오 증권 가격 파싱 실패:', priceMatch[1]);
-      return null;
-    }
-
-    const stockData = {
-      symbol: symbol,
-      name: name,
-      price: price, // 전일 종가
-      change: 0, // 변동가 제거
-      changePercent: 0, // 변동률 제거
-      volume: 0,
-      marketCap: 0,
-      lastUpdate: new Date().toISOString(),
-      source: 'kakao-finance',
-      note: '전일 종가 기준 (현재가 제거)'
-    };
-
-    console.log('카카오 증권 크롤링 성공:', stockData);
-    return stockData;
-
-  } catch (error) {
-    console.error('카카오 증권 크롤링 오류:', error);
-    return null;
   }
-}
 
-async function fetchFromToss(symbol) {
-  try {
-    // 토스 증권 API 또는 웹사이트 크롤링
-    const url = `https://toss.im/investment/stocks/${symbol}`;
-    
-    console.log(`토스 증권 크롤링: ${url}`);
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+  // 거래량 추출
+  const volumePatterns = [
+    /<span class="[^"]*tah[^"]*"[^>]*>([\d,]+)<\/span>/,
+    /<td[^>]*>([\d,]+)<\/td>/,
+    /<span[^>]*>([\d,]+)<\/span>/,
+    /<div[^>]*>([\d,]+)<\/div>/
+  ];
+
+  for (const pattern of volumePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const volumeStr = match[1].replace(/,/g, '');
+      const volumeNum = parseInt(volumeStr);
+      if (volumeNum && volumeNum > 1000) { // 합리적인 거래량 범위
+        volume = volumeNum;
+        console.log(`거래량 추출 성공: ${volume}`);
+        break;
       }
-    });
-
-    if (!response.ok) {
-      console.log(`토스 증권 응답 오류: ${response.status}`);
-      return null;
     }
-
-    const html = await response.text();
-    
-    // 토스 증권 페이지 구조에 맞는 정규식
-    const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/);
-    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
-    
-    if (!priceMatch) {
-      console.log('토스 증권에서 가격 정보를 찾을 수 없습니다');
-      return null;
-    }
-
-    const price = parseInt(priceMatch[1].replace(/,/g, ''));
-    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
-
-    if (isNaN(price)) {
-      console.log('토스 증권 가격 파싱 실패:', priceMatch[1]);
-      return null;
-    }
-
-    const stockData = {
-      symbol: symbol,
-      name: name,
-      price: price, // 전일 종가
-      change: 0, // 변동가 제거
-      changePercent: 0, // 변동률 제거
-      volume: 0,
-      marketCap: 0,
-      lastUpdate: new Date().toISOString(),
-      source: 'toss-finance',
-      note: '전일 종가 기준 (현재가 제거)'
-    };
-
-    console.log('토스 증권 크롤링 성공:', stockData);
-    return stockData;
-
-  } catch (error) {
-    console.error('토스 증권 크롤링 오류:', error);
-    return null;
   }
-}
 
-async function fetchFromFinup(symbol) {
-  try {
-    // Finup API 또는 웹사이트 크롤링
-    const url = `https://finup.co.kr/stock/${symbol}`;
-    
-    console.log(`Finup 크롤링: ${url}`);
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+  // 시가총액 추출
+  const marketCapPatterns = [
+    /시가총액[^>]*>([^<]+)<\/[^>]*>/,
+    /시총[^>]*>([^<]+)<\/[^>]*>/,
+    /<td[^>]*>([\d,]+억)<\/td>/,
+    /<span[^>]*>([\d,]+억)<\/span>/,
+    /<div[^>]*>([\d,]+억)<\/div>/
+  ];
+
+  for (const pattern of marketCapPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const marketCapStr = match[1];
+      if (marketCapStr.includes('억')) {
+        const value = parseFloat(marketCapStr.replace(/[억,]/g, ''));
+        marketCap = Math.round(value * 100000000);
+        console.log(`시가총액 추출 성공: ${marketCap}`);
+        break;
+      } else if (marketCapStr.includes('조')) {
+        const value = parseFloat(marketCapStr.replace(/[조,]/g, ''));
+        marketCap = Math.round(value * 1000000000000);
+        console.log(`시가총액 추출 성공: ${marketCap}`);
+        break;
       }
-    });
-
-    if (!response.ok) {
-      console.log(`Finup 응답 오류: ${response.status}`);
-      return null;
     }
-
-    const html = await response.text();
-    
-    // Finup 페이지 구조에 맞는 정규식
-    const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/);
-    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
-    
-    if (!priceMatch) {
-      console.log('Finup에서 가격 정보를 찾을 수 없습니다');
-      return null;
-    }
-
-    const price = parseInt(priceMatch[1].replace(/,/g, ''));
-    const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
-
-    if (isNaN(price)) {
-      console.log('Finup 가격 파싱 실패:', priceMatch[1]);
-      return null;
-    }
-
-    const stockData = {
-      symbol: symbol,
-      name: name,
-      price: price, // 전일 종가
-      change: 0, // 변동가 제거
-      changePercent: 0, // 변동률 제거
-      volume: 0,
-      marketCap: 0,
-      lastUpdate: new Date().toISOString(),
-      source: 'finup',
-      note: '전일 종가 기준 (현재가 제거)'
-    };
-
-    console.log('Finup 크롤링 성공:', stockData);
-    return stockData;
-
-  } catch (error) {
-    console.error('Finup 크롤링 오류:', error);
-    return null;
   }
-}
 
-async function fetchFromYahoo(symbol) {
-  try {
-    const yahooSymbol = `${symbol}.KS`;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`;
-    
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-      return null;
-    }
-
-    const result = data.chart.result[0];
-    const meta = result.meta;
-
-    const currentPrice = meta.regularMarketPrice;
-    const previousClose = meta.previousClose;
-    const change = currentPrice - previousClose;
-    const changePercent = (change / previousClose) * 100;
-    const volume = meta.regularMarketVolume || 0;
-    const marketCap = meta.marketCap || 0;
-
-    return {
-      symbol: symbol,
-      name: meta.longName || getStockName(symbol),
-      price: currentPrice, // 전일 종가
-      change: 0, // 변동가 제거
-      changePercent: 0, // 변동률 제거
-      volume: volume,
-      marketCap: marketCap,
-      lastUpdate: new Date().toISOString(),
-      note: '전일 종가 기준 (현재가 제거)'
-    };
-
-  } catch (error) {
-    console.error('Yahoo Finance 오류:', error);
-    return null;
-  }
+  return { price, volume, marketCap };
 }
 
 function getStockName(symbol) {
@@ -620,4 +291,3 @@ function getStockName(symbol) {
   };
   return names[symbol] || symbol;
 }
-
