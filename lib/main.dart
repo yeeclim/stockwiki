@@ -309,8 +309,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
                                     children: [
                                       _infoRow('종목명', stock['한글 종목명'].toString()),
                                       _infoRow('종목코드', stock['단축코드'].toString()),
-                                      _infoRow('현재가', _formatWon(stock['price'])),
-                                      _infoRow('전일가', _formatWon(stock['change'] != null ? (stock['price'] - stock['change']) : null)),
+                                      _infoRow('전일 종가', _formatWon(stock['price'])),
                                       _infoRow('시가총액', _formatWon(stock['marketCap'])),
                                     ],
                                   ),

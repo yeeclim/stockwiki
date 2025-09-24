@@ -133,6 +133,21 @@ async function fetchFromNaver(symbol) {
     if (!priceMatch) {
       priceMatch = html.match(/<span[^>]*class="[^"]*no_today[^"]*"[^>]*>([^<]+)<\/span>/);
     }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?price["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?현재가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<script[^>]*>[\s\S]*?종가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<td[^>]*>([\d,]+)<\/td>/);
+    }
+    if (!priceMatch) {
+      priceMatch = html.match(/<span[^>]*>([\d,]+)<\/span>/);
+    }
     
     // 종목명 추출 (여러 패턴 시도)
     let nameMatch = html.match(/<h2 class="wrap_company">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
