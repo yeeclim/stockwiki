@@ -175,6 +175,18 @@ async function fetchFromNaver(symbol) {
     if (!nameMatch) {
       nameMatch = html.match(/<span class="name">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
     }
+    if (!nameMatch) {
+      nameMatch = html.match(/<a[^>]*href="[^"]*item[^"]*"[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<a[^>]*>([^<]+)<\/a>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<div[^>]*>([^<]+)<\/div>/);
+    }
+    if (!nameMatch) {
+      nameMatch = html.match(/<span[^>]*>([^<]+)<\/span>/);
+    }
     
     // 변동 정보 추출
     const changeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d,]+)<\/span>/);
@@ -200,6 +212,9 @@ async function fetchFromNaver(symbol) {
       console.log('HTML에서 h2 관련 부분:', html.match(/<h2[^>]*>.*?<\/h2>/g) || '없음');
       console.log('HTML에서 strong 관련 부분:', html.match(/<strong[^>]*>.*?<\/strong>/g) || '없음');
       console.log('HTML에서 em 관련 부분:', html.match(/<em[^>]*>.*?<\/em>/g) || '없음');
+      console.log('HTML에서 a 태그 관련 부분:', html.match(/<a[^>]*>.*?<\/a>/g) || '없음');
+      console.log('HTML에서 div 태그 관련 부분:', html.match(/<div[^>]*>.*?<\/div>/g) || '없음');
+      console.log('HTML에서 span 태그 관련 부분:', html.match(/<span[^>]*>.*?<\/span>/g) || '없음');
     }
 
     const price = parseInt(priceMatch[1].replace(/,/g, ''));
