@@ -21,8 +21,8 @@ class KrxLoader {
 
       dev.log('네이버 금융 API 호출 시작: $symbol');
       
-      // API 호출 시도
-      final baseUrl = 'https://stockwiki.vercel.app';
+      // API 호출 시도 (현재 도메인 사용)
+      final baseUrl = Uri.base.origin;
       final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
       final response = await http.get(
@@ -185,9 +185,7 @@ class KrxLoader {
 
     // 전체 종목 API에서도 검색 (더 많은 결과)
     try {
-      final baseUrl = kReleaseMode 
-          ? 'https://stockwiki.vercel.app' 
-          : 'http://localhost:3000';
+      final baseUrl = Uri.base.origin;
       final url = '$baseUrl/api/krx-all-stocks?limit=50';
       
       final response = await http.get(Uri.parse(url));
