@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/stock.dart';
+import 'stock_chart_widget.dart';
 
 class StockCard extends StatelessWidget {
   final Stock stock;
@@ -114,6 +115,11 @@ class StockCard extends StatelessWidget {
                     ),
                   ],
                 ),
+            ],
+            // 차트 스냅샷 추가
+            if (hasRealTimeData) ...[
+              const SizedBox(height: 16),
+              StockChartWidget(symbol: stock.symbol),
             ],
           ],
         ),
