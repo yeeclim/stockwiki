@@ -1,4 +1,9 @@
 {
+  "name": "stockwiki",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "flutter build web"
+  },
   "dependencies": {
     "rss-parser": "^3.13.0",
     "jsdom": "^22.1.0"
