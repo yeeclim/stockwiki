@@ -9,6 +9,8 @@ import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
 import 'package:stockwiki/pages/interest_news_page.dart';
+import 'package:stockwiki/widgets/stock_card.dart';
+import 'package:stockwiki/models/stock.dart';
 
 void main() {
   runApp(const MyApp());
@@ -300,20 +302,9 @@ class _StockSearchPageState extends State<StockSearchPage> {
                             itemCount: _krResults.length,
                             itemBuilder: (context, index) {
                               final stock = _krResults[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 10),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _infoRow('종목명', stock['한글 종목명'].toString()),
-                                      _infoRow('종목코드', stock['단축코드'].toString()),
-                                      _infoRow('전일 종가', _formatWon(stock['price'])),
-                                      _infoRow('시가총액', _formatWon(stock['marketCap'])),
-                                    ],
-                                  ),
-                                ),
+                              // StockCard 위젯을 사용하여 차트 포함
+                              return StockCard(
+                                stock: Stock.fromKrxData(stock),
                               );
                             },
                           ),
