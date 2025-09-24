@@ -217,6 +217,18 @@ async function fetchFromNaver(symbol) {
     const changePercentMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([+-]?[\d.]+)%<\/span>/);
     const volumeMatch = html.match(/<span class="[^"]*tah[^"]*"[^>]*>([\d,]+)<\/span>/);
     
+    // 시가총액 추출 (여러 패턴 시도)
+    let marketCapMatch = html.match(/시가총액[^>]*>([^<]+)<\/[^>]*>/);
+    if (!marketCapMatch) {
+      marketCapMatch = html.match(/시총[^>]*>([^<]+)<\/[^>]*>/);
+    }
+    if (!marketCapMatch) {
+      marketCapMatch = html.match(/<td[^>]*>([\d,]+억)<\/td>/);
+    }
+    if (!marketCapMatch) {
+      marketCapMatch = html.match(/<span[^>]*>([\d,]+억)<\/span>/);
+    }
+    
     if (!priceMatch) {
       console.log('네이버에서 가격 정보를 찾을 수 없습니다');
       console.log('HTML 샘플:', html.substring(0, 1000));
@@ -249,6 +261,21 @@ async function fetchFromNaver(symbol) {
     const volumeText = volumeMatch ? volumeMatch[1].replace(/,/g, '') : '0';
     const volume = parseInt(volumeText) || 0;
     const name = nameMatch ? nameMatch[1].trim() : getStockName(symbol);
+    
+    // 시가총액 파싱
+    let marketCap = 0;
+    if (marketCapMatch) {
+      const marketCapText = marketCapMatch[1];
+      if (marketCapText.includes('억')) {
+        const value = parseFloat(marketCapText.replace(/[억,]/g, ''));
+        marketCap = Math.round(value * 100000000); // 억을 원으로 변환
+      } else if (marketCapText.includes('조')) {
+        const value = parseFloat(marketCapText.replace(/[조,]/g, ''));
+        marketCap = Math.round(value * 1000000000000); // 조를 원으로 변환
+      } else {
+        marketCap = parseInt(marketCapText.replace(/,/g, '')) || 0;
+      }
+    }
 
     if (isNaN(price)) {
       console.log('가격 파싱 실패:', priceMatch[1]);
@@ -258,13 +285,14 @@ async function fetchFromNaver(symbol) {
     const stockData = {
       symbol: symbol,
       name: name,
-      price: price,
-      change: change,
-      changePercent: changePercent,
+      price: price, // 전일 종가 (현재가 제거)
+      change: 0, // 변동가 제거
+      changePercent: 0, // 변동률 제거
       volume: volume,
-      marketCap: 0,
+      marketCap: marketCap, // 시가총액 추가
       lastUpdate: new Date().toISOString(),
-      source: 'naver-finance'
+      source: 'naver-finance',
+      note: '전일 종가 기준 (현재가 제거)'
     };
 
     console.log('네이버 증권 크롤링 성공:', stockData);
@@ -317,13 +345,14 @@ async function fetchFromKakao(symbol) {
     const stockData = {
       symbol: symbol,
       name: name,
-      price: price,
-      change: 0,
-      changePercent: 0,
+      price: price, // 전일 종가
+      change: 0, // 변동가 제거
+      changePercent: 0, // 변동률 제거
       volume: 0,
       marketCap: 0,
       lastUpdate: new Date().toISOString(),
-      source: 'kakao-finance'
+      source: 'kakao-finance',
+      note: '전일 종가 기준 (현재가 제거)'
     };
 
     console.log('카카오 증권 크롤링 성공:', stockData);
@@ -376,13 +405,14 @@ async function fetchFromToss(symbol) {
     const stockData = {
       symbol: symbol,
       name: name,
-      price: price,
-      change: 0,
-      changePercent: 0,
+      price: price, // 전일 종가
+      change: 0, // 변동가 제거
+      changePercent: 0, // 변동률 제거
       volume: 0,
       marketCap: 0,
       lastUpdate: new Date().toISOString(),
-      source: 'toss-finance'
+      source: 'toss-finance',
+      note: '전일 종가 기준 (현재가 제거)'
     };
 
     console.log('토스 증권 크롤링 성공:', stockData);
@@ -435,13 +465,14 @@ async function fetchFromFinup(symbol) {
     const stockData = {
       symbol: symbol,
       name: name,
-      price: price,
-      change: 0,
-      changePercent: 0,
+      price: price, // 전일 종가
+      change: 0, // 변동가 제거
+      changePercent: 0, // 변동률 제거
       volume: 0,
       marketCap: 0,
       lastUpdate: new Date().toISOString(),
-      source: 'finup'
+      source: 'finup',
+      note: '전일 종가 기준 (현재가 제거)'
     };
 
     console.log('Finup 크롤링 성공:', stockData);
@@ -478,12 +509,13 @@ async function fetchFromYahoo(symbol) {
     return {
       symbol: symbol,
       name: meta.longName || getStockName(symbol),
-      price: currentPrice,
-      change: change,
-      changePercent: changePercent,
+      price: currentPrice, // 전일 종가
+      change: 0, // 변동가 제거
+      changePercent: 0, // 변동률 제거
       volume: volume,
       marketCap: marketCap,
-      lastUpdate: new Date().toISOString()
+      lastUpdate: new Date().toISOString(),
+      note: '전일 종가 기준 (현재가 제거)'
     };
 
   } catch (error) {
