@@ -60,21 +60,13 @@ class _StockSearchPageState extends State<StockSearchPage> {
 
   String? _validateKeyword(String keyword) {
     final trimmed = keyword.trim();
-    final containsKorean = RegExp(r'[\uac00-\ud7a3]').hasMatch(trimmed);
-    final containsNumber = RegExp(r'\d').hasMatch(trimmed);
-    final containsEnglish = RegExp(r'[a-zA-Z]').hasMatch(trimmed);
     
-    if (trimmed.length < 1) {
+    // 빈 검색어만 체크, 나머지는 모두 허용
+    if (trimmed.isEmpty) {
       return '검색어를 입력해주세요';
     }
     
-    if (_marketType == 'kr') {
-      // 한국 주식: 한글, 영문, 숫자 모두 허용 (1글자 이상)
-      if (!containsKorean && !containsNumber && !containsEnglish) {
-        return '한글, 영문, 숫자만 입력 가능합니다';
-      }
-    }
-    return null;
+    return null; // 모든 검색어 허용
   }
 
   void _searchStocks() async {
