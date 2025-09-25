@@ -128,7 +128,14 @@ class KrxLoader {
         final name = stock['한글 종목명'].toString().toLowerCase();
         final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
         final searchTerm = q.toLowerCase();
-        return name == searchTerm || shortName == searchTerm;
+        final isMatch = name == searchTerm || shortName == searchTerm;
+        
+        // 디버깅용 로그
+        if (searchTerm == 'lg' || searchTerm == 'sk') {
+          dev.log('검색 중: $searchTerm vs $name, $shortName -> $isMatch');
+        }
+        
+        return isMatch;
       },
       orElse: () => {},
     );
@@ -184,11 +191,14 @@ class KrxLoader {
 
   // ✅ 다중 결과 반환 (실시간 데이터 포함, 최대 50개)
   static Future<List<Map<String, dynamic>>> searchStocks(String keyword) async {
+    dev.log('searchStocks 호출됨: $keyword');
     await _loadData();
     final q = keyword.trim();
+    dev.log('검색어 정리됨: $q');
 
     // 더 유연한 검색어 검증 (한글, 영문, 숫자, 공백 허용)
     final isValid = RegExp(r'^[가-힣a-zA-Z0-9\s]+$').hasMatch(q) && q.length >= 1;
+    dev.log('검색어 유효성: $isValid');
     if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
     // 먼저 로컬 데이터에서 검색 (대소문자 구분 없이, 한글 종목명과 한글 종목약명 모두 확인)
@@ -196,7 +206,14 @@ class KrxLoader {
       final name = stock['한글 종목명'].toString().toLowerCase();
       final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
       final searchTerm = q.toLowerCase();
-      return name.contains(searchTerm) || shortName.contains(searchTerm);
+      final isMatch = name.contains(searchTerm) || shortName.contains(searchTerm);
+      
+      // 디버깅용 로그
+      if (searchTerm == 'lg' || searchTerm == 'sk') {
+        dev.log('다중 검색 중: $searchTerm vs $name, $shortName -> $isMatch');
+      }
+      
+      return isMatch;
     }).take(20).toList();
 
     // 전체 종목 API에서도 검색 (더 많은 결과)
