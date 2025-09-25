@@ -119,7 +119,10 @@ class _KeywordSearchPageState extends State<KeywordSearchPage> {
                   itemCount: _results.length,
                   itemBuilder: (context, index) {
                     final stock = _results[index];
-                    return StockCard(stock: stock);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: StockCard(stock: stock),
+                    );
                   },
                 ),
               ),
