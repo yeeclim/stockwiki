@@ -108,10 +108,11 @@ class KrxLoader {
     await _loadData();
     final q = keyword.trim();
 
-    final isValid = RegExp(r'^[가-힣0-9]+$').hasMatch(q);
+    // 더 유연한 검색어 검증 (한글, 영문, 숫자, 공백 허용)
+    final isValid = RegExp(r'^[가-힣a-zA-Z0-9\s]+$').hasMatch(q) && q.length >= 1;
     if (!isValid) {
       dev.log('잘못된 검색어 형식: $q');
-      throw Exception('잘못된 검색어 형식입니다.');
+      throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
     }
 
     if (_mergedList == null || _mergedList!.isEmpty) {
@@ -121,9 +122,14 @@ class KrxLoader {
 
     dev.log('기본 데이터에서 검색 중... (총 ${_mergedList!.length}개 종목)');
 
-    // 기본 정보에서 검색
+    // 기본 정보에서 검색 (대소문자 구분 없이, 한글 종목명과 한글 종목약명 모두 확인)
     final exactMatch = _mergedList!.firstWhere(
-      (stock) => stock['한글 종목명'].toString() == q,
+      (stock) {
+        final name = stock['한글 종목명'].toString().toLowerCase();
+        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
+        final searchTerm = q.toLowerCase();
+        return name == searchTerm || shortName == searchTerm;
+      },
       orElse: () => {},
     );
 
@@ -146,7 +152,12 @@ class KrxLoader {
 
     dev.log('정확한 일치 없음, 부분 일치 검색 중...');
     final fallbackMatch = _mergedList!.firstWhere(
-      (stock) => stock['한글 종목명'].toString().contains(q),
+      (stock) {
+        final name = stock['한글 종목명'].toString().toLowerCase();
+        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
+        final searchTerm = q.toLowerCase();
+        return name.contains(searchTerm) || shortName.contains(searchTerm);
+      },
       orElse: () => {},
     );
 
@@ -176,12 +187,17 @@ class KrxLoader {
     await _loadData();
     final q = keyword.trim();
 
-    final isValid = RegExp(r'^[가-힣0-9]+$').hasMatch(q);
-    if (!isValid) throw Exception('잘못된 검색어 형식입니다.');
+    // 더 유연한 검색어 검증 (한글, 영문, 숫자, 공백 허용)
+    final isValid = RegExp(r'^[가-힣a-zA-Z0-9\s]+$').hasMatch(q) && q.length >= 1;
+    if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
-    // 먼저 로컬 데이터에서 검색
-    final localMatches = _mergedList!.where((stock) =>
-      stock['한글 종목명'].toString().contains(q)).take(20).toList();
+    // 먼저 로컬 데이터에서 검색 (대소문자 구분 없이, 한글 종목명과 한글 종목약명 모두 확인)
+    final localMatches = _mergedList!.where((stock) {
+      final name = stock['한글 종목명'].toString().toLowerCase();
+      final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
+      final searchTerm = q.toLowerCase();
+      return name.contains(searchTerm) || shortName.contains(searchTerm);
+    }).take(20).toList();
 
     // 전체 종목 API에서도 검색 (더 많은 결과)
     try {
