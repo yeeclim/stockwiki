@@ -185,6 +185,38 @@ class KrxLoader {
       return fallbackMatch;
     }
 
+    // 검색 결과가 없으면 "보통주" 추가해서 재검색
+    dev.log('검색 결과 없음, "보통주" 추가해서 재검색 시도');
+    final extendedSearchTerm = '${q}보통주';
+    dev.log('확장 검색어: $extendedSearchTerm');
+    
+    final extendedMatch = _mergedList!.firstWhere(
+      (stock) {
+        final name = stock['한글 종목명'].toString().toLowerCase();
+        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
+        return name.contains(extendedSearchTerm.toLowerCase()) || 
+               shortName.contains(extendedSearchTerm.toLowerCase());
+      },
+      orElse: () => {},
+    );
+
+    if (extendedMatch.isNotEmpty) {
+      dev.log('확장 검색으로 발견: ${extendedMatch['한글 종목명']}');
+      // 실시간 데이터 가져오기
+      final symbol = extendedMatch['단축코드']?.toString();
+      if (symbol != null) {
+        dev.log('실시간 데이터 요청: $symbol');
+        final realTimeData = await _fetchRealTimeStock(symbol);
+        if (realTimeData != null) {
+          dev.log('실시간 데이터 병합 완료');
+          return {...extendedMatch, ...realTimeData};
+        } else {
+          dev.log('실시간 데이터 가져오기 실패, 기본 데이터만 반환');
+        }
+      }
+      return extendedMatch;
+    }
+
     dev.log('검색 결과 없음');
     throw Exception('검색 결과 없음');
   }
@@ -224,17 +256,22 @@ class KrxLoader {
     
     dev.log('로컬 검색 결과: ${localMatches.length}개');
     
-    // LG, SK 특별 처리 - 결과가 없으면 직접 추가
-    if (localMatches.isEmpty && (q.toLowerCase() == 'lg' || q.toLowerCase() == 'sk')) {
-      dev.log('LG/SK 특별 처리 시작');
-      final specialMatches = _mergedList!.where((stock) {
-        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
-        return shortName == q.toLowerCase();
-      }).toList();
+    // 검색 결과가 없으면 "보통주" 추가해서 재검색
+    if (localMatches.isEmpty) {
+      dev.log('검색 결과 없음, "보통주" 추가해서 재검색 시도');
+      final extendedSearchTerm = '${q}보통주';
+      dev.log('확장 검색어: $extendedSearchTerm');
       
-      if (specialMatches.isNotEmpty) {
-        dev.log('특별 처리로 ${specialMatches.length}개 발견');
-        localMatches.addAll(specialMatches);
+      final extendedMatches = _mergedList!.where((stock) {
+        final name = stock['한글 종목명'].toString().toLowerCase();
+        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
+        return name.contains(extendedSearchTerm.toLowerCase()) || 
+               shortName.contains(extendedSearchTerm.toLowerCase());
+      }).take(20).toList();
+      
+      if (extendedMatches.isNotEmpty) {
+        dev.log('확장 검색으로 ${extendedMatches.length}개 발견');
+        localMatches.addAll(extendedMatches);
       }
     }
 
