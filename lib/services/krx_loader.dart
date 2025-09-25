@@ -202,19 +202,41 @@ class KrxLoader {
     if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
     // 먼저 로컬 데이터에서 검색 (대소문자 구분 없이, 한글 종목명과 한글 종목약명 모두 확인)
+    dev.log('로컬 데이터 검색 시작: $q');
     final localMatches = _mergedList!.where((stock) {
       final name = stock['한글 종목명'].toString().toLowerCase();
       final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
       final searchTerm = q.toLowerCase();
       final isMatch = name.contains(searchTerm) || shortName.contains(searchTerm);
       
-      // 디버깅용 로그
-      if (searchTerm == 'lg' || searchTerm == 'sk') {
-        dev.log('다중 검색 중: $searchTerm vs $name, $shortName -> $isMatch');
+      // LG, SK 특별 처리
+      if (searchTerm == 'lg' && shortName == 'lg') {
+        dev.log('LG 매치 발견: $name, $shortName');
+        return true;
+      }
+      if (searchTerm == 'sk' && shortName == 'sk') {
+        dev.log('SK 매치 발견: $name, $shortName');
+        return true;
       }
       
       return isMatch;
     }).take(20).toList();
+    
+    dev.log('로컬 검색 결과: ${localMatches.length}개');
+    
+    // LG, SK 특별 처리 - 결과가 없으면 직접 추가
+    if (localMatches.isEmpty && (q.toLowerCase() == 'lg' || q.toLowerCase() == 'sk')) {
+      dev.log('LG/SK 특별 처리 시작');
+      final specialMatches = _mergedList!.where((stock) {
+        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
+        return shortName == q.toLowerCase();
+      }).toList();
+      
+      if (specialMatches.isNotEmpty) {
+        dev.log('특별 처리로 ${specialMatches.length}개 발견');
+        localMatches.addAll(specialMatches);
+      }
+    }
 
     // 전체 종목 API에서도 검색 (더 많은 결과)
     try {
