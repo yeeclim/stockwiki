@@ -62,12 +62,16 @@ class _StockSearchPageState extends State<StockSearchPage> {
     final trimmed = keyword.trim();
     final containsKorean = RegExp(r'[\uac00-\ud7a3]').hasMatch(trimmed);
     final containsNumber = RegExp(r'\d').hasMatch(trimmed);
-    if (trimmed.length < 2) {
-      return '한글 2자 이상 또는 숫자 3자 이상 입력해주세요';
+    final containsEnglish = RegExp(r'[a-zA-Z]').hasMatch(trimmed);
+    
+    if (trimmed.length < 1) {
+      return '검색어를 입력해주세요';
     }
+    
     if (_marketType == 'kr') {
-      if (!containsKorean && !containsNumber) {
-        return '한글 2자 이상 또는 숫자 3자 이상 입력해주세요';
+      // 한국 주식: 한글, 영문, 숫자 모두 허용 (1글자 이상)
+      if (!containsKorean && !containsNumber && !containsEnglish) {
+        return '한글, 영문, 숫자만 입력 가능합니다';
       }
     }
     return null;
