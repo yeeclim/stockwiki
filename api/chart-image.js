@@ -26,29 +26,44 @@ module.exports = async function handler(req, res) {
     // 네이버 증권 차트 이미지 URL
     const chartUrl = `https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${symbol}.png`;
     
-    // 이미지 다운로드 및 프록시
-    const imageResponse = await fetch(chartUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://finance.naver.com/',
-        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
-      }
+    // https 모듈을 사용하여 이미지 다운로드
+    const imageData = await new Promise((resolve, reject) => {
+      const request = https.get(chartUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Referer': 'https://finance.naver.com/',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+      }, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`이미지 로드 실패: ${response.statusCode}`));
+          return;
+        }
+        
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => {
+          resolve({
+            data: Buffer.concat(chunks),
+            contentType: response.headers['content-type'] || 'image/png'
+          });
+        });
+      });
+      
+      request.on('error', reject);
+      request.setTimeout(10000, () => {
+        request.destroy();
+        reject(new Error('요청 시간 초과'));
+      });
     });
 
-    if (!imageResponse.ok) {
-      throw new Error(`이미지 로드 실패: ${imageResponse.status}`);
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const contentType = imageResponse.headers.get('content-type') || 'image/png';
-
     // 이미지 헤더 설정
-    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Type', imageData.contentType);
     res.setHeader('Cache-Control', 'public, max-age=300'); // 5분 캐시
-    res.setHeader('Content-Length', imageBuffer.byteLength);
+    res.setHeader('Content-Length', imageData.data.length);
 
     // 이미지 데이터 전송
-    res.status(200).send(Buffer.from(imageBuffer));
+    res.status(200).send(imageData.data);
 
   } catch (error) {
     console.error('차트 이미지 프록시 실패:', error);
