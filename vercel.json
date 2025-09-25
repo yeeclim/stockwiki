@@ -1,14 +1,11 @@
 {
   "version": 2,
-  "buildCommand": "flutter build web",
-  "outputDirectory": "build/web",
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
+  "builds": [
+    { "src": "build/web/**", "use": "@vercel/static" },
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
-    { "src": "/(.*)", "dest": "/$1" }
+    { "src": "/(.*)", "dest": "/build/web/$1" }
   ]
 }
