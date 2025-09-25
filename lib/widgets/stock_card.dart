@@ -296,7 +296,9 @@ class StockCard extends StatelessWidget {
       return _chartCache[cacheKey]!;
     }
     
-    final chartUrl = 'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png?t=$minutesSinceEpoch';
+    // Vercel 프록시 API 사용
+    final baseUrl = Uri.base.origin;
+    final chartUrl = '$baseUrl/api/chart-image?symbol=$symbol&t=$minutesSinceEpoch';
     _chartCache[cacheKey] = chartUrl;
     
     // 캐시 크기 제한 (최대 50개)
