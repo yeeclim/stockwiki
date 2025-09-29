@@ -1,5 +1,5 @@
 // 📄 /api/naver_news_python.js
-// Python 스크립트의 로직을 JavaScript로 포팅
+// 네이버 뉴스 RSS 크롤링
 
 export default async function handler(req, res) {
   // CORS 헤더 설정
@@ -30,7 +30,9 @@ export default async function handler(req, res) {
       return;
     }
 
-    // 네이버 뉴스 크롤링 실행
+    console.log('네이버 RSS 뉴스 검색:', keyword);
+
+    // 네이버 뉴스 RSS 크롤링 실행
     const newsList = await searchNaverNews(keyword.trim(), max_results);
     
     const result = {
@@ -56,14 +58,24 @@ export default async function handler(req, res) {
 // 텍스트 정리 함수
 function cleanText(text) {
   if (!text) return "";
+  
   // HTML 태그 제거
-  text = text.replace(/<[^>]+>/g, '');
+  text = text.replace(/<[^>]*>/g, '');
+  
+  // HTML 엔티티 디코딩
+  text = text.replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>')
+             .replace(/&amp;/g, '&')
+             .replace(/&quot;/g, '"')
+             .replace(/&#39;/g, "'")
+             .replace(/&nbsp;/g, ' ');
+
   // 공백 정리
   text = text.replace(/\s+/g, ' ').trim();
   return text;
 }
 
-// 네이버 뉴스 검색 함수 (RSS 피드 방식)
+// 네이버 뉴스 RSS 검색 함수
 async function searchNaverNews(keyword, maxResults = 20) {
   try {
     // URL 인코딩
@@ -94,120 +106,60 @@ async function searchNaverNews(keyword, maxResults = 20) {
     const xmlText = await response.text();
     console.log('RSS 응답 길이:', xmlText.length);
     
-    // 개선된 HTML 파싱
+    // RSS XML 파싱
     const newsList = [];
     
-    // 다양한 뉴스 아이템 패턴 시도
-    const patterns = [
-      /<div class="news_area"[^>]*>(.*?)<\/div>/gs,
-      /<div class="news_info"[^>]*>(.*?)<\/div>/gs,
-      /<div class="news_tit"[^>]*>(.*?)<\/div>/gs,
-      /<a[^>]*class="news_tit"[^>]*>(.*?)<\/a>/gs
-    ];
+    // <item> 태그들 찾기
+    const itemPattern = /<item[^>]*>(.*?)<\/item>/gs;
+    const items = xmlText.match(itemPattern) || [];
     
-    let matches = [];
-    for (const pattern of patterns) {
-      matches = html.match(pattern) || [];
-      if (matches.length > 0) {
-        console.log(`패턴 매칭 성공: ${matches.length}개 아이템`);
-        break;
-      }
-    }
-    
-    if (matches.length === 0) {
-      console.log('뉴스 아이템을 찾을 수 없습니다. HTML 구조 확인 필요');
-      return [];
-    }
-    
-    for (let i = 0; i < Math.min(matches.length, maxResults); i++) {
+    console.log(`RSS 아이템 개수: ${items.length}`);
+
+    for (let i = 0; i < Math.min(items.length, maxResults); i++) {
       try {
-        const itemHtml = matches[i];
+        const itemXml = items[i];
         
-        // 제목과 링크 추출 (더 유연한 패턴)
-        const titlePatterns = [
-          /<a[^>]*class="news_tit"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/,
-          /<a[^>]*href="([^"]*)"[^>]*class="news_tit"[^>]*>([^<]*)<\/a>/,
-          /<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/
-        ];
+        // 제목 추출 (CDATA 처리)
+        const titleMatch = itemXml.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>/) || 
+                          itemXml.match(/<title[^>]*>(.*?)<\/title>/);
+        const title = titleMatch ? cleanText(titleMatch[1]) : '';
         
-        let title = '';
-        let link = '';
+        // 링크 추출
+        const linkMatch = itemXml.match(/<link[^>]*><!\[CDATA\[(.*?)\]\]><\/link>/) || 
+                         itemXml.match(/<link[^>]*>(.*?)<\/link>/);
+        const link = linkMatch ? linkMatch[1] : '';
         
-        for (const pattern of titlePatterns) {
-          const match = itemHtml.match(pattern);
-          if (match) {
-            link = match[1];
-            title = cleanText(match[2]);
-            break;
-          }
-        }
+        // 설명 추출
+        const descMatch = itemXml.match(/<description[^>]*><!\[CDATA\[(.*?)\]\]><\/description>/) || 
+                         itemXml.match(/<description[^>]*>(.*?)<\/description>/);
+        const description = descMatch ? cleanText(descMatch[1]) : '';
         
-        // 요약 추출
-        const summaryPatterns = [
-          /<div[^>]*class="news_dsc"[^>]*>([^<]*)<\/div>/,
-          /<div[^>]*class="dsc_wrap"[^>]*>([^<]*)<\/div>/,
-          /<p[^>]*>([^<]*)<\/p>/
-        ];
+        // 발행일 추출
+        const pubDateMatch = itemXml.match(/<pubDate[^>]*>(.*?)<\/pubDate>/);
+        const pubDate = pubDateMatch ? pubDateMatch[1] : '';
         
-        let summary = '';
-        for (const pattern of summaryPatterns) {
-          const match = itemHtml.match(pattern);
-          if (match) {
-            summary = cleanText(match[1]);
-            break;
-          }
-        }
-        
-        // 언론사 추출
-        const pressPatterns = [
-          /<span[^>]*class="info_group"[^>]*>([^<]*)<\/span>/,
-          /<span[^>]*class="press"[^>]*>([^<]*)<\/span>/,
-          /<em[^>]*>([^<]*)<\/em>/
-        ];
-        
-        let press = '';
-        for (const pattern of pressPatterns) {
-          const match = itemHtml.match(pattern);
-          if (match) {
-            press = cleanText(match[1]);
-            break;
-          }
-        }
-        
-        // 날짜 추출
-        const datePatterns = [
-          /<span[^>]*class="info"[^>]*>([^<]*)<\/span>/,
-          /<span[^>]*class="date"[^>]*>([^<]*)<\/span>/,
-          /<time[^>]*>([^<]*)<\/time>/
-        ];
-        
-        let date = '';
-        for (const pattern of datePatterns) {
-          const match = itemHtml.match(pattern);
-          if (match) {
-            date = cleanText(match[1]);
-            break;
-          }
-        }
+        // 언론사 추출 (제목에서 [언론사] 패턴)
+        const sourceMatch = title.match(/\[(.*?)\]/);
+        const source = sourceMatch ? sourceMatch[1] : '네이버뉴스';
         
         if (title && link) {
           newsList.push({
             title: title,
-            description: summary,
+            description: description,
             link: link,
-            source: press || '네이버뉴스',
-            date: date,
+            source: source,
+            published_at: pubDate,
             crawled_at: new Date().toISOString()
           });
         }
         
       } catch (itemError) {
-        console.error('뉴스 아이템 파싱 오류:', itemError);
+        console.error('RSS 아이템 파싱 오류:', itemError);
         continue;
       }
     }
-    
-    console.log(`네이버 뉴스 크롤링 완료: ${newsList.length}개 결과`);
+
+    console.log(`네이버 RSS 뉴스 크롤링 완료: ${newsList.length}개 결과`);
     return newsList;
     
   } catch (error) {
