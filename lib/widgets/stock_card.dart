@@ -429,9 +429,6 @@ class _StockCardState extends State<StockCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildChartPeriodButton('1개월', 'month'),
-                    _buildChartPeriodButton('3개월', 'quarter'),
-                    _buildChartPeriodButton('6개월', 'half'),
                     _buildChartPeriodButton('1년', 'year'),
                     _buildChartPeriodButton('3년', 'three'),
                   ],
@@ -564,11 +561,8 @@ class _StockCardState extends State<StockCard> {
 
   String _getPeriodLabel(String period) {
     switch (period) {
-      case 'month': return '1개월';
-      case 'quarter': return '3개월';
-      case 'half': return '6개월';
-      case 'year': return '1년';
-      case 'three': return '3년';
+      case 'year': return '1년 (주봉)';
+      case 'three': return '3년 (월봉)';
       default: return '일봉';
     }
   }
@@ -614,19 +608,15 @@ class _StockCardState extends State<StockCard> {
     
     String chartType = 'day'; // 기본값
     switch (period) {
-      case 'month':
-        chartType = 'day';
-        break;
-      case 'quarter':
-        chartType = 'day';
-        break;
-      case 'half':
-        chartType = 'day';
-        break;
       case 'year':
-        chartType = 'day';
+        // 1년 차트: 주봉 차트 사용
+        chartType = 'week';
         break;
       case 'three':
+        // 3년 차트: 월봉 차트 사용
+        chartType = 'month';
+        break;
+      default:
         chartType = 'day';
         break;
     }
