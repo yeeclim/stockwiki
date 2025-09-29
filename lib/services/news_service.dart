@@ -27,6 +27,19 @@ class NewsService {
         print('네이버 뉴스 크롤링 실패: $e');
       }
 
+      // 1-2. 다음 뉴스 크롤링 시도 (네이버 실패 시)
+      if (allNews.isEmpty) {
+        try {
+          final daumNews = await _fetchFromDaumNews(stockName);
+          if (daumNews.isNotEmpty) {
+            allNews.addAll(daumNews);
+            print('다음 뉴스 크롤링 성공: ${daumNews.length}개');
+          }
+        } catch (e) {
+          print('다음 뉴스 크롤링 실패: $e');
+        }
+      }
+
       // 2. 뉴스가 부족하면 추가 뉴스 소스로 보완
       if (allNews.length < _maxResults) {
         final String baseUrl = Uri.base.origin;
@@ -200,6 +213,44 @@ class NewsService {
     return [];
   }
 
+  static Future<List<News>> _fetchFromDaumNews(String keyword) async {
+    try {
+      final String baseUrl = Uri.base.origin;
+      final uri = Uri.parse('$baseUrl/api/daum_news_simple');
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'keyword': keyword,
+          'max_results': 5,
+        }),
+      );
 
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        
+        if (jsonData['success'] == true && jsonData['results'] != null) {
+          final results = jsonData['results'] as List<dynamic>;
+          
+          return results.map<News>((item) => News.fromJson({
+                'title': item['title']?.toString() ?? '',
+                'description': item['description']?.toString() ?? '',
+                'link': item['link']?.toString() ?? '',
+                'source': item['source']?.toString() ?? '다음뉴스',
+                'publishedAt': item['published_at']?.toString(),
+              })).toList();
+        }
+      }
+      
+      print('다음 뉴스 API 응답 오류: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      print('다음 뉴스 API 오류: $e');
+      return [];
+    }
+  }
 
 }
