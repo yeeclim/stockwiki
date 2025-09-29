@@ -1,5 +1,7 @@
 // lib/models/stock.dart
 
+import 'news.dart';
+
 class Stock {
   final String symbol;
   final String name;
@@ -9,6 +11,7 @@ class Stock {
   final int? volume;
   final int? marketCap;
   final String? lastUpdate;
+  final List<News>? news;
 
   Stock({
     required this.symbol,
@@ -19,9 +22,16 @@ class Stock {
     this.volume,
     this.marketCap,
     this.lastUpdate,
+    this.news,
   });
 
   factory Stock.fromJson(Map<String, dynamic> json) {
+    List<News>? newsList;
+    if (json['news'] != null) {
+      final newsData = json['news'] as List<dynamic>;
+      newsList = newsData.map((item) => News.fromJson(item)).toList();
+    }
+    
     return Stock(
       symbol: json['symbol'] ?? '',
       name: json['name'] ?? '',
@@ -31,6 +41,7 @@ class Stock {
       volume: json['volume']?.toInt(),
       marketCap: json['marketCap']?.toInt(),
       lastUpdate: json['lastUpdate'],
+      news: newsList,
     );
   }
 
@@ -45,6 +56,7 @@ class Stock {
       volume: krxData['volume']?.toInt(),
       marketCap: krxData['marketCap']?.toInt(),
       lastUpdate: krxData['lastUpdate'],
+      news: null, // KRX 데이터에는 뉴스 정보가 없음
     );
   }
 }
