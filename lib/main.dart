@@ -13,6 +13,9 @@ import 'package:stockwiki/widgets/stock_card.dart';
 import 'package:stockwiki/models/stock.dart';
 
 void main() {
+  // 캐시 무효화를 위한 설정
+  WidgetsFlutterBinding.ensureInitialized();
+  
   runApp(const MyApp());
 }
 

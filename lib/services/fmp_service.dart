@@ -10,10 +10,15 @@ class FMPService {
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
   static Future<List<Stock>> fetchStocks(String keyword) async {
     try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final searchUrl = Uri.parse(
-        '$_baseUrl/search?query=$keyword&limit=10&exchange=NASDAQ&apikey=$_apiKey',
+        '$_baseUrl/search?query=$keyword&limit=10&exchange=NASDAQ&apikey=$_apiKey&t=$timestamp',
       );
-      final searchRes = await http.get(searchUrl);
+      final searchRes = await http.get(searchUrl, headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
 
       if (searchRes.statusCode != 200) throw Exception('검색 실패');
 
@@ -26,9 +31,13 @@ class FMPService {
 
       // 심볼 기반으로 실시간 정보 조회
       final quoteUrl = Uri.parse(
-        '$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey',
+        '$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp',
       );
-      final quoteRes = await http.get(quoteUrl);
+      final quoteRes = await http.get(quoteUrl, headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
 
       if (quoteRes.statusCode != 200) throw Exception('시세 조회 실패');
 
