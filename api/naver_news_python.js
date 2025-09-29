@@ -63,37 +63,36 @@ function cleanText(text) {
   return text;
 }
 
-// 네이버 뉴스 검색 함수 (개선된 버전)
+// 네이버 뉴스 검색 함수 (RSS 피드 방식)
 async function searchNaverNews(keyword, maxResults = 20) {
   try {
     // URL 인코딩
     const encodedKeyword = encodeURIComponent(keyword);
     
-    // 네이버 뉴스 검색 URL
-    const url = `https://search.naver.com/search.naver?where=news&query=${encodedKeyword}&sort=1`;
+    // 네이버 뉴스 RSS URL 사용 (봇 차단 우회)
+    const rssUrl = `https://news.naver.com/main/rss/section.naver?sid=101&query=${encodedKeyword}`;
     
-    // 헤더 설정 (봇 차단 방지)
+    console.log('네이버 RSS URL:', rssUrl);
+    
+    // 헤더 설정
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
-      'Accept-Encoding': 'gzip, deflate',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-      'Cache-Control': 'no-cache',
+      'Accept': 'application/rss+xml, application/xml, text/xml, */*',
     };
     
-    // 요청 보내기
-    const response = await fetch(url, { 
+    // RSS 요청 보내기
+    const response = await fetch(rssUrl, { 
       headers,
-      timeout: 15000 
+      timeout: 10000 
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      console.log(`RSS 요청 실패: ${response.status}`);
+      return [];
     }
     
-    const html = await response.text();
+    const xmlText = await response.text();
+    console.log('RSS 응답 길이:', xmlText.length);
     
     // 개선된 HTML 파싱
     const newsList = [];
