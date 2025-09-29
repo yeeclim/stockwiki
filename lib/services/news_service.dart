@@ -93,9 +93,14 @@ class NewsService {
 
   static Future<List<News>> _fetchFromNewsData(String keyword) async {
     try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final uri = Uri.parse(
-          'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword&language=ko,en&country=kr');
-      final response = await http.get(uri);
+          'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword&language=ko,en&country=kr&t=$timestamp');
+      final response = await http.get(uri, headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
@@ -121,9 +126,14 @@ class NewsService {
 
   static Future<List<News>> _fetchFromGNews(String keyword) async {
     try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final uri = Uri.parse(
-          'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword&lang=ko,en&country=kr');
-      final response = await http.get(uri);
+          'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword&lang=ko,en&country=kr&t=$timestamp');
+      final response = await http.get(uri, headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
@@ -149,9 +159,14 @@ class NewsService {
 
   static Future<List<News>> _fetchFromMediaStack(String keyword) async {
     try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final uri = Uri.parse(
-          'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword&languages=ko,en&countries=kr');
-      final response = await http.get(uri);
+          'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword&languages=ko,en&countries=kr&timestamp=$timestamp');
+      final response = await http.get(uri, headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
@@ -177,8 +192,13 @@ class NewsService {
 
   static Future<List<News>> _fetchFromMkRss(String baseUrl, String keyword) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/mk_stock_rss');
-      final response = await http.get(uri);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final uri = Uri.parse('$baseUrl/api/mk_stock_rss?t=$timestamp');
+      final response = await http.get(uri, headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       
       if (response.statusCode == 200) {
         // 응답이 HTML인지 JSON인지 확인
@@ -216,16 +236,21 @@ class NewsService {
   static Future<List<News>> _fetchFromDaumNews(String keyword) async {
     try {
       final String baseUrl = Uri.base.origin;
-      final uri = Uri.parse('$baseUrl/api/daum_news_simple');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final uri = Uri.parse('$baseUrl/api/daum_news_simple?t=$timestamp');
       
       final response = await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
         body: json.encode({
           'keyword': keyword,
           'max_results': 5,
+          'timestamp': timestamp,
         }),
       );
 

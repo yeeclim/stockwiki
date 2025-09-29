@@ -25,10 +25,14 @@ class KrxLoader {
       final baseUrl = Uri.base.origin;
       final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final response = await http.get(
-        Uri.parse(url),
+        Uri.parse('$url&t=$timestamp'),
         headers: {
           'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       );
 
@@ -280,7 +284,15 @@ class KrxLoader {
       final baseUrl = Uri.base.origin;
       final url = '$baseUrl/api/krx-all-stocks?limit=50';
       
-      final response = await http.get(Uri.parse(url));
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final response = await http.get(
+        Uri.parse('$url&t=$timestamp'),
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {

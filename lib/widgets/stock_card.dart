@@ -568,23 +568,24 @@ class _StockCardState extends State<StockCard> {
   }
 
   String _getChartUrl(String symbol) {
-    // 5분마다 새로운 차트를 가져오도록 타임스탬프 추가
+    // 매번 새로운 차트를 가져오도록 타임스탬프를 더 자주 변경
     final now = DateTime.now();
-    final minutesSinceEpoch = now.millisecondsSinceEpoch ~/ (5 * 60 * 1000); // 5분 단위
+    final secondsSinceEpoch = now.millisecondsSinceEpoch ~/ 1000; // 1초 단위로 변경
     
-    final cacheKey = '${symbol}_$minutesSinceEpoch';
+    final cacheKey = '${symbol}_$secondsSinceEpoch';
     
     if (_chartCache.containsKey(cacheKey)) {
       return _chartCache[cacheKey]!;
     }
     
     // 직접 네이버 URL 사용 (CORS 우회를 위해 프록시 서비스 사용)
-    final chartUrl = 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$minutesSinceEpoch';
+    // 캐시 무효화를 위해 더 자주 변경되는 타임스탬프 사용
+    final chartUrl = 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$secondsSinceEpoch&cache=false';
     _chartCache[cacheKey] = chartUrl;
     
-    // 캐시 크기 제한 (최대 50개)
-    if (_chartCache.length > 50) {
-      final keysToRemove = _chartCache.keys.take(_chartCache.length - 50).toList();
+    // 캐시 크기 제한 (최대 20개로 줄임)
+    if (_chartCache.length > 20) {
+      final keysToRemove = _chartCache.keys.take(_chartCache.length - 20).toList();
       for (final key in keysToRemove) {
         _chartCache.remove(key);
       }
@@ -594,17 +595,17 @@ class _StockCardState extends State<StockCard> {
   }
 
   String _getDetailedChartUrl(String symbol) {
-    // 더 큰 크기의 일봉 차트 URL
+    // 더 큰 크기의 일봉 차트 URL - 캐시 무효화 강화
     final now = DateTime.now();
-    final minutesSinceEpoch = now.millisecondsSinceEpoch ~/ (5 * 60 * 1000);
+    final secondsSinceEpoch = now.millisecondsSinceEpoch ~/ 1000; // 1초 단위
     
-    return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$minutesSinceEpoch&w=800&h=600';
+    return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$secondsSinceEpoch&w=800&h=600&cache=false';
   }
 
   String _getDetailedChartUrlWithPeriod(String symbol, String period) {
-    // 기간별 차트 URL (네이버 파이낸스의 다양한 기간 차트)
+    // 기간별 차트 URL (네이버 파이낸스의 다양한 기간 차트) - 캐시 무효화 강화
     final now = DateTime.now();
-    final minutesSinceEpoch = now.millisecondsSinceEpoch ~/ (5 * 60 * 1000);
+    final secondsSinceEpoch = now.millisecondsSinceEpoch ~/ 1000; // 1초 단위
     
     String chartType = 'day'; // 기본값
     switch (period) {
@@ -621,7 +622,7 @@ class _StockCardState extends State<StockCard> {
         break;
     }
     
-    return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/$chartType/$symbol.png&t=$minutesSinceEpoch&w=800&h=600';
+    return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/$chartType/$symbol.png&t=$secondsSinceEpoch&w=800&h=600&cache=false';
   }
 
   Widget _buildNewsSection() {
