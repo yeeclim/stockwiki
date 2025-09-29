@@ -17,7 +17,7 @@ class NewsService {
       
       // 1. 네이버 뉴스 크롤링 우선 시도
       try {
-        final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 10);
+        final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 5);
         if (naverNews.isNotEmpty) {
           allNews.addAll(naverNews);
           print('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
@@ -26,7 +26,29 @@ class NewsService {
         print('네이버 뉴스 크롤링 실패: $e');
       }
 
-      // 2. 네이버 뉴스가 부족하면 기존 API들로 보완
+      // 2. 다음 뉴스 크롤링 시도
+      try {
+        final daumNews = await _fetchFromDaumNews(stockName);
+        if (daumNews.isNotEmpty) {
+          allNews.addAll(daumNews);
+          print('다음 뉴스 크롤링 성공: ${daumNews.length}개');
+        }
+      } catch (e) {
+        print('다음 뉴스 크롤링 실패: $e');
+      }
+
+      // 3. 구글 뉴스 검색 시도
+      try {
+        final googleNews = await _fetchFromGoogleNews(stockName);
+        if (googleNews.isNotEmpty) {
+          allNews.addAll(googleNews);
+          print('구글 뉴스 검색 성공: ${googleNews.length}개');
+        }
+      } catch (e) {
+        print('구글 뉴스 검색 실패: $e');
+      }
+
+      // 4. 뉴스가 부족하면 기존 API들로 보완
       if (allNews.length < _maxResults) {
         final String baseUrl = Uri.base.origin;
         
@@ -185,6 +207,86 @@ class NewsService {
       print('MK Stock RSS 오류: $e');
     }
     return [];
+  }
+
+  static Future<List<News>> _fetchFromDaumNews(String keyword) async {
+    try {
+      final String baseUrl = Uri.base.origin;
+      final uri = Uri.parse('$baseUrl/api/daum_news');
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'keyword': keyword,
+          'max_results': 5,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        
+        if (jsonData['success'] == true && jsonData['results'] != null) {
+          final results = jsonData['results'] as List<dynamic>;
+          
+          return results.map<News>((item) => News.fromJson({
+                'title': item['title']?.toString() ?? '',
+                'description': item['description']?.toString() ?? '',
+                'link': item['link']?.toString() ?? '',
+                'source': '다음 뉴스',
+                'publishedAt': item['published_at']?.toString(),
+              })).toList();
+        }
+      }
+      
+      print('다음 뉴스 API 응답 오류: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      print('다음 뉴스 API 오류: $e');
+      return [];
+    }
+  }
+
+  static Future<List<News>> _fetchFromGoogleNews(String keyword) async {
+    try {
+      final String baseUrl = Uri.base.origin;
+      final uri = Uri.parse('$baseUrl/api/google_news');
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'keyword': keyword,
+          'max_results': 5,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        
+        if (jsonData['success'] == true && jsonData['results'] != null) {
+          final results = jsonData['results'] as List<dynamic>;
+          
+          return results.map<News>((item) => News.fromJson({
+                'title': item['title']?.toString() ?? '',
+                'description': item['description']?.toString() ?? '',
+                'link': item['link']?.toString() ?? '',
+                'source': '구글 뉴스',
+                'publishedAt': item['published_at']?.toString(),
+              })).toList();
+        }
+      }
+      
+      print('구글 뉴스 API 응답 오류: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      print('구글 뉴스 API 오류: $e');
+      return [];
+    }
   }
 
 }
