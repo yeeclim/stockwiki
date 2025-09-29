@@ -14,6 +14,8 @@ export default async function handler(req, res) {
   try {
     const { keyword = '대창솔루션' } = req.method === 'POST' ? req.body : req.query;
     
+    console.log('StockWiki 뉴스 API 호출됨:', keyword, 'Method:', req.method);
+    
     console.log('종목 뉴스 검색:', keyword);
 
     // 실제 뉴스 데이터 생성 (종목별 맞춤)
