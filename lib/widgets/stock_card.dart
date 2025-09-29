@@ -1,19 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/stock.dart';
+import '../models/news.dart';
+import '../services/news_service.dart';
 
-class StockCard extends StatelessWidget {
+class StockCard extends StatefulWidget {
   final Stock stock;
   static final Map<String, String> _chartCache = {};
 
   const StockCard({super.key, required this.stock});
 
   @override
+  State<StockCard> createState() => _StockCardState();
+}
+
+class _StockCardState extends State<StockCard> {
+  List<News> _newsList = [];
+  bool _isLoadingNews = false;
+  static final Map<String, String> _chartCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNews();
+  }
+
+  Future<void> _loadNews() async {
+    if (widget.stock.name.isEmpty) return;
+    
+    setState(() {
+      _isLoadingNews = true;
+    });
+
+    try {
+      final news = await NewsService.searchStockNews(widget.stock.name);
+      setState(() {
+        _newsList = news;
+        _isLoadingNews = false;
+      });
+      print('StockCard 뉴스 로딩 완료: ${news.length}개');
+    } catch (e) {
+      setState(() {
+        _isLoadingNews = false;
+      });
+      print('StockCard 뉴스 로딩 실패: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 실시간 데이터가 있는지 확인 (차트는 항상 표시)
-    final hasRealTimeData = stock.price != null && stock.price! > 0;
-    final hasChartData = stock.symbol.isNotEmpty; // 종목코드가 있으면 차트 표시
-    final change = stock.change ?? 0.0;
-    final changePercent = stock.changePercent ?? 0.0;
+    final hasRealTimeData = widget.stock.price != null && widget.stock.price! > 0;
+    final hasChartData = widget.stock.symbol.isNotEmpty; // 종목코드가 있으면 차트 표시
+    final change = widget.stock.change ?? 0.0;
+    final changePercent = widget.stock.changePercent ?? 0.0;
     final isPositive = change >= 0;
 
     return Card(
@@ -32,7 +72,7 @@ class StockCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        stock.symbol,
+                        widget.stock.symbol,
                         style: const TextStyle(
                           color: Colors.white, 
                           fontWeight: FontWeight.bold,
@@ -41,7 +81,7 @@ class StockCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        stock.name,
+                        widget.stock.name,
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
@@ -57,7 +97,7 @@ class StockCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₩${stock.price!.toStringAsFixed(0)}',
+                        '₩${widget.stock.price!.toStringAsFixed(0)}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -83,17 +123,17 @@ class StockCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (stock.volume != null)
+                  if (widget.stock.volume != null)
                     Text(
-                      '거래량: ${_formatVolume(stock.volume!)}',
+                      '거래량: ${_formatVolume(widget.stock.volume!)}',
                       style: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
                       ),
                     ),
-                  if (stock.marketCap != null && stock.marketCap! > 0)
+                  if (widget.stock.marketCap != null && widget.stock.marketCap! > 0)
                     Text(
-                      '시가총액: ${_formatMarketCap(stock.marketCap!)}',
+                      '시가총액: ${_formatMarketCap(widget.stock.marketCap!)}',
                       style: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
@@ -101,14 +141,14 @@ class StockCard extends StatelessWidget {
                     ),
                 ],
               ),
-              if (stock.lastUpdate != null)
+              if (widget.stock.lastUpdate != null)
                 const SizedBox(height: 4),
-              if (stock.lastUpdate != null)
+              if (widget.stock.lastUpdate != null)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      '업데이트: ${_formatTime(stock.lastUpdate!)}',
+                      '업데이트: ${_formatTime(widget.stock.lastUpdate!)}',
                       style: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
@@ -122,6 +162,9 @@ class StockCard extends StatelessWidget {
               const SizedBox(height: 16),
               _buildChartSnapshot(),
             ],
+            // 관련 뉴스 섹션 추가
+            const SizedBox(height: 16),
+            _buildNewsSection(),
           ],
         ),
       ),
@@ -222,7 +265,7 @@ class StockCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: Image.network(
-                  _getChartUrl(stock.symbol),
+                  _getChartUrl(widget.stock.symbol),
                   fit: BoxFit.contain,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -309,5 +352,190 @@ class StockCard extends StatelessWidget {
     }
     
     return chartUrl;
+  }
+
+  Widget _buildNewsSection() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey[850],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[700]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '관련 뉴스',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                if (_isLoadingNews)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                    ),
+                  )
+                else
+                  Text(
+                    '${_newsList.length}개',
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_isLoadingNews)
+            const Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Center(
+                child: Text(
+                  '뉴스를 불러오는 중...',
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            )
+          else if (_newsList.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Center(
+                child: Text(
+                  '관련 뉴스가 없습니다',
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            )
+          else
+            ...(_newsList.map((news) => _buildNewsItem(news)).toList()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewsItem(News news) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[600]!, width: 0.5),
+      ),
+      child: InkWell(
+        onTap: () => _launchUrl(news.link),
+        borderRadius: BorderRadius.circular(6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    news.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  Icons.open_in_new,
+                  color: Colors.grey[400],
+                  size: 16,
+                ),
+              ],
+            ),
+            if (news.description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                news.description,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 11,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  news.source,
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 10,
+                  ),
+                ),
+                if (news.publishedAt != null)
+                  Text(
+                    _formatNewsTime(news.publishedAt!),
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatNewsTime(String publishedAt) {
+    try {
+      final dateTime = DateTime.parse(publishedAt);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+      
+      if (difference.inMinutes < 1) {
+        return '방금 전';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}분 전';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}시간 전';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}일 전';
+      } else {
+        return '${dateTime.month}/${dateTime.day}';
+      }
+    } catch (e) {
+      return '알 수 없음';
+    }
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      print('URL 실행 오류: $e');
+    }
   }
 }
