@@ -1,14 +1,11 @@
 {
   "version": 2,
-  "buildCommand": "flutter build web",
-  "outputDirectory": "build/web",
-  "functions": {
-    "api/*.js": {
-      "runtime": "@vercel/node@3.0.7"
-    }
-  },
+  "builds": [
+    { "src": "build/web/**", "use": "@vercel/static" },
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/api/(.*)", "dest": "/api/$1.js" },
+    { "src": "/(.*)", "dest": "/build/web/$1" }
   ]
 }
