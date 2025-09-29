@@ -8,38 +8,40 @@ import 'naver_news_service.dart';
 class NewsService {
   static const int _maxResults = 8; // 종목별 뉴스는 8개로 증가
 
-  /// 종목명으로 관련 뉴스를 검색합니다 (기존 API 우선)
+  /// 종목명으로 관련 뉴스를 검색합니다 (네이버 뉴스 우선)
   static Future<List<News>> searchStockNews(String stockName) async {
     if (stockName.isEmpty) return [];
 
     try {
       final List<News> allNews = [];
-      final String baseUrl = Uri.base.origin;
       
-      // 기존 API들을 병렬로 호출
-      final futures = [
-        _fetchFromNewsData(stockName),
-        _fetchFromGNews(stockName),
-        _fetchFromMediaStack(stockName),
-        _fetchFromMkRss(baseUrl, stockName),
-      ];
-
-      final results = await Future.wait(futures, eagerError: false);
-
-      for (final result in results) {
-        allNews.addAll(result);
+      // 1. 네이버 뉴스 크롤링 우선 시도
+      try {
+        final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 10);
+        if (naverNews.isNotEmpty) {
+          allNews.addAll(naverNews);
+          print('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
+        }
+      } catch (e) {
+        print('네이버 뉴스 크롤링 실패: $e');
       }
 
-      // 네이버 뉴스 크롤링 시도 (백업)
+      // 2. 네이버 뉴스가 부족하면 기존 API들로 보완
       if (allNews.length < _maxResults) {
-        try {
-          final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 8);
-          if (naverNews.isNotEmpty) {
-            allNews.addAll(naverNews);
-            print('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
-          }
-        } catch (e) {
-          print('네이버 뉴스 크롤링 실패: $e');
+        final String baseUrl = Uri.base.origin;
+        
+        // 기존 API들을 병렬로 호출
+        final futures = [
+          _fetchFromNewsData(stockName),
+          _fetchFromGNews(stockName),
+          _fetchFromMediaStack(stockName),
+          _fetchFromMkRss(baseUrl, stockName),
+        ];
+
+        final results = await Future.wait(futures, eagerError: false);
+
+        for (final result in results) {
+          allNews.addAll(result);
         }
       }
 
@@ -54,13 +56,6 @@ class NewsService {
       // 최대 결과 수로 제한
       final finalNews = uniqueNews.values.take(_maxResults).toList();
       
-      // 뉴스가 없으면 샘플 뉴스 생성
-      if (finalNews.isEmpty) {
-        final sampleNews = _generateSampleNews(stockName);
-        print('샘플 뉴스 생성: ${sampleNews.length}개');
-        return sampleNews;
-      }
-      
       print('최종 뉴스 결과: ${finalNews.length}개 (네이버: ${allNews.where((n) => n.source == '네이버 뉴스').length}개)');
       
       return finalNews;
@@ -73,12 +68,14 @@ class NewsService {
   static Future<List<News>> _fetchFromNewsData(String keyword) async {
     try {
       final uri = Uri.parse(
-          'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword');
+          'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword&language=ko,en&country=kr');
       final response = await http.get(uri);
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['results'] as List<dynamic>? ?? [];
+        
+        print('NewsData.io: ${results.length}개 결과');
         
         return results.map<News>((item) => News.fromJson({
               'title': item['title']?.toString() ?? '',
@@ -87,6 +84,8 @@ class NewsService {
               'source': 'NewsData.io',
               'publishedAt': item['pubDate']?.toString(),
             })).toList();
+      } else {
+        print('NewsData.io HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
       print('NewsData.io 오류: $e');
@@ -97,12 +96,14 @@ class NewsService {
   static Future<List<News>> _fetchFromGNews(String keyword) async {
     try {
       final uri = Uri.parse(
-          'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword');
+          'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword&lang=ko,en&country=kr');
       final response = await http.get(uri);
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['articles'] as List<dynamic>? ?? [];
+        
+        print('GNews: ${results.length}개 결과');
         
         return results.map<News>((item) => News.fromJson({
               'title': item['title']?.toString() ?? '',
@@ -111,6 +112,8 @@ class NewsService {
               'source': 'GNews',
               'publishedAt': item['publishedAt']?.toString(),
             })).toList();
+      } else {
+        print('GNews HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
       print('GNews 오류: $e');
@@ -121,12 +124,14 @@ class NewsService {
   static Future<List<News>> _fetchFromMediaStack(String keyword) async {
     try {
       final uri = Uri.parse(
-          'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword');
+          'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword&languages=ko,en&countries=kr');
       final response = await http.get(uri);
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['data'] as List<dynamic>? ?? [];
+        
+        print('MediaStack: ${results.length}개 결과');
         
         return results.map<News>((item) => News.fromJson({
               'title': item['title']?.toString() ?? '',
@@ -135,6 +140,8 @@ class NewsService {
               'source': 'MediaStack',
               'publishedAt': item['published_at']?.toString(),
             })).toList();
+      } else {
+        print('MediaStack HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
       print('MediaStack 오류: $e');
@@ -180,47 +187,4 @@ class NewsService {
     return [];
   }
 
-  /// 샘플 뉴스 생성 (API 실패 시 대체)
-  static List<News> _generateSampleNews(String stockName) {
-    final now = DateTime.now();
-    final sampleNews = [
-      News(
-        title: '$stockName 관련 최신 동향 분석',
-        description: '$stockName의 최근 주가 동향과 시장 분석에 대한 종합 리포트입니다.',
-        link: 'https://finance.naver.com/item/main.naver?code=${stockName}',
-        source: '종합 분석',
-        publishedAt: now.subtract(const Duration(hours: 2)).toIso8601String(),
-      ),
-      News(
-        title: '$stockName 투자 전망 및 리스크 요인',
-        description: '$stockName에 대한 투자 전망과 주요 리스크 요인들을 살펴봅니다.',
-        link: 'https://finance.naver.com/item/main.naver?code=${stockName}',
-        source: '투자 분석',
-        publishedAt: now.subtract(const Duration(hours: 4)).toIso8601String(),
-      ),
-      News(
-        title: '$stockName 실적 발표 및 시장 반응',
-        description: '$stockName의 최근 실적 발표와 시장의 반응에 대한 분석입니다.',
-        link: 'https://finance.naver.com/item/main.naver?code=${stockName}',
-        source: '실적 분석',
-        publishedAt: now.subtract(const Duration(hours: 6)).toIso8601String(),
-      ),
-      News(
-        title: '$stockName 업계 동향 및 경쟁사 비교',
-        description: '$stockName이 속한 업계의 동향과 주요 경쟁사들과의 비교 분석입니다.',
-        link: 'https://finance.naver.com/item/main.naver?code=${stockName}',
-        source: '업계 분석',
-        publishedAt: now.subtract(const Duration(hours: 8)).toIso8601String(),
-      ),
-      News(
-        title: '$stockName 기술적 분석 및 차트 패턴',
-        description: '$stockName의 기술적 분석과 주요 차트 패턴에 대한 전문가 의견입니다.',
-        link: 'https://finance.naver.com/item/main.naver?code=${stockName}',
-        source: '기술 분석',
-        publishedAt: now.subtract(const Duration(hours: 12)).toIso8601String(),
-      ),
-    ];
-    
-    return sampleNews;
-  }
 }
