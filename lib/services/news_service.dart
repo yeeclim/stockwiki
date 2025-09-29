@@ -8,8 +8,8 @@ import 'naver_news_service.dart';
 class NewsService {
   static const int _maxResults = 8; // 종목별 뉴스는 8개로 증가
 
-  /// 종목명으로 관련 뉴스를 검색합니다 (확실한 뉴스 제공)
-  static Future<List<News>> searchStockNews(String stockName) async {
+  /// 종목명으로 관련 뉴스를 검색합니다 (국내/해외 구분)
+  static Future<List<News>> searchStockNews(String stockName, {bool isKoreanStock = true}) async {
     if (stockName.isEmpty) return [];
 
     try {
@@ -37,22 +37,34 @@ class NewsService {
         print('네이버 뉴스 크롤링 실패: $e');
       }
 
-      // 3. 뉴스가 부족하면 기존 API들로 보완
+      // 3. 뉴스가 부족하면 추가 뉴스 소스로 보완
       if (allNews.length < _maxResults) {
         final String baseUrl = Uri.base.origin;
         
-        // 기존 API들을 병렬로 호출
-        final futures = [
-          _fetchFromNewsData(stockName),
-          _fetchFromGNews(stockName),
-          _fetchFromMediaStack(stockName),
-          _fetchFromMkRss(baseUrl, stockName),
-        ];
+        if (isKoreanStock) {
+          // 국내주식: 국내 뉴스 API만 사용
+          try {
+            final mkRssNews = await _fetchFromMkRss(baseUrl, stockName);
+            if (mkRssNews.isNotEmpty) {
+              allNews.addAll(mkRssNews);
+              print('MK Stock RSS 성공: ${mkRssNews.length}개');
+            }
+          } catch (e) {
+            print('MK Stock RSS 실패: $e');
+          }
+        } else {
+          // 미국주식: 해외 뉴스 API들 사용
+          final futures = [
+            _fetchFromNewsData(stockName),
+            _fetchFromGNews(stockName),
+            _fetchFromMediaStack(stockName),
+          ];
 
-        final results = await Future.wait(futures, eagerError: false);
+          final results = await Future.wait(futures, eagerError: false);
 
-        for (final result in results) {
-          allNews.addAll(result);
+          for (final result in results) {
+            allNews.addAll(result);
+          }
         }
       }
 
