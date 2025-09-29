@@ -11,7 +11,9 @@ class NaverNewsService {
 
     try {
       final String baseUrl = Uri.base.origin;
-      final uri = Uri.parse('$baseUrl/api/naver_news_python');
+      final uri = Uri.parse('$baseUrl/api/test_naver_simple');
+      
+      print('네이버 뉴스 API 호출: $keyword, maxResults: $maxResults');
       
       final response = await http.post(
         uri,
@@ -24,11 +26,15 @@ class NaverNewsService {
         }),
       );
 
+      print('네이버 뉴스 API 응답 상태: ${response.statusCode}');
+      
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        print('네이버 뉴스 API 응답 데이터: $jsonData');
         
         if (jsonData['success'] == true && jsonData['results'] != null) {
           final results = jsonData['results'] as List<dynamic>;
+          print('네이버 뉴스 크롤링 성공: ${results.length}개');
           
           return results.map<News>((item) => News.fromJson({
                 'title': item['title']?.toString() ?? '',
@@ -37,10 +43,14 @@ class NaverNewsService {
                 'source': '네이버 뉴스',
                 'publishedAt': item['published_at']?.toString(),
               })).toList();
+        } else {
+          print('네이버 뉴스 API 실패: ${jsonData['error']}');
         }
+      } else {
+        print('네이버 뉴스 API HTTP 오류: ${response.statusCode}');
+        print('응답 본문: ${response.body}');
       }
       
-      print('네이버 뉴스 API 응답 오류: ${response.statusCode}');
       return [];
     } catch (e) {
       print('네이버 뉴스 크롤링 오류: $e');
