@@ -33,12 +33,13 @@ class _StockCardState extends State<StockCard> {
     });
 
     try {
-      final news = await NewsService.searchStockNews(widget.stock.name);
+      // 국내주식으로 가정 (KRX 데이터에서 온 경우)
+      final news = await NewsService.searchStockNews(widget.stock.name, isKoreanStock: true);
       setState(() {
         _newsList = news;
         _isLoadingNews = false;
       });
-      print('StockCard 뉴스 로딩 완료: ${news.length}개');
+      print('StockCard 뉴스 로딩 완료: ${news.length}개 (국내주식)');
     } catch (e) {
       setState(() {
         _isLoadingNews = false;
