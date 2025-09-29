@@ -8,16 +8,27 @@ import 'naver_news_service.dart';
 class NewsService {
   static const int _maxResults = 8; // 종목별 뉴스는 8개로 증가
 
-  /// 종목명으로 관련 뉴스를 검색합니다 (네이버 뉴스 우선)
+  /// 종목명으로 관련 뉴스를 검색합니다 (확실한 뉴스 제공)
   static Future<List<News>> searchStockNews(String stockName) async {
     if (stockName.isEmpty) return [];
 
     try {
       final List<News> allNews = [];
       
-      // 1. 네이버 뉴스 크롤링 우선 시도
+      // 1. StockWiki 뉴스 API 우선 시도 (확실한 뉴스 제공)
       try {
-        final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 5);
+        final stockNews = await _fetchFromStockNews(stockName);
+        if (stockNews.isNotEmpty) {
+          allNews.addAll(stockNews);
+          print('StockWiki 뉴스 성공: ${stockNews.length}개');
+        }
+      } catch (e) {
+        print('StockWiki 뉴스 실패: $e');
+      }
+
+      // 2. 네이버 뉴스 크롤링 시도
+      try {
+        final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 3);
         if (naverNews.isNotEmpty) {
           allNews.addAll(naverNews);
           print('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
@@ -26,7 +37,7 @@ class NewsService {
         print('네이버 뉴스 크롤링 실패: $e');
       }
 
-      // 2. 다음 뉴스 크롤링 시도
+      // 3. 다음 뉴스 크롤링 시도
       try {
         final daumNews = await _fetchFromDaumNews(stockName);
         if (daumNews.isNotEmpty) {
@@ -37,7 +48,7 @@ class NewsService {
         print('다음 뉴스 크롤링 실패: $e');
       }
 
-      // 3. 구글 뉴스 검색 시도
+      // 4. 구글 뉴스 검색 시도
       try {
         final googleNews = await _fetchFromGoogleNews(stockName);
         if (googleNews.isNotEmpty) {
@@ -48,7 +59,7 @@ class NewsService {
         print('구글 뉴스 검색 실패: $e');
       }
 
-      // 4. 뉴스가 부족하면 기존 API들로 보완
+      // 5. 뉴스가 부족하면 기존 API들로 보완
       if (allNews.length < _maxResults) {
         final String baseUrl = Uri.base.origin;
         
@@ -78,7 +89,7 @@ class NewsService {
       // 최대 결과 수로 제한
       final finalNews = uniqueNews.values.take(_maxResults).toList();
       
-      print('최종 뉴스 결과: ${finalNews.length}개 (네이버: ${allNews.where((n) => n.source == '네이버 뉴스').length}개)');
+      print('최종 뉴스 결과: ${finalNews.length}개 (StockWiki: ${allNews.where((n) => n.source == 'StockWiki News').length}개)');
       
       return finalNews;
     } catch (e) {
@@ -285,6 +296,45 @@ class NewsService {
       return [];
     } catch (e) {
       print('구글 뉴스 API 오류: $e');
+      return [];
+    }
+  }
+
+  static Future<List<News>> _fetchFromStockNews(String keyword) async {
+    try {
+      final String baseUrl = Uri.base.origin;
+      final uri = Uri.parse('$baseUrl/api/stock_news');
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'keyword': keyword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        
+        if (jsonData['success'] == true && jsonData['results'] != null) {
+          final results = jsonData['results'] as List<dynamic>;
+          
+          return results.map<News>((item) => News.fromJson({
+                'title': item['title']?.toString() ?? '',
+                'description': item['description']?.toString() ?? '',
+                'link': item['link']?.toString() ?? '',
+                'source': 'StockWiki News',
+                'publishedAt': item['published_at']?.toString(),
+              })).toList();
+        }
+      }
+      
+      print('StockWiki 뉴스 API 응답 오류: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      print('StockWiki 뉴스 API 오류: $e');
       return [];
     }
   }
