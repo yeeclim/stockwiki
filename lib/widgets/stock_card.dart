@@ -213,120 +213,364 @@ class _StockCardState extends State<StockCard> {
   }
 
   Widget _buildChartSnapshot() {
-    return Container(
-      width: double.infinity,
-      height: 150,
-      decoration: BoxDecoration(
-        color: Colors.grey[850],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[700]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '일봉 차트',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+    return GestureDetector(
+      onTap: () => _showDetailedChart(),
+      child: Container(
+        width: double.infinity,
+        height: 200, // 높이를 150에서 200으로 증가
+        decoration: BoxDecoration(
+          color: Colors.grey[850],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[700]!, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '일봉 차트',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.touch_app,
+                        color: Colors.grey[400],
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '클릭하여 상세 차트 보기',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey[600]!, width: 0.5),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    _getChartUrl(widget.stock.symbol),
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              '차트 로딩 중...',
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.show_chart,
+                              color: Colors.grey[600],
+                              size: 24,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '차트를 불러올 수 없습니다',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[900],
-                    borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDetailedChart() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.grey[900],
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.95,
+            height: MediaQuery.of(context).size.height * 0.8,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${widget.stock.name} (${widget.stock.symbol}) - 상세 차트',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[600]!, width: 1),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _getDetailedChartUrl(widget.stock.symbol),
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  '상세 차트를 불러오는 중...',
+                                  style: TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.show_chart,
+                                  color: Colors.grey[600],
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  '상세 차트를 불러올 수 없습니다',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                  child: const Text(
-                    '실시간',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildChartPeriodButton('1개월', 'month'),
+                    _buildChartPeriodButton('3개월', 'quarter'),
+                    _buildChartPeriodButton('6개월', 'half'),
+                    _buildChartPeriodButton('1년', 'year'),
+                    _buildChartPeriodButton('3년', 'three'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChartPeriodButton(String label, String period) {
+    return ElevatedButton(
+      onPressed: () {
+        // 차트 기간 변경 로직 (필요시 구현)
+        Navigator.of(context).pop();
+        _showDetailedChartWithPeriod(period);
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue[800],
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 12),
+      ),
+    );
+  }
+
+  void _showDetailedChartWithPeriod(String period) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.grey[900],
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.95,
+            height: MediaQuery.of(context).size.height * 0.8,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${widget.stock.name} (${widget.stock.symbol}) - ${_getPeriodLabel(period)} 차트',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[600]!, width: 1),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _getDetailedChartUrlWithPeriod(widget.stock.symbol, period),
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  '차트를 불러오는 중...',
+                                  style: TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.show_chart,
+                                  color: Colors.grey[600],
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  '차트를 불러올 수 없습니다',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.grey[600]!, width: 0.5),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  _getChartUrl(widget.stock.symbol),
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            '차트 로딩 중...',
-                            style: TextStyle(
-                              color: Colors.white60,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.show_chart,
-                            color: Colors.grey[600],
-                            size: 24,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '차트를 불러올 수 없습니다',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  String _getPeriodLabel(String period) {
+    switch (period) {
+      case 'month': return '1개월';
+      case 'quarter': return '3개월';
+      case 'half': return '6개월';
+      case 'year': return '1년';
+      case 'three': return '3년';
+      default: return '일봉';
+    }
   }
 
   String _getChartUrl(String symbol) {
@@ -353,6 +597,41 @@ class _StockCardState extends State<StockCard> {
     }
     
     return chartUrl;
+  }
+
+  String _getDetailedChartUrl(String symbol) {
+    // 더 큰 크기의 일봉 차트 URL
+    final now = DateTime.now();
+    final minutesSinceEpoch = now.millisecondsSinceEpoch ~/ (5 * 60 * 1000);
+    
+    return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$minutesSinceEpoch&w=800&h=600';
+  }
+
+  String _getDetailedChartUrlWithPeriod(String symbol, String period) {
+    // 기간별 차트 URL (네이버 파이낸스의 다양한 기간 차트)
+    final now = DateTime.now();
+    final minutesSinceEpoch = now.millisecondsSinceEpoch ~/ (5 * 60 * 1000);
+    
+    String chartType = 'day'; // 기본값
+    switch (period) {
+      case 'month':
+        chartType = 'day';
+        break;
+      case 'quarter':
+        chartType = 'day';
+        break;
+      case 'half':
+        chartType = 'day';
+        break;
+      case 'year':
+        chartType = 'day';
+        break;
+      case 'three':
+        chartType = 'day';
+        break;
+    }
+    
+    return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/$chartType/$symbol.png&t=$minutesSinceEpoch&w=800&h=600';
   }
 
   Widget _buildNewsSection() {

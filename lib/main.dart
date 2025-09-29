@@ -9,7 +9,6 @@ import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
 import 'package:stockwiki/pages/interest_news_page.dart';
-import 'package:stockwiki/pages/test_news_page.dart';
 import 'package:stockwiki/widgets/stock_card.dart';
 import 'package:stockwiki/models/stock.dart';
 
@@ -207,15 +206,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     leading: const Icon(Icons.bar_chart, color: Colors.white),
                     title: const Text("증시 시황", style: TextStyle(color: Colors.white)),
                     onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.newspaper, color: Colors.white),
-                    title: const Text("뉴스 테스트", style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const TestNewsPage()),
-                      );
-                    },
                   ),
                 ],
               ),
