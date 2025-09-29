@@ -15,18 +15,8 @@ class NewsService {
     try {
       final List<News> allNews = [];
       
-      // 1. StockWiki 뉴스 API 우선 시도 (확실한 뉴스 제공)
-      try {
-        final stockNews = await _fetchFromStockNews(stockName);
-        if (stockNews.isNotEmpty) {
-          allNews.addAll(stockNews);
-          print('StockWiki 뉴스 성공: ${stockNews.length}개');
-        }
-      } catch (e) {
-        print('StockWiki 뉴스 실패: $e');
-      }
 
-      // 2. 네이버 뉴스 크롤링 시도
+      // 1. 네이버 뉴스 크롤링 시도
       try {
         final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 3);
         if (naverNews.isNotEmpty) {
@@ -37,7 +27,7 @@ class NewsService {
         print('네이버 뉴스 크롤링 실패: $e');
       }
 
-      // 3. 뉴스가 부족하면 추가 뉴스 소스로 보완
+      // 2. 뉴스가 부족하면 추가 뉴스 소스로 보완
       if (allNews.length < _maxResults) {
         final String baseUrl = Uri.base.origin;
         
@@ -211,43 +201,5 @@ class NewsService {
   }
 
 
-  static Future<List<News>> _fetchFromStockNews(String keyword) async {
-    try {
-      final String baseUrl = Uri.base.origin;
-      final uri = Uri.parse('$baseUrl/api/stock_news');
-      
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'keyword': keyword,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        
-        if (jsonData['success'] == true && jsonData['results'] != null) {
-          final results = jsonData['results'] as List<dynamic>;
-          
-          return results.map<News>((item) => News.fromJson({
-                'title': item['title']?.toString() ?? '',
-                'description': item['description']?.toString() ?? '',
-                'link': item['link']?.toString() ?? '',
-                'source': 'StockWiki News',
-                'publishedAt': item['published_at']?.toString(),
-              })).toList();
-        }
-      }
-      
-      print('StockWiki 뉴스 API 응답 오류: ${response.statusCode}');
-      return [];
-    } catch (e) {
-      print('StockWiki 뉴스 API 오류: $e');
-      return [];
-    }
-  }
 
 }
