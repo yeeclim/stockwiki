@@ -10,9 +10,12 @@ class ChartAnalysisService {
   // 실제 주식 데이터를 가져오는 메서드
   static Future<List<Map<String, dynamic>>> getStockData(String symbol, int days) async {
     try {
+      print('=== getStockData 호출 (새로고침) ===');
+      print('종목: $symbol, 일수: $days');
+      
       // 국내 주식인지 확인 (6자리 숫자)
       if (RegExp(r'^\d{6}$').hasMatch(symbol)) {
-        // 국내 주식: KRX 데이터 사용
+        // 국내 주식: KRX 데이터 사용 (캐시 무시)
         return await _fetchKrxData(symbol, days);
       } else {
         // 해외 주식: FMP API 사용

@@ -11,13 +11,8 @@ class KrxLoader {
   // 실시간 주식 데이터 가져오기 (Yahoo Finance API 사용)
   static Future<Map<String, dynamic>?> _fetchRealTimeStock(String symbol) async {
     try {
-      // 캐시 확인 (5분 이내 데이터면 캐시 사용)
-      if (_stockCache != null && _lastUpdate != null) {
-        final now = DateTime.now();
-        if (now.difference(_lastUpdate!).inMinutes < 5) {
-          return _stockCache![symbol];
-        }
-      }
+      // 새로고침 시에는 캐시 무시하고 항상 새 데이터 가져오기
+      dev.log('캐시 무시하고 새 데이터 가져오기: $symbol');
 
       dev.log('네이버 금융 API 호출 시작: $symbol');
       
