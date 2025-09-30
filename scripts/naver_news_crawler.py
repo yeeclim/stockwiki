@@ -60,9 +60,37 @@ def search_naver_news(keyword, max_results=20):
         
         news_list = []
         
-        # 뉴스 아이템 찾기
-        news_items = soup.find_all('div', class_='news_area')
+        # 뉴스 아이템 찾기 - 새로운 네이버 구조에 맞게 수정
+        news_items = []
         
+        # 1. 기존 방식 시도
+        news_items.extend(soup.find_all('div', class_='news_area'))
+        
+        # 2. 새로운 구조에서 뉴스 링크 직접 찾기
+        all_links = soup.find_all('a', href=True)
+        news_links = []
+        
+        for link in all_links:
+            href = link.get('href', '')
+            text = link.get_text().strip()
+            
+            # 뉴스 사이트 도메인 확인
+            news_domains = [
+                'news.naver.com', 'news.daum.net', 'news.khan.co.kr', 
+                'news.mk.co.kr', 'news.jtbc.co.kr', 'news.sbs.co.kr',
+                'news.kbs.co.kr', 'news.mbc.co.kr', 'news.hankyung.com',
+                'news.chosun.com', 'news.joins.com', 'news.donga.com',
+                'news.hankookilbo.com', 'news.heraldcorp.com', 'news.seoul.co.kr'
+            ]
+            
+            if any(domain in href for domain in news_domains) and len(text) > 10:
+                news_links.append({
+                    'title': text,
+                    'link': href,
+                    'domain': next((domain for domain in news_domains if domain in href), 'unknown')
+                })
+        
+        # 기존 방식으로 뉴스 파싱
         for item in news_items[:max_results]:
             try:
                 # 제목 추출
@@ -96,6 +124,23 @@ def search_naver_news(keyword, max_results=20):
             except Exception as e:
                 print(f"뉴스 아이템 파싱 오류: {e}", file=sys.stderr)
                 continue
+        
+        # 기존 방식이 실패하면 직접 찾은 뉴스 링크 사용
+        if not news_list and news_links:
+            for i, news_link in enumerate(news_links[:max_results]):
+                try:
+                    news_item = {
+                        'title': news_link['title'],
+                        'description': '',
+                        'link': news_link['link'],
+                        'source': news_link['domain'],
+                        'date': '',
+                        'crawled_at': datetime.now().isoformat()
+                    }
+                    news_list.append(news_item)
+                except Exception as e:
+                    print(f"뉴스 링크 파싱 오류: {e}", file=sys.stderr)
+                    continue
         
         return news_list
         

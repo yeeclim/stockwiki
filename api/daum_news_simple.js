@@ -60,10 +60,10 @@ export default async function handler(req, res) {
     const htmlText = await response.text();
     console.log('다음 뉴스 응답 길이:', htmlText.length);
 
-    // HTML 파싱
+    // HTML 파싱 - BeautifulSoup 스타일로 개선
     const newsList = [];
     
-    // 다음 뉴스 아이템 패턴
+    // 다음 뉴스 아이템 패턴 개선
     const itemPattern = /<div[^>]*class="item-title"[^>]*>(.*?)<\/div>/gs;
     const items = htmlText.match(itemPattern) || [];
     
@@ -73,13 +73,21 @@ export default async function handler(req, res) {
       try {
         const itemHtml = items[i];
         
-        // 제목과 링크 추출
-        const linkMatch = itemHtml.match(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/);
-        if (linkMatch) {
+        // 제목과 링크 추출 - 실제 HTML 구조에 맞게 수정
+        // <div class="item-title"> <strong class="tit-g clamp-g"> <a href="..." target="_blank" onclick='...'>제목</a> </strong> </div>
+        
+        // 중첩된 구조에서 링크와 텍스트 추출
+        // <a href="..." target="_blank" onclick='...'> <b>대창솔루션</b>, MBS 글로벌 점유율 45%…조선업 호황 속 주목 </a>
+        const linkPattern = /<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/g;
+        let linkMatch;
+        
+        while ((linkMatch = linkPattern.exec(itemHtml)) !== null) {
           const link = linkMatch[1];
-          const title = cleanText(linkMatch[2]);
+          const titleWithTags = linkMatch[2];
+          const title = cleanText(titleWithTags);
           
-          if (title && link) {
+          // 대창솔루션이 포함된 뉴스만 필터링
+          if (title && link && title.includes(keyword.trim())) {
             newsList.push({
               title: title,
               description: '',
@@ -88,6 +96,7 @@ export default async function handler(req, res) {
               published_at: new Date().toISOString(),
               crawled_at: new Date().toISOString()
             });
+            break; // 하나의 아이템에서 첫 번째 매치만 사용
           }
         }
         
