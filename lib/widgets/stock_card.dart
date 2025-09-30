@@ -444,7 +444,7 @@ class _StockCardState extends State<StockCard> {
   Widget _buildChartPeriodButton(String label, String period) {
     return ElevatedButton(
       onPressed: () {
-        // 차트 기간 변경 로직 (필요시 구현)
+        // 현재 다이얼로그 닫고 새로운 기간으로 다시 열기
         Navigator.of(context).pop();
         _showDetailedChartWithPeriod(period);
       },
@@ -550,6 +550,14 @@ class _StockCardState extends State<StockCard> {
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildChartPeriodButton('1년', 'year'),
+                    _buildChartPeriodButton('3년', 'three'),
+                  ],
                 ),
               ],
             ),
