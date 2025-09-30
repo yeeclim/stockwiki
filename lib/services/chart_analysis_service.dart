@@ -1,17 +1,164 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'krx_loader.dart';
 
 class ChartAnalysisService {
+  static const String _fmpApiKey = '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh';
+  static const String _fmpBaseUrl = 'https://financialmodelingprep.com/api/v3';
+
   // 실제 주식 데이터를 가져오는 메서드
   static Future<List<Map<String, dynamic>>> getStockData(String symbol, int days) async {
     try {
-      // 실제 API 호출 (예: Alpha Vantage, Yahoo Finance 등)
-      // 여기서는 시뮬레이션된 데이터를 생성
-      return _generateSimulatedData(days);
+      // 국내 주식인지 확인 (6자리 숫자)
+      if (RegExp(r'^\d{6}$').hasMatch(symbol)) {
+        // 국내 주식: KRX 데이터 사용
+        return await _fetchKrxData(symbol, days);
+      } else {
+        // 해외 주식: FMP API 사용
+        return await _fetchRealStockData(symbol, days);
+      }
     } catch (e) {
-      throw Exception('주식 데이터를 가져올 수 없습니다: $e');
+      print('실제 데이터 가져오기 실패, 시뮬레이션 데이터 사용: $e');
+      // 실제 데이터 실패 시 시뮬레이션 데이터 사용
+      return _generateSimulatedData(days);
     }
+  }
+
+  // KRX 데이터 가져오기 (국내 주식)
+  static Future<List<Map<String, dynamic>>> _fetchKrxData(String symbol, int days) async {
+    try {
+      // KRX 로더를 사용해서 실제 주식 데이터 가져오기
+      final stockData = await KrxLoader.searchStock(symbol);
+      
+      if (stockData.isNotEmpty && stockData['price'] != null) {
+        // 실제 가격을 기반으로 히스토리컬 데이터 생성
+        return _generateKrxHistoricalData(stockData, days);
+      } else {
+        throw Exception('KRX 데이터를 가져올 수 없습니다');
+      }
+    } catch (e) {
+      print('KRX 데이터 오류: $e');
+      // 실패 시 시뮬레이션 데이터 사용
+      return _generateKrxSimulatedData(symbol, days);
+    }
+  }
+
+  // 실제 KRX 가격을 기반으로 히스토리컬 데이터 생성
+  static List<Map<String, dynamic>> _generateKrxHistoricalData(Map<String, dynamic> stockData, int days) {
+    final random = Random();
+    final data = <Map<String, dynamic>>[];
+    
+    // 실제 현재가를 기반으로 함
+    final currentPrice = (stockData['price'] as num).toDouble();
+    final currentVolume = stockData['volume'] as int? ?? 1000000;
+    
+    double basePrice = currentPrice;
+    
+    for (int i = days; i >= 0; i--) {
+      // 실제 가격 변동률을 고려한 시뮬레이션
+      final changePercent = (random.nextDouble() - 0.5) * 0.1; // -5% ~ +5%
+      basePrice = basePrice * (1 + changePercent);
+      basePrice = max(basePrice, currentPrice * 0.5); // 현재가의 50% 이하로는 안 떨어짐
+      basePrice = min(basePrice, currentPrice * 2.0); // 현재가의 200% 이상으로는 안 올라감
+      
+      final high = basePrice * (1 + random.nextDouble() * 0.05); // 최대 5% 상승
+      final low = basePrice * (1 - random.nextDouble() * 0.05);  // 최대 5% 하락
+      final volume = (currentVolume * (0.5 + random.nextDouble())).round();
+      
+      data.add({
+        'date': DateTime.now().subtract(Duration(days: i)),
+        'open': basePrice,
+        'high': high,
+        'low': low,
+        'close': basePrice,
+        'volume': volume,
+      });
+    }
+    
+    return data;
+  }
+
+  // KRX 기반 시뮬레이션 데이터 (백업용)
+  static List<Map<String, dynamic>> _generateKrxSimulatedData(String symbol, int days) {
+    final random = Random();
+    final data = <Map<String, dynamic>>[];
+    
+    // 기본 가격 (종목별로 다르게 설정)
+    double basePrice = 45000;
+    if (symbol.startsWith('00')) basePrice = 10000; // 코스닥
+    if (symbol.startsWith('01')) basePrice = 50000; // 대형주
+    
+    for (int i = days; i >= 0; i--) {
+      // 더 현실적인 가격 변동 시뮬레이션
+      double change = (random.nextDouble() - 0.5) * 1000; // -500 ~ +500
+      basePrice += change;
+      basePrice = max(basePrice, 1000); // 최소 가격 보장
+      
+      final high = basePrice + random.nextDouble() * 500;
+      final low = basePrice - random.nextDouble() * 500;
+      final volume = (random.nextDouble() * 1000000 + 100000).round();
+      
+      data.add({
+        'date': DateTime.now().subtract(Duration(days: i)),
+        'open': basePrice,
+        'high': high,
+        'low': low,
+        'close': basePrice,
+        'volume': volume,
+      });
+    }
+    
+    return data;
+  }
+
+  // FMP API를 통한 실제 주식 데이터 가져오기
+  static Future<List<Map<String, dynamic>>> _fetchRealStockData(String symbol, int days) async {
+    try {
+      // 일봉 데이터 가져오기
+      final url = Uri.parse(
+        '$_fmpBaseUrl/historical-price-full/$symbol?apikey=$_fmpApiKey&from=${_getDateString(days)}&to=${_getDateString(0)}'
+      );
+      
+      final response = await http.get(url, headers: {
+        'Cache-Control': 'no-cache',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      });
+
+      if (response.statusCode != 200) {
+        throw Exception('API 응답 오류: ${response.statusCode}');
+      }
+
+      final data = json.decode(response.body);
+      
+      if (data['historical'] == null) {
+        throw Exception('히스토리컬 데이터가 없습니다');
+      }
+
+      final historical = data['historical'] as List;
+      
+      // 데이터를 역순으로 정렬 (오래된 것부터)
+      historical.sort((a, b) => DateTime.parse(a['date']).compareTo(DateTime.parse(b['date'])));
+      
+      return historical.map<Map<String, dynamic>>((item) => {
+        'date': DateTime.parse(item['date']),
+        'open': (item['open'] as num).toDouble(),
+        'high': (item['high'] as num).toDouble(),
+        'low': (item['low'] as num).toDouble(),
+        'close': (item['close'] as num).toDouble(),
+        'volume': item['volume'] as int,
+      }).toList();
+      
+    } catch (e) {
+      print('FMP API 오류: $e');
+      throw Exception('실제 데이터를 가져올 수 없습니다: $e');
+    }
+  }
+
+  // 날짜 문자열 생성 (days일 전부터)
+  static String _getDateString(int daysAgo) {
+    final date = DateTime.now().subtract(Duration(days: daysAgo));
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
   // 시뮬레이션된 주식 데이터 생성

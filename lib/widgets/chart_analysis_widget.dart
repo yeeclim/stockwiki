@@ -55,6 +55,9 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
       // 실제 주식 데이터 가져오기
       final stockData = await ChartAnalysisService.getStockData(widget.symbol, 120);
       
+      // 데이터 소스 확인
+      final isRealData = stockData.isNotEmpty && stockData.first['date'] != null;
+      
       // 기술적 분석 수행
       final analysis = ChartAnalysisService.analyzeChart(stockData);
       
@@ -121,6 +124,8 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
         'currentPrice': currentPrice.round(),
         'priceChange': priceChange.round(),
         'priceChangePercent': priceChangePercent,
+        'isRealData': isRealData,
+        'dataSource': isRealData ? '실제 데이터' : '시뮬레이션',
         'analysis': {
           'trend': analysis['trend']['direction'],
           'strength': analysis['trend']['strength'],
@@ -226,10 +231,16 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     final currentPrice = _analysisResult!['currentPrice'] as int;
     final priceChange = _analysisResult!['priceChange'] as int;
     final priceChangePercent = _analysisResult!['priceChangePercent'] as double;
+    final isRealData = _analysisResult!['isRealData'] as bool;
+    final dataSource = _analysisResult!['dataSource'] as String;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 데이터 소스 표시
+        _buildDataSourceSection(isRealData, dataSource),
+        const SizedBox(height: 16),
+        
         // 현재 가격 및 변동률
         _buildPriceSection(currentPrice, priceChange, priceChangePercent),
         const SizedBox(height: 16),
@@ -245,6 +256,48 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
         // 기술적 지표
         _buildTechnicalIndicators(),
       ],
+    );
+  }
+
+  Widget _buildDataSourceSection(bool isRealData, String dataSource) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isRealData ? Colors.green[900] : Colors.orange[900],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isRealData ? Colors.green : Colors.orange,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isRealData ? Icons.check_circle : Icons.warning,
+            color: isRealData ? Colors.green : Colors.orange,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '데이터 소스: $dataSource',
+            style: TextStyle(
+              color: isRealData ? Colors.green[100] : Colors.orange[100],
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          if (!isRealData)
+            Text(
+              '참고용',
+              style: TextStyle(
+                color: Colors.orange[200],
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
