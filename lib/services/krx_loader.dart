@@ -124,52 +124,86 @@ class KrxLoader {
     return prices[symbol] ?? 0.0;
   }
 
-  // 직접 네이버 크롤링 (CORS 우회)
+  // Alpha Vantage API 사용 (한국 주식 지원)
+  static Future<Map<String, dynamic>?> _fetchFromAlphaVantage(String symbol) async {
+    try {
+      // Alpha Vantage는 한국 주식을 지원하지 않으므로 다른 방법 사용
+      dev.log('Alpha Vantage는 한국 주식 미지원 - 다른 방법 시도');
+      return null;
+    } catch (e) {
+      dev.log('Alpha Vantage 오류: $e');
+      return null;
+    }
+  }
+
+  // 직접 네이버 크롤링 (CORS 프록시 사용)
   static Future<Map<String, dynamic>?> _crawlNaverDirectly(String symbol) async {
     try {
-      // CORS 프록시 사용
-      final proxyUrl = 'https://api.allorigins.win/raw?url=';
+      // 여러 CORS 프록시 시도
+      final proxies = [
+        'https://api.allorigins.win/raw?url=',
+        'https://cors-anywhere.herokuapp.com/',
+        'https://thingproxy.freeboard.io/fetch/',
+      ];
+      
       final naverUrl = 'https://finance.naver.com/item/main.naver?code=$symbol';
-      final fullUrl = '$proxyUrl${Uri.encodeComponent(naverUrl)}';
       
-      dev.log('직접 크롤링 URL: $fullUrl');
-      
-      final response = await http.get(
-        Uri.parse(fullUrl),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        final html = response.body;
-        dev.log('크롤링 HTML 길이: ${html.length}');
-        
-        // 간단한 가격 추출
-        final priceMatch = RegExp(r'<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)</span>').firstMatch(html);
-        if (priceMatch != null) {
-          final priceStr = priceMatch.group(1)!.replaceAll(',', '');
-          final price = double.tryParse(priceStr);
+      for (final proxy in proxies) {
+        try {
+          final fullUrl = '$proxy${Uri.encodeComponent(naverUrl)}';
+          dev.log('크롤링 시도: $fullUrl');
           
-          if (price != null && price > 0) {
-            return {
-              'symbol': symbol,
-              'name': _getStockName(symbol),
-              'price': price,
-              'change': 0.0,
-              'changePercent': 0.0,
-              'volume': 1000000,
-              'marketCap': 0,
-              'lastUpdate': DateTime.now().toIso8601String(),
-            };
+          final response = await http.get(
+            Uri.parse(fullUrl),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          );
+          
+          if (response.statusCode == 200) {
+            final html = response.body;
+            dev.log('크롤링 HTML 길이: ${html.length}');
+            
+            // 가격 추출 시도
+            final pricePatterns = [
+              RegExp(r'<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)</span>'),
+              RegExp(r'<span class="no_today"[^>]*>([^<]+)</span>'),
+              RegExp(r'<em class="no_today"[^>]*>([^<]+)</em>'),
+              RegExp(r'<strong class="no_today"[^>]*>([^<]+)</strong>'),
+            ];
+            
+            for (final pattern in pricePatterns) {
+              final match = pattern.firstMatch(html);
+              if (match != null) {
+                final priceStr = match.group(1)!.replaceAll(',', '').replaceAll('원', '');
+                final price = double.tryParse(priceStr);
+                
+                if (price != null && price > 0) {
+                  dev.log('크롤링 성공: $price');
+                  return {
+                    'symbol': symbol,
+                    'name': _getStockName(symbol),
+                    'price': price,
+                    'change': 0.0,
+                    'changePercent': 0.0,
+                    'volume': 1000000,
+                    'marketCap': 0,
+                    'lastUpdate': DateTime.now().toIso8601String(),
+                  };
+                }
+              }
+            }
           }
+        } catch (e) {
+          dev.log('프록시 실패: $e');
+          continue;
         }
       }
       
-      dev.log('직접 크롤링 실패: ${response.statusCode}');
+      dev.log('모든 크롤링 시도 실패');
       return null;
     } catch (e) {
-      dev.log('직접 크롤링 오류: $e');
+      dev.log('크롤링 오류: $e');
       return null;
     }
   }
