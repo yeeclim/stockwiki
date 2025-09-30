@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GoldWidget extends StatefulWidget {
   const GoldWidget({super.key});
@@ -17,7 +18,41 @@ class _GoldWidgetState extends State<GoldWidget> {
   @override
   void initState() {
     super.initState();
+    _loadCachedPrice();
     _fetchGoldPrice();
+  }
+
+  // 캐시된 가격 로드
+  Future<void> _loadCachedPrice() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedPrice = prefs.getDouble('gold_price');
+      final cacheTime = prefs.getInt('gold_cache_time');
+      
+      if (cachedPrice != null && cacheTime != null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        // 5분 이내 캐시된 데이터가 있으면 사용
+        if (now - cacheTime < 5 * 60 * 1000) {
+          setState(() {
+            _goldPrice = cachedPrice;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      // 캐시 로드 실패 시 무시
+    }
+  }
+
+  // 가격 캐시 저장
+  Future<void> _cachePrice(double price) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('gold_price', price);
+      await prefs.setInt('gold_cache_time', DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      // 캐시 저장 실패 시 무시
+    }
   }
 
   Future<void> _fetchGoldPrice() async {
@@ -30,10 +65,16 @@ class _GoldWidgetState extends State<GoldWidget> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['price'] != null) {
-          setState(() {
-            _goldPrice = double.tryParse(data['price']);
-            _isLoading = false;
-          });
+          final price = double.tryParse(data['price']);
+          if (price != null) {
+            setState(() {
+              _goldPrice = price;
+              _isLoading = false;
+            });
+            await _cachePrice(price); // 가격 캐시 저장
+          } else {
+            throw Exception('가격 데이터 형식 오류');
+          }
         } else {
           throw Exception(data['message'] ?? '데이터 오류');
         }
