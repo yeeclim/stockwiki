@@ -39,42 +39,25 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     });
 
     try {
-      // StockCard에서 전달받은 실제 가격이 있으면 사용
-      if (widget.currentPrice != null && widget.currentPrice! > 0) {
-        print('=== 차트 분석 디버깅 ===');
-        print('종목: ${widget.symbol}');
-        print('종목명: ${widget.stockName}');
-        print('StockCard에서 받은 가격: ${widget.currentPrice}');
-        print('StockCard에서 받은 거래량: ${widget.volume}');
-        print('========================');
-        
-        final stockData = await ChartAnalysisService.getStockDataWithRealPrice(
-          widget.symbol, 
-          120, 
-          widget.currentPrice!, 
-          widget.volume ?? 1000000
-        );
-        print('생성된 히스토리컬 데이터 개수: ${stockData.length}');
-        print('최종 가격: ${stockData.last['close']}');
-        
-        final analysis = ChartAnalysisService.analyzeChart(stockData);
-        final result = _buildAnalysisResult(stockData, analysis, true);
-        
-        setState(() {
-          _analysisResult = result;
-          _isLoading = false;
-        });
-      } else {
-        // 실제 주식 데이터 가져오기
-        final stockData = await ChartAnalysisService.getStockData(widget.symbol, 120);
-        final analysis = ChartAnalysisService.analyzeChart(stockData);
-        final result = _buildAnalysisResult(stockData, analysis, false);
-        
-        setState(() {
-          _analysisResult = result;
-          _isLoading = false;
-        });
-      }
+      print('=== 새로고침 버튼 클릭 ===');
+      print('종목: ${widget.symbol}');
+      print('종목명: ${widget.stockName}');
+      print('StockCard 가격: ${widget.currentPrice}');
+      print('StockCard 거래량: ${widget.volume}');
+      print('=======================');
+      
+      // 새로고침 시에는 항상 새 데이터 가져오기 (캐시 무시)
+      final stockData = await ChartAnalysisService.getStockData(widget.symbol, 120);
+      print('새로고침으로 가져온 데이터 개수: ${stockData.length}');
+      print('새로고침 최종 가격: ${stockData.last['close']}');
+      
+      final analysis = ChartAnalysisService.analyzeChart(stockData);
+      final result = _buildAnalysisResult(stockData, analysis, false);
+      
+      setState(() {
+        _analysisResult = result;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _error = '분석 중 오류가 발생했습니다: $e';
