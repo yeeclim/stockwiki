@@ -7,37 +7,58 @@ import 'naver_news_service.dart';
 
 class NewsService {
   static const int _maxResults = 8; // 종목별 뉴스는 8개로 증가
+  
+  // 뉴스 캐시 (5분간 유효)
+  static final Map<String, List<News>> _newsCache = {};
+  static final Map<String, DateTime> _cacheTime = {};
+  static const Duration _cacheExpiry = Duration(minutes: 5);
 
   /// 종목명으로 관련 뉴스를 검색합니다 (국내/해외 구분)
   static Future<List<News>> searchStockNews(String stockName, {bool isKoreanStock = true}) async {
     if (stockName.isEmpty) return [];
 
+    // 캐시 확인
+    final cacheKey = '${stockName}_${isKoreanStock ? 'kr' : 'us'}';
+    final now = DateTime.now();
+    
+    if (_newsCache.containsKey(cacheKey) && 
+        _cacheTime.containsKey(cacheKey) &&
+        now.difference(_cacheTime[cacheKey]!) < _cacheExpiry) {
+      print('뉴스 캐시 사용: $stockName');
+      return _newsCache[cacheKey]!;
+    }
+
     try {
       final List<News> allNews = [];
       
 
-      // 1. 네이버 뉴스 크롤링 시도
-      try {
-        final naverNews = await NaverNewsService.searchNaverNews(stockName, maxResults: 3);
-        if (naverNews.isNotEmpty) {
-          allNews.addAll(naverNews);
-          print('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
-        }
-      } catch (e) {
-        print('네이버 뉴스 크롤링 실패: $e');
+      // 1. 주요 뉴스 소스들을 병렬로 처리
+      final futures = <Future<List<News>>>[];
+      
+      // 네이버 뉴스 (국내주식만)
+      if (isKoreanStock) {
+        futures.add(NaverNewsService.searchNaverNews(stockName, maxResults: 3).catchError((e) {
+          print('네이버 뉴스 크롤링 실패: $e');
+          return <News>[];
+        }));
       }
-
-      // 1-2. 다음 뉴스 크롤링 시도 (네이버 실패 시)
-      if (allNews.isEmpty) {
-        try {
-          final daumNews = await _fetchFromDaumNews(stockName);
-          if (daumNews.isNotEmpty) {
-            allNews.addAll(daumNews);
-            print('다음 뉴스 크롤링 성공: ${daumNews.length}개');
-          }
-        } catch (e) {
-          print('다음 뉴스 크롤링 실패: $e');
-        }
+      
+      // 다음 뉴스 (항상 시도)
+      futures.add(_fetchFromDaumNews(stockName).catchError((e) {
+        print('다음 뉴스 크롤링 실패: $e');
+        return <News>[];
+      }));
+      
+      // 병렬로 실행 (타임아웃 10초)
+      final results = await Future.wait(futures, eagerError: false)
+          .timeout(Duration(seconds: 10), onTimeout: () {
+        print('뉴스 로딩 타임아웃');
+        return <List<News>>[];
+      });
+      
+      // 결과 합치기
+      for (final result in results) {
+        allNews.addAll(result);
       }
 
       // 2. 뉴스가 부족하면 추가 뉴스 소스로 보완
@@ -83,6 +104,10 @@ class NewsService {
       final finalNews = uniqueNews.values.take(_maxResults).toList();
       
       print('최종 뉴스 결과: ${finalNews.length}개 (StockWiki: ${allNews.where((n) => n.source == 'StockWiki News').length}개)');
+      
+      // 캐시에 저장
+      _newsCache[cacheKey] = finalNews;
+      _cacheTime[cacheKey] = now;
       
       return finalNews;
     } catch (e) {
