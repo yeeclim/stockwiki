@@ -3,7 +3,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/stock.dart';
 import '../models/news.dart';
 import '../services/news_service.dart';
-import 'chart_analysis_widget.dart';
 
 class StockCard extends StatefulWidget {
   final Stock stock;
@@ -164,26 +163,6 @@ class _StockCardState extends State<StockCard> {
               const SizedBox(height: 16),
               _buildChartSnapshot(),
               const SizedBox(height: 16),
-              // 차트 분석 위젯 추가
-              Builder(
-                builder: (context) {
-                  print('=== StockCard 디버깅 ===');
-                  print('종목: ${widget.stock.symbol}');
-                  print('종목명: ${widget.stock.name}');
-                  print('Stock 가격: ${widget.stock.price}');
-                  print('Stock 거래량: ${widget.stock.volume}');
-                  print('가격이 null인가? ${widget.stock.price == null}');
-                  print('가격이 0인가? ${widget.stock.price == 0}');
-                  print('======================');
-                  
-                  return ChartAnalysisWidget(
-                    symbol: widget.stock.symbol,
-                    stockName: widget.stock.name,
-                    currentPrice: widget.stock.price,
-                    volume: widget.stock.volume,
-                  );
-                },
-              ),
             ],
             // 관련 뉴스 섹션 추가
             const SizedBox(height: 16),
