@@ -25,16 +25,66 @@ class ChartAnalysisService {
     }
   }
 
+  // 실제 가격을 받아서 히스토리컬 데이터 생성
+  static Future<List<Map<String, dynamic>>> getStockDataWithRealPrice(String symbol, int days, double realPrice, int realVolume) async {
+    try {
+      print('실제 가격으로 데이터 생성: $symbol, 가격: $realPrice, 거래량: $realVolume');
+      return _generateRealPriceBasedData(symbol, days, realPrice, realVolume);
+    } catch (e) {
+      print('실제 가격 기반 데이터 생성 실패: $e');
+      return _generateSimulatedData(days);
+    }
+  }
+
+  // 실제 가격을 기반으로 한 히스토리컬 데이터 생성
+  static List<Map<String, dynamic>> _generateRealPriceBasedData(String symbol, int days, double realPrice, int realVolume) {
+    final random = Random();
+    final data = <Map<String, dynamic>>[];
+    
+    double basePrice = realPrice;
+    
+    for (int i = days; i >= 0; i--) {
+      // 실제 가격 변동률을 고려한 시뮬레이션 (더 현실적으로)
+      final changePercent = (random.nextDouble() - 0.5) * 0.08; // -4% ~ +4%
+      basePrice = basePrice * (1 + changePercent);
+      
+      // 가격 범위 제한 (현재가의 30%~170% 범위)
+      basePrice = max(basePrice, realPrice * 0.3);
+      basePrice = min(basePrice, realPrice * 1.7);
+      
+      final high = basePrice * (1 + random.nextDouble() * 0.03); // 최대 3% 상승
+      final low = basePrice * (1 - random.nextDouble() * 0.03);  // 최대 3% 하락
+      final volume = (realVolume * (0.3 + random.nextDouble() * 1.4)).round(); // 30%~170% 범위
+      
+      data.add({
+        'date': DateTime.now().subtract(Duration(days: i)),
+        'open': basePrice,
+        'high': high,
+        'low': low,
+        'close': basePrice,
+        'volume': volume,
+      });
+    }
+    
+    print('실제 가격 기반 데이터 생성 완료: ${data.length}개, 최종 가격: ${data.last['close']}');
+    return data;
+  }
+
   // KRX 데이터 가져오기 (국내 주식)
   static Future<List<Map<String, dynamic>>> _fetchKrxData(String symbol, int days) async {
     try {
+      print('KRX 데이터 요청: $symbol');
+      
       // KRX 로더를 사용해서 실제 주식 데이터 가져오기
       final stockData = await KrxLoader.searchStock(symbol);
+      print('KRX 응답 데이터: $stockData');
       
-      if (stockData.isNotEmpty && stockData['price'] != null) {
+      if (stockData.isNotEmpty && stockData['price'] != null && stockData['price'] > 0) {
+        print('실제 KRX 데이터 발견: ${stockData['price']}');
         // 실제 가격을 기반으로 히스토리컬 데이터 생성
         return _generateKrxHistoricalData(stockData, days);
       } else {
+        print('KRX 데이터가 비어있거나 가격이 0입니다');
         throw Exception('KRX 데이터를 가져올 수 없습니다');
       }
     } catch (e) {
@@ -112,10 +162,11 @@ class ChartAnalysisService {
     return data;
   }
 
-  // FMP API를 통한 실제 주식 데이터 가져오기
+  // FMP API를 통한 실제 주식 데이터 가져오기 (미국 주식만)
   static Future<List<Map<String, dynamic>>> _fetchRealStockData(String symbol, int days) async {
     try {
-      // 일봉 데이터 가져오기
+      print('FMP API로 미국 주식 데이터 요청: $symbol');
+      // 일봉 데이터 가져오기 (FMP는 미국 주식만 지원)
       final url = Uri.parse(
         '$_fmpBaseUrl/historical-price-full/$symbol?apikey=$_fmpApiKey&from=${_getDateString(days)}&to=${_getDateString(0)}'
       );

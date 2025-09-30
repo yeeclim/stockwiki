@@ -168,6 +168,8 @@ class _StockCardState extends State<StockCard> {
               ChartAnalysisWidget(
                 symbol: widget.stock.symbol,
                 stockName: widget.stock.name,
+                currentPrice: widget.stock.price,
+                volume: widget.stock.volume,
               ),
             ],
             // 관련 뉴스 섹션 추가

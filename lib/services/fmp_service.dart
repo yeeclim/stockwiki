@@ -11,8 +11,9 @@ class FMPService {
   static Future<List<Stock>> fetchStocks(String keyword) async {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
+      // FMP는 미국 주식 시장만 지원 (NASDAQ, NYSE 등)
       final searchUrl = Uri.parse(
-        '$_baseUrl/search?query=$keyword&limit=10&exchange=NASDAQ&apikey=$_apiKey&t=$timestamp',
+        '$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp',
       );
       final searchRes = await http.get(searchUrl, headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
