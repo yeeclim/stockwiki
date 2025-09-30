@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/stock.dart';
 import '../models/news.dart';
 import '../services/news_service.dart';
+import 'chart_analysis_widget.dart';
 
 class StockCard extends StatefulWidget {
   final Stock stock;
@@ -162,6 +163,12 @@ class _StockCardState extends State<StockCard> {
             if (hasChartData) ...[
               const SizedBox(height: 16),
               _buildChartSnapshot(),
+              const SizedBox(height: 16),
+              // 차트 분석 위젯 추가
+              ChartAnalysisWidget(
+                symbol: widget.stock.symbol,
+                stockName: widget.stock.name,
+              ),
             ],
             // 관련 뉴스 섹션 추가
             const SizedBox(height: 16),
