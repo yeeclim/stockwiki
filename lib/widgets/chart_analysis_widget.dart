@@ -41,13 +41,22 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     try {
       // StockCard에서 전달받은 실제 가격이 있으면 사용
       if (widget.currentPrice != null && widget.currentPrice! > 0) {
-        print('StockCard에서 실제 가격 사용: ${widget.currentPrice}');
+        print('=== 차트 분석 디버깅 ===');
+        print('종목: ${widget.symbol}');
+        print('종목명: ${widget.stockName}');
+        print('StockCard에서 받은 가격: ${widget.currentPrice}');
+        print('StockCard에서 받은 거래량: ${widget.volume}');
+        print('========================');
+        
         final stockData = await ChartAnalysisService.getStockDataWithRealPrice(
           widget.symbol, 
           120, 
           widget.currentPrice!, 
           widget.volume ?? 1000000
         );
+        print('생성된 히스토리컬 데이터 개수: ${stockData.length}');
+        print('최종 가격: ${stockData.last['close']}');
+        
         final analysis = ChartAnalysisService.analyzeChart(stockData);
         final result = _buildAnalysisResult(stockData, analysis, true);
         
@@ -75,11 +84,19 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
   }
 
   Map<String, dynamic> _buildAnalysisResult(List<Map<String, dynamic>> stockData, Map<String, dynamic> analysis, bool isRealData) {
-    // 현재 가격 정보
-    final currentPrice = stockData.last['close'] as double;
+    // 강제로 실제 가격만 사용 (문제 해결을 위해)
+    final currentPrice = widget.currentPrice ?? 0.0;
+    
+    // 전일 가격은 히스토리컬 데이터에서 가져오되, 실제 가격 기반으로 조정
     final previousPrice = stockData.length > 1 ? stockData[stockData.length - 2]['close'] as double : currentPrice;
     final priceChange = currentPrice - previousPrice;
     final priceChangePercent = (priceChange / previousPrice) * 100;
+    
+    print('=== 강제 실제 가격 사용 ===');
+    print('widget.currentPrice: ${widget.currentPrice}');
+    print('stockData.last[close]: ${stockData.last['close']}');
+    print('강제 사용할 currentPrice: $currentPrice');
+    print('========================');
     
     // 시간대별 분석 (다양한 기간의 데이터로 분석)
     final timeframes = <String, Map<String, dynamic>>{};
@@ -278,7 +295,7 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '현재가',
+                '현재가 (실제)',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 12,
@@ -290,6 +307,30 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              // 디버깅용 실제 가격 표시
+              if (widget.currentPrice != null && widget.currentPrice! > 0)
+                Text(
+                  '원본: ${widget.currentPrice!.toStringAsFixed(0)}원',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontSize: 12,
+                  ),
+                ),
+              // 문제 진단용 추가 정보
+              Text(
+                '분석가격: ${currentPrice.toStringAsFixed(0)}원',
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                '차이: ${(currentPrice - (widget.currentPrice ?? 0)).toStringAsFixed(0)}원',
+                style: const TextStyle(
+                  color: Colors.orange,
+                  fontSize: 12,
                 ),
               ),
             ],
