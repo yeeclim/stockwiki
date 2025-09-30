@@ -86,8 +86,8 @@ export default async function handler(req, res) {
           const titleWithTags = linkMatch[2];
           const title = cleanText(titleWithTags);
           
-          // 대창솔루션이 포함된 뉴스만 필터링
-          if (title && link && title.includes(keyword.trim())) {
+          // 검색 결과에 나온 모든 뉴스 표시
+          if (title && link) {
             newsList.push({
               title: title,
               description: '',
