@@ -6,11 +6,15 @@ import '../services/chart_analysis_service.dart';
 class ChartAnalysisWidget extends StatefulWidget {
   final String symbol;
   final String stockName;
+  final double? currentPrice;
+  final int? volume;
 
   const ChartAnalysisWidget({
     super.key,
     required this.symbol,
     required this.stockName,
+    this.currentPrice,
+    this.volume,
   });
 
   @override
@@ -35,13 +39,33 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     });
 
     try {
-      // 실제 주식 데이터를 가져와서 분석
-      final analysis = await _performTechnicalAnalysis();
-      
-      setState(() {
-        _analysisResult = analysis;
-        _isLoading = false;
-      });
+      // StockCard에서 전달받은 실제 가격이 있으면 사용
+      if (widget.currentPrice != null && widget.currentPrice! > 0) {
+        print('StockCard에서 실제 가격 사용: ${widget.currentPrice}');
+        final stockData = await ChartAnalysisService.getStockDataWithRealPrice(
+          widget.symbol, 
+          120, 
+          widget.currentPrice!, 
+          widget.volume ?? 1000000
+        );
+        final analysis = ChartAnalysisService.analyzeChart(stockData);
+        final result = _buildAnalysisResult(stockData, analysis, true);
+        
+        setState(() {
+          _analysisResult = result;
+          _isLoading = false;
+        });
+      } else {
+        // 실제 주식 데이터 가져오기
+        final stockData = await ChartAnalysisService.getStockData(widget.symbol, 120);
+        final analysis = ChartAnalysisService.analyzeChart(stockData);
+        final result = _buildAnalysisResult(stockData, analysis, false);
+        
+        setState(() {
+          _analysisResult = result;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _error = '분석 중 오류가 발생했습니다: $e';
@@ -50,118 +74,103 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     }
   }
 
-  Future<Map<String, dynamic>> _performTechnicalAnalysis() async {
-    try {
-      // 실제 주식 데이터 가져오기
-      final stockData = await ChartAnalysisService.getStockData(widget.symbol, 120);
-      
-      // 데이터 소스 확인
-      final isRealData = stockData.isNotEmpty && stockData.first['date'] != null;
-      
-      // 기술적 분석 수행
-      final analysis = ChartAnalysisService.analyzeChart(stockData);
-      
-      // 현재 가격 정보
-      final currentPrice = stockData.last['close'] as double;
-      final previousPrice = stockData.length > 1 ? stockData[stockData.length - 2]['close'] as double : currentPrice;
-      final priceChange = currentPrice - previousPrice;
-      final priceChangePercent = (priceChange / previousPrice) * 100;
-      
-      // 시간대별 분석 (다양한 기간의 데이터로 분석)
-      final timeframes = <String, Map<String, dynamic>>{};
-      
-      // 1일 분석
-      if (stockData.length >= 1) {
-        final day1Data = stockData.sublist(stockData.length - 1);
-        final day1Analysis = ChartAnalysisService.analyzeChart(day1Data);
-        timeframes['1day'] = {
-          'trend': day1Analysis['trend']['direction'],
-          'strength': day1Analysis['trend']['strength'],
-        };
-      }
-      
-      // 1주 분석
-      if (stockData.length >= 7) {
-        final week1Data = stockData.sublist(stockData.length - 7);
-        final week1Analysis = ChartAnalysisService.analyzeChart(week1Data);
-        timeframes['1week'] = {
-          'trend': week1Analysis['trend']['direction'],
-          'strength': week1Analysis['trend']['strength'],
-        };
-      }
-      
-      // 1개월 분석
-      if (stockData.length >= 30) {
-        final month1Data = stockData.sublist(stockData.length - 30);
-        final month1Analysis = ChartAnalysisService.analyzeChart(month1Data);
-        timeframes['1month'] = {
-          'trend': month1Analysis['trend']['direction'],
-          'strength': month1Analysis['trend']['strength'],
-        };
-      }
-      
-      // 3개월 분석
-      if (stockData.length >= 90) {
-        final month3Data = stockData.sublist(stockData.length - 90);
-        final month3Analysis = ChartAnalysisService.analyzeChart(month3Data);
-        timeframes['3month'] = {
-          'trend': month3Analysis['trend']['direction'],
-          'strength': month3Analysis['trend']['strength'],
-        };
-      }
-      
-      // 1년 분석
-      if (stockData.length >= 120) {
-        final year1Data = stockData.sublist(stockData.length - 120);
-        final year1Analysis = ChartAnalysisService.analyzeChart(year1Data);
-        timeframes['1year'] = {
-          'trend': year1Analysis['trend']['direction'],
-          'strength': year1Analysis['trend']['strength'],
-        };
-      }
-      
-      return {
-        'currentPrice': currentPrice.round(),
-        'priceChange': priceChange.round(),
-        'priceChangePercent': priceChangePercent,
-        'isRealData': isRealData,
-        'dataSource': isRealData ? '실제 데이터' : '시뮬레이션',
-        'analysis': {
-          'trend': analysis['trend']['direction'],
-          'strength': analysis['trend']['strength'],
-          'position': analysis['overall']['position'],
-          'support': analysis['supportResistance']['support'].round(),
-          'resistance': analysis['supportResistance']['resistance'].round(),
-          'rsi': analysis['rsi'],
-          'macd': analysis['macd']['macd'] > 0 ? '상승' : '하락',
-          'volume': analysis['volume']['trend'],
-          'pattern': analysis['pattern'],
-          'recommendation': analysis['overall']['recommendation'],
-          'confidence': analysis['overall']['confidence'],
-        },
-        'timeframes': timeframes,
-        'indicators': {
-          'movingAverage': {
-            'ma5': analysis['movingAverages']['ma5'].round(),
-            'ma20': analysis['movingAverages']['ma20'].round(),
-            'ma60': analysis['movingAverages']['ma60'].round(),
-            'ma120': analysis['movingAverages']['ma120'].round(),
-          },
-          'bollinger': {
-            'upper': analysis['bollingerBands']['upper'].round(),
-            'middle': analysis['bollingerBands']['middle'].round(),
-            'lower': analysis['bollingerBands']['lower'].round(),
-          },
-          'volume': {
-            'current': analysis['volume']['current'],
-            'average': analysis['volume']['average'],
-            'ratio': analysis['volume']['ratio'],
-          }
-        }
+  Map<String, dynamic> _buildAnalysisResult(List<Map<String, dynamic>> stockData, Map<String, dynamic> analysis, bool isRealData) {
+    // 현재 가격 정보
+    final currentPrice = stockData.last['close'] as double;
+    final previousPrice = stockData.length > 1 ? stockData[stockData.length - 2]['close'] as double : currentPrice;
+    final priceChange = currentPrice - previousPrice;
+    final priceChangePercent = (priceChange / previousPrice) * 100;
+    
+    // 시간대별 분석 (다양한 기간의 데이터로 분석)
+    final timeframes = <String, Map<String, dynamic>>{};
+    
+    // 1일 분석
+    if (stockData.length >= 1) {
+      final day1Data = stockData.sublist(stockData.length - 1);
+      final day1Analysis = ChartAnalysisService.analyzeChart(day1Data);
+      timeframes['1day'] = {
+        'trend': day1Analysis['trend']['direction'],
+        'strength': day1Analysis['trend']['strength'],
       };
-    } catch (e) {
-      throw Exception('기술적 분석 중 오류가 발생했습니다: $e');
     }
+    
+    // 1주 분석
+    if (stockData.length >= 7) {
+      final week1Data = stockData.sublist(stockData.length - 7);
+      final week1Analysis = ChartAnalysisService.analyzeChart(week1Data);
+      timeframes['1week'] = {
+        'trend': week1Analysis['trend']['direction'],
+        'strength': week1Analysis['trend']['strength'],
+      };
+    }
+    
+    // 1개월 분석
+    if (stockData.length >= 30) {
+      final month1Data = stockData.sublist(stockData.length - 30);
+      final month1Analysis = ChartAnalysisService.analyzeChart(month1Data);
+      timeframes['1month'] = {
+        'trend': month1Analysis['trend']['direction'],
+        'strength': month1Analysis['trend']['strength'],
+      };
+    }
+    
+    // 3개월 분석
+    if (stockData.length >= 90) {
+      final month3Data = stockData.sublist(stockData.length - 90);
+      final month3Analysis = ChartAnalysisService.analyzeChart(month3Data);
+      timeframes['3month'] = {
+        'trend': month3Analysis['trend']['direction'],
+        'strength': month3Analysis['trend']['strength'],
+      };
+    }
+    
+    // 1년 분석
+    if (stockData.length >= 120) {
+      final year1Data = stockData.sublist(stockData.length - 120);
+      final year1Analysis = ChartAnalysisService.analyzeChart(year1Data);
+      timeframes['1year'] = {
+        'trend': year1Analysis['trend']['direction'],
+        'strength': year1Analysis['trend']['strength'],
+      };
+    }
+    
+    return {
+      'currentPrice': currentPrice.round(),
+      'priceChange': priceChange.round(),
+      'priceChangePercent': priceChangePercent,
+      'analysis': {
+        'trend': analysis['trend']['direction'],
+        'strength': analysis['trend']['strength'],
+        'position': analysis['overall']['position'],
+        'support': analysis['supportResistance']['support'].round(),
+        'resistance': analysis['supportResistance']['resistance'].round(),
+        'rsi': analysis['rsi'],
+        'macd': analysis['macd']['macd'] > 0 ? '상승' : '하락',
+        'volume': analysis['volume']['trend'],
+        'pattern': analysis['pattern'],
+        'recommendation': analysis['overall']['recommendation'],
+        'confidence': analysis['overall']['confidence'],
+      },
+      'timeframes': timeframes,
+      'indicators': {
+        'movingAverage': {
+          'ma5': analysis['movingAverages']['ma5'].round(),
+          'ma20': analysis['movingAverages']['ma20'].round(),
+          'ma60': analysis['movingAverages']['ma60'].round(),
+          'ma120': analysis['movingAverages']['ma120'].round(),
+        },
+        'bollinger': {
+          'upper': analysis['bollingerBands']['upper'].round(),
+          'middle': analysis['bollingerBands']['middle'].round(),
+          'lower': analysis['bollingerBands']['lower'].round(),
+        },
+        'volume': {
+          'current': analysis['volume']['current'],
+          'average': analysis['volume']['average'],
+          'ratio': analysis['volume']['ratio'],
+        }
+      }
+    };
   }
 
   @override
@@ -231,16 +240,10 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     final currentPrice = _analysisResult!['currentPrice'] as int;
     final priceChange = _analysisResult!['priceChange'] as int;
     final priceChangePercent = _analysisResult!['priceChangePercent'] as double;
-    final isRealData = _analysisResult!['isRealData'] as bool;
-    final dataSource = _analysisResult!['dataSource'] as String;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 데이터 소스 표시
-        _buildDataSourceSection(isRealData, dataSource),
-        const SizedBox(height: 16),
-        
         // 현재 가격 및 변동률
         _buildPriceSection(currentPrice, priceChange, priceChangePercent),
         const SizedBox(height: 16),
@@ -259,48 +262,6 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
     );
   }
 
-  Widget _buildDataSourceSection(bool isRealData, String dataSource) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isRealData ? Colors.green[900] : Colors.orange[900],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isRealData ? Colors.green : Colors.orange,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isRealData ? Icons.check_circle : Icons.warning,
-            color: isRealData ? Colors.green : Colors.orange,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '데이터 소스: $dataSource',
-            style: TextStyle(
-              color: isRealData ? Colors.green[100] : Colors.orange[100],
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Spacer(),
-          if (!isRealData)
-            Text(
-              '참고용',
-              style: TextStyle(
-                color: Colors.orange[200],
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPriceSection(int currentPrice, int priceChange, double priceChangePercent) {
     final isPositive = priceChange >= 0;
     
@@ -316,7 +277,7 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 '현재가',
                 style: TextStyle(
                   color: Colors.white70,
@@ -336,7 +297,7 @@ class _ChartAnalysisWidgetState extends State<ChartAnalysisWidget> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
+              const Text(
                 '전일 대비',
                 style: TextStyle(
                   color: Colors.white70,
