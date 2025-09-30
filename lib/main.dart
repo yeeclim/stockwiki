@@ -284,6 +284,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
               ),
             ],
             const SizedBox(height: 20),
+            
             if (_isLoading)
               const CircularProgressIndicator()
             else
