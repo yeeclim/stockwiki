@@ -38,6 +38,12 @@ class ChartAnalysisService {
 
   // 실제 가격을 기반으로 한 히스토리컬 데이터 생성
   static List<Map<String, dynamic>> _generateRealPriceBasedData(String symbol, int days, double realPrice, int realVolume) {
+    print('=== 실제 가격 기반 데이터 생성 시작 ===');
+    print('종목: $symbol');
+    print('받은 실제 가격: $realPrice');
+    print('받은 실제 거래량: $realVolume');
+    print('생성할 일수: $days');
+    
     final random = Random();
     final data = <Map<String, dynamic>>[];
     
@@ -66,7 +72,11 @@ class ChartAnalysisService {
       });
     }
     
-    print('실제 가격 기반 데이터 생성 완료: ${data.length}개, 최종 가격: ${data.last['close']}');
+    print('실제 가격 기반 데이터 생성 완료: ${data.length}개');
+    print('첫 번째 가격: ${data.first['close']}');
+    print('마지막 가격: ${data.last['close']}');
+    print('원본 실제 가격: $realPrice');
+    print('=====================================');
     return data;
   }
 
