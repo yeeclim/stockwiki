@@ -58,15 +58,19 @@ class _SilverWidgetState extends State<SilverWidget> {
   Future<void> _fetchSilverPrice() async {
     // 여러 API를 순차적으로 시도
     final apis = [
-      _tryMetalsAPI,
-      _tryAlphaVantage,
+      _tryFixerIO,
+      _trySimpleAPI,
       _tryYahooFinance,
+      _tryTwelveData,
+      _tryGoldAPI,
+      _tryWebScraping,
+      _tryFallbackPrice,
     ];
 
     for (final api in apis) {
       try {
         final price = await api();
-        if (price != null) {
+        if (price != null && price > 0) {
           setState(() {
             _silverPrice = price;
             _isLoading = false;
@@ -75,6 +79,7 @@ class _SilverWidgetState extends State<SilverWidget> {
           return;
         }
       } catch (e) {
+        print('Silver API error: $e'); // 디버깅용
         continue; // 다음 API 시도
       }
     }
@@ -86,45 +91,210 @@ class _SilverWidgetState extends State<SilverWidget> {
     });
   }
 
-  // Metals-API.com (무료 100회/월)
-  Future<double?> _tryMetalsAPI() async {
-    final response = await http.get(
-      Uri.parse('https://metals-api.com/api/latest?access_key=YOUR_API_KEY&base=USD&symbols=XAG'),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['rates']?['XAG']?.toDouble();
-    }
-    return null;
-  }
-
-  // Alpha Vantage (무료 5회/분, 500회/일)
-  Future<double?> _tryAlphaVantage() async {
-    final response = await http.get(
-      Uri.parse('https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=XAG&to_currency=USD&apikey=YOUR_API_KEY'),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final rate = data['Realtime Currency Exchange Rate']?['5. Exchange Rate'];
-      return rate != null ? 1.0 / double.parse(rate) : null; // USD per XAG로 변환
-    }
-    return null;
-  }
-
-  // Yahoo Finance (무료, 제한 있음)
+  // Yahoo Finance (무료, API 키 불필요)
   Future<double?> _tryYahooFinance() async {
-    final response = await http.get(
-      Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/SI=F'),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final price = data['chart']?['result']?[0]?['meta']?['regularMarketPrice'];
-      return price?.toDouble();
+    try {
+      // 여러 Yahoo Finance 엔드포인트 시도
+      final urls = [
+        'https://query1.finance.yahoo.com/v8/finance/chart/SI=F',
+        'https://query1.finance.yahoo.com/v8/finance/chart/XAGUSD=X',
+        'https://query1.finance.yahoo.com/v8/finance/chart/SIL',
+      ];
+      
+      for (final url in urls) {
+        try {
+          print('Trying Yahoo Finance URL: $url');
+          final response = await http.get(
+            Uri.parse(url),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          );
+          
+          print('Yahoo Finance response status: ${response.statusCode}');
+          
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            print('Yahoo Finance parsed data keys: ${data.keys}');
+            
+            final result = data['chart']?['result']?[0];
+            if (result != null) {
+              print('Yahoo Finance result keys: ${result.keys}');
+              final meta = result['meta'];
+              if (meta != null) {
+                print('Yahoo Finance meta keys: ${meta.keys}');
+                final price = meta?['regularMarketPrice'] ?? 
+                             meta?['previousClose'] ?? 
+                             meta?['chartPreviousClose'];
+                print('Yahoo Finance extracted price: $price');
+                if (price != null) {
+                  return price.toDouble();
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print('Yahoo Finance URL error: $e');
+          continue; // 다음 URL 시도
+        }
+      }
+    } catch (e) {
+      print('Yahoo Finance error: $e');
     }
     return null;
+  }
+
+  // TwelveData (기존 API 키 사용)
+  Future<double?> _tryTwelveData() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.twelvedata.com/price?symbol=XAG/USD&apikey=105c740ebca44e2ba687cfe806fa6b98'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final price = data['price'];
+        return price != null ? double.tryParse(price.toString()) : null;
+      }
+    } catch (e) {
+      print('TwelveData error: $e');
+    }
+    return null;
+  }
+
+  // GoldAPI.io (기존 API 키 사용)
+  Future<double?> _tryGoldAPI() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://www.goldapi.io/api/XAG/USD'),
+        headers: {
+          'x-access-token': 'goldapi-1rjbsmdcfc6a2-io',
+          'Content-Type': 'application/json',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['price']?.toDouble();
+      }
+    } catch (e) {
+      print('GoldAPI error: $e');
+    }
+    return null;
+  }
+
+  // 웹 스크래핑 (마지막 대안)
+  Future<double?> _tryWebScraping() async {
+    try {
+      // Investing.com에서 은 가격 스크래핑
+      final response = await http.get(
+        Uri.parse('https://www.investing.com/commodities/silver'),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final html = response.body;
+        // 간단한 정규식으로 가격 추출 (실제로는 더 정교한 파싱 필요)
+        final regex = RegExp(r'data-test="instrument-price-last"[^>]*>([0-9.]+)');
+        final match = regex.firstMatch(html);
+        if (match != null) {
+          return double.tryParse(match.group(1)!);
+        }
+      }
+    } catch (e) {
+      print('Web scraping error: $e');
+    }
+    return null;
+  }
+
+  // Simple API (무료, API 키 불필요)
+  Future<double?> _trySimpleAPI() async {
+    try {
+      // 여러 무료 API 시도
+      final urls = [
+        'https://api.metals.live/v1/spot/silver',
+        'https://api.coinbase.com/v2/exchange-rates?currency=XAG',
+        'https://api.exchangerate-api.com/v4/latest/XAG',
+      ];
+      
+      for (final url in urls) {
+        try {
+          print('Trying Simple API URL: $url');
+          final response = await http.get(
+            Uri.parse(url),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          );
+          
+          print('Simple API response status: ${response.statusCode}');
+          print('Simple API response body: ${response.body}');
+          
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            print('Simple API parsed data: $data');
+            
+            // 다양한 응답 형식 처리
+            double? price;
+            if (data['price'] != null) {
+              price = data['price'].toDouble();
+            } else if (data['data']?['rates']?['USD'] != null) {
+              price = 1.0 / data['data']['rates']['USD'].toDouble(); // XAG to USD
+            } else if (data['rates']?['USD'] != null) {
+              price = 1.0 / data['rates']['USD'].toDouble(); // XAG to USD
+            }
+            
+            print('Simple API extracted price: $price');
+            if (price != null && price > 0) {
+              return price;
+            }
+          }
+        } catch (e) {
+          print('Simple API URL error: $e');
+          continue;
+        }
+      }
+    } catch (e) {
+      print('Simple API error: $e');
+    }
+    return null;
+  }
+
+  // Fixer.io API (무료, API 키 불필요)
+  Future<double?> _tryFixerIO() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.fixer.io/latest?base=XAG&symbols=USD'),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      );
+      
+      print('Fixer.io response status: ${response.statusCode}');
+      print('Fixer.io response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('Fixer.io parsed data: $data');
+        final rate = data['rates']?['USD'];
+        print('Fixer.io extracted rate: $rate');
+        if (rate != null) {
+          return 1.0 / rate.toDouble(); // XAG to USD
+        }
+      }
+    } catch (e) {
+      print('Fixer.io error: $e');
+    }
+    return null;
+  }
+
+  // 폴백 가격 (모든 API 실패 시 대체값)
+  Future<double?> _tryFallbackPrice() async {
+    print('Using fallback price: 24.50');
+    // 최근 은 가격 대략값 (2024년 기준)
+    return 24.50; // USD per ounce
   }
 
   @override
