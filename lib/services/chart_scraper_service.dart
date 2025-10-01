@@ -10,8 +10,16 @@ class ChartScraperService {
     try {
       print('📊 [Chart Scraper] Yahoo 차트 이미지 스크랩 시작: $symbol');
       
-      // Yahoo Finance 차트 이미지 URL 생성
-      final chartUrl = 'https://chart.yahoo.com/z?s=$symbol&t=1m&q=l&l=on&z=l&a=v&p=s&lang=en-US&region=US&.tsrc=fin-srch';
+      // 여러 Yahoo Finance 차트 이미지 URL 시도
+      final chartUrls = [
+        'https://chart.finance.yahoo.com/v7/finance/chart/$symbol?range=1d&interval=1d&width=400&height=300',
+        'https://chart.yahoo.com/z?s=$symbol&t=1m&q=l&l=on&z=l&a=v&p=s&lang=en-US&region=US&.tsrc=fin-srch',
+        'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?interval=1d&range=1mo',
+        'https://chart.yahoo.com/z?s=$symbol&t=1m&q=l&l=on&z=l&a=v&p=s&lang=en-US&region=US',
+      ];
+      
+      // 첫 번째 URL 사용
+      final chartUrl = chartUrls[0];
       
       if (kIsWeb) {
         // 웹에서는 CORS 프록시 사용
@@ -86,6 +94,14 @@ class ChartScraperService {
         }
       }
       
+      // 다른 차트 이미지 서비스들 시도
+      final otherCharts = {
+        'alpha_vantage': 'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=$symbol&apikey=demo&datatype=csv',
+        'iex_cloud': 'https://cloud.iexapis.com/stable/stock/$symbol/chart/1m?token=demo',
+        'finnhub': 'https://finnhub.io/api/v1/quote?symbol=$symbol&token=demo',
+        'polygon': 'https://api.polygon.io/v2/aggs/ticker/$symbol/prev?adjusted=true&apikey=demo',
+      };
+      
       // 웹뷰용 차트들 추가
       charts['tradingview'] = getTradingViewChartUrl(symbol);
       charts['marketwatch'] = getMarketWatchChartUrl(symbol);
@@ -93,10 +109,18 @@ class ChartScraperService {
       charts['finviz'] = getFinvizChartUrl(symbol);
       charts['investing'] = getInvestingChartUrl(symbol);
       
+      // 차트 이미지가 없는 경우 간단한 차트 위젯 표시
+      if (charts.isEmpty) {
+        charts['simple_chart'] = 'simple_chart';
+        print('⚠️ [Chart Scraper] 차트 이미지 없음, 간단한 차트 위젯 사용');
+      }
+      
       print('📊 [Chart Scraper] 총 ${charts.length}개 차트 소스 준비 완료');
       return charts;
     } catch (e) {
       print('❌ [Chart Scraper] 차트 소스 준비 실패: $e');
+      // 오류가 발생해도 기본 차트는 제공
+      charts['simple_chart'] = 'simple_chart';
       return charts;
     }
   }
