@@ -1,37 +1,50 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/news.dart';
 
 class UsStockNewsService {
   static const String _fmpApiKey = '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh';
   static const String _fmpBaseUrl = 'https://financialmodelingprep.com/api/v3';
+  static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
 
   /// 미국 주식 관련 뉴스 조회 (FMP API 사용)
   static Future<List<News>> fetchStockNews(String symbol, {int limit = 10}) async {
     try {
+      print('📰 [News] 뉴스 조회 시작: $symbol');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final newsUrl = Uri.parse(
-        '$_fmpBaseUrl/stock_news?tickers=$symbol&limit=$limit&apikey=$_fmpApiKey&t=$timestamp',
-      );
       
-      final response = await http.get(newsUrl, headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      });
+      // 웹에서 CORS 문제 해결을 위한 프록시 사용
+      final newsUrl = kIsWeb 
+        ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_fmpBaseUrl/stock_news?tickers=$symbol&limit=$limit&apikey=$_fmpApiKey&t=$timestamp')}')
+        : Uri.parse('$_fmpBaseUrl/stock_news?tickers=$symbol&limit=$limit&apikey=$_fmpApiKey&t=$timestamp');
+      
+      print('🌐 [News] 뉴스 URL: $newsUrl');
+      print('📱 [News] 웹 모드: $kIsWeb');
+      
+      final response = await http.get(newsUrl);
+      print('📊 [News] 뉴스 응답 상태: ${response.statusCode}');
+      print('📄 [News] 뉴스 응답 본문: ${response.body}');
 
       if (response.statusCode != 200) {
+        print('❌ [News] 뉴스 조회 실패 - 상태 코드: ${response.statusCode}');
         return [];
       }
 
       final data = json.decode(response.body);
+      print('📋 [News] 뉴스 데이터 파싱 완료: ${data.runtimeType}');
+      
       if (data is List) {
-        return data.map((item) => News.fromJson(item)).toList();
+        final newsList = data.map((item) => News.fromJson(item)).toList();
+        print('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
+        return newsList;
       }
       
+      print('⚠️ [News] 뉴스 데이터가 리스트가 아님');
       return [];
     } catch (e) {
+      print('💥 [News] 뉴스 조회 오류: $e');
       return [];
     }
   }
