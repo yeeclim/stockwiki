@@ -181,6 +181,57 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
   Widget _buildChartWidget() {
     final chartUrl = _chartUrls![_selectedChartType!]!;
     
+    // 간단한 차트인 경우
+    if (_selectedChartType == 'simple_chart') {
+      return Container(
+        width: double.infinity,
+        height: 300,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[600]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            color: Colors.grey[850],
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.trending_up,
+                    color: Colors.blue,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${widget.symbol} 차트',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '차트 데이터를 불러오는 중...',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
     // Yahoo 차트 이미지인 경우
     if (_selectedChartType == 'yahoo_image') {
       return Container(
@@ -509,6 +560,8 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
 
   String _getChartTypeName(String type) {
     switch (type) {
+      case 'simple_chart':
+        return '간단한 차트';
       case 'yahoo_image':
         return 'Yahoo 차트 이미지';
       case 'tradingview':
