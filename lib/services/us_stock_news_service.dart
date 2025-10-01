@@ -8,25 +8,29 @@ class UsStockNewsService {
   static const String _fmpApiKey = '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh';
   static const String _fmpBaseUrl = 'https://financialmodelingprep.com/api/v3';
   static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
+  
+  // Finnhub API (무료, CORS 지원)
+  static const String _finnhubApiKey = 'ctchvspr01qncgiv1r3gctchvspr01qncgiv1r40';
+  static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
 
-  /// 미국 주식 관련 뉴스 조회 (FMP API 사용)
+  /// 미국 주식 관련 뉴스 조회 (Finnhub API 사용 - 무료)
   static Future<List<News>> fetchStockNews(String symbol, {int limit = 10}) async {
     try {
-      print('📰 [News] 뉴스 조회 시작: $symbol');
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      print('📰 [News] 뉴스 조회 시작 (Finnhub): $symbol');
       
-      // 웹에서 CORS 문제 해결을 위한 프록시 사용
-      final newsUrl = kIsWeb 
-        ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_fmpBaseUrl/stock_news?tickers=$symbol&limit=$limit&apikey=$_fmpApiKey&t=$timestamp')}')
-        : Uri.parse('$_fmpBaseUrl/stock_news?tickers=$symbol&limit=$limit&apikey=$_fmpApiKey&t=$timestamp');
+      // Finnhub company news API (최근 30일)
+      final fromDate = DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T')[0];
+      final toDate = DateTime.now().toIso8601String().split('T')[0];
+      
+      final newsUrl = Uri.parse(
+        '$_finnhubBaseUrl/company-news?symbol=$symbol&from=$fromDate&to=$toDate&token=$_finnhubApiKey'
+      );
       
       print('🌐 [News] 뉴스 URL: $newsUrl');
-      print('📱 [News] 웹 모드: $kIsWeb');
       
       final response = await http.get(newsUrl);
       print('📊 [News] 뉴스 응답 상태: ${response.statusCode}');
-      print('📄 [News] 뉴스 응답 본문: ${response.body}');
-
+      
       if (response.statusCode != 200) {
         print('❌ [News] 뉴스 조회 실패 - 상태 코드: ${response.statusCode}');
         return [];
@@ -36,9 +40,32 @@ class UsStockNewsService {
       print('📋 [News] 뉴스 데이터 파싱 완료: ${data.runtimeType}');
       
       if (data is List) {
-        final newsList = data.map((item) => News.fromJson(item)).toList();
-        print('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
-        return newsList;
+        if (data.isEmpty) {
+          print('⚠️ [News] 뉴스 리스트가 비어있음');
+          return [];
+        }
+        
+        print('📰 [News] 첫 번째 뉴스 샘플: ${data[0]}');
+        
+        try {
+          final newsList = data
+              .take(limit)
+              .map((item) => News(
+                    title: item['headline'] ?? '',
+                    description: item['summary'] ?? '',
+                    link: item['url'] ?? '',
+                    source: item['source'] ?? '',
+                    publishedAt: DateTime.fromMillisecondsSinceEpoch(
+                      (item['datetime'] ?? 0) * 1000,
+                    ).toIso8601String(),
+                  ))
+              .toList();
+          print('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
+          return newsList;
+        } catch (e) {
+          print('💥 [News] 뉴스 파싱 오류: $e');
+          return [];
+        }
       }
       
       print('⚠️ [News] 뉴스 데이터가 리스트가 아님');

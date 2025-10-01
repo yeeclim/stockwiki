@@ -19,12 +19,13 @@ class News {
   });
 
   factory News.fromJson(Map<String, dynamic> json) {
+    // FMP API 응답 형식에 맞게 수정
     return News(
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
+      title: json['title'] ?? json['headline'] ?? '',
+      description: json['description'] ?? json['text'] ?? json['summary'] ?? '',
       link: json['link'] ?? json['url'] ?? '',
-      source: json['source'] ?? '',
-      publishedAt: json['publishedAt'] ?? json['published_at'],
+      source: json['source'] ?? json['site'] ?? '',
+      publishedAt: json['publishedAt'] ?? json['publishedDate'] ?? json['published_at'] ?? json['date'] ?? '',
     );
   }
 
