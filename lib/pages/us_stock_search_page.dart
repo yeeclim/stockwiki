@@ -185,8 +185,6 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                               },
                             ),
                           ),
-                          // 차트 위젯 추가
-                          UsStockChartWidget(symbol: stock.symbol),
                         ],
                       ),
                     );
