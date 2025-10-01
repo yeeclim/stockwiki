@@ -39,12 +39,12 @@ class _StockCardState extends State<StockCard> {
         _newsList = news;
         _isLoadingNews = false;
       });
-      print('StockCard 뉴스 로딩 완료: ${news.length}개 (국내주식)');
+      // 뉴스 로딩 완료
     } catch (e) {
       setState(() {
         _isLoadingNews = false;
       });
-      print('StockCard 뉴스 로딩 실패: $e');
+      // 뉴스 로딩 실패
     }
   }
 
@@ -815,7 +815,7 @@ class _StockCardState extends State<StockCard> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      print('URL 실행 오류: $e');
+      // URL 실행 오류
     }
   }
 }

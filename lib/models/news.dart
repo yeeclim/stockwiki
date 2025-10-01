@@ -7,6 +7,9 @@ class News {
   final String source;
   final String? publishedAt;
 
+  // url은 link의 별칭으로 사용
+  String get url => link;
+
   News({
     required this.title,
     required this.description,
