@@ -39,11 +39,11 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     });
 
     try {
-      // Finviz, Investing.com, Yahoo Finance 차트 이미지 URL들 생성
+      // 차트 이미지 URL들 생성 (실제 이미지를 제공하는 서비스들)
       _chartUrls = {
-        'finviz': 'https://finviz.com/chart.ashx?t=${widget.symbol}&ty=c&ta=1&p=d&s=l',
-        'investing': 'https://www.investing.com/equities/${widget.symbol.toLowerCase()}-chart',
         'yahoo': 'https://query1.finance.yahoo.com/v8/finance/chart/${widget.symbol}?interval=1d&range=1mo',
+        'chart': 'https://chart.yahoo.com/z?s=${widget.symbol}&t=1m&q=l&l=on&z=l&a=v&p=s&lang=en-US&region=US&.tsrc=fin-srch',
+        'marketwatch': 'https://www.marketwatch.com/investing/stock/${widget.symbol.toLowerCase()}',
         'tradingview': 'https://www.tradingview.com/chart/?symbol=${widget.symbol}',
       };
 
@@ -173,8 +173,8 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
   Widget _buildChartWidget() {
     final chartUrl = _chartUrls![_selectedChartType!]!;
     
-    // Finviz 차트 이미지인 경우
-    if (_selectedChartType == 'finviz') {
+    // Yahoo 차트 이미지인 경우
+    if (_selectedChartType == 'chart') {
       return Container(
         width: double.infinity,
         height: 300,
@@ -209,7 +209,7 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        'Finviz 차트를 불러올 수 없습니다',
+                        'Yahoo 차트를 불러올 수 없습니다',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
@@ -220,6 +220,49 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
                 ),
               );
             },
+          ),
+        ),
+      );
+    }
+    
+    // MarketWatch 차트인 경우
+    if (_selectedChartType == 'marketwatch') {
+      return Container(
+        width: double.infinity,
+        height: 300,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[600]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.trending_up,
+                  color: Colors.blue,
+                  size: 48,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'MarketWatch 차트',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '웹에서 전체 차트를 확인하세요',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -458,12 +501,12 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
 
   String _getChartTypeName(String type) {
     switch (type) {
-      case 'finviz':
-        return 'Finviz 차트';
-      case 'investing':
-        return 'Investing.com';
       case 'yahoo':
         return 'Yahoo Finance';
+      case 'chart':
+        return 'Yahoo 차트 이미지';
+      case 'marketwatch':
+        return 'MarketWatch';
       case 'tradingview':
         return 'TradingView 차트';
       default:
