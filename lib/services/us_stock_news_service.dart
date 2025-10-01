@@ -10,10 +10,14 @@ class UsStockNewsService {
   static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
   
   // Finnhub API (무료, CORS 지원)
-  static const String _finnhubApiKey = 'ctchvspr01qncgiv1r3gctchvspr01qncgiv1r40';
+  static const String _finnhubApiKey = 'd3ecam1r01qrd38tq1c0d3ecam1r01qrd38tq1cg';
   static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
+  
+  // Alpha Vantage API (무료, 안정적)
+  static const String _alphaVantageApiKey = 'demo'; // 실제 키로 교체 필요
+  static const String _alphaVantageBaseUrl = 'https://www.alphavantage.co/query';
 
-  /// 미국 주식 관련 뉴스 조회 (Finnhub API 사용 - 무료)
+  /// 미국 주식 관련 뉴스 조회 (Finnhub API 사용 - 무료, CORS 지원)
   static Future<List<News>> fetchStockNews(String symbol, {int limit = 10}) async {
     try {
       print('📰 [News] 뉴스 조회 시작 (Finnhub): $symbol');
@@ -39,6 +43,7 @@ class UsStockNewsService {
       final data = json.decode(response.body);
       print('📋 [News] 뉴스 데이터 파싱 완료: ${data.runtimeType}');
       
+      // Finnhub는 배열로 직접 반환
       if (data is List) {
         if (data.isEmpty) {
           print('⚠️ [News] 뉴스 리스트가 비어있음');
@@ -50,25 +55,44 @@ class UsStockNewsService {
         try {
           final newsList = data
               .take(limit)
-              .map((item) => News(
-                    title: item['headline'] ?? '',
-                    description: item['summary'] ?? '',
-                    link: item['url'] ?? '',
-                    source: item['source'] ?? '',
-                    publishedAt: DateTime.fromMillisecondsSinceEpoch(
-                      (item['datetime'] ?? 0) * 1000,
-                    ).toIso8601String(),
-                  ))
+              .map((item) {
+                try {
+                  final datetime = item['datetime'];
+                  String publishedAt = '';
+                  
+                  if (datetime != null) {
+                    try {
+                      publishedAt = DateTime.fromMillisecondsSinceEpoch(
+                        datetime * 1000,
+                      ).toIso8601String();
+                    } catch (e) {
+                      print('⚠️ [News] datetime 파싱 오류: $e');
+                    }
+                  }
+                  
+                  return News(
+                    title: item['headline']?.toString() ?? '',
+                    description: item['summary']?.toString() ?? '',
+                    link: item['url']?.toString() ?? '',
+                    source: item['source']?.toString() ?? '',
+                    publishedAt: publishedAt,
+                  );
+                } catch (e) {
+                  print('⚠️ [News] 개별 뉴스 파싱 오류: $e, item: $item');
+                  rethrow;
+                }
+              })
               .toList();
           print('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
           return newsList;
         } catch (e) {
           print('💥 [News] 뉴스 파싱 오류: $e');
+          print('📄 [News] 오류 스택: ${StackTrace.current}');
           return [];
         }
       }
       
-      print('⚠️ [News] 뉴스 데이터가 리스트가 아님');
+      print('⚠️ [News] 뉴스 데이터가 리스트가 아님: $data');
       return [];
     } catch (e) {
       print('💥 [News] 뉴스 조회 오류: $e');
