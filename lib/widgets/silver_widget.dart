@@ -79,7 +79,6 @@ class _SilverWidgetState extends State<SilverWidget> {
           return;
         }
       } catch (e) {
-        print('Silver API error: $e'); // 디버깅용
         continue; // 다음 API 시도
       }
     }
@@ -103,7 +102,6 @@ class _SilverWidgetState extends State<SilverWidget> {
       
       for (final url in urls) {
         try {
-          print('Trying Yahoo Finance URL: $url');
           final response = await http.get(
             Uri.parse(url),
             headers: {
@@ -111,22 +109,15 @@ class _SilverWidgetState extends State<SilverWidget> {
             },
           );
           
-          print('Yahoo Finance response status: ${response.statusCode}');
-          
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
-            print('Yahoo Finance parsed data keys: ${data.keys}');
-            
             final result = data['chart']?['result']?[0];
             if (result != null) {
-              print('Yahoo Finance result keys: ${result.keys}');
               final meta = result['meta'];
               if (meta != null) {
-                print('Yahoo Finance meta keys: ${meta.keys}');
                 final price = meta?['regularMarketPrice'] ?? 
                              meta?['previousClose'] ?? 
                              meta?['chartPreviousClose'];
-                print('Yahoo Finance extracted price: $price');
                 if (price != null) {
                   return price.toDouble();
                 }
@@ -134,12 +125,11 @@ class _SilverWidgetState extends State<SilverWidget> {
             }
           }
         } catch (e) {
-          print('Yahoo Finance URL error: $e');
           continue; // 다음 URL 시도
         }
       }
     } catch (e) {
-      print('Yahoo Finance error: $e');
+      // Yahoo Finance error
     }
     return null;
   }
@@ -157,7 +147,7 @@ class _SilverWidgetState extends State<SilverWidget> {
         return price != null ? double.tryParse(price.toString()) : null;
       }
     } catch (e) {
-      print('TwelveData error: $e');
+      // TwelveData error
     }
     return null;
   }
@@ -178,7 +168,7 @@ class _SilverWidgetState extends State<SilverWidget> {
         return data['price']?.toDouble();
       }
     } catch (e) {
-      print('GoldAPI error: $e');
+      // GoldAPI error
     }
     return null;
   }
@@ -204,7 +194,7 @@ class _SilverWidgetState extends State<SilverWidget> {
         }
       }
     } catch (e) {
-      print('Web scraping error: $e');
+      // Web scraping error
     }
     return null;
   }
@@ -221,7 +211,6 @@ class _SilverWidgetState extends State<SilverWidget> {
       
       for (final url in urls) {
         try {
-          print('Trying Simple API URL: $url');
           final response = await http.get(
             Uri.parse(url),
             headers: {
@@ -229,12 +218,8 @@ class _SilverWidgetState extends State<SilverWidget> {
             },
           );
           
-          print('Simple API response status: ${response.statusCode}');
-          print('Simple API response body: ${response.body}');
-          
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
-            print('Simple API parsed data: $data');
             
             // 다양한 응답 형식 처리
             double? price;
@@ -246,18 +231,16 @@ class _SilverWidgetState extends State<SilverWidget> {
               price = 1.0 / data['rates']['USD'].toDouble(); // XAG to USD
             }
             
-            print('Simple API extracted price: $price');
             if (price != null && price > 0) {
               return price;
             }
           }
         } catch (e) {
-          print('Simple API URL error: $e');
           continue;
         }
       }
     } catch (e) {
-      print('Simple API error: $e');
+      // Simple API error
     }
     return null;
   }
@@ -272,27 +255,21 @@ class _SilverWidgetState extends State<SilverWidget> {
         },
       );
       
-      print('Fixer.io response status: ${response.statusCode}');
-      print('Fixer.io response body: ${response.body}');
-      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('Fixer.io parsed data: $data');
         final rate = data['rates']?['USD'];
-        print('Fixer.io extracted rate: $rate');
         if (rate != null) {
           return 1.0 / rate.toDouble(); // XAG to USD
         }
       }
     } catch (e) {
-      print('Fixer.io error: $e');
+      // Fixer.io error
     }
     return null;
   }
 
   // 폴백 가격 (모든 API 실패 시 대체값)
   Future<double?> _tryFallbackPrice() async {
-    print('Using fallback price: 24.50');
     // 최근 은 가격 대략값 (2024년 기준)
     return 24.50; // USD per ounce
   }

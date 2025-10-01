@@ -9,6 +9,9 @@ import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
 import 'package:stockwiki/pages/interest_news_page.dart';
+import 'package:stockwiki/pages/us_stock_detail_page.dart';
+import 'package:stockwiki/pages/us_stock_search_page.dart';
+import 'package:stockwiki/pages/keyword_search_page.dart';
 import 'package:stockwiki/widgets/stock_card.dart';
 import 'package:stockwiki/models/stock.dart';
 
@@ -47,6 +50,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
   final TextEditingController _controller = TextEditingController();
   List<String> _results = [];
   List<Map<String, dynamic>> _krResults = [];
+  List<Stock> _usStocks = []; // 미국 주식 객체 저장용
   bool _isLoading = false;
   String _marketType = 'us';
   bool _showWidgets = true;
@@ -56,6 +60,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
       _controller.clear();
       _results.clear();
       _krResults.clear();
+      _usStocks.clear();
       _isLoading = false;
       _showWidgets = true;
     });
@@ -88,15 +93,16 @@ class _StockSearchPageState extends State<StockSearchPage> {
       _isLoading = true;
       _results.clear();
       _krResults.clear();
+      _usStocks.clear();
       _showWidgets = false;
     });
 
     try {
       if (_marketType == 'us') {
         final stocks = await FMPService.fetchStocks(keyword);
-        final result = stocks.map((s) => '${s.name} (${s.symbol}) - \$${s.price}').toList();
         setState(() {
-          _results = result;
+          _usStocks = stocks;
+          _results = stocks.map((s) => '${s.name} (${s.symbol}) - \$${s.price}').toList();
         });
       } else {
         final list = await KrxLoader.searchStocks(keyword);
@@ -108,6 +114,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
       setState(() {
         _results = ['오류 발생: $e'];
         _krResults = [];
+        _usStocks = [];
       });
     } finally {
       setState(() {
@@ -206,6 +213,24 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     },
                   ),
                   ListTile(
+                    leading: const Icon(Icons.search, color: Colors.white),
+                    title: const Text("국내주식 검색", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const KeywordSearchPage()),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.public, color: Colors.white),
+                    title: const Text("미국주식 검색", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const UsStockSearchPage()),
+                      );
+                    },
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.bar_chart, color: Colors.white),
                     title: const Text("증시 시황", style: TextStyle(color: Colors.white)),
                     onTap: () {},
@@ -290,12 +315,59 @@ class _StockSearchPageState extends State<StockSearchPage> {
             else
               Expanded(
                 child: _marketType == 'us'
-                    ? ListView.builder(
-                        itemCount: _results.length,
-                        itemBuilder: (context, index) => ListTile(
-                          title: Text(_results[index]),
-                        ),
-                      )
+                    ? _usStocks.isEmpty
+                        ? const Text('')
+                        : ListView.builder(
+                            itemCount: _usStocks.length,
+                            itemBuilder: (context, index) {
+                              final stock = _usStocks[index];
+                              return Card(
+                                color: Colors.grey[800],
+                                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                child: ListTile(
+                                  title: Text(
+                                    stock.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '${stock.symbol} - \$${stock.price?.toStringAsFixed(2) ?? 'N/A'}',
+                                    style: TextStyle(color: Colors.grey[300]),
+                                  ),
+                                  trailing: stock.changePercent != null
+                                      ? Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
+                                              style: TextStyle(
+                                                color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Icon(
+                                              stock.changePercent! >= 0 ? Icons.trending_up : Icons.trending_down,
+                                              color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                              size: 16,
+                                            ),
+                                          ],
+                                        )
+                                      : null,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => UsStockDetailPage(stock: stock),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          )
                     : _krResults.isEmpty
                         ? const Text('')
                         : ListView.builder(

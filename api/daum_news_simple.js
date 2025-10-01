@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       } catch (itemError) {
         console.error('다음 뉴스 아이템 파싱 오류:', itemError);
         continue;
-      }
+      }ㄱ
     }
 
     console.log(`다음 뉴스 크롤링 완료: ${newsList.length}개 결과`);
