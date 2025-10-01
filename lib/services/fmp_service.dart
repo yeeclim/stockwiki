@@ -41,10 +41,19 @@ class FMPService {
         return [];
       }
 
+      // 미국 주식만 필터링 (무료 플랜 제한)
       List<String> symbols = searchData
+          .where((e) => e['exchangeShortName'] == 'NASDAQ' || 
+                       e['exchangeShortName'] == 'NYSE' ||
+                       e['exchangeShortName'] == 'AMEX')
           .map<String>((e) => e['symbol'] as String)
           .toList();
-      print('🏷️ [FMP] 추출된 심볼들: $symbols');
+      print('🏷️ [FMP] 추출된 심볼들 (미국 주식만): $symbols');
+      
+      if (symbols.isEmpty) {
+        print('⚠️ [FMP] 미국 주식이 없음');
+        return [];
+      }
 
       // 심볼 기반으로 실시간 정보 조회
       final quoteUrl = kIsWeb 
