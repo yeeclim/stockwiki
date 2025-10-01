@@ -39,15 +39,13 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     });
 
     try {
-      // Yahoo Finance 차트 이미지 URL들 생성
+      // Finviz, Investing.com, Yahoo Finance 차트 이미지 URL들 생성
       _chartUrls = {
-        'daily': 'https://query1.finance.yahoo.com/v8/finance/chart/${widget.symbol}?interval=1d&range=1mo',
-        'weekly': 'https://query1.finance.yahoo.com/v8/finance/chart/${widget.symbol}?interval=1wk&range=3mo',
-        'monthly': 'https://query1.finance.yahoo.com/v8/finance/chart/${widget.symbol}?interval=1mo&range=1y',
+        'finviz': 'https://finviz.com/chart.ashx?t=${widget.symbol}&ty=c&ta=1&p=d&s=l',
+        'investing': 'https://www.investing.com/equities/${widget.symbol.toLowerCase()}-chart',
+        'yahoo': 'https://query1.finance.yahoo.com/v8/finance/chart/${widget.symbol}?interval=1d&range=1mo',
+        'tradingview': 'https://www.tradingview.com/chart/?symbol=${widget.symbol}',
       };
-
-      // TradingView 차트 URL도 추가
-      _chartUrls!['tradingview'] = 'https://www.tradingview.com/chart/?symbol=${widget.symbol}';
 
       setState(() {
         _isLoading = false;
@@ -175,7 +173,59 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
   Widget _buildChartWidget() {
     final chartUrl = _chartUrls![_selectedChartType!]!;
     
-    // TradingView 차트인 경우 WebView 사용
+    // Finviz 차트 이미지인 경우
+    if (_selectedChartType == 'finviz') {
+      return Container(
+        width: double.infinity,
+        height: 300,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[600]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            chartUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey[800],
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 48,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Finviz 차트를 불러올 수 없습니다',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+    
+    // TradingView 차트인 경우
     if (_selectedChartType == 'tradingview') {
       return Container(
         width: double.infinity,
@@ -408,12 +458,12 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
 
   String _getChartTypeName(String type) {
     switch (type) {
-      case 'daily':
-        return '일봉 차트';
-      case 'weekly':
-        return '주봉 차트';
-      case 'monthly':
-        return '월봉 차트';
+      case 'finviz':
+        return 'Finviz 차트';
+      case 'investing':
+        return 'Investing.com';
+      case 'yahoo':
+        return 'Yahoo Finance';
       case 'tradingview':
         return 'TradingView 차트';
       default:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/stock.dart';
 import '../services/fmp_service.dart';
 import '../widgets/stock_card.dart';
+import '../widgets/us_stock_chart_widget.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockSearchPage extends StatefulWidget {
@@ -138,49 +139,55 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                     final stock = _results[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Card(
-                        color: Colors.grey[800],
-                        child: ListTile(
-                          title: Text(
-                            stock.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                      child: Column(
+                        children: [
+                          Card(
+                            color: Colors.grey[800],
+                            child: ListTile(
+                              title: Text(
+                                stock.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${stock.symbol} - \$${stock.price?.toStringAsFixed(2) ?? 'N/A'}',
+                                style: TextStyle(color: Colors.grey[300]),
+                              ),
+                              trailing: stock.changePercent != null
+                                  ? Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
+                                          style: TextStyle(
+                                            color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Icon(
+                                          stock.changePercent! >= 0 ? Icons.trending_up : Icons.trending_down,
+                                          color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    )
+                                  : null,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => UsStockDetailPage(stock: stock),
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                          subtitle: Text(
-                            '${stock.symbol} - \$${stock.price?.toStringAsFixed(2) ?? 'N/A'}',
-                            style: TextStyle(color: Colors.grey[300]),
-                          ),
-                          trailing: stock.changePercent != null
-                              ? Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
-                                      style: TextStyle(
-                                        color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Icon(
-                                      stock.changePercent! >= 0 ? Icons.trending_up : Icons.trending_down,
-                                      color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
-                                      size: 16,
-                                    ),
-                                  ],
-                                )
-                              : null,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => UsStockDetailPage(stock: stock),
-                              ),
-                            );
-                          },
-                        ),
+                          // 차트 위젯 추가
+                          UsStockChartWidget(symbol: stock.symbol),
+                        ],
                       ),
                     );
                   },
