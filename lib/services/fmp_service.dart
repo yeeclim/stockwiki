@@ -8,7 +8,7 @@ import '../models/news.dart';
 class FMPService {
   static const String _apiKey = '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh'; // 실제 키로 교체
   static const String _baseUrl = 'https://financialmodelingprep.com/api/v3';
-  static const String _corsProxy = 'https://api.allorigins.win/raw?url=';
+  static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
 
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
   static Future<List<Stock>> fetchStocks(String keyword) async {

@@ -25384,7 +25384,7 @@ aIP(a2){var s=0,r=A.I(t.k8),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1
 var $async$rT=A.J(function(a3,a4){if(a3===1){o.push(a4)
 s=p}while(true)switch(s){case 0:p=4
 n=Date.now()
-m=A.bW("https://api.allorigins.win/raw?url="+A.nP(2,"https://financialmodelingprep.com/api/v3/search?query="+a2+"&limit=10&apikey=0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh&t="+A.k(n),B.G,!1),0,null)
+m=A.bW("https://api.codetabs.com/v1/proxy?quest="+A.nP(2,"https://financialmodelingprep.com/api/v3/search?query="+a2+"&limit=10&apikey=0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh&t="+A.k(n),B.G,!1),0,null)
 s=7
 return A.L(A.dr(m,null),$async$rT)
 case 7:l=a4
@@ -25398,7 +25398,7 @@ s=1
 break}c=J.dC(k,new A.a2y(),t.N)
 b=A.X(c,c.$ti.i("an.E"))
 j=b
-i=A.bW("https://api.allorigins.win/raw?url="+A.nP(2,u.v+J.awV(j,",")+u.R+A.k(n),B.G,!1),0,null)
+i=A.bW("https://api.codetabs.com/v1/proxy?quest="+A.nP(2,u.v+J.awV(j,",")+u.R+A.k(n),B.G,!1),0,null)
 s=8
 return A.L(A.dr(i,null),$async$rT)
 case 8:h=a4
@@ -25437,7 +25437,7 @@ aIO(a){var s=0,r=A.I(t.nA),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$a2x=A.J(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
 n=Date.now()
-m=A.bW("https://api.allorigins.win/raw?url="+A.nP(2,u.v+a+u.R+A.k(n),B.G,!1),0,null)
+m=A.bW("https://api.codetabs.com/v1/proxy?quest="+A.nP(2,u.v+a+u.R+A.k(n),B.G,!1),0,null)
 s=7
 return A.L(A.dr(m,null),$async$a2x)
 case 7:l=c
