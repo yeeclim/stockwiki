@@ -107,9 +107,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             _buildStockInfoCard(),
             const SizedBox(height: 16),
             
-            // 차트
-            UsStockChartWidget(symbol: widget.stock.symbol),
-            const SizedBox(height: 16),
+            // 차트 섹션 제거 - 차트가 제대로 작동하지 않음
+            // UsStockChartWidget(symbol: widget.stock.symbol),
+            // const SizedBox(height: 16),
             
             // 뉴스 섹션
             _buildNewsSection(),
