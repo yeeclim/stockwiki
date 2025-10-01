@@ -21,19 +21,27 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
     final keyword = _controller.text.trim();
     if (keyword.isEmpty) return;
 
+    print('🚀 [US Stock Search] 검색 시작: $keyword');
+    
     setState(() {
       _isLoading = true;
       _error = '';
     });
 
     try {
+      print('📞 [US Stock Search] FMPService.fetchStocks 호출');
       // 미국 주식 검색
       final results = await FMPService.fetchStocks(keyword);
+      print('📊 [US Stock Search] 검색 결과: ${results.length}개');
+      
       setState(() => _results = results);
+      print('✅ [US Stock Search] UI 업데이트 완료');
     } catch (e) {
+      print('❌ [US Stock Search] 오류 발생: $e');
       setState(() => _error = '검색 중 오류 발생: $e');
     } finally {
       setState(() => _isLoading = false);
+      print('🏁 [US Stock Search] 검색 완료');
     }
   }
 

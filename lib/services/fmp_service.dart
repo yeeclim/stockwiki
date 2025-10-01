@@ -13,6 +13,7 @@ class FMPService {
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
   static Future<List<Stock>> fetchStocks(String keyword) async {
     try {
+      print('🔍 [FMP] 검색 시작: $keyword');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       
       // 웹에서 CORS 문제 해결을 위한 프록시 사용
@@ -20,35 +21,63 @@ class FMPService {
         ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp')}')
         : Uri.parse('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp');
       
+      print('🌐 [FMP] 검색 URL: $searchUrl');
+      print('📱 [FMP] 웹 모드: $kIsWeb');
+      
       final searchRes = await http.get(searchUrl);
+      print('📊 [FMP] 검색 응답 상태: ${searchRes.statusCode}');
+      print('📄 [FMP] 검색 응답 본문: ${searchRes.body}');
 
-      if (searchRes.statusCode != 200) throw Exception('검색 실패');
+      if (searchRes.statusCode != 200) {
+        print('❌ [FMP] 검색 실패 - 상태 코드: ${searchRes.statusCode}');
+        throw Exception('검색 실패: ${searchRes.statusCode}');
+      }
 
       final searchData = json.decode(searchRes.body);
-      if (searchData is! List || searchData.isEmpty) return [];
+      print('📋 [FMP] 검색 데이터 파싱 완료: ${searchData.runtimeType}');
+      
+      if (searchData is! List || searchData.isEmpty) {
+        print('⚠️ [FMP] 검색 결과가 비어있음');
+        return [];
+      }
 
       List<String> symbols = searchData
           .map<String>((e) => e['symbol'] as String)
           .toList();
+      print('🏷️ [FMP] 추출된 심볼들: $symbols');
 
       // 심볼 기반으로 실시간 정보 조회
       final quoteUrl = kIsWeb 
         ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp')}')
         : Uri.parse('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp');
+      
+      print('💰 [FMP] 시세 URL: $quoteUrl');
       final quoteRes = await http.get(quoteUrl);
+      print('📊 [FMP] 시세 응답 상태: ${quoteRes.statusCode}');
+      print('📄 [FMP] 시세 응답 본문: ${quoteRes.body}');
 
-      if (quoteRes.statusCode != 200) throw Exception('시세 조회 실패');
+      if (quoteRes.statusCode != 200) {
+        print('❌ [FMP] 시세 조회 실패 - 상태 코드: ${quoteRes.statusCode}');
+        throw Exception('시세 조회 실패: ${quoteRes.statusCode}');
+      }
 
       final quoteData = json.decode(quoteRes.body);
-      if (quoteData is! List) return [];
+      print('📋 [FMP] 시세 데이터 파싱 완료: ${quoteData.runtimeType}');
+      
+      if (quoteData is! List) {
+        print('⚠️ [FMP] 시세 데이터가 리스트가 아님');
+        return [];
+      }
 
       List<Stock> stocks = quoteData
           .map<Stock>((item) => Stock.fromJson(item))
           .toList();
-
+      
+      print('✅ [FMP] 최종 결과: ${stocks.length}개 주식');
       return stocks;
     } catch (e) {
-      print('Error fetching stocks: $e');
+      print('💥 [FMP] 전체 오류: $e');
+      print('📚 [FMP] 오류 타입: ${e.runtimeType}');
       return [];
     }
   }
