@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../services/chart_scraper_service.dart';
 
 class UsStockChartWidget extends StatefulWidget {
   final String symbol;
@@ -39,18 +40,25 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     });
 
     try {
-      // 차트 이미지 URL들 생성 (실제 이미지를 제공하는 서비스들)
-      _chartUrls = {
-        'yahoo': 'https://query1.finance.yahoo.com/v8/finance/chart/${widget.symbol}?interval=1d&range=1mo',
-        'chart': 'https://chart.yahoo.com/z?s=${widget.symbol}&t=1m&q=l&l=on&z=l&a=v&p=s&lang=en-US&region=US&.tsrc=fin-srch',
-        'marketwatch': 'https://www.marketwatch.com/investing/stock/${widget.symbol.toLowerCase()}',
-        'tradingview': 'https://www.tradingview.com/chart/?symbol=${widget.symbol}',
-      };
+      print('🔍 [Chart Widget] 차트 URL 로드 시작: ${widget.symbol}');
+      
+      // 차트 스크래핑 서비스를 통해 사용 가능한 차트들 가져오기
+      final availableCharts = await ChartScraperService.getAvailableCharts(widget.symbol);
+      
+      _chartUrls = availableCharts;
+      
+      // 기본 차트 타입 설정
+      if (_chartUrls!.isNotEmpty) {
+        _selectedChartType = _chartUrls!.keys.first;
+      }
 
+      print('📊 [Chart Widget] 로드된 차트: ${_chartUrls!.keys.toList()}');
+      
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      print('❌ [Chart Widget] 차트 로드 실패: $e');
       setState(() {
         _isLoading = false;
         _error = '차트 데이터를 불러올 수 없습니다: $e';
@@ -174,7 +182,7 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     final chartUrl = _chartUrls![_selectedChartType!]!;
     
     // Yahoo 차트 이미지인 경우
-    if (_selectedChartType == 'chart') {
+    if (_selectedChartType == 'yahoo_image') {
       return Container(
         width: double.infinity,
         height: 300,
@@ -501,14 +509,18 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
 
   String _getChartTypeName(String type) {
     switch (type) {
-      case 'yahoo':
-        return 'Yahoo Finance';
-      case 'chart':
+      case 'yahoo_image':
         return 'Yahoo 차트 이미지';
-      case 'marketwatch':
-        return 'MarketWatch';
       case 'tradingview':
         return 'TradingView 차트';
+      case 'marketwatch':
+        return 'MarketWatch';
+      case 'google_finance':
+        return 'Google Finance';
+      case 'finviz':
+        return 'Finviz';
+      case 'investing':
+        return 'Investing.com';
       default:
         return type;
     }

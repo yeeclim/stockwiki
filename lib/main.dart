@@ -213,24 +213,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.search, color: Colors.white),
-                    title: const Text("국내주식 검색", style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const KeywordSearchPage()),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.public, color: Colors.white),
-                    title: const Text("미국주식 검색", style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const UsStockSearchPage()),
-                      );
-                    },
-                  ),
-                  ListTile(
                     leading: const Icon(Icons.bar_chart, color: Colors.white),
                     title: const Text("증시 시황", style: TextStyle(color: Colors.white)),
                     onTap: () {},
