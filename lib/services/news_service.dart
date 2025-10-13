@@ -49,10 +49,10 @@ class NewsService {
         return <News>[];
       }));
       
-      // 병렬로 실행 (타임아웃 10초)
+      // 병렬로 실행 (타임아웃 5초로 단축)
       final results = await Future.wait(futures, eagerError: false)
-          .timeout(Duration(seconds: 10), onTimeout: () {
-        print('뉴스 로딩 타임아웃');
+          .timeout(Duration(seconds: 5), onTimeout: () {
+        print('뉴스 로딩 타임아웃 (5초)');
         return <List<News>>[];
       });
       
@@ -77,17 +77,19 @@ class NewsService {
             print('MK Stock RSS 실패: $e');
           }
         } else {
-          // 미국주식: 해외 뉴스 API들 사용
-          final futures = [
-            _fetchFromNewsData(stockName),
-            _fetchFromGNews(stockName),
-            _fetchFromMediaStack(stockName),
-          ];
+          // 미국주식: 해외 뉴스 API들을 병렬로 호출 (3초 타임아웃)
+          try {
+            final results = await Future.wait([
+              _fetchFromNewsData(stockName),
+              _fetchFromGNews(stockName),
+              _fetchFromMediaStack(stockName),
+            ], eagerError: false).timeout(const Duration(seconds: 3));
 
-          final results = await Future.wait(futures, eagerError: false);
-
-          for (final result in results) {
-            allNews.addAll(result);
+            for (final result in results) {
+              allNews.addAll(result);
+            }
+          } catch (e) {
+            print('미국 뉴스 API 타임아웃: $e');
           }
         }
       }
@@ -125,7 +127,7 @@ class NewsService {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
-      });
+      }).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
@@ -158,7 +160,7 @@ class NewsService {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
-      });
+      }).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
@@ -191,7 +193,7 @@ class NewsService {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
-      });
+      }).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
@@ -223,7 +225,7 @@ class NewsService {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
-      });
+      }).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         // 응답이 HTML인지 JSON인지 확인
@@ -277,7 +279,7 @@ class NewsService {
           'max_results': 5,
           'timestamp': timestamp,
         }),
-      );
+      ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
