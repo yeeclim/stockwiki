@@ -31,8 +31,8 @@ class _SilverWidgetState extends State<SilverWidget> {
       
       if (cachedPrice != null && cacheTime != null) {
         final now = DateTime.now().millisecondsSinceEpoch;
-        // 5분 이내 캐시된 데이터가 있으면 사용
-        if (now - cacheTime < 5 * 60 * 1000) {
+        // 10분 이내 캐시된 데이터가 있으면 사용
+        if (now - cacheTime < 10 * 60 * 1000) {
           setState(() {
             _silverPrice = cachedPrice;
             _isLoading = false;
@@ -56,34 +56,41 @@ class _SilverWidgetState extends State<SilverWidget> {
   }
 
   Future<void> _fetchSilverPrice() async {
-    // 여러 API를 순차적으로 시도
-    final apis = [
-      _tryFixerIO,
-      _trySimpleAPI,
-      _tryYahooFinance,
-      _tryTwelveData,
-      _tryGoldAPI,
-      _tryWebScraping,
-      _tryFallbackPrice,
-    ];
+    // 여러 API를 병렬로 호출하고 가장 빨리 성공하는 것을 사용
+    try {
+      final price = await Future.any([
+        _tryYahooFinance(),
+        _trySimpleAPI(),
+        _tryTwelveData(),
+        _tryGoldAPI(),
+        _tryFixerIO(),
+      ]).timeout(const Duration(seconds: 8));
 
-    for (final api in apis) {
+      if (price != null && price > 0) {
+        setState(() {
+          _silverPrice = price;
+          _isLoading = false;
+        });
+        await _cachePrice(price);
+        return;
+      }
+    } catch (e) {
+      // 병렬 호출 실패 시, 폴백 가격 사용
       try {
-        final price = await api();
-        if (price != null && price > 0) {
+        final fallbackPrice = await _tryFallbackPrice();
+        if (fallbackPrice != null && fallbackPrice > 0) {
           setState(() {
-            _silverPrice = price;
+            _silverPrice = fallbackPrice;
             _isLoading = false;
           });
-          await _cachePrice(price); // 가격 캐시 저장
           return;
         }
       } catch (e) {
-        continue; // 다음 API 시도
+        // 폴백도 실패
       }
     }
 
-    // 모든 API 실패 시
+    // 모든 시도 실패 시
     setState(() {
       _error = '데이터 없음';
       _isLoading = false;
@@ -93,21 +100,20 @@ class _SilverWidgetState extends State<SilverWidget> {
   // Yahoo Finance (무료, API 키 불필요)
   Future<double?> _tryYahooFinance() async {
     try {
-      // 여러 Yahoo Finance 엔드포인트 시도
+      // 병렬로 여러 Yahoo Finance 엔드포인트 시도
       final urls = [
         'https://query1.finance.yahoo.com/v8/finance/chart/SI=F',
         'https://query1.finance.yahoo.com/v8/finance/chart/XAGUSD=X',
-        'https://query1.finance.yahoo.com/v8/finance/chart/SIL',
       ];
       
-      for (final url in urls) {
+      final futures = urls.map((url) async {
         try {
           final response = await http.get(
             Uri.parse(url),
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             },
-          );
+          ).timeout(const Duration(seconds: 3));
           
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
@@ -125,7 +131,15 @@ class _SilverWidgetState extends State<SilverWidget> {
             }
           }
         } catch (e) {
-          continue; // 다음 URL 시도
+          return null;
+        }
+        return null;
+      });
+
+      final results = await Future.wait(futures);
+      for (final price in results) {
+        if (price != null && price > 0) {
+          return price;
         }
       }
     } catch (e) {
@@ -139,7 +153,7 @@ class _SilverWidgetState extends State<SilverWidget> {
     try {
       final response = await http.get(
         Uri.parse('https://api.twelvedata.com/price?symbol=XAG/USD&apikey=105c740ebca44e2ba687cfe806fa6b98'),
-      );
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -161,7 +175,7 @@ class _SilverWidgetState extends State<SilverWidget> {
           'x-access-token': 'goldapi-1rjbsmdcfc6a2-io',
           'Content-Type': 'application/json',
         },
-      );
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -173,50 +187,24 @@ class _SilverWidgetState extends State<SilverWidget> {
     return null;
   }
 
-  // 웹 스크래핑 (마지막 대안)
-  Future<double?> _tryWebScraping() async {
-    try {
-      // Investing.com에서 은 가격 스크래핑
-      final response = await http.get(
-        Uri.parse('https://www.investing.com/commodities/silver'),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        final html = response.body;
-        // 간단한 정규식으로 가격 추출 (실제로는 더 정교한 파싱 필요)
-        final regex = RegExp(r'data-test="instrument-price-last"[^>]*>([0-9.]+)');
-        final match = regex.firstMatch(html);
-        if (match != null) {
-          return double.tryParse(match.group(1)!);
-        }
-      }
-    } catch (e) {
-      // Web scraping error
-    }
-    return null;
-  }
 
   // Simple API (무료, API 키 불필요)
   Future<double?> _trySimpleAPI() async {
     try {
-      // 여러 무료 API 시도
+      // 여러 무료 API를 병렬로 시도
       final urls = [
         'https://api.metals.live/v1/spot/silver',
         'https://api.coinbase.com/v2/exchange-rates?currency=XAG',
-        'https://api.exchangerate-api.com/v4/latest/XAG',
       ];
       
-      for (final url in urls) {
+      final futures = urls.map((url) async {
         try {
           final response = await http.get(
             Uri.parse(url),
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             },
-          );
+          ).timeout(const Duration(seconds: 3));
           
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
@@ -226,9 +214,9 @@ class _SilverWidgetState extends State<SilverWidget> {
             if (data['price'] != null) {
               price = data['price'].toDouble();
             } else if (data['data']?['rates']?['USD'] != null) {
-              price = 1.0 / data['data']['rates']['USD'].toDouble(); // XAG to USD
+              price = 1.0 / data['data']['rates']['USD'].toDouble();
             } else if (data['rates']?['USD'] != null) {
-              price = 1.0 / data['rates']['USD'].toDouble(); // XAG to USD
+              price = 1.0 / data['rates']['USD'].toDouble();
             }
             
             if (price != null && price > 0) {
@@ -236,7 +224,15 @@ class _SilverWidgetState extends State<SilverWidget> {
             }
           }
         } catch (e) {
-          continue;
+          return null;
+        }
+        return null;
+      });
+
+      final results = await Future.wait(futures);
+      for (final price in results) {
+        if (price != null && price > 0) {
+          return price;
         }
       }
     } catch (e) {
@@ -253,7 +249,7 @@ class _SilverWidgetState extends State<SilverWidget> {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      );
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
