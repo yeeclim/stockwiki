@@ -12,6 +12,7 @@ import 'package:stockwiki/pages/interest_news_page.dart';
 import 'package:stockwiki/pages/us_stock_detail_page.dart';
 import 'package:stockwiki/pages/us_stock_search_page.dart';
 import 'package:stockwiki/pages/keyword_search_page.dart';
+import 'package:stockwiki/pages/ai_stock_recommend_page.dart';
 import 'package:stockwiki/widgets/stock_card.dart';
 import 'package:stockwiki/models/stock.dart';
 
@@ -201,21 +202,12 @@ class _StockSearchPageState extends State<StockSearchPage> {
                   ListTile(
                     leading: const Icon(Icons.auto_graph, color: Colors.white),
                     title: const Text("AI 종목 추천", style: TextStyle(color: Colors.white)),
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.layers, color: Colors.white),
-                    title: const Text("테마별 뉴스", style: TextStyle(color: Colors.white)),
                     onTap: () {
+                      Navigator.of(context).pop(); // 드로어 닫기
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const InterestNewsPage()),
+                        MaterialPageRoute(builder: (_) => const AiStockRecommendPage()),
                       );
                     },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.bar_chart, color: Colors.white),
-                    title: const Text("증시 시황", style: TextStyle(color: Colors.white)),
-                    onTap: () {},
                   ),
                 ],
               ),

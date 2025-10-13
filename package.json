@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "rss-parser": "^3.13.0",
-    "jsdom": "^22.1.0"
+    "jsdom": "^22.1.0",
+    "@vercel/kv": "^1.0.1"
   }
 }
