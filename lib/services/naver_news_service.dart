@@ -24,7 +24,7 @@ class NaverNewsService {
           'keyword': keyword,
           'max_results': maxResults,
         }),
-      );
+      ).timeout(const Duration(seconds: 3));
 
       print('네이버 뉴스 API 응답 상태: ${response.statusCode}');
       

@@ -11,8 +11,19 @@ class KrxLoader {
   // 실시간 주식 데이터 가져오기 (Yahoo Finance API 사용)
   static Future<Map<String, dynamic>?> _fetchRealTimeStock(String symbol) async {
     try {
-      // 새로고침 시에는 캐시 무시하고 항상 새 데이터 가져오기
-      dev.log('캐시 무시하고 새 데이터 가져오기: $symbol');
+      // 캐시 확인 (1분 이내 데이터는 재사용)
+      if (_stockCache != null && _stockCache!.containsKey(symbol)) {
+        final cachedData = _stockCache![symbol];
+        final lastUpdateStr = cachedData?['lastUpdate'] as String?;
+        if (lastUpdateStr != null) {
+          final lastUpdate = DateTime.parse(lastUpdateStr);
+          final now = DateTime.now();
+          if (now.difference(lastUpdate).inMinutes < 1) {
+            dev.log('캐시 사용: $symbol (${now.difference(lastUpdate).inSeconds}초 전)');
+            return cachedData;
+          }
+        }
+      }
 
       dev.log('네이버 금융 API 호출 시작: $symbol');
       
@@ -31,7 +42,7 @@ class KrxLoader {
           'Pragma': 'no-cache',
           'Expires': '0',
         },
-      );
+      ).timeout(const Duration(seconds: 5));
 
       dev.log('API 응답 상태: ${response.statusCode}');
       dev.log('API 응답 본문: ${response.body}');
@@ -474,22 +485,24 @@ class KrxLoader {
     // API 실패시 로컬 데이터만 사용
     if (localMatches.isEmpty) throw Exception('검색 결과 없음');
 
-    // 실시간 데이터 병합 (병렬 처리)
-    final List<Map<String, dynamic>> results = [];
-    for (final match in localMatches) {
+    // 실시간 데이터 병합 (병렬 처리로 개선)
+    final futures = localMatches.map((match) async {
       final symbol = match['단축코드']?.toString();
       if (symbol != null) {
-        final realTimeData = await _fetchRealTimeStock(symbol);
-        if (realTimeData != null) {
-          results.add({...match, ...realTimeData});
-        } else {
-          results.add(match);
+        try {
+          final realTimeData = await _fetchRealTimeStock(symbol)
+              .timeout(const Duration(seconds: 3));
+          if (realTimeData != null) {
+            return {...match, ...realTimeData};
+          }
+        } catch (e) {
+          dev.log('실시간 데이터 가져오기 실패 (타임아웃): $symbol');
         }
-      } else {
-        results.add(match);
       }
-    }
+      return match;
+    }).toList();
 
+    final results = await Future.wait(futures, eagerError: false);
     return results;
   }
 
