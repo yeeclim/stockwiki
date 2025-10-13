@@ -45,3 +45,10 @@ app.*.map.json
 
 #my own
 .env
+
+# Build outputs
+build/
+
+# Documentation (keep README.md only)
+*.md
+!README.md
