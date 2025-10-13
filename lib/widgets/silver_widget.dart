@@ -56,23 +56,26 @@ class _SilverWidgetState extends State<SilverWidget> {
   }
 
   Future<void> _fetchSilverPrice() async {
-    // 여러 API를 병렬로 호출하고 가장 빨리 성공하는 것을 사용
+    // 여러 API를 병렬로 호출하고 첫 번째 유효한 값 사용
     try {
-      final price = await Future.any([
+      final results = await Future.wait([
         _tryYahooFinance(),
         _trySimpleAPI(),
         _tryTwelveData(),
         _tryGoldAPI(),
         _tryFixerIO(),
-      ]).timeout(const Duration(seconds: 8));
+      ], eagerError: false).timeout(const Duration(seconds: 8));
 
-      if (price != null && price > 0) {
-        setState(() {
-          _silverPrice = price;
-          _isLoading = false;
-        });
-        await _cachePrice(price);
-        return;
+      // 첫 번째 유효한 가격 찾기
+      for (final price in results) {
+        if (price != null && price > 0) {
+          setState(() {
+            _silverPrice = price;
+            _isLoading = false;
+          });
+          await _cachePrice(price);
+          return;
+        }
       }
     } catch (e) {
       // 병렬 호출 실패 시, 폴백 가격 사용
