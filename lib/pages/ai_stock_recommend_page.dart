@@ -29,9 +29,16 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       _error = null;
     });
 
-    // 로컬 개발 환경 체크
+    // 환경 구분 및 로깅
     final baseUrl = Uri.base.origin;
-    if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
+    final isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+    
+    print('🌍 환경 정보: ${isLocalDev ? "로컬 개발" : "운영"}');
+    print('🔗 현재 URL: $baseUrl');
+    print('📱 User Agent: ${Uri.base.toString()}');
+    
+    if (isLocalDev) {
+      print('🏠 로컬 개발 환경 감지 - API 호출 생략');
       setState(() {
         _isLoading = false;
         _error = null;
@@ -41,16 +48,21 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     }
 
     try {
+      print('🚀 운영 환경에서 API 호출 시작');
       // 실제 API 데이터만 사용
       final recommendations = await _fetchFromAPI();
       
+      print('✅ API 호출 성공: ${recommendations.length}개 추천 받음');
       setState(() {
         _recommendations = recommendations;
         _isLoading = false;
       });
     } catch (e) {
       // API 실패 시 빈 목록 표시 (더미 데이터 사용 안함)
-      print('❌ API 호출 실패: $e');
+      print('❌ 운영 환경 API 호출 실패: $e');
+      print('🔍 에러 타입: ${e.runtimeType}');
+      print('📋 에러 상세: ${e.toString()}');
+      
       setState(() {
         _recommendations = [];
         _isLoading = false;
@@ -95,38 +107,65 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     
     print('🌐 AI 추천 API 호출 URL: $url');
     print('📱 현재 도메인: $baseUrl');
+    print('🕐 API 호출 시간: ${DateTime.now().toIso8601String()}');
     
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/json',
-      },
-    ).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () {
-        throw Exception('API 응답 시간 초과 (30초)');
-      },
-    );
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          print('⏰ API 타임아웃 발생 (30초 초과)');
+          throw Exception('API 응답 시간 초과 (30초)');
+        },
+      );
+      
+      print('📊 API 응답 상태: ${response.statusCode}');
+      print('📄 API 응답 헤더: ${response.headers}');
+      print('📄 응답 본문 길이: ${response.body.length}');
+      print('📄 API 응답 본문 (첫 500자): ${response.body.length > 500 ? response.body.substring(0, 500) : response.body}');
+      
+      // 응답 상태 코드별 처리
+      if (response.statusCode != 200) {
+        print('❌ HTTP 에러: ${response.statusCode} ${response.reasonPhrase}');
+        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+      }
     
-    print('📊 API 응답 상태: ${response.statusCode}');
-    print('📄 API 응답 헤더: ${response.headers}');
-    print('📄 API 응답 본문 (첫 200자): ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
-    
-    if (response.statusCode == 200) {
       // 응답이 JSON인지 확인
-      if (!response.body.trim().startsWith('{')) {
-        throw Exception('API가 JSON이 아닌 응답을 반환했습니다: ${response.body.substring(0, 100)}...');
+      final responseBody = response.body.trim();
+      print('🔍 응답 본문 시작: ${responseBody.substring(0, responseBody.length > 50 ? 50 : responseBody.length)}');
+      
+      if (!responseBody.startsWith('{')) {
+        print('❌ JSON 응답이 아님 - HTML 응답 감지');
+        print('📄 전체 응답 본문: $responseBody');
+        throw Exception('API가 JSON이 아닌 응답을 반환했습니다: ${responseBody.substring(0, 100)}...');
       }
       
-      final data = json.decode(response.body);
+      print('✅ JSON 응답 확인됨 - 파싱 시작');
+      final data = json.decode(responseBody);
+      print('📊 파싱된 JSON 데이터: ${data.runtimeType}');
+      print('🔑 JSON 키들: ${data is Map ? (data as Map).keys.toList() : 'N/A'}');
+      
+      if (data is! Map) {
+        throw Exception('JSON 응답이 객체가 아닙니다: ${data.runtimeType}');
+      }
       
       if (data['success'] != true) {
+        print('❌ API 응답에서 success=false');
         throw Exception('API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
       }
       
       final results = data['data'] as List<dynamic>? ?? [];
+      print('📋 추천 데이터 개수: ${results.length}');
+      
+      if (results.isEmpty) {
+        print('⚠️ 추천 데이터가 비어있음');
+      }
       
       return results.map((item) => StockRecommendation(
         stockName: item['stockName'] ?? '',
@@ -169,8 +208,12 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
               )
             : null,
       )).toList();
-    } else {
-      throw Exception('API 호출 실패: ${response.statusCode}');
+      
+    } catch (e) {
+      print('❌ API 호출 중 예외 발생: $e');
+      print('🔍 예외 타입: ${e.runtimeType}');
+      print('📋 스택 트레이스: ${e.toString()}');
+      rethrow;
     }
   }
 
