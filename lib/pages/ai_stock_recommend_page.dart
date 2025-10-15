@@ -15,190 +15,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   bool _isLoading = true;
   String? _error;
 
-  // 임시 샘플 데이터 (API 연동 전 테스트용) - 주의: 이 데이터는 더 이상 사용되지 않음
-  final List<StockRecommendation> _sampleData = [
-    StockRecommendation(
-      stockName: '삼성전자',
-      stockCode: '005930',
-      currentPrice: 75000, // ⚠️ 더미 데이터 - 실시간 데이터로 대체됨
-      changePercent: 2.3, // ⚠️ 더미 데이터 - 실시간 데이터로 대체됨
-      changeAmount: 1700, // ⚠️ 더미 데이터 - 실시간 데이터로 대체됨
-      action: '매수',
-      reasons: [
-        '반도체 업황 회복 신호',
-        'HBM3E 양산 본격화',
-        '4분기 실적 개선 전망',
-      ],
-      targetPrice: 85000,
-      postedAt: DateTime.now().subtract(const Duration(hours: 2)),
-      likes: 156,
-      comments: 12,
-      shares: 23,
-      dayTrading: TradingStrategy(
-        buyPrice: 74500,
-        sellPrice: 76800,
-        stopLoss: 73500,
-        period: '1~3일',
-        expectedReturn: 3.1,
-      ),
-      swingTrading: TradingStrategy(
-        buyPrice: 74000,
-        sellPrice: 81000,
-        stopLoss: 72000,
-        period: '1주~1개월',
-        expectedReturn: 9.5,
-      ),
-      longTerm: TradingStrategy(
-        buyPrice: 75000,
-        sellPrice: 92000,
-        stopLoss: 70000,
-        period: '3개월~1년',
-        expectedReturn: 22.7,
-      ),
-    ),
-    StockRecommendation(
-      stockName: 'SK하이닉스',
-      stockCode: '000660',
-      currentPrice: 185000,
-      changePercent: 1.8,
-      changeAmount: 3300,
-      action: '매수',
-      reasons: [
-        'AI 반도체 수요 급증',
-        'HBM 점유율 1위 유지',
-        '영업이익률 개선 지속',
-      ],
-      targetPrice: 210000,
-      postedAt: DateTime.now().subtract(const Duration(hours: 5)),
-      likes: 243,
-      comments: 34,
-      shares: 45,
-      dayTrading: TradingStrategy(
-        buyPrice: 184000,
-        sellPrice: 189500,
-        stopLoss: 181000,
-        period: '1~3일',
-        expectedReturn: 3.0,
-      ),
-      swingTrading: TradingStrategy(
-        buyPrice: 183000,
-        sellPrice: 198000,
-        stopLoss: 178000,
-        period: '1주~1개월',
-        expectedReturn: 8.2,
-      ),
-      longTerm: TradingStrategy(
-        buyPrice: 185000,
-        sellPrice: 230000,
-        stopLoss: 175000,
-        period: '3개월~1년',
-        expectedReturn: 24.3,
-      ),
-    ),
-    StockRecommendation(
-      stockName: 'NAVER',
-      stockCode: '035420',
-      currentPrice: 235000,
-      changePercent: -0.8,
-      changeAmount: -1900,
-      action: '보유',
-      reasons: [
-        'AI 검색 서비스 강화',
-        '클라우드 사업 성장세',
-        '단기 조정 후 반등 예상',
-      ],
-      targetPrice: 260000,
-      postedAt: DateTime.now().subtract(const Duration(hours: 8)),
-      likes: 98,
-      comments: 15,
-      shares: 12,
-      swingTrading: TradingStrategy(
-        buyPrice: 232000,
-        sellPrice: 248000,
-        stopLoss: 225000,
-        period: '1주~1개월',
-        expectedReturn: 6.9,
-      ),
-      longTerm: TradingStrategy(
-        buyPrice: 235000,
-        sellPrice: 280000,
-        stopLoss: 220000,
-        period: '3개월~1년',
-        expectedReturn: 19.1,
-      ),
-    ),
-    StockRecommendation(
-      stockName: '카카오',
-      stockCode: '035720',
-      currentPrice: 51000,
-      changePercent: 3.5,
-      changeAmount: 1700,
-      action: '매수',
-      reasons: [
-        '카카오페이 IPO 기대감',
-        '광고 매출 회복세',
-        '저평가 구간 진입',
-      ],
-      targetPrice: 62000,
-      postedAt: DateTime.now().subtract(const Duration(days: 1)),
-      likes: 187,
-      comments: 28,
-      shares: 31,
-      dayTrading: TradingStrategy(
-        buyPrice: 50500,
-        sellPrice: 52800,
-        stopLoss: 49500,
-        period: '1~3일',
-        expectedReturn: 4.6,
-      ),
-      swingTrading: TradingStrategy(
-        buyPrice: 50000,
-        sellPrice: 56500,
-        stopLoss: 48000,
-        period: '1주~1개월',
-        expectedReturn: 13.0,
-      ),
-      longTerm: TradingStrategy(
-        buyPrice: 51000,
-        sellPrice: 68000,
-        stopLoss: 47000,
-        period: '3개월~1년',
-        expectedReturn: 33.3,
-      ),
-    ),
-    StockRecommendation(
-      stockName: 'LG에너지솔루션',
-      stockCode: '373220',
-      currentPrice: 420000,
-      changePercent: 1.2,
-      changeAmount: 5000,
-      action: '매수',
-      reasons: [
-        '북미 IRA 수혜주',
-        '전기차 배터리 점유율 확대',
-        '신규 공장 가동 임박',
-      ],
-      targetPrice: 480000,
-      postedAt: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-      likes: 321,
-      comments: 52,
-      shares: 67,
-      swingTrading: TradingStrategy(
-        buyPrice: 415000,
-        sellPrice: 445000,
-        stopLoss: 400000,
-        period: '1주~1개월',
-        expectedReturn: 7.2,
-      ),
-      longTerm: TradingStrategy(
-        buyPrice: 420000,
-        sellPrice: 520000,
-        stopLoss: 390000,
-        period: '3개월~1년',
-        expectedReturn: 23.8,
-      ),
-    ),
-  ];
+  // 더미 데이터 완전 제거 - 실시간 API 데이터만 사용
 
   @override
   void initState() {
@@ -213,7 +30,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     });
 
     try {
-      // 실제 API 호출
+      // 실시간 API 데이터만 사용
       final recommendations = await _fetchFromAPI();
       
       setState(() {
@@ -221,11 +38,12 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
         _isLoading = false;
       });
     } catch (e) {
-      // API 실패 시 샘플 데이터 사용 (폴백)
-      print('⚠️ API 호출 실패, 샘플 데이터 사용: $e');
+      // API 실패 시 빈 목록 표시 (더미 데이터 사용 안함)
+      print('❌ API 호출 실패: $e');
       setState(() {
-        _recommendations = _sampleData;
+        _recommendations = [];
         _isLoading = false;
+        _error = '실시간 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.';
       });
     }
   }
@@ -337,16 +155,22 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.inbox, color: Colors.grey, size: 48),
+            const Icon(Icons.refresh, color: Colors.blue, size: 48),
             const SizedBox(height: 16),
             const Text(
-              '아직 AI 추천이 없습니다',
+              '실시간 데이터를 불러오는 중입니다',
               style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 8),
             Text(
-              'AI가 분석한 종목 추천이 여기에 표시됩니다',
+              '실제 주가 데이터를 기반으로 한 AI 추천이 곧 표시됩니다',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadRecommendations,
+              child: const Text('새로고침'),
             ),
           ],
         ),
