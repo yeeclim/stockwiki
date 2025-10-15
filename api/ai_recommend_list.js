@@ -27,12 +27,23 @@ export default async function handler(req, res) {
   try {
     const { limit = '20', offset = '0', refresh = 'false' } = req.query;
     
-    // refresh=true이거나 저장소가 비어있으면 실시간 데이터로 새로고침
-    if (refresh === 'true' || recommendationsStore.length === 0) {
-      console.log('🔄 실시간 주가 데이터 새로고침 중...');
+  // refresh=true이거나 저장소가 비어있으면 실시간 데이터로 새로고침
+  if (refresh === 'true' || recommendationsStore.length === 0) {
+    console.log('🔄 실시간 주가 데이터 새로고침 중...');
+    try {
       recommendationsStore = await getSampleRecommendationsWithRealPrices();
-      console.log('📊 실시간 주가 데이터로 업데이트 완료: 5개 추천');
+      console.log('📊 실시간 주가 데이터로 업데이트 완료:', recommendationsStore.length, '개 추천');
+      
+      // 실시간 데이터를 가져올 수 없는 경우 최소한의 정보라도 제공
+      if (recommendationsStore.length === 0) {
+        console.log('⚠️ 실시간 데이터 없음 - 기본 정보 제공');
+        recommendationsStore = getFallbackRecommendations();
+      }
+    } catch (error) {
+      console.error('❌ 실시간 데이터 새로고침 실패:', error);
+      recommendationsStore = getFallbackRecommendations(); // 폴백 데이터 제공
     }
+  }
     
     const limitNum = parseInt(limit);
     const offsetNum = parseInt(offset);
@@ -195,6 +206,55 @@ function generateTradingStrategy(currentPrice, type) {
   return strategies[type];
 }
 
+// 폴백 추천 데이터 (실시간 데이터를 가져올 수 없는 경우)
+function getFallbackRecommendations() {
+  return [
+    {
+      id: 'rec_fallback_001',
+      stockName: '삼성전자',
+      stockCode: '005930',
+      currentPrice: null, // 실시간 데이터 없음 표시
+      changePercent: 0,
+      changeAmount: 0,
+      action: '매수',
+      reasons: [
+        '반도체 업황 회복 신호 포착',
+        'HBM3E 양산 본격화로 수익성 개선',
+        '4분기 실적 시장 컨센서스 상회 전망',
+      ],
+      targetPrice: 85000,
+      postedAt: new Date().toISOString(),
+      likes: 156,
+      comments: 12,
+      shares: 23,
+      lastUpdate: new Date().toISOString(),
+      priceSource: 'unavailable',
+      note: '실시간 데이터를 불러올 수 없습니다. 네이버 증권에서 직접 확인해주세요.',
+      dayTrading: {
+        buyPrice: 74500,
+        sellPrice: 76800,
+        stopLoss: 73500,
+        period: '1~3일',
+        expectedReturn: 3.1,
+      },
+      swingTrading: {
+        buyPrice: 74000,
+        sellPrice: 81000,
+        stopLoss: 72000,
+        period: '1주~1개월',
+        expectedReturn: 9.5,
+      },
+      longTerm: {
+        buyPrice: 75000,
+        sellPrice: 92000,
+        stopLoss: 70000,
+        period: '3개월~1년',
+        expectedReturn: 22.7,
+      },
+    }
+  ];
+}
+
 // 실시간 주가 데이터 가져오기 (기존 naver-stock API 활용)
 async function fetchStockPrice(symbol) {
   try {
@@ -225,21 +285,27 @@ async function fetchStockDataDirect(symbol) {
   try {
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
     
-    console.log(`🌐 네이버 증권 크롤링: ${url}`);
+    console.log(`🌐 네이버 증권 크롤링 시작: ${symbol}`);
+    
+    // 타임아웃 설정과 함께 fetch
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
     
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-      }
+      },
+      signal: controller.signal
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      console.log(`❌ 네이버 응답 오류: ${response.status}`);
+      console.log(`❌ 네이버 응답 오류: ${response.status} ${response.statusText}`);
       return null;
     }
 
@@ -253,7 +319,7 @@ async function fetchStockDataDirect(symbol) {
     const priceInfo = extractPriceInfo(html);
     
     if (!priceInfo.price) {
-      console.log('❌ 가격 정보를 찾을 수 없습니다');
+      console.log(`❌ ${symbol} 가격 정보를 찾을 수 없습니다`);
       return null;
     }
 
@@ -270,11 +336,15 @@ async function fetchStockDataDirect(symbol) {
       note: '전일 종가 기준 (실시간 크롤링)'
     };
 
-    console.log('✅ 크롤링 성공:', stockData);
+    console.log(`✅ ${symbol} 크롤링 성공: ₩${stockData.price.toLocaleString()}`);
     return stockData;
 
   } catch (error) {
-    console.error('❌ 크롤링 오류:', error);
+    if (error.name === 'AbortError') {
+      console.error(`❌ ${symbol} 크롤링 타임아웃 (10초 초과)`);
+    } else {
+      console.error(`❌ ${symbol} 크롤링 오류:`, error.message);
+    }
     return null;
   }
 }
