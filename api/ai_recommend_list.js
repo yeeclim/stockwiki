@@ -1,7 +1,7 @@
 // AI 종목 추천 목록 조회 API
 // GET으로 저장된 추천 목록을 반환 (실시간 주가 데이터 포함)
 
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch'; // Vercel에서는 내장 fetch 사용
 
 // 메모리 저장소 참조
 let recommendationsStore = [];
