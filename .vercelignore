@@ -1,6 +1,4 @@
-# Vercel 배포 시 제외할 파일들
-
-# Flutter 빌드 임시 파일
+# Flutter 관련
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -8,39 +6,32 @@
 .pub-cache/
 .pub/
 
-# 개발 환경
-.env.local
-.env*.local
-*.log
-
-# IDE
+# IDE 관련
 .idea/
 .vscode/
-*.swp
-*.swo
-*~
+*.iml
 
-# OS
+# OS 관련
 .DS_Store
 Thumbs.db
 
-# 문서 (선택사항)
-*.md
-!README.md
+# 로그 파일
+*.log
 
-# 로컬 테스트 파일
+# 임시 파일
+*.tmp
+*.temp
+
+# Node modules (필요한 경우에만)
+node_modules/
+
+# 테스트 파일
 test/
-scripts/*.json
-recommendation_*.json
-kv_backup_*.json
+coverage/
 
-# 불필요한 빌드 파일
-android/
-ios/
-linux/
-macos/
-windows/
+# 문서 파일
+*.md
+docs/
 
-# Node modules (package.json에서 자동 설치)
-# node_modules는 .gitignore에 있으면 됨
-
+# 스크립트 파일
+scripts/

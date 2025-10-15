@@ -25,7 +25,6 @@ class _VixWidgetState extends State<VixWidget> {
     try {
       final response = await http.get(
         Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=1d'),
-        headers: {'User-Agent': 'Mozilla/5.0'},
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
