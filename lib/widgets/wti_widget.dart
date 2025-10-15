@@ -109,9 +109,6 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       final response = await http.get(
         Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/CL=F'),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
@@ -172,9 +169,6 @@ class _WtiWidgetState extends State<WtiWidget> {
       // OANDA API 사용 (무료)
       final response = await http.get(
         Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/BZ=F'),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
