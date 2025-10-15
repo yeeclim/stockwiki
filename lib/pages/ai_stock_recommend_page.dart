@@ -54,7 +54,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       setState(() {
         _recommendations = [];
         _isLoading = false;
-        _error = 'AI 추천 서비스를 불러올 수 없습니다. 네트워크 연결을 확인하고 잠시 후 다시 시도해주세요.';
+        _error = 'AI 추천 서비스를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.';
       });
     }
   }
