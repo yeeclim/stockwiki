@@ -103,69 +103,76 @@ export default async function handler(req, res) {
 
 // 실시간 주가 데이터만 포함한 추천 데이터 생성 (더미 데이터 완전 제거)
 async function getSampleRecommendationsWithRealPrices() {
-  // 추천할 종목 목록 (가격 없는 기본 정보만)
-  const stockSymbols = [
-    { code: '005930', name: '삼성전자', action: '매수' },
-    { code: '000660', name: 'SK하이닉스', action: '매수' },
-    { code: '035420', name: 'NAVER', action: '보유' },
-    { code: '035720', name: '카카오', action: '매수' },
-    { code: '373220', name: 'LG에너지솔루션', action: '매수' }
-  ];
-
-  const recommendations = [];
+  console.log('🔄 실시간 추천 데이터 생성 시작...');
   
-  for (let i = 0; i < stockSymbols.length; i++) {
-    const stock = stockSymbols[i];
+  try {
+    // 추천할 종목 목록 (가격 없는 기본 정보만)
+    const stockSymbols = [
+      { code: '005930', name: '삼성전자', action: '매수' },
+      { code: '000660', name: 'SK하이닉스', action: '매수' },
+      { code: '035420', name: 'NAVER', action: '보유' },
+      { code: '035720', name: '카카오', action: '매수' },
+      { code: '373220', name: 'LG에너지솔루션', action: '매수' }
+    ];
+
+    const recommendations = [];
     
-    try {
-      console.log(`📊 ${stock.name} 실시간 주가 조회 중...`);
-      const stockData = await fetchStockPrice(stock.code);
+    for (let i = 0; i < stockSymbols.length; i++) {
+      const stock = stockSymbols[i];
       
-      if (stockData && stockData.price) {
-        // 실시간 데이터로만 추천 생성
-        const recommendation = {
-          id: `rec_real_${stock.code}_${Date.now()}`,
-          stockName: stockData.name || stock.name,
-          stockCode: stock.code,
-          currentPrice: stockData.price,
-          changePercent: 0, // 실시간 변동률은 별도 계산 필요
-          changeAmount: 0, // 실시간 변동가도 별도 계산 필요
-          action: stock.action,
-          reasons: generateReasons(stock.code, stock.name),
-          targetPrice: Math.round(stockData.price * 1.15), // 현재가의 115%로 목표가 설정
-          postedAt: new Date().toISOString(),
-          likes: Math.floor(Math.random() * 200) + 50,
-          comments: Math.floor(Math.random() * 30) + 5,
-          shares: Math.floor(Math.random() * 40) + 10,
-          lastUpdate: new Date().toISOString(),
-          priceSource: 'real-time',
-          volume: stockData.volume || 0,
-          marketCap: stockData.marketCap || 0
-        };
+      try {
+        console.log(`📊 ${stock.name} 실시간 주가 조회 중...`);
+        const stockData = await fetchStockPrice(stock.code);
+        
+        if (stockData && stockData.price) {
+          // 실시간 데이터로만 추천 생성
+          const recommendation = {
+            id: `rec_real_${stock.code}_${Date.now()}`,
+            stockName: stockData.name || stock.name,
+            stockCode: stock.code,
+            currentPrice: stockData.price,
+            changePercent: 0, // 실시간 변동률은 별도 계산 필요
+            changeAmount: 0, // 실시간 변동가도 별도 계산 필요
+            action: stock.action,
+            reasons: generateReasons(stock.code, stock.name),
+            targetPrice: Math.round(stockData.price * 1.15), // 현재가의 115%로 목표가 설정
+            postedAt: new Date().toISOString(),
+            likes: Math.floor(Math.random() * 200) + 50,
+            comments: Math.floor(Math.random() * 30) + 5,
+            shares: Math.floor(Math.random() * 40) + 10,
+            lastUpdate: new Date().toISOString(),
+            priceSource: 'real-time',
+            volume: stockData.volume || 0,
+            marketCap: stockData.marketCap || 0
+          };
 
-        // 투자 전략은 현재가 기준으로 동적 계산
-        recommendation.dayTrading = generateTradingStrategy(recommendation.currentPrice, 'day');
-        recommendation.swingTrading = generateTradingStrategy(recommendation.currentPrice, 'swing');
-        recommendation.longTerm = generateTradingStrategy(recommendation.currentPrice, 'long');
+          // 투자 전략은 현재가 기준으로 동적 계산
+          recommendation.dayTrading = generateTradingStrategy(recommendation.currentPrice, 'day');
+          recommendation.swingTrading = generateTradingStrategy(recommendation.currentPrice, 'swing');
+          recommendation.longTerm = generateTradingStrategy(recommendation.currentPrice, 'long');
 
-        recommendations.push(recommendation);
-        console.log(`✅ ${stock.name}: ₩${stockData.price.toLocaleString()} (실시간 데이터)`);
-      } else {
-        console.log(`❌ ${stock.name}: 실시간 데이터 조회 실패 - 추천에서 제외`);
+          recommendations.push(recommendation);
+          console.log(`✅ ${stock.name}: ₩${stockData.price.toLocaleString()} (실시간 데이터)`);
+        } else {
+          console.log(`❌ ${stock.name}: 실시간 데이터 조회 실패 - 추천에서 제외`);
+        }
+      } catch (error) {
+        console.error(`❌ ${stock.name} 주가 조회 실패:`, error.message);
+        // 실시간 데이터를 가져올 수 없는 종목은 추천에서 완전 제외
       }
-    } catch (error) {
-      console.error(`❌ ${stock.name} 주가 조회 실패:`, error);
-      // 실시간 데이터를 가져올 수 없는 종목은 추천에서 완전 제외
     }
-  }
-  
-  if (recommendations.length === 0) {
-    console.log('⚠️ 실시간 데이터를 가져올 수 있는 종목이 없습니다.');
+    
+    if (recommendations.length === 0) {
+      console.log('⚠️ 실시간 데이터를 가져올 수 있는 종목이 없습니다.');
+      return [];
+    }
+    
+    console.log(`🎯 총 ${recommendations.length}개 종목의 실시간 데이터로 추천 생성 완료`);
+    return recommendations;
+  } catch (error) {
+    console.error('❌ 실시간 추천 데이터 생성 실패:', error.message);
     return [];
   }
-  
-  console.log(`🎯 총 ${recommendations.length}개 종목의 실시간 데이터로 추천 생성 완료`);
-  return recommendations;
 }
 
 // 종목별 추천 근거 생성
