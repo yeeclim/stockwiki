@@ -231,9 +231,9 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   }
 
   Future<List<StockRecommendation>> _fetchFromAPI() async {
-    // 실제 API 호출
+    // 실제 API 호출 (새로고침 플래그 포함)
     final baseUrl = Uri.base.origin;
-    final url = '$baseUrl/api/ai_recommend_list?limit=20';
+    final url = '$baseUrl/api/ai_recommend_list?limit=20&refresh=true';
     
     final response = await http.get(Uri.parse(url));
     
