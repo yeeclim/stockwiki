@@ -29,8 +29,19 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       _error = null;
     });
 
+    // 로컬 개발 환경 체크
+    final baseUrl = Uri.base.origin;
+    if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
+      setState(() {
+        _isLoading = false;
+        _error = null;
+        _recommendations = [];
+      });
+      return;
+    }
+
     try {
-      // 실시간 API 데이터만 사용
+      // 실제 API 데이터만 사용
       final recommendations = await _fetchFromAPI();
       
       setState(() {
@@ -48,16 +59,49 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     }
   }
 
+
+  Future<int?> _getRealTimePrice(String symbol) async {
+    try {
+      // 네이버 증권에서 실시간 주가 크롤링 시도
+      final baseUrl = Uri.base.origin;
+      final url = '$baseUrl/api/naver-stock?symbol=$symbol';
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      ).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final price = data['data']['price'] as int?;
+          print('📊 $symbol 실시간 주가: ₩${price?.toString() ?? 'N/A'}');
+          return price;
+        }
+      }
+    } catch (e) {
+      print('⚠️ $symbol 실시간 주가 조회 실패: $e');
+    }
+    return null;
+  }
+
   Future<List<StockRecommendation>> _fetchFromAPI() async {
     // 실제 API 호출 (새로고침 플래그 포함)
     final baseUrl = Uri.base.origin;
     final url = '$baseUrl/api/ai_recommend_list?limit=20&refresh=true';
+    
+    print('🌐 AI 추천 API 호출 URL: $url');
+    print('📱 현재 도메인: $baseUrl');
     
     final response = await http.get(
       Uri.parse(url),
       headers: {
         'Accept': 'application/json',
         'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json',
       },
     ).timeout(
       const Duration(seconds: 30),
@@ -66,9 +110,23 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       },
     );
     
+    print('📊 API 응답 상태: ${response.statusCode}');
+    print('📄 API 응답 헤더: ${response.headers}');
+    print('📄 API 응답 본문 (첫 200자): ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+    
     if (response.statusCode == 200) {
+      // 응답이 JSON인지 확인
+      if (!response.body.trim().startsWith('{')) {
+        throw Exception('API가 JSON이 아닌 응답을 반환했습니다: ${response.body.substring(0, 100)}...');
+      }
+      
       final data = json.decode(response.body);
-      final results = data['data'] as List<dynamic>;
+      
+      if (data['success'] != true) {
+        throw Exception('API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
+      }
+      
+      final results = data['data'] as List<dynamic>? ?? [];
       
       return results.map((item) => StockRecommendation(
         stockName: item['stockName'] ?? '',
@@ -162,27 +220,39 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     }
 
     if (_recommendations.isEmpty) {
+      final baseUrl = Uri.base.origin;
+      final isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+      
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.refresh, color: Colors.blue, size: 48),
+            Icon(
+              isLocalDev ? Icons.cloud_off : Icons.refresh,
+              color: isLocalDev ? Colors.orange : Colors.blue,
+              size: 48,
+            ),
             const SizedBox(height: 16),
-            const Text(
-              '실시간 데이터를 불러오는 중입니다',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+            Text(
+              isLocalDev 
+                ? 'AI 추천 서비스는 운영서버에서만 지원됩니다'
+                : '실시간 데이터를 불러오는 중입니다',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 8),
             Text(
-              '실제 주가 데이터를 기반으로 한 AI 추천이 곧 표시됩니다',
+              isLocalDev
+                ? '실제 서비스에서는 실시간 주가 데이터를 기반으로 한\nAI 종목 추천을 제공합니다'
+                : '실제 주가 데이터를 기반으로 한 AI 추천이 곧 표시됩니다',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadRecommendations,
-              child: const Text('새로고침'),
-            ),
+            if (!isLocalDev)
+              ElevatedButton(
+                onPressed: _loadRecommendations,
+                child: const Text('새로고침'),
+              ),
           ],
         ),
       );

@@ -7,19 +7,25 @@ import fetch from 'node-fetch';
 let recommendationsStore = [];
 
 export default async function handler(req, res) {
+  // 디버깅 로그 추가
+  console.log('🚀 AI 추천 API 호출됨:', req.method, req.url, req.query);
+  
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Content-Type', 'application/json');
 
   // OPTIONS 요청 처리
   if (req.method === 'OPTIONS') {
+    console.log('📋 OPTIONS 요청 처리');
     res.status(200).end();
     return;
   }
 
   // GET 요청만 허용
   if (req.method !== 'GET') {
+    console.log('❌ 잘못된 메서드:', req.method);
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
@@ -27,28 +33,34 @@ export default async function handler(req, res) {
   try {
     const { limit = '20', offset = '0', refresh = 'false' } = req.query;
     
-  // refresh=true이거나 저장소가 비어있으면 실시간 데이터로 새로고침
+    console.log('📊 요청 파라미터:', { limit, offset, refresh });
+    
+  // refresh=true이거나 저장소가 비어있으면 데이터 로드
   if (refresh === 'true' || recommendationsStore.length === 0) {
-    console.log('🔄 실시간 주가 데이터 새로고침 중...');
+    console.log('🔄 추천 데이터 로드 중...');
     try {
-      recommendationsStore = await getSampleRecommendationsWithRealPrices();
-      console.log('📊 실시간 주가 데이터로 업데이트 완료:', recommendationsStore.length, '개 추천');
+      // 먼저 폴백 데이터로 빠르게 응답
+      recommendationsStore = getFallbackRecommendations();
+      console.log('✅ 폴백 데이터 로드 완료:', recommendationsStore.length, '개 추천');
       
-      // 실시간 데이터를 가져올 수 없는 경우 최소한의 정보라도 제공
-      if (recommendationsStore.length === 0) {
-        console.log('⚠️ 실시간 데이터 없음 - 기본 정보 제공');
-        recommendationsStore = getFallbackRecommendations();
+      // 백그라운드에서 실시간 데이터 시도 (사용자 응답에는 영향 없음)
+      if (refresh === 'true') {
+        setTimeout(async () => {
+          try {
+            console.log('🔄 백그라운드에서 실시간 데이터 시도 중...');
+            const realTimeData = await getSampleRecommendationsWithRealPrices();
+            if (realTimeData.length > 0) {
+              recommendationsStore = realTimeData;
+              console.log('📊 백그라운드 실시간 데이터 업데이트 완료');
+            }
+          } catch (error) {
+            console.log('⚠️ 백그라운드 실시간 데이터 실패 (폴백 데이터 유지)');
+          }
+        }, 100);
       }
     } catch (error) {
-      console.error('❌ 실시간 데이터 새로고침 실패:', error.message);
-      // 폴백 데이터 제공
-      try {
-        recommendationsStore = getFallbackRecommendations();
-        console.log('✅ 폴백 데이터로 복구 완료');
-      } catch (fallbackError) {
-        console.error('❌ 폴백 데이터 생성 실패:', fallbackError.message);
-        recommendationsStore = []; // 빈 배열로 초기화
-      }
+      console.error('❌ 데이터 로드 실패:', error.message);
+      recommendationsStore = []; // 빈 배열로 초기화
     }
   }
     
@@ -62,13 +74,22 @@ export default async function handler(req, res) {
 
     console.log(`📥 추천 목록 조회: ${paginatedResults.length}개 (전체 ${recommendationsStore.length}개)`);
 
-    res.status(200).json({
+    // 응답 데이터 검증
+    if (!Array.isArray(paginatedResults)) {
+      console.error('❌ paginatedResults가 배열이 아님:', typeof paginatedResults);
+      paginatedResults = [];
+    }
+
+    const responseData = {
       success: true,
       total: recommendationsStore.length,
       count: paginatedResults.length,
       data: paginatedResults,
       lastUpdated: recommendationsStore.length > 0 ? recommendationsStore[0].lastUpdate : null
-    });
+    };
+
+    console.log('📤 응답 데이터:', JSON.stringify(responseData, null, 2));
+    res.status(200).json(responseData);
 
   } catch (error) {
     console.error('❌ AI 추천 조회 오류:', error);
@@ -313,6 +334,12 @@ async function fetchStockDataDirect(symbol) {
 
     const html = await response.text();
     console.log(`📄 HTML 길이: ${html.length}`);
+    
+    // HTML 응답이 JSON이 아닌 경우 체크
+    if (html.trim().startsWith('<!DOCTYPE') || html.trim().startsWith('<html')) {
+      console.log(`❌ ${symbol} HTML 응답 받음 - JSON이 아님`);
+      return null;
+    }
     
     // 종목명 추출
     const name = extractStockName(html, symbol);
