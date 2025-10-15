@@ -35,14 +35,14 @@ class _StockChartWidgetState extends State<StockChartWidget> {
     });
 
     try {
-      final baseUrl = Uri.base.origin;
-      final response = await Future.wait([
-        Future.delayed(Duration(milliseconds: 500)), // 로딩 시뮬레이션
-      ]);
-
-      // 네이버 증권 일봉 캔들 차트만 생성
+      // 캐시 방지를 위한 타임스탬프 생성
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      
+      // 다양한 차트 소스 제공 (캐시 방지 파라미터 추가)
       _chartUrls = {
-        'candle': 'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${widget.symbol}.png',
+        'candle': 'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${widget.symbol}.png?t=$timestamp',
+        'line': 'https://ssl.pstatic.net/imgfinance/chart/item/area/day/${widget.symbol}.png?t=$timestamp',
+        'volume': 'https://ssl.pstatic.net/imgfinance/chart/item/volume/day/${widget.symbol}.png?t=$timestamp',
       };
 
       setState(() {
@@ -76,23 +76,33 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                     fontSize: 16,
                   ),
                 ),
-                if (_chartUrls != null)
-                  DropdownButton<String>(
-                    value: _selectedChartType,
-                    dropdownColor: Colors.grey[800],
-                    style: const TextStyle(color: Colors.white),
-                    items: _chartUrls!.keys.map((String type) {
-                      return DropdownMenuItem<String>(
-                        value: type,
-                        child: Text(_getChartTypeName(type)),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedChartType = newValue;
-                      });
-                    },
-                  ),
+                Row(
+                  children: [
+                    if (_chartUrls != null)
+                      DropdownButton<String>(
+                        value: _selectedChartType,
+                        dropdownColor: Colors.grey[800],
+                        style: const TextStyle(color: Colors.white),
+                        items: _chartUrls!.keys.map((String type) {
+                          return DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(_getChartTypeName(type)),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedChartType = newValue;
+                          });
+                        },
+                      ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      onPressed: _loadChartUrls,
+                      tooltip: '실시간 차트 새로고침',
+                    ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -115,6 +125,11 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                   child: Image.network(
                     _chartUrls![_selectedChartType!]!,
                     fit: BoxFit.contain,
+                    headers: {
+                      'Cache-Control': 'no-cache, no-store, must-revalidate',
+                      'Pragma': 'no-cache',
+                      'Expires': '0',
+                    },
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return Center(
@@ -192,6 +207,10 @@ class _StockChartWidgetState extends State<StockChartWidget> {
     switch (type) {
       case 'candle':
         return '일봉 캔들 차트';
+      case 'line':
+        return '일봉 선 차트';
+      case 'volume':
+        return '거래량 차트';
       default:
         return type;
     }

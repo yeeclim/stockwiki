@@ -62,7 +62,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       return results.map((item) => StockRecommendation(
         stockName: item['stockName'] ?? '',
         stockCode: item['stockCode'] ?? '',
-        currentPrice: item['currentPrice'] ?? 0,
+        currentPrice: item['currentPrice'] ?? 0, // null이면 0으로 처리
         changePercent: (item['changePercent'] ?? 0).toDouble(),
         changeAmount: item['changeAmount'] ?? 0,
         action: item['action'] ?? '보유',
@@ -283,30 +283,48 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                         fontSize: 14,
                       ),
                     ),
-                    Text(
-                      '₩${_formatPrice(rec.currentPrice)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isPositive ? Colors.red[900]?.withOpacity(0.3) : Colors.blue[900]?.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${isPositive ? '▲' : '▼'} ${rec.changePercent.abs().toStringAsFixed(2)}% (${isPositive ? '+' : ''}${_formatPrice(rec.changeAmount)})',
-                        style: TextStyle(
-                          color: isPositive ? Colors.red[400] : Colors.blue[400],
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                    if (rec.currentPrice > 0) ...[
+                      Text(
+                        '₩${_formatPrice(rec.currentPrice)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPositive ? Colors.red[900]?.withOpacity(0.3) : Colors.blue[900]?.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${isPositive ? '▲' : '▼'} ${rec.changePercent.abs().toStringAsFixed(2)}% (${isPositive ? '+' : ''}${_formatPrice(rec.changeAmount)})',
+                          style: TextStyle(
+                            color: isPositive ? Colors.red[400] : Colors.blue[400],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[900]?.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '실시간 데이터 없음',
+                          style: TextStyle(
+                            color: Colors.orange[400],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
