@@ -43,7 +43,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       setState(() {
         _recommendations = [];
         _isLoading = false;
-        _error = '실시간 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.';
+        _error = 'AI 추천 서비스를 불러올 수 없습니다. 네트워크 연결을 확인하고 잠시 후 다시 시도해주세요.';
       });
     }
   }
@@ -53,7 +53,18 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     final baseUrl = Uri.base.origin;
     final url = '$baseUrl/api/ai_recommend_list?limit=20&refresh=true';
     
-    final response = await http.get(Uri.parse(url));
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+      },
+    ).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        throw Exception('API 응답 시간 초과 (30초)');
+      },
+    );
     
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
