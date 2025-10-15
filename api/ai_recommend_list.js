@@ -40,8 +40,15 @@ export default async function handler(req, res) {
         recommendationsStore = getFallbackRecommendations();
       }
     } catch (error) {
-      console.error('❌ 실시간 데이터 새로고침 실패:', error);
-      recommendationsStore = getFallbackRecommendations(); // 폴백 데이터 제공
+      console.error('❌ 실시간 데이터 새로고침 실패:', error.message);
+      // 폴백 데이터 제공
+      try {
+        recommendationsStore = getFallbackRecommendations();
+        console.log('✅ 폴백 데이터로 복구 완료');
+      } catch (fallbackError) {
+        console.error('❌ 폴백 데이터 생성 실패:', fallbackError.message);
+        recommendationsStore = []; // 빈 배열로 초기화
+      }
     }
   }
     
@@ -287,10 +294,7 @@ async function fetchStockDataDirect(symbol) {
     
     console.log(`🌐 네이버 증권 크롤링 시작: ${symbol}`);
     
-    // 타임아웃 설정과 함께 fetch
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
-    
+    // 간단한 fetch 요청 (타임아웃 제거)
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -299,10 +303,8 @@ async function fetchStockDataDirect(symbol) {
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
       },
-      signal: controller.signal
+      timeout: 10000 // 10초 타임아웃
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.log(`❌ 네이버 응답 오류: ${response.status} ${response.statusText}`);
@@ -340,11 +342,7 @@ async function fetchStockDataDirect(symbol) {
     return stockData;
 
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.error(`❌ ${symbol} 크롤링 타임아웃 (10초 초과)`);
-    } else {
-      console.error(`❌ ${symbol} 크롤링 오류:`, error.message);
-    }
+    console.error(`❌ ${symbol} 크롤링 오류:`, error.message);
     return null;
   }
 }
