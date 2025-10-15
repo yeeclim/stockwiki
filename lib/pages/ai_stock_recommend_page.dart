@@ -15,14 +15,14 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   bool _isLoading = true;
   String? _error;
 
-  // 임시 샘플 데이터 (API 연동 전 테스트용)
+  // 임시 샘플 데이터 (API 연동 전 테스트용) - 주의: 이 데이터는 더 이상 사용되지 않음
   final List<StockRecommendation> _sampleData = [
     StockRecommendation(
       stockName: '삼성전자',
       stockCode: '005930',
-      currentPrice: 75000,
-      changePercent: 2.3,
-      changeAmount: 1700,
+      currentPrice: 75000, // ⚠️ 더미 데이터 - 실시간 데이터로 대체됨
+      changePercent: 2.3, // ⚠️ 더미 데이터 - 실시간 데이터로 대체됨
+      changeAmount: 1700, // ⚠️ 더미 데이터 - 실시간 데이터로 대체됨
       action: '매수',
       reasons: [
         '반도체 업황 회복 신호',
