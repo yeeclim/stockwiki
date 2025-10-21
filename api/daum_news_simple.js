@@ -4,6 +4,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Content-Type', 'application/json');
 
   // OPTIONS 요청 처리
   if (req.method === 'OPTIONS') {
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
       } catch (itemError) {
         console.error('다음 뉴스 아이템 파싱 오류:', itemError);
         continue;
-      }ㄱ
+      }
     }
 
     console.log(`다음 뉴스 크롤링 완료: ${newsList.length}개 결과`);

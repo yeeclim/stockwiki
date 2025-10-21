@@ -5,6 +5,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Content-Type', 'application/json');
 
   // OPTIONS 요청 처리
   if (req.method === 'OPTIONS') {
@@ -134,7 +135,7 @@ async function searchStocks(keyword, limit) {
           changePercent: 0,
           volume: 0,
           marketCap: 0,
-          lastUpdate: new Date().toISO8601String(),
+          lastUpdate: new Date().toISOString(),
           source: 'search-result',
           note: '데이터 로딩 실패'
         });
