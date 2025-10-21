@@ -237,273 +237,134 @@ class KrxLoader {
   }
 
 
-  // JSON 데이터를 한 번만 불러오고 병합 (기본 정보용)
+  // 실시간 검색만 사용 (정적 파일 완전 제거)
   static Future<void> _loadData() async {
-    if (_mergedList != null) return;
-
-    try {
-      dev.log('KRX 기본 데이터 로딩 시작...');
-    final basicRes = await http.get(Uri.base.resolve('assets/krx_basic_info.json'));
-
-      if (basicRes.statusCode == 200) {
-    final basicJson = utf8.decode(basicRes.bodyBytes);
-    final basicList = json.decode(basicJson) as List;
-
-    _mergedList = basicList.map<Map<String, dynamic>>((item) {
-          return {...item};
-    }).toList();
-        
-        dev.log('KRX 기본 데이터 로딩 완료: ${_mergedList!.length}개 종목');
-      } else {
-        dev.log('KRX 기본 데이터 로딩 실패: ${basicRes.statusCode}');
-        _mergedList = [];
-      }
-    } catch (e) {
-      dev.log('KRX 기본 데이터 로딩 오류: $e');
-      _mergedList = [];
-    }
+    // 정적 데이터 로딩 완전 제거 - 실시간 검색만 사용
+    _mergedList = [];
+    dev.log('정적 파일 사용 안함 - 실시간 검색만 사용');
   }
 
-  // ✅ 단일 결과 반환 (실시간 데이터 포함)
+  // ✅ 단일 결과 반환 (새로운 API 사용)
   static Future<Map<String, dynamic>> searchStock(String keyword) async {
-    dev.log('주식 검색 시작: $keyword');
-    await _loadData();
+    dev.log('단일 주식 검색 시작: $keyword');
     final q = keyword.trim();
 
-    // 더 유연한 검색어 검증 (한글, 영문, 숫자, 공백 허용)
-    final isValid = RegExp(r'^[가-힣a-zA-Z0-9\s]+$').hasMatch(q) && q.length >= 1;
-    if (!isValid) {
-      dev.log('잘못된 검색어 형식: $q');
-      throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
+    if (q.isEmpty) {
+      throw Exception('검색어를 입력해주세요');
     }
 
-    if (_mergedList == null || _mergedList!.isEmpty) {
-      dev.log('기본 데이터가 로드되지 않았습니다.');
-      throw Exception('데이터 로딩 실패');
-    }
+    // 새로운 종목 검색 API 사용
+    try {
+      final baseUrl = Uri.base.origin;
+      final url = '$baseUrl/api/stock-search?keyword=$q&limit=1';
+      
+      dev.log('단일 종목 검색 API 호출: $url');
+      
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final response = await http.get(
+        Uri.parse('$url&t=$timestamp&v=${DateTime.now().millisecondsSinceEpoch}'),
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'If-Modified-Since': 'Mon, 01 Jan 1990 00:00:00 GMT',
+          'If-None-Match': '*',
+        },
+      ).timeout(const Duration(seconds: 15));
 
-    dev.log('기본 데이터에서 검색 중... (총 ${_mergedList!.length}개 종목)');
-
-    // 기본 정보에서 검색 (대소문자 구분 없이, 한글 종목명과 한글 종목약명 모두 확인)
-    final exactMatch = _mergedList!.firstWhere(
-      (stock) {
-        final name = stock['한글 종목명'].toString().toLowerCase();
-        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
-        final searchTerm = q.toLowerCase();
-        final isMatch = name == searchTerm || shortName == searchTerm;
-        
-        // 디버깅용 로그
-        if (searchTerm == 'lg' || searchTerm == 'sk') {
-          dev.log('검색 중: $searchTerm vs $name, $shortName -> $isMatch');
-        }
-        
-        return isMatch;
-      },
-      orElse: () => {},
-    );
-
-    if (exactMatch.isNotEmpty) {
-      dev.log('정확한 일치 발견: ${exactMatch['한글 종목명']}');
-      // 실시간 데이터 가져오기
-      final symbol = exactMatch['단축코드']?.toString();
-      if (symbol != null) {
-        dev.log('실시간 데이터 요청: $symbol');
-        final realTimeData = await _fetchRealTimeStock(symbol);
-        if (realTimeData != null) {
-          dev.log('실시간 데이터 병합 완료');
-          return {...exactMatch, ...realTimeData};
-        } else {
-          dev.log('실시간 데이터 가져오기 실패, 기본 데이터만 반환');
-        }
-      }
-      return exactMatch;
-    }
-
-    dev.log('정확한 일치 없음, 부분 일치 검색 중...');
-    final fallbackMatch = _mergedList!.firstWhere(
-      (stock) {
-        final name = stock['한글 종목명'].toString().toLowerCase();
-        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
-        final searchTerm = q.toLowerCase();
-        return name.contains(searchTerm) || shortName.contains(searchTerm);
-      },
-      orElse: () => {},
-    );
-
-    if (fallbackMatch.isNotEmpty) {
-      dev.log('부분 일치 발견: ${fallbackMatch['한글 종목명']}');
-      // 실시간 데이터 가져오기
-      final symbol = fallbackMatch['단축코드']?.toString();
-      if (symbol != null) {
-        dev.log('실시간 데이터 요청: $symbol');
-        final realTimeData = await _fetchRealTimeStock(symbol);
-        if (realTimeData != null) {
-          dev.log('실시간 데이터 병합 완료');
-          return {...fallbackMatch, ...realTimeData};
-        } else {
-          dev.log('실시간 데이터 가져오기 실패, 기본 데이터만 반환');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final stocks = List<Map<String, dynamic>>.from(data['data']);
+          
+          if (stocks.isNotEmpty) {
+            final stock = stocks.first;
+            
+            // KRX 로더 형식으로 변환
+            final result = {
+              '단축코드': stock['symbol'],
+              '한글 종목명': stock['name'],
+              '한글 종목약명': stock['name'],
+              '시장구분': 'KOSPI', // 기본값
+              'price': stock['price']?.toDouble() ?? 0.0,
+              'change': stock['change']?.toDouble() ?? 0.0,
+              'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
+              'volume': stock['volume']?.toInt() ?? 0,
+              'marketCap': stock['marketCap']?.toInt() ?? 0,
+              'lastUpdate': DateTime.now().toIso8601String(),
+            };
+            
+            dev.log('단일 검색 성공: ${result['한글 종목명']}');
+            return result;
+          }
         }
       }
-      return fallbackMatch;
-    }
-
-    // 검색 결과가 없으면 "보통주" 추가해서 재검색
-    dev.log('검색 결과 없음, "보통주" 추가해서 재검색 시도');
-    final extendedSearchTerm = '${q}보통주';
-    dev.log('확장 검색어: $extendedSearchTerm');
-    
-    final extendedMatch = _mergedList!.firstWhere(
-      (stock) {
-        final name = stock['한글 종목명'].toString().toLowerCase();
-        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
-        return name.contains(extendedSearchTerm.toLowerCase()) || 
-               shortName.contains(extendedSearchTerm.toLowerCase());
-      },
-      orElse: () => {},
-    );
-
-    if (extendedMatch.isNotEmpty) {
-      dev.log('확장 검색으로 발견: ${extendedMatch['한글 종목명']}');
-      // 실시간 데이터 가져오기
-      final symbol = extendedMatch['단축코드']?.toString();
-      if (symbol != null) {
-        dev.log('실시간 데이터 요청: $symbol');
-        final realTimeData = await _fetchRealTimeStock(symbol);
-        if (realTimeData != null) {
-          dev.log('실시간 데이터 병합 완료');
-          return {...extendedMatch, ...realTimeData};
-        } else {
-          dev.log('실시간 데이터 가져오기 실패, 기본 데이터만 반환');
-        }
-      }
-      return extendedMatch;
+    } catch (e) {
+      dev.log('단일 종목 검색 API 호출 실패: $e');
     }
 
     dev.log('검색 결과 없음');
-    throw Exception('검색 결과 없음');
+    throw Exception('검색 결과 없음: $q');
   }
 
-  // ✅ 다중 결과 반환 (실시간 데이터 포함, 최대 50개)
+  // ✅ 실시간 검색만 사용 (정적 파일 완전 제거)
   static Future<List<Map<String, dynamic>>> searchStocks(String keyword) async {
-    dev.log('searchStocks 호출됨: $keyword');
-    await _loadData();
+    dev.log('실시간 주식 검색 시작: $keyword');
     final q = keyword.trim();
     dev.log('검색어 정리됨: $q');
 
-    // 더 유연한 검색어 검증 (한글, 영문, 숫자, 공백 허용)
+    // 검색어 검증
     final isValid = RegExp(r'^[가-힣a-zA-Z0-9\s]+$').hasMatch(q) && q.length >= 1;
     dev.log('검색어 유효성: $isValid');
     if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
-    // 먼저 로컬 데이터에서 검색 (대소문자 구분 없이, 한글 종목명과 한글 종목약명 모두 확인)
-    dev.log('로컬 데이터 검색 시작: $q');
-    final localMatches = _mergedList!.where((stock) {
-      final name = stock['한글 종목명'].toString().toLowerCase();
-      final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
-      final searchTerm = q.toLowerCase();
-      final isMatch = name.contains(searchTerm) || shortName.contains(searchTerm);
-      
-      // LG, SK 특별 처리
-      if (searchTerm == 'lg' && shortName == 'lg') {
-        dev.log('LG 매치 발견: $name, $shortName');
-        return true;
-      }
-      if (searchTerm == 'sk' && shortName == 'sk') {
-        dev.log('SK 매치 발견: $name, $shortName');
-        return true;
-      }
-      
-      return isMatch;
-    }).take(20).toList();
-    
-    dev.log('로컬 검색 결과: ${localMatches.length}개');
-    
-    // 검색 결과가 없으면 "보통주" 추가해서 재검색
-    if (localMatches.isEmpty) {
-      dev.log('검색 결과 없음, "보통주" 추가해서 재검색 시도');
-      final extendedSearchTerm = '${q}보통주';
-      dev.log('확장 검색어: $extendedSearchTerm');
-      
-      final extendedMatches = _mergedList!.where((stock) {
-        final name = stock['한글 종목명'].toString().toLowerCase();
-        final shortName = stock['한글 종목약명']?.toString().toLowerCase() ?? '';
-        return name.contains(extendedSearchTerm.toLowerCase()) || 
-               shortName.contains(extendedSearchTerm.toLowerCase());
-      }).take(20).toList();
-      
-      if (extendedMatches.isNotEmpty) {
-        dev.log('확장 검색으로 ${extendedMatches.length}개 발견');
-        localMatches.addAll(extendedMatches);
-      }
-    }
-
-    // 전체 종목 API에서도 검색 (더 많은 결과)
+    // 새로운 종목 검색 API 사용
     try {
       final baseUrl = Uri.base.origin;
-      final url = '$baseUrl/api/krx-all-stocks?limit=50';
+      final url = '$baseUrl/api/stock-search?keyword=$q&limit=10';
+      
+      dev.log('종목 검색 API 호출: $url');
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final response = await http.get(
-        Uri.parse('$url&t=$timestamp'),
+        Uri.parse('$url&t=$timestamp&v=${DateTime.now().millisecondsSinceEpoch}'),
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
           'Pragma': 'no-cache',
           'Expires': '0',
+          'If-Modified-Since': 'Mon, 01 Jan 1990 00:00:00 GMT',
+          'If-None-Match': '*',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
-          final allStocks = List<Map<String, dynamic>>.from(data['data']);
-          final apiMatches = allStocks.where((stock) =>
-            stock['name'].toString().contains(q) ||
-            stock['symbol'].toString().contains(q)).take(30).toList();
+          final stocks = List<Map<String, dynamic>>.from(data['data']);
           
-          // 로컬 결과와 API 결과 병합
-          final allMatches = [...localMatches, ...apiMatches];
+          // KRX 로더 형식으로 변환
+          final results = stocks.map((stock) => {
+            '단축코드': stock['symbol'],
+            '한글 종목명': stock['name'],
+            '한글 종목약명': stock['name'],
+            '시장구분': 'KOSPI', // 기본값
+            'price': stock['price']?.toDouble() ?? 0.0,
+            'change': stock['change']?.toDouble() ?? 0.0,
+            'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
+            'volume': stock['volume']?.toInt() ?? 0,
+            'marketCap': stock['marketCap']?.toInt() ?? 0,
+            'lastUpdate': DateTime.now().toIso8601String(),
+          }).toList();
           
-          // 중복 제거 (symbol 기준)
-          final uniqueMatches = <String, Map<String, dynamic>>{};
-          for (final match in allMatches) {
-            final symbol = match['symbol']?.toString() ?? match['단축코드']?.toString();
-            if (symbol != null && !uniqueMatches.containsKey(symbol)) {
-              uniqueMatches[symbol] = match;
-            }
-          }
-          
-          final results = uniqueMatches.values.take(50).toList();
-          
-          if (results.isNotEmpty) {
-            return results;
-          }
+          dev.log('실시간 검색 성공: ${results.length}개 종목');
+          return results;
         }
       }
     } catch (e) {
-      dev.log('전체 종목 API 호출 실패, 로컬 데이터만 사용: $e');
+      dev.log('종목 검색 API 호출 실패: $e');
     }
 
-    // API 실패시 로컬 데이터만 사용
-    if (localMatches.isEmpty) throw Exception('검색 결과 없음');
-
-    // 실시간 데이터 병합 (병렬 처리로 개선)
-    final futures = localMatches.map((match) async {
-      final symbol = match['단축코드']?.toString();
-      if (symbol != null) {
-        try {
-          final realTimeData = await _fetchRealTimeStock(symbol)
-              .timeout(const Duration(seconds: 3));
-          if (realTimeData != null) {
-            return {...match, ...realTimeData};
-          }
-        } catch (e) {
-          dev.log('실시간 데이터 가져오기 실패 (타임아웃): $symbol');
-        }
-      }
-      return match;
-    }).toList();
-
-    final results = await Future.wait(futures, eagerError: false);
-    return results;
+    throw Exception('검색 결과 없음: $q');
   }
 
   // 캐시 초기화 (새로고침 시 사용)

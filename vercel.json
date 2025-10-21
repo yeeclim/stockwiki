@@ -6,15 +6,16 @@
   ],
   "routes": [
     { "src": "/api/ai_recommend_list", "dest": "/api/ai_recommend_list.js" },
+    { "src": "/api/stock-search", "dest": "/api/stock-search-full.js" },
+    { "src": "/api/stock-search-fast", "dest": "/api/stock-search-fast.js" },
+    { "src": "/api/stock-search-old", "dest": "/api/stock-search.js" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/favicon.ico", "dest": "/favicon.png" },
     { "src": "/assets/(.*)", "dest": "/build/web/assets/$1" },
     { "src": "/icons/(.*)", "dest": "/build/web/icons/$1" },
-    { "src": "/manifest.json", "dest": "/build/web/manifest.json", "headers": { "Cache-Control": "public, max-age=86400" } },
+    { "src": "/manifest.json", "dest": "/build/web/manifest.json" },
     { "src": "/thumbnail.png", "dest": "/build/web/thumbnail.png" },
     { "src": "/favicon.png", "dest": "/build/web/favicon.png" },
     { "src": "/(.*)", "dest": "/build/web/index.html" }
-  ],
-  "cleanUrls": true,
-  "trailingSlash": false
+  ]
 }
