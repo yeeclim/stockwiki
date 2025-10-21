@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "updated_at": "2025-10-20T14:04:17.036556",
-    "total_count": 4003,
+    "updated_at": "2025-10-20T14:04:07.389409",
+    "total_count": 4002,
     "source": "Naver Finance Massive Scraping",
-    "description": "KRX 전체 상장기업 기본정보 (폴라리스오피스 수동 추가)",
+    "description": "KRX 대량 상장기업 기본정보",
     "version": "7.0",
     "update_type": "massive_scraping"
   },
@@ -56035,20 +56035,6 @@
       "volume": 23,
       "market_cap": 0,
       "updated_at": "2025-10-20T14:04:04.019885"
-    },
-    {
-      "code": "010940",
-      "name": "폴라리스오피스",
-      "market": "KOSDAQ",
-      "sector": "서비스업",
-      "listed_date": "2020-01-01",
-      "par_value": "100",
-      "current_price": 5200,
-      "change": 0,
-      "change_rate": 0.0,
-      "volume": 0,
-      "market_cap": 0,
-      "updated_at": "2025-10-20T14:04:17.036015"
     }
   ]
 }
