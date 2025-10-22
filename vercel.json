@@ -18,10 +18,6 @@
     {
       "src": "/(.*)",
       "dest": "/build/web/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/build/web/index.html"
     }
   ]
 }
