@@ -1,5 +1,4 @@
-// import fetch from 'node-fetch'; // Vercel에서는 내장 fetch 사용
-
+// Vercel API 핸들러
 export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -56,106 +55,8 @@ async function searchStocks(keyword, limit) {
   try {
     console.log(`실시간 종목 검색 시작: ${keyword}`);
     
-    // KRX 데이터베이스에서 검색
-    const fs = require('fs');
-    const path = require('path');
-    
-    // KRX 데이터 파일 경로
-    const krxDataPath = path.join(process.cwd(), 'assets', 'data', 'krx_basic_info.json');
-    
-    let krxData = null;
-    try {
-      const dataFile = fs.readFileSync(krxDataPath, 'utf8');
-      krxData = JSON.parse(dataFile);
-      console.log(`KRX 데이터 로드 완료: ${krxData.stocks?.length || 0}개 종목`);
-    } catch (error) {
-      console.error('KRX 데이터 로드 실패:', error.message);
-      // 폴백: 주요 종목 목록 사용
-      return await searchFromMajorStocks(keyword, limit);
-    }
-
-    if (!krxData || !krxData.stocks || !Array.isArray(krxData.stocks)) {
-      console.log('KRX 데이터가 유효하지 않음 - 주요 종목으로 폴백');
-      return await searchFromMajorStocks(keyword, limit);
-    }
-
-    // 키워드와 일치하는 종목 찾기 (대소문자 구분 없이)
-    const searchKeyword = keyword.toLowerCase();
-    const matches = krxData.stocks.filter(stock => {
-      const name = (stock.name || '').toLowerCase();
-      const code = (stock.code || '').toLowerCase();
-      const market = (stock.market || '').toLowerCase();
-      const sector = (stock.sector || '').toLowerCase();
-      
-      return name.includes(searchKeyword) || 
-             code.includes(searchKeyword) ||
-             market.includes(searchKeyword) ||
-             sector.includes(searchKeyword) ||
-             searchKeyword.includes(name) ||
-             searchKeyword.includes(code);
-    }).slice(0, limit);
-
-    console.log(`KRX 데이터베이스 검색 결과: ${matches.length}개`);
-
-    // 각 종목의 실시간 데이터 가져오기
-    const results = [];
-    for (const stock of matches) {
-      try {
-        // KRX 데이터에서 기본 정보 가져오기
-        const stockInfo = {
-          symbol: stock.code,
-          name: stock.name,
-          market: stock.market || 'KOSPI',
-          sector: stock.sector || '기타',
-          price: stock.current_price || 0,
-          change: stock.change || 0,
-          changePercent: stock.change_rate || 0,
-          volume: stock.volume || 0,
-          marketCap: stock.market_cap || 0,
-          lastUpdate: stock.updated_at || new Date().toISOString(),
-          source: 'krx-database',
-          note: 'KRX 데이터베이스'
-        };
-
-        // 실시간 데이터 시도 (선택적)
-        try {
-          const realtimeData = await fetchStockData(stock.code);
-          if (realtimeData && realtimeData.price > 0) {
-            stockInfo.price = realtimeData.price;
-            stockInfo.change = realtimeData.change;
-            stockInfo.changePercent = realtimeData.changePercent;
-            stockInfo.volume = realtimeData.volume;
-            stockInfo.marketCap = realtimeData.marketCap;
-            stockInfo.lastUpdate = realtimeData.lastUpdate;
-            stockInfo.source = 'realtime-crawling';
-            stockInfo.note = '실시간 크롤링';
-          }
-        } catch (realtimeError) {
-          console.log(`${stock.code} 실시간 데이터 실패, 기본 데이터 사용: ${realtimeError.message}`);
-        }
-
-        results.push(stockInfo);
-      } catch (error) {
-        console.error(`${stock.code} 처리 실패:`, error);
-        // 실패해도 기본 정보는 포함
-        results.push({
-          symbol: stock.code,
-          name: stock.name,
-          market: stock.market || 'KOSPI',
-          sector: stock.sector || '기타',
-          price: stock.current_price || 0,
-          change: stock.change || 0,
-          changePercent: stock.change_rate || 0,
-          volume: stock.volume || 0,
-          marketCap: stock.market_cap || 0,
-          lastUpdate: stock.updated_at || new Date().toISOString(),
-          source: 'krx-database',
-          note: '기본 데이터'
-        });
-      }
-    }
-
-    return results;
+    // 간단한 주요 종목 검색 (Vercel 환경에서 안정적)
+    return await searchFromMajorStocks(keyword, limit);
 
   } catch (error) {
     console.error('종목 검색 오류:', error);
