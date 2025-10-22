@@ -318,50 +318,66 @@ class KrxLoader {
     dev.log('검색어 유효성: $isValid');
     if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
-    // 새로운 종목 검색 API 사용
+    // 직접 KRX 데이터 검색 (API 없이)
     try {
-      final baseUrl = Uri.base.origin;
-      final url = '$baseUrl/api/stock-search?keyword=$q&limit=10';
+      dev.log('직접 KRX 데이터 검색: $q');
       
-      dev.log('종목 검색 API 호출: $url');
+      // KRX JSON 파일 직접 로드
+      final krxDataUrl = '${Uri.base.origin}/assets/data/krx_basic_info.json';
+      dev.log('KRX 데이터 URL: $krxDataUrl');
       
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final response = await http.get(
-        Uri.parse('$url&t=$timestamp&v=${DateTime.now().millisecondsSinceEpoch}'),
+        Uri.parse('$krxDataUrl?t=${DateTime.now().millisecondsSinceEpoch}'),
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
           'Pragma': 'no-cache',
           'Expires': '0',
-          'If-Modified-Since': 'Mon, 01 Jan 1990 00:00:00 GMT',
-          'If-None-Match': '*',
         },
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && data['data'] != null) {
-          final stocks = List<Map<String, dynamic>>.from(data['data']);
+        final stocks = List<Map<String, dynamic>>.from(data['stocks'] ?? []);
+        
+        dev.log('KRX 데이터 로드 성공: ${stocks.length}개 종목');
+        
+        // 키워드와 일치하는 종목 찾기
+        final searchKeyword = q.toLowerCase();
+        final matches = stocks.where((stock) {
+          final name = (stock['name'] ?? '').toString().toLowerCase();
+          final code = (stock['code'] ?? '').toString().toLowerCase();
+          final market = (stock['market'] ?? '').toString().toLowerCase();
+          final sector = (stock['sector'] ?? '').toString().toLowerCase();
           
-          // KRX 로더 형식으로 변환
-          final results = stocks.map((stock) => {
-            '단축코드': stock['symbol'],
-            '한글 종목명': stock['name'],
-            '한글 종목약명': stock['name'],
-            '시장구분': 'KOSPI', // 기본값
-            'price': stock['price']?.toDouble() ?? 0.0,
-            'change': stock['change']?.toDouble() ?? 0.0,
-            'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
-            'volume': stock['volume']?.toInt() ?? 0,
-            'marketCap': stock['marketCap']?.toInt() ?? 0,
-            'lastUpdate': DateTime.now().toIso8601String(),
-          }).toList();
-          
-          dev.log('실시간 검색 성공: ${results.length}개 종목');
-          return results;
-        }
+          return name.contains(searchKeyword) || 
+                 code.contains(searchKeyword) ||
+                 market.contains(searchKeyword) ||
+                 sector.contains(searchKeyword) ||
+                 searchKeyword.contains(name) ||
+                 searchKeyword.contains(code);
+        }).take(10).toList();
+        
+        dev.log('검색 결과: ${matches.length}개');
+        
+        // KRX 로더 형식으로 변환
+        final results = matches.map((stock) => {
+          '단축코드': stock['code'],
+          '한글 종목명': stock['name'],
+          '한글 종목약명': stock['name'],
+          '시장구분': stock['market'] ?? 'KOSPI',
+          'price': (stock['current_price'] ?? 0).toDouble(),
+          'change': (stock['change'] ?? 0).toDouble(),
+          'changePercent': (stock['change_rate'] ?? 0).toDouble(),
+          'volume': (stock['volume'] ?? 0).toInt(),
+          'marketCap': (stock['market_cap'] ?? 0).toInt(),
+          'lastUpdate': stock['updated_at'] ?? DateTime.now().toIso8601String(),
+        }).toList();
+        
+        dev.log('직접 검색 성공: ${results.length}개 종목');
+        return results;
       }
     } catch (e) {
-      dev.log('종목 검색 API 호출 실패: $e');
+      dev.log('직접 검색 실패: $e');
     }
 
     throw Exception('검색 결과 없음: $q');

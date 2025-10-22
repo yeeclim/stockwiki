@@ -60,48 +60,67 @@ class _WtiWidgetState extends State<WtiWidget> {
   }
 
   Future<void> _fetchWtiPrice() async {
-    // 여러 API를 병렬로 호출하고 첫 번째 유효한 값 사용
     try {
-      final results = await Future.wait([
-        _tryYahooFinance(),
-        _tryEIA(),
-        _tryAlternativeAPI(),
-      ], eagerError: false).timeout(const Duration(seconds: 5));
-
-      // 첫 번째 유효한 가격 찾기
-      for (final result in results) {
-        if (result != null && result['price'] != null && result['price']! > 0) {
-          setState(() {
-            _wtiPrice = result['price'];
-            _date = result['date'];
-            _isLoading = false;
-          });
-          await _cachePrice(result['price']!, result['date']);
-          return;
-        }
+      // 간단하고 안정적인 API 사용
+      final result = await _trySimpleAPI();
+      
+      if (result != null && result['price'] != null && result['price']! > 0) {
+        setState(() {
+          _wtiPrice = result['price'];
+          _date = result['date'];
+          _isLoading = false;
+        });
+        await _cachePrice(result['price']!, result['date']);
+        return;
+      }
+      
+      // API 실패 시 폴백 가격 사용
+      final fallbackPrice = _getFallbackPrice();
+      if (fallbackPrice > 0) {
+        setState(() {
+          _wtiPrice = fallbackPrice;
+          _date = 'Estimated';
+          _isLoading = false;
+        });
+        return;
       }
     } catch (e) {
-      // 병렬 호출 실패 시, 폴백 가격 사용
-      try {
-        final fallbackPrice = _getFallbackPrice();
-        if (fallbackPrice > 0) {
-          setState(() {
-            _wtiPrice = fallbackPrice;
-            _date = 'Estimated';
-            _isLoading = false;
-          });
-          return;
-        }
-      } catch (e) {
-        // 폴백도 실패
-      }
+      // 모든 시도 실패 시
     }
 
-    // 모든 시도 실패 시
+    // 최종 실패 시
     setState(() {
       _error = '데이터 없음';
       _isLoading = false;
     });
+  }
+
+  // 간단하고 안정적인 API
+  Future<Map<String, dynamic>?> _trySimpleAPI() async {
+    try {
+      // Alpha Vantage API 사용 (무료)
+      const apiKey = 'demo'; // 무료 키
+      final response = await http.get(
+        Uri.parse('https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=CL&apikey=$apiKey'),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final quote = data['Global Quote'];
+        if (quote != null && quote['05. price'] != null) {
+          final price = double.tryParse(quote['05. price']);
+          if (price != null && price > 0) {
+            return {
+              'price': price,
+              'date': 'Latest',
+            };
+          }
+        }
+      }
+    } catch (e) {
+      // API 실패 시 무시
+    }
+    return null;
   }
 
   // Yahoo Finance - WTI Crude Oil Futures (CL=F)
