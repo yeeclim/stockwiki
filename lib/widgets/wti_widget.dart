@@ -98,22 +98,27 @@ class _WtiWidgetState extends State<WtiWidget> {
   // 간단하고 안정적인 API
   Future<Map<String, dynamic>?> _trySimpleAPI() async {
     try {
-      // Alpha Vantage API 사용 (무료)
-      const apiKey = 'demo'; // 무료 키
+      // Yahoo Finance API 사용 (더 안정적)
       final response = await http.get(
-        Uri.parse('https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=CL&apikey=$apiKey'),
+        Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/CL=F'),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final quote = data['Global Quote'];
-        if (quote != null && quote['05. price'] != null) {
-          final price = double.tryParse(quote['05. price']);
-          if (price != null && price > 0) {
-            return {
-              'price': price,
-              'date': 'Latest',
-            };
+        final result = data['chart']?['result']?[0];
+        if (result != null) {
+          final meta = result['meta'];
+          if (meta != null) {
+            final price = meta['regularMarketPrice'] ?? meta['previousClose'];
+            if (price != null && price > 0) {
+              return {
+                'price': price.toDouble(),
+                'date': 'Latest',
+              };
+            }
           }
         }
       }
