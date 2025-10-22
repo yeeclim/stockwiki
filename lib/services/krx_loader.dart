@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as dev;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
 
 class KrxLoader {
@@ -318,11 +319,56 @@ class KrxLoader {
     dev.log('검색어 유효성: $isValid');
     if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
-    // 확장된 주요 종목 목록으로 검색
+    // JSON 파일에서 전체 종목 검색
     try {
-      dev.log('주요 종목 검색: $q');
+      dev.log('JSON 파일 검색: $q');
       
-      // 확장된 주요 종목 목록 (200개)
+      // 1. assets에서 JSON 파일 직접 로드
+      final jsonString = await rootBundle.loadString('assets/data/krx_basic_info.json');
+      final jsonData = json.decode(jsonString);
+      
+      if (jsonData['stocks'] != null) {
+        final allStocks = List<Map<String, dynamic>>.from(jsonData['stocks']);
+        dev.log('전체 종목 수: ${allStocks.length}');
+        
+        // 2. 검색어로 필터링
+        final searchKeyword = q.toLowerCase();
+        final matches = allStocks.where((stock) {
+          final name = (stock['name'] ?? '').toString().toLowerCase();
+          final code = (stock['code'] ?? '').toString().toLowerCase();
+          return name.contains(searchKeyword) || code.contains(searchKeyword);
+        }).take(10).toList();
+        
+        dev.log('검색 결과: ${matches.length}개');
+        
+        // 3. 결과 반환
+        if (matches.isNotEmpty) {
+          final results = matches.map((stock) => {
+            '단축코드': stock['code'],
+            '한글 종목명': stock['name'],
+            '한글 종목약명': stock['name'],
+            '시장구분': stock['market'] ?? 'KOSPI',
+            'price': (stock['current_price'] ?? 0).toDouble(),
+            'change': (stock['change'] ?? 0).toDouble(),
+            'changePercent': (stock['change_rate'] ?? 0).toDouble(),
+            'volume': (stock['volume'] ?? 0).toInt(),
+            'marketCap': (stock['market_cap'] ?? 0).toInt(),
+            'lastUpdate': stock['updated_at'] ?? DateTime.now().toIso8601String(),
+          }).toList();
+          
+          dev.log('JSON 검색 성공: ${results.length}개');
+          return results;
+        }
+      }
+    } catch (e) {
+      dev.log('JSON 검색 실패: $e');
+    }
+
+    // 폴백: 클라이언트 사이드 검색 (확장된 종목 목록)
+    try {
+      dev.log('폴백 검색: $q');
+      
+      // 확장된 주요 종목 목록 (100개)
       final stocks = [
         // 삼성 그룹
         {'code': '005930', 'name': '삼성전자', 'market': 'KOSPI', 'sector': '전기전자'},
