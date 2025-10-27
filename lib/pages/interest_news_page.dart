@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
-// import 'package:stockwiki/services/naver_news_service.dart'; // 임시 주석 처리
+import 'package:stockwiki/services/naver_news_service.dart';
 
 class InterestNewsPage extends StatefulWidget {
   const InterestNewsPage({super.key});
@@ -26,19 +26,26 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
     });
 
     try {
-      // 1) 네이버 뉴스 서비스 임시 비활성화
-      // try {
-      //   final naverNews = await NaverNewsService.searchNewsWithFallback(
-      //     keyword,
-      //     maxResults: 10,
-      //   );
-      //   if (naverNews.isNotEmpty) {
-      //     setState(() => _newsList = naverNews);
-      //     debugPrint('네이버 뉴스 우선 표시: ${naverNews.length}개');
-      //   }
-      // } catch (e) {
-      //   debugPrint('네이버 뉴스 우선 표시 실패: $e');
-      // }
+      // 1) 네이버 뉴스 서비스 활성화
+      try {
+        final naverNews = await NaverNewsService.searchNewsWithFallback(
+          keyword,
+          maxResults: 20,
+        );
+        if (naverNews.isNotEmpty) {
+          // News 객체를 Map으로 변환
+          final newsMap = naverNews.map((news) => {
+            'title': news.title,
+            'description': news.description ?? '',
+            'link': news.link,
+            'source': news.source ?? '네이버 뉴스',
+          }).toList();
+          setState(() => _newsList = newsMap);
+          debugPrint('네이버 뉴스 우선 표시: ${newsMap.length}개');
+        }
+      } catch (e) {
+        debugPrint('네이버 뉴스 우선 표시 실패: $e');
+      }
 
       // 2) 기존 API 결과 병합 (중복 제거)
       await _fetchNewsFromAPIs(keyword);
