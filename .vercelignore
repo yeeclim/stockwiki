@@ -6,7 +6,6 @@ ios/
 linux/
 macos/
 windows/
-web/
 analysis_options.yaml
 pubspec.yaml
 pubspec.lock

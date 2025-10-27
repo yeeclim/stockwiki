@@ -2,7 +2,7 @@
   "name": "stockwiki",
   "version": "1.0.0",
   "scripts": {
-    "build": "flutter build web"
+    "build": "echo Skipping Flutter build"
   },
   "dependencies": {
     "rss-parser": "^3.13.0",

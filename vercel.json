@@ -1,6 +1,8 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "build/web",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/build/web/$1" }
+    { "src": "/(.*)", "dest": "/$1" }
   ]
 }
