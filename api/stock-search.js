@@ -202,6 +202,7 @@ function findStockByKeyword(keyword) {
     
     // KOSDAQ 주요 종목
     '대창솔루션': { symbol: '096350', name: '대창솔루션', market: 'KOSDAQ' },
+    '빅텍': { symbol: '065450', name: '빅텍', market: 'KOSDAQ' },
     '에코프로': { symbol: '086520', name: '에코프로', market: 'KOSPI' },
     '에코프로비엠': { symbol: '247540', name: '에코프로비엠', market: 'KOSPI' },
     '알테오젠': { symbol: '196170', name: '알테오젠', market: 'KOSPI' },
