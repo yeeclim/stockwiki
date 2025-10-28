@@ -31,9 +31,11 @@ class _KeywordSearchPageState extends State<KeywordSearchPage> {
       List<Stock> results = [];
       
       if (_isKoreaSearch) {
-        // 한국 주식 검색 (실시간 데이터 포함)
-        final krxResults = await KrxLoader.searchStocks(keyword);
-        results = krxResults.map((data) => Stock.fromKrxData(data)).toList();
+        // 한국 주식 검색 기능은 현재 비활성화됨
+        results = [];
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('한국 주식 검색 기능은 현재 테마별 추천 시스템으로 대체되었습니다.')),
+        );
       } else {
         // 미국 주식 검색
         results = await FMPService.fetchStocks(keyword);
@@ -96,7 +98,7 @@ class _KeywordSearchPageState extends State<KeywordSearchPage> {
                   IconButton(
                     icon: const Icon(Icons.refresh, color: Colors.white),
                     onPressed: () {
-                      KrxLoader.clearCache();
+                      // 캐시 클리어 기능은 현재 비활성화됨
                       _search();
                     },
                     tooltip: '실시간 데이터 새로고침',

@@ -103,10 +103,10 @@ class KrxLoader {
     final randomFactor = symbol.hashCode % 100;
     
     // 이평선 데이터
-    final ma5 = basePrice + (randomFactor * 100);
-    final ma20 = basePrice + (randomFactor * 80);
-    final ma60 = basePrice + (randomFactor * 60);
-    final currentPrice = basePrice + (randomFactor * 120);
+    final ma5 = (basePrice + (randomFactor * 100)).toDouble();
+    final ma20 = (basePrice + (randomFactor * 80)).toDouble();
+    final ma60 = (basePrice + (randomFactor * 60)).toDouble();
+    final currentPrice = (basePrice + (randomFactor * 120)).toDouble();
     
     // 거래량 및 거래대금
     final volume = 1000000 + (randomFactor * 500000);
@@ -133,8 +133,8 @@ class KrxLoader {
     final totalScore = (technicalScore * 0.6 + fundamentalScore * 0.4).round();
     final recommendation = _getRecommendation(totalScore);
     
-    return {
-      'symbol': symbol,
+                  return {
+                    'symbol': symbol,
       'currentPrice': currentPrice,
       'ma5': ma5,
       'ma20': ma20,
@@ -153,9 +153,9 @@ class KrxLoader {
       'totalScore': totalScore,
       'recommendation': recommendation,
       'confidence': totalScore,
-      'lastUpdate': DateTime.now().toIso8601String(),
-    };
-  }
+                    'lastUpdate': DateTime.now().toIso8601String(),
+                  };
+                }
 
   // 추세 분석
   static String _analyzeTrend(double current, double ma5, double ma20, double ma60) {
@@ -295,8 +295,8 @@ class KrxLoader {
       'volumeTrend': volumeTrend,
       'marketCap': totalMarketCap,
       'stockCount': stocks.length,
-      'lastUpdate': DateTime.now().toIso8601String(),
-    };
+              'lastUpdate': DateTime.now().toIso8601String(),
+            };
   }
 
   // 가장 많은 거래량 추세 찾기
@@ -316,14 +316,14 @@ class KrxLoader {
   // 전체 추천 종목 랭킹 (모든 테마 통합)
   static List<Map<String, dynamic>> getTopRecommendations({int limit = 10, String sortBy = 'totalScore'}) {
     final allStocks = getAllRecommendedStocks();
-    final analyses = allStocks.map((stock) => {
+    final analyses = allStocks.map((stock) {
       final analysis = getComprehensiveAnalysis(stock['symbol']);
       return {
         ...stock,
         ...analysis,
       };
-    }).toList();
-    
+          }).toList();
+          
     // 정렬
     analyses.sort((a, b) {
       switch (sortBy) {
@@ -409,8 +409,8 @@ class KrxLoader {
         ...stock,
         ...analysis,
       };
-    }).toList();
-    
+      }).toList();
+      
     List<Map<String, dynamic>> filtered;
     if (riskLevel == 'low') {
       // 안전한 종목 (대형주, 높은 펀더멘털 점수)
