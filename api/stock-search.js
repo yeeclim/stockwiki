@@ -1,5 +1,5 @@
 // Vercel API 핸들러 - 실시간 주가 크롤링
-async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -350,4 +350,4 @@ async function fetchWithProxy(url, options) {
   throw new Error('모든 프록시 서버 실패');
 }
 
-module.exports = { handler };
+// Vercel에서는 export default만 사용
