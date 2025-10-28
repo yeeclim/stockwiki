@@ -246,21 +246,21 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 4,
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     color: getRecommendationColor(),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
@@ -268,12 +268,12 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 12,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,14 +281,14 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                       Text(
                         stock['name'] as String,
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         '${stock['symbol']} • ${stock['sector']}',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           color: Colors.grey[600],
                         ),
                       ),
@@ -296,10 +296,10 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: getRecommendationColor().withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: getRecommendationColor()),
                   ),
                   child: Text(
@@ -307,13 +307,13 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                     style: TextStyle(
                       color: getRecommendationColor(),
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 10,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -327,7 +327,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -353,17 +353,17 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: Colors.grey[600],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Container(
-          width: 40,
-          height: 40,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(color: color),
           ),
           child: Center(
@@ -372,7 +372,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 12,
               ),
             ),
           ),
@@ -388,15 +388,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: Colors.grey[600],
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
         ),
