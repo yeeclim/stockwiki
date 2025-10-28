@@ -172,6 +172,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                     return _buildRecommendationCard(stock, index + 1);
                   },
                 ),
+        ),
       ],
     );
   }
