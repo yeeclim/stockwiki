@@ -220,9 +220,9 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     final totalScore = stock['totalScore'] as int;
     final technicalScore = stock['technicalScore'] as int;
     final fundamentalScore = stock['fundamentalScore'] as int;
-    final currentPrice = stock['currentPrice'] as int;
     final trend = stock['trend'] as String;
     final volumeTrend = stock['volumeTrend'] as String;
+    final marketCap = stock['marketCap'] as int;
 
     Color getRecommendationColor() {
       switch (recommendation) {
@@ -331,13 +331,13 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
             Row(
               children: [
                 Expanded(
-                  child: _buildInfoItem('현재가', '${currentPrice.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}원'),
-                ),
-                Expanded(
                   child: _buildInfoItem('추세', trend),
                 ),
                 Expanded(
                   child: _buildInfoItem('거래량', volumeTrend),
+                ),
+                Expanded(
+                  child: _buildInfoItem('시가총액', '${(marketCap / 1000000000000).toStringAsFixed(1)}조원'),
                 ),
               ],
             ),

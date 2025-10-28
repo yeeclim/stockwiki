@@ -293,7 +293,6 @@ function getComprehensiveAnalysis(symbol) {
   
   return {
     symbol: symbol,
-    currentPrice: currentPrice,
     ma5: ma5,
     ma20: ma20,
     ma60: ma60,
