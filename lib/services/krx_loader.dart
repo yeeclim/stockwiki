@@ -1,417 +1,110 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as dev;
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:flutter/foundation.dart';
 
 class KrxLoader {
-  static List<Map<String, dynamic>>? _mergedList;
-  static Map<String, dynamic>? _stockCache;
-  static DateTime? _lastUpdate;
+  // 테마별 추천 종목 데이터
+  static const Map<String, List<Map<String, dynamic>>> _themeStocks = {
+    '2차전지': [
+      {'symbol': '005930', 'name': '삼성SDI', 'sector': '2차전지'},
+      {'symbol': '000270', 'name': '기아', 'sector': '2차전지'},
+      {'symbol': '003670', 'name': '포스코홀딩스', 'sector': '2차전지'},
+      {'symbol': '006400', 'name': '삼성SDI', 'sector': '2차전지'},
+      {'symbol': '051910', 'name': 'LG화학', 'sector': '2차전지'},
+    ],
+    '반도체': [
+      {'symbol': '000660', 'name': 'SK하이닉스', 'sector': '반도체'},
+      {'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '반도체'},
+      {'symbol': '006400', 'name': '삼성SDI', 'sector': '반도체'},
+      {'symbol': '000270', 'name': '기아', 'sector': '반도체'},
+      {'symbol': '005930', 'name': '삼성전자', 'sector': '반도체'},
+    ],
+    '전기차': [
+      {'symbol': '000270', 'name': '기아', 'sector': '전기차'},
+      {'symbol': '005380', 'name': '현대차', 'sector': '전기차'},
+      {'symbol': '003670', 'name': '포스코홀딩스', 'sector': '전기차'},
+      {'symbol': '051910', 'name': 'LG화학', 'sector': '전기차'},
+      {'symbol': '005930', 'name': '삼성전자', 'sector': '전기차'},
+    ],
+    'AI': [
+      {'symbol': '005930', 'name': '삼성전자', 'sector': 'AI'},
+      {'symbol': '000660', 'name': 'SK하이닉스', 'sector': 'AI'},
+      {'symbol': '207940', 'name': '삼성바이오로직스', 'sector': 'AI'},
+      {'symbol': '006400', 'name': '삼성SDI', 'sector': 'AI'},
+      {'symbol': '000270', 'name': '기아', 'sector': 'AI'},
+    ],
+    '바이오': [
+      {'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '바이오'},
+      {'symbol': '068270', 'name': '셀트리온', 'sector': '바이오'},
+      {'symbol': '006400', 'name': '삼성SDI', 'sector': '바이오'},
+      {'symbol': '051910', 'name': 'LG화학', 'sector': '바이오'},
+      {'symbol': '005930', 'name': '삼성전자', 'sector': '바이오'},
+    ],
+  };
 
-  // 실시간 주식 데이터 가져오기 (Yahoo Finance API 사용)
-  static Future<Map<String, dynamic>?> _fetchRealTimeStock(String symbol) async {
-    try {
-      // 캐시 확인 (1분 이내 데이터는 재사용)
-      if (_stockCache != null && _stockCache!.containsKey(symbol)) {
-        final cachedData = _stockCache![symbol];
-        final lastUpdateStr = cachedData?['lastUpdate'] as String?;
-        if (lastUpdateStr != null) {
-          final lastUpdate = DateTime.parse(lastUpdateStr);
-          final now = DateTime.now();
-          if (now.difference(lastUpdate).inMinutes < 1) {
-            dev.log('캐시 사용: $symbol (${now.difference(lastUpdate).inSeconds}초 전)');
-            return cachedData;
-          }
-        }
-      }
+  // 테마 목록 가져오기
+  static List<String> getThemes() {
+    return _themeStocks.keys.toList();
+  }
 
-      dev.log('네이버 금융 API 호출 시작: $symbol');
-      
-      // 1차: API 호출 시도 (현재 도메인 사용)
-      final baseUrl = Uri.base.origin;
-      final url = '$baseUrl/api/naver-stock?symbol=$symbol';
-      
-      dev.log('API URL: $url');
-      
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final response = await http.get(
-        Uri.parse('$url&t=$timestamp'),
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-      ).timeout(const Duration(seconds: 5));
+  // 특정 테마의 추천 종목 가져오기
+  static List<Map<String, dynamic>> getThemeStocks(String theme) {
+    return _themeStocks[theme] ?? [];
+  }
 
-      dev.log('API 응답 상태: ${response.statusCode}');
-      dev.log('API 응답 본문: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        dev.log('API 응답 데이터: $data');
-
-        if (data['success'] == true && data['data'] != null) {
-          final stockData = data['data'];
-
-          final result = {
-            'symbol': symbol,
-            'name': stockData['name'] ?? symbol,
-            'price': stockData['price']?.toDouble() ?? 0.0,
-            'change': stockData['change']?.toDouble() ?? 0.0,
-            'changePercent': stockData['changePercent']?.toDouble() ?? 0.0,
-            'volume': stockData['volume']?.toInt() ?? 0,
-            'marketCap': stockData['marketCap']?.toInt() ?? 0,
-            'lastUpdate': DateTime.now().toIso8601String(),
-          };
-
-          dev.log('=== KRX 로더 디버깅 ===');
-          dev.log('종목: $symbol');
-          dev.log('원본 데이터: $stockData');
-          dev.log('파싱된 가격: ${result['price']}');
-          dev.log('가격이 0인가? ${result['price'] == 0.0}');
-          dev.log('가격이 null인가? ${result['price'] == null}');
-          dev.log('주식 데이터 파싱 완료: $result');
-          dev.log('======================');
-
-          // 캐시 업데이트
-          _stockCache ??= {};
-          _stockCache![symbol] = result;
-          _lastUpdate = DateTime.now();
-
-          return result;
-        }
-      }
-      
-      // 2차: 직접 네이버 크롤링 시도
-      dev.log('API 실패 - 직접 크롤링 시도: $symbol');
-      final crawledData = await _crawlNaverDirectly(symbol);
-      if (crawledData != null) {
-        dev.log('직접 크롤링 성공: $crawledData');
-        return crawledData;
-      }
-      
-      // 3차: 대체 가격 사용 (최후 수단)
-      dev.log('모든 방법 실패 - 대체 가격 사용: $symbol');
-      final fallbackPrice = _getFallbackPrice(symbol);
-      if (fallbackPrice > 0) {
-        final result = {
-          'symbol': symbol,
-          'name': _getStockName(symbol),
-          'price': fallbackPrice,
-          'change': 0.0,
-          'changePercent': 0.0,
-          'volume': 1000000,
-          'marketCap': 0,
-          'lastUpdate': DateTime.now().toIso8601String(),
-        };
-        
-        dev.log('대체 가격 사용: $result');
-        return result;
-      }
-      
-      dev.log('API 실패 - 모든 방법 실패: $symbol');
-      return null;
-    } catch (e) {
-      dev.log('실시간 주식 데이터 가져오기 실패: $e');
-      return null;
+  // 모든 테마의 추천 종목 가져오기
+  static List<Map<String, dynamic>> getAllRecommendedStocks() {
+    List<Map<String, dynamic>> allStocks = [];
+    for (String theme in _themeStocks.keys) {
+      allStocks.addAll(_themeStocks[theme]!);
     }
+    return allStocks;
   }
 
-  // 하드코딩된 가격 맵 제거 - 실시간 API에서 가격 제공
-  static double _getFallbackPrice(String symbol) {
-    // 하드코딩 제거 - 실시간 API에서 가격을 가져옴
-    return 0.0;
+  // 이평선 분석 (임시 데이터)
+  static Map<String, dynamic> getMovingAverageAnalysis(String symbol) {
+    // 실제로는 API에서 이평선 데이터를 가져와야 함
+    return {
+      'symbol': symbol,
+      'ma5': 75000 + (symbol.hashCode % 10000),
+      'ma20': 72000 + (symbol.hashCode % 8000),
+      'ma60': 70000 + (symbol.hashCode % 6000),
+      'trend': '상승', // 상승, 하락, 횡보
+      'recommendation': '매수', // 매수, 매도, 관망
+      'confidence': 85, // 신뢰도 0-100
+      'lastUpdate': DateTime.now().toIso8601String(),
+    };
   }
 
-  // Alpha Vantage API 사용 (한국 주식 지원)
-  static Future<Map<String, dynamic>?> _fetchFromAlphaVantage(String symbol) async {
-    try {
-      // Alpha Vantage는 한국 주식을 지원하지 않으므로 다른 방법 사용
-      dev.log('Alpha Vantage는 한국 주식 미지원 - 다른 방법 시도');
-      return null;
-    } catch (e) {
-      dev.log('Alpha Vantage 오류: $e');
-      return null;
-    }
-  }
-
-  // 직접 네이버 크롤링 (CORS 프록시 사용)
-  static Future<Map<String, dynamic>?> _crawlNaverDirectly(String symbol) async {
-    try {
-      // 여러 CORS 프록시 시도
-      final proxies = [
-        'https://api.allorigins.win/raw?url=',
-        'https://cors-anywhere.herokuapp.com/',
-        'https://thingproxy.freeboard.io/fetch/',
-      ];
-      
-      final naverUrl = 'https://finance.naver.com/item/main.naver?code=$symbol';
-      
-      for (final proxy in proxies) {
-        try {
-          final fullUrl = '$proxy${Uri.encodeComponent(naverUrl)}';
-          dev.log('크롤링 시도: $fullUrl');
-          
-          final response = await http.get(
-            Uri.parse(fullUrl),
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            },
-          );
-          
-          if (response.statusCode == 200) {
-            final html = response.body;
-            dev.log('크롤링 HTML 길이: ${html.length}');
-            
-            // 가격 추출 시도
-            final pricePatterns = [
-              RegExp(r'<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)</span>'),
-              RegExp(r'<span class="no_today"[^>]*>([^<]+)</span>'),
-              RegExp(r'<em class="no_today"[^>]*>([^<]+)</em>'),
-              RegExp(r'<strong class="no_today"[^>]*>([^<]+)</strong>'),
-            ];
-            
-            for (final pattern in pricePatterns) {
-              final match = pattern.firstMatch(html);
-              if (match != null) {
-                final priceStr = match.group(1)!.replaceAll(',', '').replaceAll('원', '');
-                final price = double.tryParse(priceStr);
-                
-                if (price != null && price > 0) {
-                  dev.log('크롤링 성공: $price');
-                  return {
-                    'symbol': symbol,
-                    'name': _getStockName(symbol),
-                    'price': price,
-                    'change': 0.0,
-                    'changePercent': 0.0,
-                    'volume': 1000000,
-                    'marketCap': 0,
-                    'lastUpdate': DateTime.now().toIso8601String(),
-                  };
-                }
-              }
-            }
-          }
-        } catch (e) {
-          dev.log('프록시 실패: $e');
-          continue;
-        }
-      }
-      
-      dev.log('모든 크롤링 시도 실패');
-      return null;
-    } catch (e) {
-      dev.log('크롤링 오류: $e');
-      return null;
-    }
-  }
-
-  // 하드코딩된 종목명 맵 제거 - 실시간 API에서 종목명 제공
-  static String _getStockName(String symbol) {
-    // 하드코딩 제거 - 실시간 API에서 종목명을 가져옴
-    return symbol;
-  }
-
-
-  // 실시간 검색만 사용 (정적 파일 완전 제거)
-  static Future<void> _loadData() async {
-    // 정적 데이터 로딩 완전 제거 - 실시간 검색만 사용
-    _mergedList = [];
-    dev.log('정적 파일 사용 안함 - 실시간 검색만 사용');
-  }
-
-  // ✅ 단일 결과 반환 (새로운 API 사용)
-  static Future<Map<String, dynamic>> searchStock(String keyword) async {
-    dev.log('단일 주식 검색 시작: $keyword');
-    final q = keyword.trim();
-
-    if (q.isEmpty) {
-      throw Exception('검색어를 입력해주세요');
+  // 테마별 투자 적합성 분석
+  static Map<String, dynamic> getThemeAnalysis(String theme) {
+    final stocks = getThemeStocks(theme);
+    if (stocks.isEmpty) {
+      return {
+        'theme': theme,
+        'score': 0,
+        'recommendation': '분석 불가',
+        'topStock': null,
+        'analysis': '해당 테마의 종목이 없습니다.',
+      };
     }
 
-    // 새로운 종목 검색 API 사용
-    try {
-      final baseUrl = Uri.base.origin;
-      dev.log('단일 검색 Base URL: $baseUrl');
-      
-      // 웹 환경에서 baseUrl이 비어있을 경우 대체 URL 사용
-      String apiUrl;
-      if (baseUrl.isEmpty || baseUrl == 'null' || baseUrl == 'http://localhost:8080' || baseUrl == 'http://localhost:3000') {
-        apiUrl = 'https://stockwiki-ovmt2w5hu-bermonts-projects.vercel.app/api/stock-search?keyword=$q&limit=1';
-        dev.log('Vercel 배포 URL 사용: $apiUrl');
-      } else if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
-        apiUrl = 'http://localhost:3000/api/stock-search?keyword=$q&limit=1';
-        dev.log('로컬 개발 URL 사용: $apiUrl');
-      } else {
-        apiUrl = '$baseUrl/api/stock-search?keyword=$q&limit=1';
-        dev.log('현재 도메인 URL 사용: $apiUrl');
-      }
-      
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final finalUrl = '$apiUrl&t=$timestamp&v=${DateTime.now().millisecondsSinceEpoch}';
-      dev.log('단일 종목 검색 API 호출: $finalUrl');
-      
-      final response = await http.get(
-        Uri.parse(finalUrl),
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      ).timeout(const Duration(seconds: 15));
-
-      dev.log('단일 검색 응답 상태: ${response.statusCode}');
-      dev.log('단일 검색 응답 본문: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        dev.log('단일 검색 파싱된 데이터: $data');
-        
-        if (data['success'] == true && data['data'] != null) {
-          final stocks = List<Map<String, dynamic>>.from(data['data']);
-          dev.log('단일 검색 종목 데이터: $stocks');
-          
-          if (stocks.isNotEmpty) {
-            final stock = stocks.first;
-            
-            // KRX 로더 형식으로 변환
-            final result = {
-              '단축코드': stock['symbol'],
-              '한글 종목명': stock['name'],
-              '한글 종목약명': stock['name'],
-              '시장구분': stock['market'] ?? 'KOSPI',
-              'price': stock['price']?.toDouble() ?? 0.0,
-              'change': stock['change']?.toDouble() ?? 0.0,
-              'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
-              'volume': stock['volume']?.toInt() ?? 0,
-              'marketCap': stock['marketCap']?.toInt() ?? 0,
-              'lastUpdate': DateTime.now().toIso8601String(),
-            };
-            
-            dev.log('단일 검색 성공: ${result['한글 종목명']}');
-            return result;
-          } else {
-            dev.log('단일 검색: API 응답에 종목 데이터가 없음');
-          }
-        } else {
-          dev.log('단일 검색 API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
-        }
-      } else {
-        dev.log('단일 검색 HTTP 오류: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      dev.log('단일 종목 검색 API 호출 실패: $e');
-    }
-
-    dev.log('검색 결과 없음');
-    throw Exception('검색 결과 없음: $q');
+    // 임시 분석 로직 (실제로는 더 복잡한 분석 필요)
+    final scores = stocks.map((stock) => getMovingAverageAnalysis(stock['symbol']));
+    final avgConfidence = scores.map((s) => s['confidence'] as int).reduce((a, b) => a + b) / scores.length;
+    
+    return {
+      'theme': theme,
+      'score': avgConfidence.round(),
+      'recommendation': avgConfidence > 70 ? '매수' : avgConfidence > 50 ? '관망' : '매도',
+      'topStock': stocks.first,
+      'analysis': '이평선 분석 결과 ${avgConfidence.round()}점으로 ${avgConfidence > 70 ? '투자 적합' : '투자 주의'}합니다.',
+      'lastUpdate': DateTime.now().toIso8601String(),
+    };
   }
 
-  // ✅ 실시간 검색만 사용 (정적 파일 완전 제거)
-  static Future<List<Map<String, dynamic>>> searchStocks(String keyword) async {
-    dev.log('실시간 주식 검색 시작: $keyword');
-    final q = keyword.trim();
-    dev.log('검색어 정리됨: $q');
-
-    // 검색어 검증
-    final isValid = RegExp(r'^[가-힣a-zA-Z0-9\s]+$').hasMatch(q) && q.length >= 1;
-    dev.log('검색어 유효성: $isValid');
-    if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
-
-    // 실시간 API 검색 (JSON 파일 제거됨)
-    try {
-      dev.log('실시간 API 검색: $q');
-      
-      // 디버깅을 위한 상세 로그
-      final baseUrl = Uri.base.origin;
-      dev.log('Base URL: $baseUrl');
-      dev.log('Is Web: $kIsWeb');
-      dev.log('Current URI: ${Uri.base}');
-      
-      // 웹 환경에서 baseUrl이 비어있을 경우 대체 URL 사용
-      String apiUrl;
-      if (baseUrl.isEmpty || baseUrl == 'null' || baseUrl == 'http://localhost:8080' || baseUrl == 'http://localhost:3000') {
-        // Vercel 배포 환경에서의 URL 구성
-        apiUrl = 'https://stockwiki-ovmt2w5hu-bermonts-projects.vercel.app/api/stock-search?keyword=$q&limit=10';
-        dev.log('Vercel 배포 URL 사용: $apiUrl');
-      } else if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
-        // 로컬 개발 환경
-        apiUrl = 'http://localhost:3000/api/stock-search?keyword=$q&limit=10';
-        dev.log('로컬 개발 URL 사용: $apiUrl');
-      } else {
-        apiUrl = '$baseUrl/api/stock-search?keyword=$q&limit=10';
-        dev.log('현재 도메인 URL 사용: $apiUrl');
-      }
-      
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final finalUrl = '$apiUrl&t=$timestamp';
-      dev.log('최종 API URL: $finalUrl');
-      
-      final response = await http.get(
-        Uri.parse(finalUrl),
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      ).timeout(const Duration(seconds: 15));
-
-      dev.log('API 응답 상태: ${response.statusCode}');
-      dev.log('API 응답 본문: ${response.body}');
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        dev.log('파싱된 데이터: $data');
-        
-        if (data['success'] == true && data['data'] != null) {
-          final stocks = List<Map<String, dynamic>>.from(data['data']);
-          dev.log('종목 데이터: $stocks');
-          
-          if (stocks.isNotEmpty) {
-            final results = stocks.map((stock) => {
-              '단축코드': stock['symbol'],
-        '한글 종목명': stock['name'],
-        '한글 종목약명': stock['name'],
-              '시장구분': stock['market'] ?? 'KOSPI',
-              'price': stock['price']?.toDouble() ?? 0.0,
-              'change': stock['change']?.toDouble() ?? 0.0,
-              'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
-              'volume': stock['volume']?.toInt() ?? 0,
-              'marketCap': stock['marketCap']?.toInt() ?? 0,
-        'lastUpdate': DateTime.now().toIso8601String(),
-      }).toList();
-      
-            dev.log('실시간 API 검색 성공: ${results.length}개');
-      return results;
-          } else {
-            dev.log('API 응답에 종목 데이터가 없음');
-          }
-        } else {
-          dev.log('API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
-        }
-      } else {
-        dev.log('HTTP 오류: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      dev.log('실시간 API 검색 실패: $e');
-    }
-
-    // 하드코딩된 폴백 제거 - 실시간 API만 사용
-    dev.log('실시간 API 검색 실패 - 하드코딩된 폴백 제거됨');
-
-    throw Exception('검색 결과 없음: $q');
-  }
-
-  // 캐시 초기화 (새로고침 시 사용)
-  static void clearCache() {
-    _stockCache = null;
-    _lastUpdate = null;
+  // 모든 테마 분석 결과 가져오기
+  static List<Map<String, dynamic>> getAllThemeAnalysis() {
+    return getThemes().map((theme) => getThemeAnalysis(theme)).toList();
   }
 }
