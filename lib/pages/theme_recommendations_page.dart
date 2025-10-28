@@ -84,23 +84,41 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
           tabs: [
-            const Tab(text: '전체 추천'),
-            const Tab(text: '안전 종목'),
-            ..._themes.map((theme) => Tab(text: theme)),
+            const Tab(text: '전체'),
+            const Tab(text: '안전'),
+            ..._themes.map((theme) => Tab(text: theme.length > 4 ? theme.substring(0, 4) : theme)),
           ],
         ),
         actions: [
           PopupMenuButton<String>(
-            onSelected: _onSortChanged,
+            onSelected: (value) {
+              if (value.startsWith('theme_')) {
+                final theme = value.substring(6);
+                final themeIndex = _themes.indexOf(theme) + 2; // +2 for '전체' and '안전' tabs
+                _tabController.animateTo(themeIndex);
+              } else {
+                _onSortChanged(value);
+              }
+            },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'totalScore', child: Text('종합 점수')),
               const PopupMenuItem(value: 'technicalScore', child: Text('기술적 점수')),
               const PopupMenuItem(value: 'fundamentalScore', child: Text('펀더멘털 점수')),
               const PopupMenuItem(value: 'marketCap', child: Text('시가총액')),
               const PopupMenuItem(value: 'volume', child: Text('거래량')),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'themes', child: Text('테마 선택', style: TextStyle(fontWeight: FontWeight.bold))),
+              ..._themes.map((theme) => PopupMenuItem(
+                value: 'theme_$theme',
+                child: Text(theme),
+              )),
             ],
-            child: const Icon(Icons.sort),
+            child: const Icon(Icons.more_vert),
           ),
         ],
       ),
