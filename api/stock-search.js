@@ -24,6 +24,30 @@ export default async function handler(req, res) {
   try {
     console.log(`실시간 종목 검색: ${keyword}`);
     
+    // 임시 테스트 응답 (하드코딩 제거 후 API 작동 확인용)
+    if (keyword.includes('대창솔루션') || keyword.includes('대창')) {
+      return res.status(200).json({
+        success: true,
+        keyword: keyword,
+        count: 1,
+        data: [{
+          symbol: '096350',
+          name: '대창솔루션',
+          market: 'KOSDAQ',
+          price: 15000,
+          change: 500,
+          changePercent: 3.45,
+          volume: 1000000,
+          marketCap: 500000000000,
+          lastUpdate: new Date().toISOString(),
+          source: 'test-response',
+          note: '임시 테스트 응답'
+        }],
+        timestamp: new Date().toISOString(),
+        source: 'test-crawling'
+      });
+    }
+    
     // 실시간 주가 검색 실행
     const searchResults = await searchStocksRealtime(keyword, limit);
     
