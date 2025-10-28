@@ -313,7 +313,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -327,7 +327,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -353,17 +353,17 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         Text(
           label,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 9,
             color: Colors.grey[600],
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Container(
-          width: 30,
-          height: 30,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color),
           ),
           child: Center(
@@ -372,7 +372,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 10,
               ),
             ),
           ),
@@ -388,15 +388,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         Text(
           label,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 8,
             color: Colors.grey[600],
           ),
         ),
-        const SizedBox(height: 1),
+        const SizedBox(height: 0),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             fontWeight: FontWeight.w500,
           ),
         ),
