@@ -319,49 +319,51 @@ class KrxLoader {
     dev.log('검색어 유효성: $isValid');
     if (!isValid) throw Exception('검색어는 한글, 영문, 숫자만 입력 가능합니다.');
 
-    // JSON 파일에서 전체 종목 검색
+    // 실시간 API 검색 (JSON 파일 제거됨)
     try {
-      dev.log('JSON 파일 검색: $q');
+      dev.log('실시간 API 검색: $q');
       
-      // 1. assets에서 JSON 파일 직접 로드
-      final jsonString = await rootBundle.loadString('assets/data/krx_basic_info.json');
-      final jsonData = json.decode(jsonString);
+      final baseUrl = Uri.base.origin;
+      final url = '$baseUrl/api/stock-search?keyword=$q&limit=10';
       
-      if (jsonData['stocks'] != null) {
-        final allStocks = List<Map<String, dynamic>>.from(jsonData['stocks']);
-        dev.log('전체 종목 수: ${allStocks.length}');
-        
-        // 2. 검색어로 필터링
-        final searchKeyword = q.toLowerCase();
-        final matches = allStocks.where((stock) {
-          final name = (stock['name'] ?? '').toString().toLowerCase();
-          final code = (stock['code'] ?? '').toString().toLowerCase();
-          return name.contains(searchKeyword) || code.contains(searchKeyword);
-        }).take(10).toList();
-        
-        dev.log('검색 결과: ${matches.length}개');
-        
-        // 3. 결과 반환
-        if (matches.isNotEmpty) {
-          final results = matches.map((stock) => {
-            '단축코드': stock['code'],
-            '한글 종목명': stock['name'],
-            '한글 종목약명': stock['name'],
-            '시장구분': stock['market'] ?? 'KOSPI',
-            'price': (stock['current_price'] ?? 0).toDouble(),
-            'change': (stock['change'] ?? 0).toDouble(),
-            'changePercent': (stock['change_rate'] ?? 0).toDouble(),
-            'volume': (stock['volume'] ?? 0).toInt(),
-            'marketCap': (stock['market_cap'] ?? 0).toInt(),
-            'lastUpdate': stock['updated_at'] ?? DateTime.now().toIso8601String(),
-          }).toList();
+      dev.log('실시간 검색 API 호출: $url');
+      
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final response = await http.get(
+        Uri.parse('$url&t=$timestamp'),
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final stocks = List<Map<String, dynamic>>.from(data['data']);
           
-          dev.log('JSON 검색 성공: ${results.length}개');
-          return results;
+          if (stocks.isNotEmpty) {
+            final results = stocks.map((stock) => {
+              '단축코드': stock['symbol'],
+              '한글 종목명': stock['name'],
+              '한글 종목약명': stock['name'],
+              '시장구분': stock['market'] ?? 'KOSPI',
+              'price': stock['price']?.toDouble() ?? 0.0,
+              'change': stock['change']?.toDouble() ?? 0.0,
+              'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
+              'volume': stock['volume']?.toInt() ?? 0,
+              'marketCap': stock['marketCap']?.toInt() ?? 0,
+              'lastUpdate': DateTime.now().toIso8601String(),
+            }).toList();
+            
+            dev.log('실시간 API 검색 성공: ${results.length}개');
+            return results;
+          }
         }
       }
     } catch (e) {
-      dev.log('JSON 검색 실패: $e');
+      dev.log('실시간 API 검색 실패: $e');
     }
 
     // 폴백: 클라이언트 사이드 검색 (확장된 종목 목록)
