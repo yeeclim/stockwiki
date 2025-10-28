@@ -312,4 +312,130 @@ class KrxLoader {
   static List<Map<String, dynamic>> getAllThemeAnalysis() {
     return getThemes().map((theme) => getThemeAnalysis(theme)).toList();
   }
+
+  // 전체 추천 종목 랭킹 (모든 테마 통합)
+  static List<Map<String, dynamic>> getTopRecommendations({int limit = 10, String sortBy = 'totalScore'}) {
+    final allStocks = getAllRecommendedStocks();
+    final analyses = allStocks.map((stock) => {
+      final analysis = getComprehensiveAnalysis(stock['symbol']);
+      return {
+        ...stock,
+        ...analysis,
+      };
+    }).toList();
+    
+    // 정렬
+    analyses.sort((a, b) {
+      switch (sortBy) {
+        case 'totalScore':
+          return (b['totalScore'] as int).compareTo(a['totalScore'] as int);
+        case 'technicalScore':
+          return (b['technicalScore'] as int).compareTo(a['technicalScore'] as int);
+        case 'fundamentalScore':
+          return (b['fundamentalScore'] as int).compareTo(a['fundamentalScore'] as int);
+        case 'marketCap':
+          return (b['marketCap'] as int).compareTo(a['marketCap'] as int);
+        case 'volume':
+          return (b['volume'] as int).compareTo(a['volume'] as int);
+        case 'tradingValue':
+          return (b['tradingValue'] as int).compareTo(a['tradingValue'] as int);
+        default:
+          return (b['totalScore'] as int).compareTo(a['totalScore'] as int);
+      }
+    });
+    
+    return analyses.take(limit).toList();
+  }
+
+  // 특정 테마의 추천 종목 랭킹
+  static List<Map<String, dynamic>> getThemeRecommendations(String theme, {int limit = 5, String sortBy = 'totalScore'}) {
+    final stocks = getThemeStocks(theme);
+    if (stocks.isEmpty) {
+      return [];
+    }
+    
+    final analyses = stocks.map((stock) {
+      final analysis = getComprehensiveAnalysis(stock['symbol']);
+      return {
+        ...stock,
+        ...analysis,
+      };
+    }).toList();
+    
+    // 정렬
+    analyses.sort((a, b) {
+      switch (sortBy) {
+        case 'totalScore':
+          return (b['totalScore'] as int).compareTo(a['totalScore'] as int);
+        case 'technicalScore':
+          return (b['technicalScore'] as int).compareTo(a['technicalScore'] as int);
+        case 'fundamentalScore':
+          return (b['fundamentalScore'] as int).compareTo(a['fundamentalScore'] as int);
+        case 'marketCap':
+          return (b['marketCap'] as int).compareTo(a['marketCap'] as int);
+        case 'volume':
+          return (b['volume'] as int).compareTo(a['volume'] as int);
+        case 'tradingValue':
+          return (b['tradingValue'] as int).compareTo(a['tradingValue'] as int);
+        default:
+          return (b['totalScore'] as int).compareTo(a['totalScore'] as int);
+      }
+    });
+    
+    return analyses.take(limit).toList();
+  }
+
+  // 추천 종목 필터링 (추천 등급별)
+  static List<Map<String, dynamic>> getRecommendationsByGrade(String grade, {int limit = 10}) {
+    final allStocks = getAllRecommendedStocks();
+    final analyses = allStocks.map((stock) {
+      final analysis = getComprehensiveAnalysis(stock['symbol']);
+      return {
+        ...stock,
+        ...analysis,
+      };
+    }).toList();
+    
+    final filtered = analyses.where((analysis) => analysis['recommendation'] == grade).toList();
+    return filtered.take(limit).toList();
+  }
+
+  // 위험도별 추천 종목
+  static List<Map<String, dynamic>> getRecommendationsByRisk(String riskLevel, {int limit = 10}) {
+    final allStocks = getAllRecommendedStocks();
+    final analyses = allStocks.map((stock) {
+      final analysis = getComprehensiveAnalysis(stock['symbol']);
+      return {
+        ...stock,
+        ...analysis,
+      };
+    }).toList();
+    
+    List<Map<String, dynamic>> filtered;
+    if (riskLevel == 'low') {
+      // 안전한 종목 (대형주, 높은 펀더멘털 점수)
+      filtered = analyses.where((analysis) => 
+        (analysis['marketCap'] as int) > 50000000000000 && 
+        (analysis['fundamentalScore'] as int) > 70 &&
+        (analysis['totalScore'] as int) > 60
+      ).toList();
+    } else if (riskLevel == 'high') {
+      // 고위험 고수익 종목 (소형주, 높은 기술적 점수)
+      filtered = analyses.where((analysis) => 
+        (analysis['marketCap'] as int) < 20000000000000 && 
+        (analysis['technicalScore'] as int) > 80 &&
+        analysis['volumeTrend'] == '급증'
+      ).toList();
+    } else {
+      // 중간 위험도 (균형잡힌 종목)
+      filtered = analyses.where((analysis) => 
+        (analysis['totalScore'] as int) >= 50 && 
+        (analysis['totalScore'] as int) <= 80 &&
+        (analysis['marketCap'] as int) >= 20000000000000
+      ).toList();
+    }
+    
+    filtered.sort((a, b) => (b['totalScore'] as int).compareTo(a['totalScore'] as int));
+    return filtered.take(limit).toList();
+  }
 }

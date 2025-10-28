@@ -94,6 +94,44 @@ export default async function handler(req, res) {
       });
     }
 
+    if (action === 'recommendations') {
+      // 추천 종목 랭킹 반환
+      const { limit = 10, sortBy = 'totalScore' } = req.query;
+      const recommendations = getTopRecommendations(parseInt(limit), sortBy);
+      
+      return res.status(200).json({
+        success: true,
+        data: recommendations,
+        count: recommendations.length,
+        sortBy: sortBy,
+        timestamp: new Date().toISOString(),
+        source: 'theme-recommendations'
+      });
+    }
+
+    if (action === 'theme-recommendations') {
+      // 특정 테마의 추천 종목 반환
+      if (!theme) {
+        return res.status(400).json({
+          success: false,
+          error: '테마가 필요합니다'
+        });
+      }
+
+      const { limit = 5, sortBy = 'totalScore' } = req.query;
+      const recommendations = getThemeRecommendations(theme, parseInt(limit), sortBy);
+      
+      return res.status(200).json({
+        success: true,
+        theme: theme,
+        data: recommendations,
+        count: recommendations.length,
+        sortBy: sortBy,
+        timestamp: new Date().toISOString(),
+        source: 'theme-recommendations'
+      });
+    }
+
     // 기본: 모든 추천 종목 반환
     const allStocks = getAllRecommendedStocks();
     return res.status(200).json({
@@ -431,4 +469,114 @@ function getMostCommonVolumeTrend(trends) {
 // 모든 테마 분석 결과 가져오기
 function getAllThemeAnalysis() {
   return getThemes().map(theme => getThemeAnalysis(theme));
+}
+
+// 전체 추천 종목 랭킹 (모든 테마 통합)
+function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
+  const allStocks = getAllRecommendedStocks();
+  const analyses = allStocks.map(stock => ({
+    ...stock,
+    ...getComprehensiveAnalysis(stock.symbol)
+  }));
+  
+  // 정렬
+  analyses.sort((a, b) => {
+    if (sortBy === 'totalScore') {
+      return b.totalScore - a.totalScore;
+    } else if (sortBy === 'technicalScore') {
+      return b.technicalScore - a.technicalScore;
+    } else if (sortBy === 'fundamentalScore') {
+      return b.fundamentalScore - a.fundamentalScore;
+    } else if (sortBy === 'marketCap') {
+      return b.marketCap - a.marketCap;
+    } else if (sortBy === 'volume') {
+      return b.volume - a.volume;
+    } else if (sortBy === 'tradingValue') {
+      return b.tradingValue - a.tradingValue;
+    }
+    return b.totalScore - a.totalScore;
+  });
+  
+  return analyses.slice(0, limit);
+}
+
+// 특정 테마의 추천 종목 랭킹
+function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') {
+  const stocks = getThemeStocks(theme);
+  if (stocks.length === 0) {
+    return [];
+  }
+  
+  const analyses = stocks.map(stock => ({
+    ...stock,
+    ...getComprehensiveAnalysis(stock.symbol)
+  }));
+  
+  // 정렬
+  analyses.sort((a, b) => {
+    if (sortBy === 'totalScore') {
+      return b.totalScore - a.totalScore;
+    } else if (sortBy === 'technicalScore') {
+      return b.technicalScore - a.technicalScore;
+    } else if (sortBy === 'fundamentalScore') {
+      return b.fundamentalScore - a.fundamentalScore;
+    } else if (sortBy === 'marketCap') {
+      return b.marketCap - a.marketCap;
+    } else if (sortBy === 'volume') {
+      return b.volume - a.volume;
+    } else if (sortBy === 'tradingValue') {
+      return b.tradingValue - a.tradingValue;
+    }
+    return b.totalScore - a.totalScore;
+  });
+  
+  return analyses.slice(0, limit);
+}
+
+// 추천 종목 필터링 (추천 등급별)
+function getRecommendationsByGrade(grade, limit = 10) {
+  const allStocks = getAllRecommendedStocks();
+  const analyses = allStocks.map(stock => ({
+    ...stock,
+    ...getComprehensiveAnalysis(stock.symbol)
+  }));
+  
+  const filtered = analyses.filter(analysis => analysis.recommendation === grade);
+  return filtered.slice(0, limit);
+}
+
+// 위험도별 추천 종목
+function getRecommendationsByRisk(riskLevel = 'medium', limit = 10) {
+  const allStocks = getAllRecommendedStocks();
+  const analyses = allStocks.map(stock => ({
+    ...stock,
+    ...getComprehensiveAnalysis(stock.symbol)
+  }));
+  
+  let filtered;
+  if (riskLevel === 'low') {
+    // 안전한 종목 (대형주, 높은 펀더멘털 점수)
+    filtered = analyses.filter(analysis => 
+      analysis.marketCap > 50000000000000 && 
+      analysis.fundamentalScore > 70 &&
+      analysis.totalScore > 60
+    );
+  } else if (riskLevel === 'high') {
+    // 고위험 고수익 종목 (소형주, 높은 기술적 점수)
+    filtered = analyses.filter(analysis => 
+      analysis.marketCap < 20000000000000 && 
+      analysis.technicalScore > 80 &&
+      analysis.volumeTrend === '급증'
+    );
+  } else {
+    // 중간 위험도 (균형잡힌 종목)
+    filtered = analyses.filter(analysis => 
+      analysis.totalScore >= 50 && 
+      analysis.totalScore <= 80 &&
+      analysis.marketCap >= 20000000000000
+    );
+  }
+  
+  filtered.sort((a, b) => b.totalScore - a.totalScore);
+  return filtered.slice(0, limit);
 }
