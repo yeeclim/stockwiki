@@ -119,21 +119,10 @@ class KrxLoader {
     }
   }
 
-  // 대체 가격 제공 (임시) - 2024년 12월 기준
+  // 하드코딩된 가격 맵 제거 - 실시간 API에서 가격 제공
   static double _getFallbackPrice(String symbol) {
-    final prices = {
-      '005930': 75000.0, // 삼성전자 (현실적 가격)
-      '000660': 120000.0, // SK하이닉스 (현실적 가격)
-      '035420': 180000.0, // NAVER (현실적 가격)
-      '035720': 45000.0, // 카카오 (현실적 가격)
-      '207940': 800000.0, // 삼성바이오로직스 (현실적 가격)
-      '006400': 400000.0, // 삼성SDI (현실적 가격)
-      '051910': 350000.0, // LG화학 (현실적 가격)
-      '068270': 180000.0, // 셀트리온 (현실적 가격)
-      '323410': 45000.0, // 카카오뱅크 (현실적 가격)
-      '000270': 100000.0, // 기아 (현실적 가격)
-    };
-    return prices[symbol] ?? 0.0;
+    // 하드코딩 제거 - 실시간 API에서 가격을 가져옴
+    return 0.0;
   }
 
   // Alpha Vantage API 사용 (한국 주식 지원)
@@ -220,21 +209,10 @@ class KrxLoader {
     }
   }
 
-  // 종목명 제공
+  // 하드코딩된 종목명 맵 제거 - 실시간 API에서 종목명 제공
   static String _getStockName(String symbol) {
-    final names = {
-      '005930': '삼성전자',
-      '000660': 'SK하이닉스',
-      '035420': 'NAVER',
-      '035720': '카카오',
-      '207940': '삼성바이오로직스',
-      '006400': '삼성SDI',
-      '051910': 'LG화학',
-      '068270': '셀트리온',
-      '323410': '카카오뱅크',
-      '000270': '기아',
-    };
-    return names[symbol] ?? symbol;
+    // 하드코딩 제거 - 실시간 API에서 종목명을 가져옴
+    return symbol;
   }
 
 
@@ -289,7 +267,7 @@ class KrxLoader {
 
       dev.log('단일 검색 응답 상태: ${response.statusCode}');
       dev.log('단일 검색 응답 본문: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         dev.log('단일 검색 파싱된 데이터: $data');
@@ -399,19 +377,19 @@ class KrxLoader {
           if (stocks.isNotEmpty) {
             final results = stocks.map((stock) => {
               '단축코드': stock['symbol'],
-              '한글 종목명': stock['name'],
-              '한글 종목약명': stock['name'],
+        '한글 종목명': stock['name'],
+        '한글 종목약명': stock['name'],
               '시장구분': stock['market'] ?? 'KOSPI',
               'price': stock['price']?.toDouble() ?? 0.0,
               'change': stock['change']?.toDouble() ?? 0.0,
               'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
               'volume': stock['volume']?.toInt() ?? 0,
               'marketCap': stock['marketCap']?.toInt() ?? 0,
-              'lastUpdate': DateTime.now().toIso8601String(),
-            }).toList();
-            
+        'lastUpdate': DateTime.now().toIso8601String(),
+      }).toList();
+      
             dev.log('실시간 API 검색 성공: ${results.length}개');
-            return results;
+      return results;
           } else {
             dev.log('API 응답에 종목 데이터가 없음');
           }
