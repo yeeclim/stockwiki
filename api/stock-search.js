@@ -100,9 +100,41 @@ async function searchStocksRealtime(keyword, limit) {
 
 async function searchNaverFinance(keyword, limit) {
   try {
-
-    // 바로 웹 검색 사용 (더 안정적)
-    return await searchNaverWeb(keyword, limit);
+    console.log(`실시간 네이버 증권 검색: ${keyword}`);
+    
+    // 1. 네이버 증권 웹 검색 시도
+    const naverResults = await searchNaverWeb(keyword, limit);
+    if (naverResults.length > 0) {
+      console.log(`네이버 검색 성공: ${naverResults.length}개`);
+      return naverResults;
+    }
+    
+    // 2. Yahoo Finance 시도
+    console.log('Yahoo Finance 검색 시도');
+    const yahooResults = await searchYahooFinance(keyword, limit);
+    if (yahooResults.length > 0) {
+      console.log(`Yahoo Finance 검색 성공: ${yahooResults.length}개`);
+      return yahooResults;
+    }
+    
+    // 3. Investing.com 시도
+    console.log('Investing.com 검색 시도');
+    const investingResults = await searchInvestingCom(keyword, limit);
+    if (investingResults.length > 0) {
+      console.log(`Investing.com 검색 성공: ${investingResults.length}개`);
+      return investingResults;
+    }
+    
+    // 4. Alpha Vantage API 시도
+    console.log('Alpha Vantage API 검색 시도');
+    const alphaResults = await searchAlphaVantage(keyword, limit);
+    if (alphaResults.length > 0) {
+      console.log(`Alpha Vantage 검색 성공: ${alphaResults.length}개`);
+      return alphaResults;
+    }
+    
+    console.log('모든 검색 소스 실패');
+    return [];
 
   } catch (error) {
     console.error('네이버 증권 검색 오류:', error);
@@ -375,116 +407,7 @@ async function searchGeneralStocks(keyword, limit) {
   return [];
 }
 
-function extractYahooStockResults(html, keyword) {
-  const results = [];
-  
-  console.log('Yahoo Finance HTML에서 한국 주식 정보 추출 중...');
-  
-  // Yahoo Finance 검색 결과에서 한국 주식 정보 추출하는 패턴들
-  const patterns = [
-    // 한국 주식 링크 패턴들 (.KS, .KQ)
-    /<a[^>]*href="[^"]*\/quote\/([^"]*\.KS)[^"]*"[^>]*>([^<]+)<\/a>/g,
-    /<a[^>]*href="[^"]*\/quote\/([^"]*\.KQ)[^"]*"[^>]*>([^<]+)<\/a>/g,
-    // 테이블 내 패턴들
-    /<td[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/quote\/([^"]*\.KS)[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/td>/g,
-    /<td[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/quote\/([^"]*\.KQ)[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/td>/g,
-    // 리스트 패턴들
-    /<li[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/quote\/([^"]*\.KS)[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/li>/g,
-    /<li[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/quote\/([^"]*\.KQ)[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/li>/g,
-    // 일반적인 링크 패턴들
-    /href="[^"]*\/quote\/([^"]*\.KS)[^"]*"[^>]*>([^<]+)</g,
-    /href="[^"]*\/quote\/([^"]*\.KQ)[^"]*"[^>]*>([^<]+)</g
-  ];
 
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const symbol = match[1];
-      const name = match[2].trim();
-      
-      // 한국 주식인지 확인 (.KS, .KQ)
-      if (symbol && name && name.length > 0 && name.length < 100) {
-        const lowerName = name.toLowerCase();
-        const lowerKeyword = keyword.toLowerCase();
-        
-        // 키워드 매칭 확인
-        if (lowerName.includes(lowerKeyword) || lowerKeyword.includes(lowerName)) {
-          results.push({
-            symbol: symbol,
-            name: name,
-            market: symbol.includes('.KQ') ? 'KOSDAQ' : 'KOSPI'
-          });
-          console.log(`추출된 한국 주식: ${name} (${symbol})`);
-        }
-      }
-    }
-  }
-
-  // 중복 제거
-  const uniqueResults = results.filter((stock, index, self) => 
-    index === self.findIndex(s => s.symbol === stock.symbol)
-  );
-
-  console.log(`중복 제거 후 ${uniqueResults.length}개 한국 주식`);
-  return uniqueResults;
-}
-
-function extractInvestingStockResults(html, keyword) {
-  const results = [];
-  
-  console.log('Investing.com HTML에서 한국 주식 정보 추출 중...');
-  
-  // Investing.com 검색 결과에서 한국 주식 정보 추출하는 패턴들
-  const patterns = [
-    // 한국 주식 링크 패턴들
-    /<a[^>]*href="[^"]*\/equities\/([^"]*)"[^>]*>([^<]+)<\/a>/g,
-    /<a[^>]*href="[^"]*\/stocks\/([^"]*)"[^>]*>([^<]+)<\/a>/g,
-    /<a[^>]*href="[^"]*\/quotes\/([^"]*)"[^>]*>([^<]+)<\/a>/g,
-    // 테이블 내 패턴들
-    /<td[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/equities\/([^"]*)"[^>]*>([^<]+)<\/a>[\s\S]*?<\/td>/g,
-    /<tr[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/equities\/([^"]*)"[^>]*>([^<]+)<\/a>[\s\S]*?<\/tr>/g,
-    // 리스트 패턴들
-    /<li[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/equities\/([^"]*)"[^>]*>([^<]+)<\/a>[\s\S]*?<\/li>/g,
-    /<div[^>]*>[\s\S]*?<a[^>]*href="[^"]*\/equities\/([^"]*)"[^>]*>([^<]+)<\/a>[\s\S]*?<\/div>/g
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const symbol = match[1];
-      const name = match[2].trim();
-      
-      // 한국 주식인지 확인 (KOSPI/KOSDAQ)
-      if (symbol && name && name.length > 0 && name.length < 100) {
-        const lowerName = name.toLowerCase();
-        const lowerKeyword = keyword.toLowerCase();
-        
-        // 키워드 매칭 확인
-        if (lowerName.includes(lowerKeyword) || lowerKeyword.includes(lowerName)) {
-          // 한국 주식인지 확인 (KOSPI/KOSDAQ 포함)
-          if (symbol.includes('kospi') || symbol.includes('kosdaq') || 
-              name.includes('KOSPI') || name.includes('KOSDAQ') ||
-              symbol.match(/\d{6}/)) {
-            results.push({
-              symbol: symbol,
-              name: name,
-              market: symbol.includes('kosdaq') ? 'KOSDAQ' : 'KOSPI'
-            });
-            console.log(`추출된 한국 주식: ${name} (${symbol})`);
-          }
-        }
-      }
-    }
-  }
-
-  // 중복 제거
-  const uniqueResults = results.filter((stock, index, self) => 
-    index === self.findIndex(s => s.symbol === stock.symbol)
-  );
-
-  console.log(`중복 제거 후 ${uniqueResults.length}개 한국 주식`);
-  return uniqueResults;
-}
 
 function extractStockSearchResults(html, keyword) {
   const results = [];
@@ -621,78 +544,6 @@ async function fetchYahooStockPrice(symbol) {
   }
 }
 
-async function fetchInvestingStockPrice(symbol) {
-  try {
-    console.log(`Investing.com에서 ${symbol} 가격 조회 중...`);
-    
-    // Investing.com 주식 페이지 URL
-    const url = `https://www.investing.com/equities/${symbol}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Referer': 'https://www.investing.com/',
-        'DNT': '1'
-      }
-    });
-
-    if (!response.ok) {
-      console.log(`Investing.com 가격 조회 오류: ${response.status}`);
-      return null;
-    }
-
-    const html = await response.text();
-    
-    // 가격 정보 추출
-    const pricePatterns = [
-      /<span class="text-2xl[^"]*"[^>]*>([^<]+)<\/span>/,
-      /<span class="text-3xl[^"]*"[^>]*>([^<]+)<\/span>/,
-      /<span class="text-4xl[^"]*"[^>]*>([^<]+)<\/span>/,
-      /<div class="text-2xl[^"]*"[^>]*>([^<]+)<\/div>/,
-      /<div class="text-3xl[^"]*"[^>]*>([^<]+)<\/div>/,
-      /<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/,
-      /<div[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/div>/,
-      /<span[^>]*data-test="instrument-price-last"[^>]*>([^<]+)<\/span>/,
-      /<div[^>]*data-test="instrument-price-last"[^>]*>([^<]+)<\/div>/
-    ];
-
-    let price = null;
-    for (const pattern of pricePatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        const priceStr = match[1].replace(/,/g, '').replace(/[^\d.-]/g, '');
-        const priceNum = parseFloat(priceStr);
-        if (priceNum && priceNum > 0 && priceNum < 10000000) {
-          price = Math.round(priceNum);
-          break;
-        }
-      }
-    }
-
-    if (price) {
-      console.log(`Investing.com 가격 조회 성공: ${price}`);
-      return {
-        price: price,
-        change: 0,
-        changePercent: 0,
-        volume: 0,
-        marketCap: 0
-      };
-    }
-
-    console.log(`Investing.com 가격 조회 실패: ${symbol}`);
-    return null;
-
-  } catch (error) {
-    console.error(`Investing.com 가격 조회 오류:`, error);
-    return null;
-  }
-}
 
 async function fetchStockPrice(symbol) {
   try {
@@ -824,6 +675,303 @@ function isBlockedPage(html) {
   
   const lowerHtml = html.toLowerCase();
   return blockIndicators.some(indicator => lowerHtml.includes(indicator));
+}
+
+// Yahoo Finance 검색 함수
+async function searchYahooFinance(keyword, limit) {
+  try {
+    console.log(`Yahoo Finance 검색: ${keyword}`);
+    
+    // Yahoo Finance에서 한국 주식 검색
+    const searchUrl = `https://finance.yahoo.com/lookup?s=${encodeURIComponent(keyword)}&t=A&b=0&c=100`;
+    
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://finance.yahoo.com/',
+        'DNT': '1'
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`Yahoo Finance 검색 오류: ${response.status}`);
+      return [];
+    }
+
+    const html = await response.text();
+    const stockResults = extractYahooStockResults(html, keyword);
+    
+    // 각 종목의 실시간 가격 정보 가져오기
+    const detailedResults = [];
+    for (let i = 0; i < Math.min(stockResults.length, limit); i++) {
+      const stock = stockResults[i];
+      try {
+        const priceInfo = await fetchYahooStockPrice(stock.symbol);
+        if (priceInfo) {
+          detailedResults.push({
+            symbol: stock.symbol,
+            name: stock.name,
+            market: stock.market || 'KOSPI',
+            price: priceInfo.price,
+            change: priceInfo.change || 0,
+            changePercent: priceInfo.changePercent || 0,
+            volume: priceInfo.volume || 0,
+            marketCap: priceInfo.marketCap || 0,
+            lastUpdate: new Date().toISOString(),
+            source: 'yahoo-finance-realtime',
+            note: 'Yahoo Finance 실시간 크롤링 데이터'
+          });
+        }
+      } catch (error) {
+        console.error(`Yahoo Finance 종목 ${stock.symbol} 가격 조회 오류:`, error);
+      }
+    }
+
+    return detailedResults;
+
+  } catch (error) {
+    console.error('Yahoo Finance 검색 오류:', error);
+    return [];
+  }
+}
+
+// Investing.com 검색 함수
+async function searchInvestingCom(keyword, limit) {
+  try {
+    console.log(`Investing.com 검색: ${keyword}`);
+    
+    // Investing.com에서 한국 주식 검색
+    const searchUrl = `https://www.investing.com/search/?q=${encodeURIComponent(keyword)}&tab=quotes`;
+    
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://www.investing.com/',
+        'DNT': '1'
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`Investing.com 검색 오류: ${response.status}`);
+      return [];
+    }
+
+    const html = await response.text();
+    const stockResults = extractInvestingStockResults(html, keyword);
+    
+    // 각 종목의 실시간 가격 정보 가져오기
+    const detailedResults = [];
+    for (let i = 0; i < Math.min(stockResults.length, limit); i++) {
+      const stock = stockResults[i];
+      try {
+        const priceInfo = await fetchInvestingStockPrice(stock.symbol);
+        if (priceInfo) {
+          detailedResults.push({
+            symbol: stock.symbol,
+      name: stock.name,
+      market: stock.market || 'KOSPI',
+            price: priceInfo.price,
+            change: priceInfo.change || 0,
+            changePercent: priceInfo.changePercent || 0,
+            volume: priceInfo.volume || 0,
+            marketCap: priceInfo.marketCap || 0,
+            lastUpdate: new Date().toISOString(),
+            source: 'investing-com-realtime',
+            note: 'Investing.com 실시간 크롤링 데이터'
+          });
+        }
+      } catch (error) {
+        console.error(`Investing.com 종목 ${stock.symbol} 가격 조회 오류:`, error);
+      }
+    }
+
+    return detailedResults;
+
+  } catch (error) {
+    console.error('Investing.com 검색 오류:', error);
+    return [];
+  }
+}
+
+// Alpha Vantage API 검색 함수
+async function searchAlphaVantage(keyword, limit) {
+  try {
+    console.log(`Alpha Vantage API 검색: ${keyword}`);
+    
+    // Alpha Vantage는 한국 주식을 지원하지 않으므로 빈 결과 반환
+    console.log('Alpha Vantage는 한국 주식 미지원');
+    return [];
+
+  } catch (error) {
+    console.error('Alpha Vantage API 검색 오류:', error);
+    return [];
+  }
+}
+
+// Yahoo Finance 검색 결과 파싱
+function extractYahooStockResults(html, keyword) {
+  const results = [];
+  
+  try {
+    // Yahoo Finance 검색 결과에서 주식 정보 추출
+    const stockPatterns = [
+      /<tr[^>]*class="[^"]*data-symbol[^"]*"[^>]*data-symbol="([^"]+)"[^>]*>[\s\S]*?<td[^>]*class="[^"]*name[^"]*"[^>]*>([^<]+)<\/td>[\s\S]*?<td[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/td>/g,
+      /<a[^>]*href="\/quote\/([^"]+)"[^>]*>([^<]+)<\/a>/g,
+      /<span[^>]*class="[^"]*symbol[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<span[^>]*class="[^"]*name[^"]*"[^>]*>([^<]+)<\/span>/g
+    ];
+
+    for (const pattern of stockPatterns) {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        const symbol = match[1]?.trim();
+        const name = match[2]?.trim();
+        
+        if (symbol && name && name.toLowerCase().includes(keyword.toLowerCase())) {
+          results.push({
+            symbol: symbol,
+            name: name,
+            market: symbol.includes('.KS') ? 'KOSPI' : symbol.includes('.KQ') ? 'KOSDAQ' : 'KOSPI'
+          });
+        }
+      }
+    }
+
+    // 중복 제거
+    const uniqueResults = results.filter((stock, index, self) => 
+      index === self.findIndex(s => s.symbol === stock.symbol)
+    );
+
+    console.log(`Yahoo Finance 검색 결과: ${uniqueResults.length}개`);
+    return uniqueResults;
+
+  } catch (error) {
+    console.error('Yahoo Finance 결과 파싱 오류:', error);
+    return [];
+  }
+}
+
+// Investing.com 검색 결과 파싱
+function extractInvestingStockResults(html, keyword) {
+  const results = [];
+  
+  try {
+    // Investing.com 검색 결과에서 주식 정보 추출
+    const stockPatterns = [
+      /<a[^>]*href="[^"]*\/equities\/([^"]+)"[^>]*>([^<]+)<\/a>/g,
+      /<td[^>]*class="[^"]*symbol[^"]*"[^>]*>([^<]+)<\/td>[\s\S]*?<td[^>]*class="[^"]*name[^"]*"[^>]*>([^<]+)<\/td>/g,
+      /<span[^>]*class="[^"]*symbol[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<span[^>]*class="[^"]*name[^"]*"[^>]*>([^<]+)<\/span>/g
+    ];
+
+    for (const pattern of stockPatterns) {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        const symbol = match[1]?.trim();
+        const name = match[2]?.trim();
+        
+        if (symbol && name && name.toLowerCase().includes(keyword.toLowerCase())) {
+          results.push({
+            symbol: symbol,
+            name: name,
+            market: 'KOSPI' // 기본값
+          });
+        }
+      }
+    }
+
+    // 중복 제거
+    const uniqueResults = results.filter((stock, index, self) => 
+      index === self.findIndex(s => s.symbol === stock.symbol)
+    );
+
+    console.log(`Investing.com 검색 결과: ${uniqueResults.length}개`);
+    return uniqueResults;
+
+  } catch (error) {
+    console.error('Investing.com 결과 파싱 오류:', error);
+    return [];
+  }
+}
+
+// Investing.com 주식 가격 조회
+async function fetchInvestingStockPrice(symbol) {
+  try {
+    console.log(`Investing.com에서 ${symbol} 가격 조회 중...`);
+    
+    // Investing.com 주식 페이지 URL
+    const url = `https://www.investing.com/equities/${symbol}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://www.investing.com/',
+        'DNT': '1'
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`Investing.com 가격 조회 오류: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    
+    // 가격 정보 추출
+    const pricePatterns = [
+      /<span[^>]*class="[^"]*text-2xl[^"]*"[^>]*>([^<]+)<\/span>/,
+      /<span[^>]*class="[^"]*text-xl[^"]*"[^>]*>([^<]+)<\/span>/,
+      /<span[^>]*class="[^"]*text-lg[^"]*"[^>]*>([^<]+)<\/span>/,
+      /<span[^>]*data-test="instrument-price-last"[^>]*>([^<]+)<\/span>/,
+      /<div[^>]*data-test="instrument-price-last"[^>]*>([^<]+)<\/div>/,
+      /<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/,
+      /<div[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/div>/
+    ];
+
+    let price = null;
+    for (const pattern of pricePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        const priceStr = match[1].replace(/,/g, '').replace(/[^\d.-]/g, '');
+        const priceNum = parseFloat(priceStr);
+        if (priceNum && priceNum > 0 && priceNum < 10000000) {
+          price = Math.round(priceNum);
+          break;
+        }
+      }
+    }
+
+    if (price) {
+      console.log(`Investing.com 가격 조회 성공: ${price}`);
+      return {
+        price: price,
+        change: 0,
+        changePercent: 0,
+        volume: 0,
+        marketCap: 0
+      };
+    }
+
+    console.log(`Investing.com 가격 조회 실패: ${symbol}`);
+    return null;
+
+  } catch (error) {
+    console.error(`Investing.com 가격 조회 오류:`, error);
+    return null;
+  }
 }
 
 // 프록시 서버 사용 (필요시)
