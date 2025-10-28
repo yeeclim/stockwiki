@@ -257,26 +257,46 @@ class KrxLoader {
     // 새로운 종목 검색 API 사용
     try {
       final baseUrl = Uri.base.origin;
-      final url = '$baseUrl/api/stock-search?keyword=$q&limit=1';
+      dev.log('단일 검색 Base URL: $baseUrl');
       
-      dev.log('단일 종목 검색 API 호출: $url');
+      // 웹 환경에서 baseUrl이 비어있을 경우 대체 URL 사용
+      String apiUrl;
+      if (baseUrl.isEmpty || baseUrl == 'null' || baseUrl == 'http://localhost:8080' || baseUrl == 'http://localhost:3000') {
+        apiUrl = 'https://stockwiki.vercel.app/api/stock-search?keyword=$q&limit=1';
+        dev.log('Vercel 배포 URL 사용: $apiUrl');
+      } else if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
+        apiUrl = 'http://localhost:3000/api/stock-search?keyword=$q&limit=1';
+        dev.log('로컬 개발 URL 사용: $apiUrl');
+      } else {
+        apiUrl = '$baseUrl/api/stock-search?keyword=$q&limit=1';
+        dev.log('현재 도메인 URL 사용: $apiUrl');
+      }
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final finalUrl = '$apiUrl&t=$timestamp&v=${DateTime.now().millisecondsSinceEpoch}';
+      dev.log('단일 종목 검색 API 호출: $finalUrl');
+      
       final response = await http.get(
-        Uri.parse('$url&t=$timestamp&v=${DateTime.now().millisecondsSinceEpoch}'),
+        Uri.parse(finalUrl),
         headers: {
+          'Accept': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
           'Pragma': 'no-cache',
           'Expires': '0',
-          'If-Modified-Since': 'Mon, 01 Jan 1990 00:00:00 GMT',
-          'If-None-Match': '*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
       ).timeout(const Duration(seconds: 15));
 
+      dev.log('단일 검색 응답 상태: ${response.statusCode}');
+      dev.log('단일 검색 응답 본문: ${response.body}');
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        dev.log('단일 검색 파싱된 데이터: $data');
+        
         if (data['success'] == true && data['data'] != null) {
           final stocks = List<Map<String, dynamic>>.from(data['data']);
+          dev.log('단일 검색 종목 데이터: $stocks');
           
           if (stocks.isNotEmpty) {
             final stock = stocks.first;
@@ -286,7 +306,7 @@ class KrxLoader {
               '단축코드': stock['symbol'],
               '한글 종목명': stock['name'],
               '한글 종목약명': stock['name'],
-              '시장구분': 'KOSPI', // 기본값
+              '시장구분': stock['market'] ?? 'KOSPI',
               'price': stock['price']?.toDouble() ?? 0.0,
               'change': stock['change']?.toDouble() ?? 0.0,
               'changePercent': stock['changePercent']?.toDouble() ?? 0.0,
@@ -297,8 +317,14 @@ class KrxLoader {
             
             dev.log('단일 검색 성공: ${result['한글 종목명']}');
             return result;
+          } else {
+            dev.log('단일 검색: API 응답에 종목 데이터가 없음');
           }
+        } else {
+          dev.log('단일 검색 API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
         }
+      } else {
+        dev.log('단일 검색 HTTP 오류: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       dev.log('단일 종목 검색 API 호출 실패: $e');
@@ -323,25 +349,52 @@ class KrxLoader {
     try {
       dev.log('실시간 API 검색: $q');
       
+      // 디버깅을 위한 상세 로그
       final baseUrl = Uri.base.origin;
-      final url = '$baseUrl/api/stock-search?keyword=$q&limit=10';
+      dev.log('Base URL: $baseUrl');
+      dev.log('Is Web: $kIsWeb');
+      dev.log('Current URI: ${Uri.base}');
       
-      dev.log('실시간 검색 API 호출: $url');
+      // 웹 환경에서 baseUrl이 비어있을 경우 대체 URL 사용
+      String apiUrl;
+      if (baseUrl.isEmpty || baseUrl == 'null' || baseUrl == 'http://localhost:8080' || baseUrl == 'http://localhost:3000') {
+        // Vercel 배포 환경에서의 URL 구성
+        apiUrl = 'https://stockwiki.vercel.app/api/stock-search?keyword=$q&limit=10';
+        dev.log('Vercel 배포 URL 사용: $apiUrl');
+      } else if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
+        // 로컬 개발 환경
+        apiUrl = 'http://localhost:3000/api/stock-search?keyword=$q&limit=10';
+        dev.log('로컬 개발 URL 사용: $apiUrl');
+      } else {
+        apiUrl = '$baseUrl/api/stock-search?keyword=$q&limit=10';
+        dev.log('현재 도메인 URL 사용: $apiUrl');
+      }
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final finalUrl = '$apiUrl&t=$timestamp';
+      dev.log('최종 API URL: $finalUrl');
+      
       final response = await http.get(
-        Uri.parse('$url&t=$timestamp'),
+        Uri.parse(finalUrl),
         headers: {
+          'Accept': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
       ).timeout(const Duration(seconds: 15));
 
+      dev.log('API 응답 상태: ${response.statusCode}');
+      dev.log('API 응답 본문: ${response.body}');
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        dev.log('파싱된 데이터: $data');
+        
         if (data['success'] == true && data['data'] != null) {
           final stocks = List<Map<String, dynamic>>.from(data['data']);
+          dev.log('종목 데이터: $stocks');
           
           if (stocks.isNotEmpty) {
             final results = stocks.map((stock) => {
@@ -359,8 +412,14 @@ class KrxLoader {
             
             dev.log('실시간 API 검색 성공: ${results.length}개');
             return results;
+          } else {
+            dev.log('API 응답에 종목 데이터가 없음');
           }
+        } else {
+          dev.log('API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
         }
+      } else {
+        dev.log('HTTP 오류: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       dev.log('실시간 API 검색 실패: $e');
