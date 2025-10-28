@@ -107,10 +107,13 @@ class _StockSearchPageState extends State<StockSearchPage> {
           _results = stocks.map((s) => '${s.name} (${s.symbol}) - \$${s.price}').toList();
         });
       } else {
-        final list = await KrxLoader.searchStocks(keyword);
+        // 한국 주식 검색 기능은 현재 비활성화됨
         setState(() {
-          _krResults = list;
+          _krResults = [];
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('한국 주식 검색 기능은 현재 테마별 추천 시스템으로 대체되었습니다.')),
+        );
       }
     } catch (e) {
       setState(() {
