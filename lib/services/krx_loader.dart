@@ -240,7 +240,7 @@ class KrxLoader {
       // 웹 환경에서 baseUrl이 비어있을 경우 대체 URL 사용
       String apiUrl;
       if (baseUrl.isEmpty || baseUrl == 'null' || baseUrl == 'http://localhost:8080' || baseUrl == 'http://localhost:3000') {
-        apiUrl = 'https://stockwiki-5g3zl3i49-bermonts-projects.vercel.app/api/stock-search?keyword=$q&limit=1';
+        apiUrl = 'https://stockwiki-ovmt2w5hu-bermonts-projects.vercel.app/api/stock-search?keyword=$q&limit=1';
         dev.log('Vercel 배포 URL 사용: $apiUrl');
       } else if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
         apiUrl = 'http://localhost:3000/api/stock-search?keyword=$q&limit=1';
@@ -337,7 +337,7 @@ class KrxLoader {
       String apiUrl;
       if (baseUrl.isEmpty || baseUrl == 'null' || baseUrl == 'http://localhost:8080' || baseUrl == 'http://localhost:3000') {
         // Vercel 배포 환경에서의 URL 구성
-        apiUrl = 'https://stockwiki-5g3zl3i49-bermonts-projects.vercel.app/api/stock-search?keyword=$q&limit=10';
+        apiUrl = 'https://stockwiki-ovmt2w5hu-bermonts-projects.vercel.app/api/stock-search?keyword=$q&limit=10';
         dev.log('Vercel 배포 URL 사용: $apiUrl');
       } else if (baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1')) {
         // 로컬 개발 환경
