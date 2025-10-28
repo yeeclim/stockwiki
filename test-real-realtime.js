@@ -1,9 +1,9 @@
-// 최종 실시간 검색 테스트
-async function testFinalSearch(keyword) {
+// 진짜 실시간 검색 테스트 (하드코딩 없음)
+async function testRealRealtimeSearch(keyword) {
   try {
-    console.log(`=== ${keyword} 최종 실시간 검색 테스트 ===`);
+    console.log(`=== ${keyword} 진짜 실시간 검색 테스트 ===`);
     
-    // 네이버 증권 검색 페이지 직접 호출
+    // 네이버 증권 검색 페이지에서 실시간 검색
     const searchUrl = `https://finance.naver.com/search/searchList.naver?query=${encodeURIComponent(keyword)}`;
     
     console.log(`검색 URL: ${searchUrl}`);
@@ -77,7 +77,19 @@ function extractStockSearchResults(html, keyword) {
     /<tr[^>]*>[\s\S]*?<a[^>]*href="[^"]*item[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/tr>/g,
     /<div[^>]*>[\s\S]*?<a[^>]*href="[^"]*item[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/div>/g,
     /<span[^>]*>[\s\S]*?<a[^>]*href="[^"]*item[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/span>/g,
-    /<p[^>]*>[\s\S]*?<a[^>]*href="[^"]*item[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/p>/g
+    /<p[^>]*>[\s\S]*?<a[^>]*href="[^"]*item[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/p>/g,
+    // 추가 패턴들
+    /<a[^>]*href="[^"]*\/item\/main\.naver\?code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>/g,
+    /<a[^>]*href="[^"]*\/item\/chart\.naver\?code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>/g,
+    /<a[^>]*href="[^"]*\/item\/board\.naver\?code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>/g,
+    // 테이블 내 패턴들
+    /<td[^>]*class="[^"]*"[^>]*>[\s\S]*?<a[^>]*href="[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/td>/g,
+    /<th[^>]*class="[^"]*"[^>]*>[\s\S]*?<a[^>]*href="[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/th>/g,
+    // 리스트 패턴들
+    /<li[^>]*>[\s\S]*?<a[^>]*href="[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/li>/g,
+    /<ul[^>]*>[\s\S]*?<a[^>]*href="[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<\/ul>/g,
+    // 일반적인 링크 패턴들
+    /href="[^"]*code=(\d{6})[^"]*"[^>]*>([^<]+)</g
   ];
 
   for (const pattern of patterns) {
@@ -86,14 +98,20 @@ function extractStockSearchResults(html, keyword) {
       const code = match[1];
       const name = match[2].trim();
       
-      // 종목명이 키워드를 포함하는지 확인
-      if (code && name && name.toLowerCase().includes(keyword.toLowerCase())) {
-        results.push({
-          symbol: code,
-          name: name,
-          market: code.startsWith('0') ? 'KOSDAQ' : 'KOSPI'
-        });
-        console.log(`추출된 종목: ${name} (${code})`);
+      // 종목명이 키워드를 포함하는지 확인 (더 유연한 매칭)
+      if (code && name && name.length > 0 && name.length < 50) {
+        const lowerName = name.toLowerCase();
+        const lowerKeyword = keyword.toLowerCase();
+        
+        // 키워드 매칭 확인 (부분 매칭)
+        if (lowerName.includes(lowerKeyword) || lowerKeyword.includes(lowerName)) {
+          results.push({
+            symbol: code,
+            name: name,
+            market: code.startsWith('0') ? 'KOSDAQ' : 'KOSPI'
+          });
+          console.log(`추출된 종목: ${name} (${code})`);
+        }
       }
     }
   }
@@ -110,9 +128,6 @@ function extractStockSearchResults(html, keyword) {
 async function fetchStockPrice(symbol) {
   try {
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
-    
-    // 랜덤 지연 (봇 탐지 회피)
-    await randomDelay(1000, 2000);
     
     const response = await fetch(url, {
       headers: {
@@ -172,10 +187,5 @@ async function fetchStockPrice(symbol) {
   }
 }
 
-function randomDelay(min, max) {
-  const delay = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise(resolve => setTimeout(resolve, delay));
-}
-
 // 테스트 실행
-testFinalSearch('삼성전자');
+testRealRealtimeSearch('삼성');
