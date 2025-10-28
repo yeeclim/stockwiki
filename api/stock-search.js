@@ -56,25 +56,51 @@ async function searchStocksRealtime(keyword, limit) {
   try {
     console.log(`실시간 종목 검색 시작: ${keyword}`);
     
-    // 하드코딩 완전 제거 - 진짜 실시간 검색만 사용
-    console.log('하드코딩 제거됨 - 실시간 검색 시도');
-    
     // 네이버 증권에서 실시간 검색 시도
     const searchResults = await searchNaverFinance(keyword, limit);
+    
+    // 검색 결과가 없으면 기본 응답
+    if (searchResults.length === 0) {
+      console.log('검색 결과 없음 - 기본 응답 반환');
+      return [{
+        symbol: '000000',
+        name: '검색 결과 없음',
+        market: 'N/A',
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        volume: 0,
+        marketCap: 0,
+        lastUpdate: new Date().toISOString(),
+        source: 'no-results',
+        note: '검색 결과가 없습니다. 네이버 증권 봇 차단으로 인한 제한일 수 있습니다.'
+      }];
+    }
     
     console.log(`실시간 검색 결과: ${searchResults.length}개`);
     return searchResults;
 
   } catch (error) {
     console.error('실시간 종목 검색 오류:', error);
-    return [];
+    return [{
+      symbol: '000000',
+      name: '검색 오류',
+      market: 'N/A',
+      price: 0,
+      change: 0,
+      changePercent: 0,
+      volume: 0,
+      marketCap: 0,
+      lastUpdate: new Date().toISOString(),
+      source: 'error',
+      note: `검색 오류: ${error.message}`
+    }];
   }
 }
 
 async function searchNaverFinance(keyword, limit) {
   try {
-    console.log(`실시간 네이버 증권 검색: ${keyword}`);
-    
+
     // 바로 웹 검색 사용 (더 안정적)
     return await searchNaverWeb(keyword, limit);
 
