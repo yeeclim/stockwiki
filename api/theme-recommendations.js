@@ -74,6 +74,26 @@ export default async function handler(req, res) {
       });
     }
 
+    if (action === 'stock-analysis') {
+      // 개별 종목 분석 반환
+      const { symbol } = req.query;
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: '종목코드가 필요합니다'
+        });
+      }
+
+      const analysis = getComprehensiveAnalysis(symbol);
+      return res.status(200).json({
+        success: true,
+        symbol: symbol,
+        data: analysis,
+        timestamp: new Date().toISOString(),
+        source: 'theme-recommendations'
+      });
+    }
+
     // 기본: 모든 추천 종목 반환
     const allStocks = getAllRecommendedStocks();
     return res.status(200).json({
@@ -185,22 +205,166 @@ function getAllRecommendedStocks() {
   return allStocks;
 }
 
-// 이평선 분석 (임시 데이터)
-function getMovingAverageAnalysis(symbol) {
-  const basePrice = 50000 + (symbol.hashCode % 50000);
+// 종목코드를 숫자로 변환하는 함수
+function symbolToNumber(symbol) {
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) {
+    const char = symbol.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 32bit 정수로 변환
+  }
+  return Math.abs(hash);
+}
+
+// 종합 투자 분석 (이평선, 거래량, 거래대금, 자본금, 분기실적 포함)
+function getComprehensiveAnalysis(symbol) {
+  const symbolNum = symbolToNumber(symbol);
+  const basePrice = 50000 + (symbolNum % 50000);
+  const randomFactor = symbolNum % 100;
+  
+  // 이평선 데이터
+  const ma5 = basePrice + (randomFactor * 100);
+  const ma20 = basePrice + (randomFactor * 80);
+  const ma60 = basePrice + (randomFactor * 60);
+  const currentPrice = basePrice + (randomFactor * 120);
+  
+  // 거래량 및 거래대금
+  const volume = 1000000 + (randomFactor * 500000);
+  const tradingValue = Math.round(currentPrice * volume);
+  
+  // 자본금 (시가총액 기반)
+  const marketCap = 10000000000000 + (randomFactor * 1000000000000);
+  const capital = Math.round(marketCap * 0.1); // 자본금은 시가총액의 10% 가정
+  
+  // 분기실적 (임시 데이터)
+  const quarterlyRevenue = 1000000000000 + (randomFactor * 100000000000);
+  const quarterlyProfit = 50000000000 + (randomFactor * 10000000000);
+  const profitMargin = Math.round(quarterlyProfit / quarterlyRevenue * 100);
+  
+  // 기술적 분석
+  const trend = analyzeTrend(currentPrice, ma5, ma20, ma60);
+  const volumeTrend = analyzeVolumeTrend(volume, randomFactor);
+  const technicalScore = calculateTechnicalScore(currentPrice, ma5, ma20, ma60, volume);
+  
+  // 펀더멘털 분석
+  const fundamentalScore = calculateFundamentalScore(quarterlyProfit, quarterlyRevenue, marketCap);
+  
+  // 종합 점수 및 추천
+  const totalScore = Math.round(technicalScore * 0.6 + fundamentalScore * 0.4);
+  const recommendation = getRecommendation(totalScore);
+  
   return {
     symbol: symbol,
-    ma5: basePrice + (symbol.hashCode % 5000),
-    ma20: basePrice + (symbol.hashCode % 3000),
-    ma60: basePrice + (symbol.hashCode % 1000),
-    trend: symbol.hashCode % 3 === 0 ? '상승' : symbol.hashCode % 3 === 1 ? '하락' : '횡보',
-    recommendation: symbol.hashCode % 3 === 0 ? '매수' : symbol.hashCode % 3 === 1 ? '매도' : '관망',
-    confidence: 60 + (symbol.hashCode % 40),
+    currentPrice: currentPrice,
+    ma5: ma5,
+    ma20: ma20,
+    ma60: ma60,
+    trend: trend,
+    volume: volume,
+    tradingValue: tradingValue,
+    marketCap: marketCap,
+    capital: capital,
+    quarterlyRevenue: quarterlyRevenue,
+    quarterlyProfit: quarterlyProfit,
+    profitMargin: profitMargin,
+    volumeTrend: volumeTrend,
+    technicalScore: technicalScore,
+    fundamentalScore: fundamentalScore,
+    totalScore: totalScore,
+    recommendation: recommendation,
+    confidence: totalScore,
     lastUpdate: new Date().toISOString(),
   };
 }
 
-// 테마별 투자 적합성 분석
+// 추세 분석
+function analyzeTrend(current, ma5, ma20, ma60) {
+  if (current > ma5 && ma5 > ma20 && ma20 > ma60) {
+    return '강한상승';
+  } else if (current > ma5 && ma5 > ma20) {
+    return '상승';
+  } else if (current > ma5) {
+    return '약한상승';
+  } else if (current < ma5 && ma5 < ma20 && ma20 < ma60) {
+    return '강한하락';
+  } else if (current < ma5 && ma5 < ma20) {
+    return '하락';
+  } else if (current < ma5) {
+    return '약한하락';
+  } else {
+    return '횡보';
+  }
+}
+
+// 거래량 추세 분석
+function analyzeVolumeTrend(volume, randomFactor) {
+  const avgVolume = 1000000 + (randomFactor * 200000);
+  if (volume > avgVolume * 1.5) {
+    return '급증';
+  } else if (volume > avgVolume * 1.2) {
+    return '증가';
+  } else if (volume < avgVolume * 0.8) {
+    return '감소';
+  } else {
+    return '보통';
+  }
+}
+
+// 기술적 분석 점수 계산
+function calculateTechnicalScore(current, ma5, ma20, ma60, volume) {
+  let score = 50; // 기본 점수
+  
+  // 이평선 분석
+  if (current > ma5) score += 10;
+  if (ma5 > ma20) score += 10;
+  if (ma20 > ma60) score += 10;
+  
+  // 거래량 분석
+  if (volume > 1500000) score += 10;
+  else if (volume < 800000) score -= 10;
+  
+  // 가격 위치 분석
+  const pricePosition = (current - ma60) / ma60;
+  if (pricePosition > 0.1) score += 10;
+  else if (pricePosition < -0.1) score -= 10;
+  
+  return Math.max(0, Math.min(100, score));
+}
+
+// 펀더멘털 분석 점수 계산
+function calculateFundamentalScore(profit, revenue, marketCap) {
+  let score = 50; // 기본 점수
+  
+  // 수익성 분석
+  const profitMargin = profit / revenue;
+  if (profitMargin > 0.1) score += 20;
+  else if (profitMargin > 0.05) score += 10;
+  else if (profitMargin < 0) score -= 20;
+  
+  // 성장성 분석 (임시)
+  const growthRate = 0.1 + (marketCap % 100) / 1000; // 10-20% 성장률 가정
+  if (growthRate > 0.15) score += 15;
+  else if (growthRate > 0.1) score += 10;
+  
+  // 안정성 분석 (시가총액 기반)
+  if (marketCap > 50000000000000) score += 15; // 대형주
+  else if (marketCap > 10000000000000) score += 10; // 중형주
+  
+  return Math.max(0, Math.min(100, score));
+}
+
+// 추천 결정
+function getRecommendation(totalScore) {
+  if (totalScore >= 80) return '강력매수';
+  else if (totalScore >= 70) return '매수';
+  else if (totalScore >= 60) return '약한매수';
+  else if (totalScore >= 50) return '관망';
+  else if (totalScore >= 40) return '약한매도';
+  else if (totalScore >= 30) return '매도';
+  else return '강력매도';
+}
+
+// 테마별 종합 투자 분석
 function getThemeAnalysis(theme) {
   const stocks = getThemeStocks(theme);
   if (stocks.length === 0) {
@@ -210,21 +374,58 @@ function getThemeAnalysis(theme) {
       recommendation: '분석 불가',
       topStock: null,
       analysis: '해당 테마의 종목이 없습니다.',
+      technicalScore: 0,
+      fundamentalScore: 0,
+      volumeTrend: '보통',
+      marketCap: 0,
+      lastUpdate: new Date().toISOString(),
     };
   }
 
-  // 임시 분석 로직
-  const scores = stocks.map(stock => getMovingAverageAnalysis(stock.symbol));
-  const avgConfidence = scores.reduce((sum, s) => sum + s.confidence, 0) / scores.length;
+  // 각 종목의 종합 분석 수행
+  const analyses = stocks.map(stock => getComprehensiveAnalysis(stock.symbol));
+  
+  // 테마별 평균 점수 계산
+  const avgTechnicalScore = analyses.reduce((sum, a) => sum + a.technicalScore, 0) / analyses.length;
+  const avgFundamentalScore = analyses.reduce((sum, a) => sum + a.fundamentalScore, 0) / analyses.length;
+  const avgTotalScore = analyses.reduce((sum, a) => sum + a.totalScore, 0) / analyses.length;
+  
+  // 최고 종목 선정
+  const topStockAnalysis = analyses.reduce((a, b) => a.totalScore > b.totalScore ? a : b);
+  const topStock = stocks.find(s => s.symbol === topStockAnalysis.symbol);
+  
+  // 거래량 추세 분석
+  const volumeTrends = analyses.map(a => a.volumeTrend);
+  const volumeTrend = getMostCommonVolumeTrend(volumeTrends);
+  
+  // 시가총액 합계
+  const totalMarketCap = analyses.reduce((sum, a) => sum + a.marketCap, 0);
+  
+  // 추천 결정
+  const recommendation = getRecommendation(Math.round(avgTotalScore));
   
   return {
     theme: theme,
-    score: Math.round(avgConfidence),
-    recommendation: avgConfidence > 70 ? '매수' : avgConfidence > 50 ? '관망' : '매도',
-    topStock: stocks[0],
-    analysis: `이평선 분석 결과 ${Math.round(avgConfidence)}점으로 ${avgConfidence > 70 ? '투자 적합' : '투자 주의'}합니다.`,
+    score: Math.round(avgTotalScore),
+    recommendation: recommendation,
+    topStock: topStock,
+    analysis: `종합 분석 결과 ${Math.round(avgTotalScore)}점으로 ${avgTotalScore > 70 ? '투자 적합' : avgTotalScore > 50 ? '투자 주의' : '투자 위험'}합니다.`,
+    technicalScore: Math.round(avgTechnicalScore),
+    fundamentalScore: Math.round(avgFundamentalScore),
+    volumeTrend: volumeTrend,
+    marketCap: totalMarketCap,
+    stockCount: stocks.length,
     lastUpdate: new Date().toISOString(),
   };
+}
+
+// 가장 많은 거래량 추세 찾기
+function getMostCommonVolumeTrend(trends) {
+  const counts = {};
+  for (const trend of trends) {
+    counts[trend] = (counts[trend] || 0) + 1;
+  }
+  return Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
 }
 
 // 모든 테마 분석 결과 가져오기
