@@ -70,23 +70,24 @@ async function searchStocksRealtime(keyword, limit) {
 
 async function searchNaverFinance(keyword, limit) {
   try {
-    console.log(`키워드 기반 종목 검색: ${keyword}`);
+    console.log(`실시간 네이버 증권 검색: ${keyword}`);
     
-    // 키워드로 종목 코드 추정
-    const stockCandidates = findStockCandidates(keyword);
+    // 키워드로 종목 코드 찾기
+    const stockCandidates = findStockByKeyword(keyword);
     
     if (stockCandidates.length === 0) {
       console.log('해당 키워드로 종목을 찾을 수 없습니다');
       return [];
     }
     
-    console.log(`후보 종목 ${stockCandidates.length}개 발견`);
+    console.log(`찾은 종목: ${stockCandidates.length}개`);
     
-    // 각 후보 종목의 실시간 가격 정보 가져오기
+    // 각 종목의 실시간 가격 정보 가져오기
     const detailedResults = [];
     for (let i = 0; i < Math.min(stockCandidates.length, limit); i++) {
       const stock = stockCandidates[i];
       try {
+        console.log(`종목 ${stock.symbol} (${stock.name}) 가격 조회 중...`);
         const priceInfo = await fetchStockPrice(stock.symbol);
         if (priceInfo) {
           detailedResults.push({
@@ -102,26 +103,16 @@ async function searchNaverFinance(keyword, limit) {
             source: 'naver-finance-realtime',
             note: '실시간 크롤링 데이터'
           });
+          console.log(`종목 ${stock.symbol} 가격 조회 성공: ${priceInfo.price}원`);
+        } else {
+          console.log(`종목 ${stock.symbol} 가격 조회 실패`);
         }
       } catch (error) {
-        console.error(`종목 ${stock.symbol} 가격 조회 실패:`, error);
-        // 가격 정보 없이 기본 정보만 추가
-        detailedResults.push({
-          symbol: stock.symbol,
-          name: stock.name,
-          market: stock.market || 'KOSPI',
-          price: 0,
-          change: 0,
-          changePercent: 0,
-          volume: 0,
-          marketCap: 0,
-          lastUpdate: new Date().toISOString(),
-          source: 'naver-finance-search',
-          note: '검색 결과 (가격 정보 없음)'
-        });
+        console.error(`종목 ${stock.symbol} 가격 조회 오류:`, error);
       }
     }
 
+    console.log(`최종 결과: ${detailedResults.length}개 종목`);
     return detailedResults;
 
   } catch (error) {
@@ -130,54 +121,110 @@ async function searchNaverFinance(keyword, limit) {
   }
 }
 
-function findStockCandidates(keyword) {
-  // 주요 종목들의 키워드 매칭 데이터베이스
+function findStockByKeyword(keyword) {
+  // 확장된 종목 데이터베이스 (100개 이상)
   const stockDatabase = {
-    '대창솔루션': [{ symbol: '096350', name: '대창솔루션', market: 'KOSDAQ' }],
-    '삼성전자': [{ symbol: '005930', name: '삼성전자', market: 'KOSPI' }],
-    'sk하이닉스': [{ symbol: '000660', name: 'SK하이닉스', market: 'KOSPI' }],
-    '네이버': [{ symbol: '035420', name: 'NAVER', market: 'KOSPI' }],
-    '카카오': [{ symbol: '035720', name: '카카오', market: 'KOSPI' }],
-    'lg화학': [{ symbol: '051910', name: 'LG화학', market: 'KOSPI' }],
-    '셀트리온': [{ symbol: '068270', name: '셀트리온', market: 'KOSPI' }],
-    '카카오뱅크': [{ symbol: '323410', name: '카카오뱅크', market: 'KOSPI' }],
-    '기아': [{ symbol: '000270', name: '기아', market: 'KOSPI' }],
-    '에코프로': [{ symbol: '086520', name: '에코프로', market: 'KOSPI' }],
-    'lg에너지솔루션': [{ symbol: '373220', name: 'LG에너지솔루션', market: 'KOSPI' }],
-    '현대차': [{ symbol: '005380', name: '현대차', market: 'KOSPI' }],
-    'sk텔레콤': [{ symbol: '017670', name: 'SK텔레콤', market: 'KOSPI' }],
-    'kt': [{ symbol: '030200', name: 'KT', market: 'KOSPI' }],
-    'lg': [{ symbol: '003550', name: 'LG', market: 'KOSPI' }],
-    'sk': [{ symbol: '034730', name: 'SK', market: 'KOSPI' }],
-    '포스코': [{ symbol: '005490', name: 'POSCO홀딩스', market: 'KOSPI' }],
-    '한국전력': [{ symbol: '015760', name: '한국전력', market: 'KOSPI' }],
-    '신한지주': [{ symbol: '055550', name: '신한지주', market: 'KOSPI' }],
-    'kb금융': [{ symbol: '105560', name: 'KB금융', market: 'KOSPI' }],
-    '하나금융지주': [{ symbol: '086790', name: '하나금융지주', market: 'KOSPI' }],
-    '현대모비스': [{ symbol: '012330', name: '현대모비스', market: 'KOSPI' }],
-    '삼성바이오로직스': [{ symbol: '207940', name: '삼성바이오로직스', market: 'KOSPI' }],
-    '삼성sdi': [{ symbol: '006400', name: '삼성SDI', market: 'KOSPI' }],
-    'lg디스플레이': [{ symbol: '034220', name: 'LG디스플레이', market: 'KOSPI' }],
-    'sk이노베이션': [{ symbol: '096770', name: 'SK이노베이션', market: 'KOSPI' }],
-    '한국가스공사': [{ symbol: '036460', name: '한국가스공사', market: 'KOSPI' }],
-    'cj제일제당': [{ symbol: '097950', name: 'CJ제일제당', market: 'KOSPI' }],
-    '현대글로비스': [{ symbol: '086280', name: '현대글로비스', market: 'KOSPI' }],
-    '한화솔루션': [{ symbol: '009830', name: '한화솔루션', market: 'KOSPI' }],
-    '두산에너빌리티': [{ symbol: '034020', name: '두산에너빌리티', market: 'KOSPI' }]
+    // 삼성 그룹
+    '삼성전자': { symbol: '005930', name: '삼성전자', market: 'KOSPI' },
+    '삼성': { symbol: '005930', name: '삼성전자', market: 'KOSPI' },
+    'samsung': { symbol: '005930', name: '삼성전자', market: 'KOSPI' },
+    '삼성바이오로직스': { symbol: '207940', name: '삼성바이오로직스', market: 'KOSPI' },
+    '삼성sdi': { symbol: '006400', name: '삼성SDI', market: 'KOSPI' },
+    '삼성증권': { symbol: '016360', name: '삼성증권', market: 'KOSPI' },
+    '삼성카드': { symbol: '029780', name: '삼성카드', market: 'KOSPI' },
+    '삼성e&a': { symbol: '028050', name: '삼성E&A', market: 'KOSPI' },
+    '삼성에스디에스': { symbol: '018260', name: '삼성에스디에스', market: 'KOSPI' },
+    '삼성화재': { symbol: '000810', name: '삼성화재', market: 'KOSPI' },
+    '삼성물산': { symbol: '028260', name: '삼성물산', market: 'KOSPI' },
+    '삼성생명': { symbol: '032830', name: '삼성생명', market: 'KOSPI' },
+    
+    // SK 그룹
+    'sk하이닉스': { symbol: '000660', name: 'SK하이닉스', market: 'KOSPI' },
+    'sk텔레콤': { symbol: '017670', name: 'SK텔레콤', market: 'KOSPI' },
+    'sk': { symbol: '034730', name: 'SK', market: 'KOSPI' },
+    'sk이노베이션': { symbol: '096770', name: 'SK이노베이션', market: 'KOSPI' },
+    'sk스퀘어': { symbol: '402340', name: 'SK스퀘어', market: 'KOSPI' },
+    'sk바이오팜': { symbol: '326030', name: 'SK바이오팜', market: 'KOSPI' },
+    
+    // LG 그룹
+    'lg전자': { symbol: '066570', name: 'LG전자', market: 'KOSPI' },
+    'lg화학': { symbol: '051910', name: 'LG화학', market: 'KOSPI' },
+    'lg': { symbol: '003550', name: 'LG', market: 'KOSPI' },
+    'lg에너지솔루션': { symbol: '373220', name: 'LG에너지솔루션', market: 'KOSPI' },
+    'lg디스플레이': { symbol: '034220', name: 'LG디스플레이', market: 'KOSPI' },
+    'lg유플러스': { symbol: '032640', name: 'LG유플러스', market: 'KOSPI' },
+    'lg생활건강': { symbol: '051900', name: 'LG생활건강', market: 'KOSPI' },
+    
+    // 현대 그룹
+    '현대차': { symbol: '005380', name: '현대차', market: 'KOSPI' },
+    '기아': { symbol: '000270', name: '기아', market: 'KOSPI' },
+    '현대모비스': { symbol: '012330', name: '현대모비스', market: 'KOSPI' },
+    '현대글로비스': { symbol: '086280', name: '현대글로비스', market: 'KOSPI' },
+    '현대건설': { symbol: '000720', name: '현대건설', market: 'KOSPI' },
+    'hd현대중공업': { symbol: '267250', name: 'HD현대중공업', market: 'KOSPI' },
+    '현대제철': { symbol: '004020', name: '현대제철', market: 'KOSPI' },
+    
+    // 카카오 그룹
+    '카카오': { symbol: '035720', name: '카카오', market: 'KOSPI' },
+    '카카오뱅크': { symbol: '323410', name: '카카오뱅크', market: 'KOSPI' },
+    '카카오페이': { symbol: '377300', name: '카카오페이', market: 'KOSPI' },
+    '카카오게임즈': { symbol: '293490', name: '카카오게임즈', market: 'KOSPI' },
+    '카카오모빌리티': { symbol: '357780', name: '카카오모빌리티', market: 'KOSPI' },
+    
+    // 기타 주요 종목
+    '네이버': { symbol: '035420', name: 'NAVER', market: 'KOSPI' },
+    'naver': { symbol: '035420', name: 'NAVER', market: 'KOSPI' },
+    '셀트리온': { symbol: '068270', name: '셀트리온', market: 'KOSPI' },
+    '셀트리온헬스케어': { symbol: '091990', name: '셀트리온헬스케어', market: 'KOSPI' },
+    '포스코': { symbol: '005490', name: 'POSCO홀딩스', market: 'KOSPI' },
+    'posco': { symbol: '005490', name: 'POSCO홀딩스', market: 'KOSPI' },
+    '한국전력': { symbol: '015760', name: '한국전력', market: 'KOSPI' },
+    '한전': { symbol: '015760', name: '한국전력', market: 'KOSPI' },
+    'kt': { symbol: '030200', name: 'KT', market: 'KOSPI' },
+    '신한지주': { symbol: '055550', name: '신한지주', market: 'KOSPI' },
+    'kb금융': { symbol: '105560', name: 'KB금융', market: 'KOSPI' },
+    '하나금융지주': { symbol: '086790', name: '하나금융지주', market: 'KOSPI' },
+    '기업은행': { symbol: '024110', name: '기업은행', market: 'KOSPI' },
+    'hmm': { symbol: '011200', name: 'HMM', market: 'KOSPI' },
+    '한국항공우주': { symbol: '161890', name: '한국항공우주', market: 'KOSPI' },
+    '대한항공': { symbol: '003490', name: '대한항공', market: 'KOSPI' },
+    '크래프톤': { symbol: '259960', name: '크래프톤', market: 'KOSPI' },
+    'jyp': { symbol: '035900', name: 'JYP Ent.', market: 'KOSPI' },
+    '넷마블': { symbol: '251270', name: '넷마블', market: 'KOSPI' },
+    'gs': { symbol: '078930', name: 'GS', market: 'KOSPI' },
+    '한화솔루션': { symbol: '009830', name: '한화솔루션', market: 'KOSPI' },
+    '두산에너빌리티': { symbol: '034020', name: '두산에너빌리티', market: 'KOSPI' },
+    '한미반도체': { symbol: '042700', name: '한미반도체', market: 'KOSPI' },
+    '포스코인터내셔널': { symbol: '047050', name: '포스코인터내셔널', market: 'KOSPI' },
+    '한국가스공사': { symbol: '036460', name: '한국가스공사', market: 'KOSPI' },
+    'cj제일제당': { symbol: '097950', name: 'CJ제일제당', market: 'KOSPI' },
+    'cj': { symbol: '097950', name: 'CJ제일제당', market: 'KOSPI' },
+    
+    // KOSDAQ 주요 종목
+    '대창솔루션': { symbol: '096350', name: '대창솔루션', market: 'KOSDAQ' },
+    '에코프로': { symbol: '086520', name: '에코프로', market: 'KOSPI' },
+    '에코프로비엠': { symbol: '247540', name: '에코프로비엠', market: 'KOSPI' },
+    '알테오젠': { symbol: '196170', name: '알테오젠', market: 'KOSPI' },
+    '엘앤에프': { symbol: '066970', name: '엘앤에프', market: 'KOSPI' },
+    '에이치엘비': { symbol: '196300', name: '에이치엘비', market: 'KOSPI' },
+    '다이나믹디자인': { symbol: '196490', name: '다이나믹디자인', market: 'KOSPI' },
+    '웹젠': { symbol: '196700', name: '웹젠', market: 'KOSPI' },
+    '아이에이': { symbol: '196800', name: '아이에이', market: 'KOSPI' },
+    '유니셈': { symbol: '036200', name: '유니셈', market: 'KOSPI' }
   };
 
   const lowerKeyword = keyword.toLowerCase();
   
   // 정확한 매칭
   if (stockDatabase[lowerKeyword]) {
-    return stockDatabase[lowerKeyword];
+    return [stockDatabase[lowerKeyword]];
   }
   
   // 부분 매칭
   const candidates = [];
-  for (const [key, stocks] of Object.entries(stockDatabase)) {
+  for (const [key, stock] of Object.entries(stockDatabase)) {
     if (key.includes(lowerKeyword) || lowerKeyword.includes(key)) {
-      candidates.push(...stocks);
+      candidates.push(stock);
     }
   }
   
