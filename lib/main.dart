@@ -1,7 +1,5 @@
 // 📄 lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:stockwiki/services/fmp_service.dart';
-import 'package:stockwiki/services/krx_loader.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
 import 'package:stockwiki/widgets/usdkrw_widget.dart';
 import 'package:stockwiki/widgets/gold_widget.dart';
@@ -9,13 +7,9 @@ import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
 import 'package:stockwiki/pages/interest_news_page.dart';
-import 'package:stockwiki/pages/us_stock_detail_page.dart';
 import 'package:stockwiki/pages/us_stock_search_page.dart';
-import 'package:stockwiki/pages/keyword_search_page.dart';
 import 'package:stockwiki/pages/ai_stock_recommend_page.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
-import 'package:stockwiki/widgets/stock_card.dart';
-import 'package:stockwiki/models/stock.dart';
 
 void main() {
   // 캐시 무효화를 위한 설정
@@ -49,83 +43,12 @@ class StockSearchPage extends StatefulWidget {
 }
 
 class _StockSearchPageState extends State<StockSearchPage> {
-  final TextEditingController _controller = TextEditingController();
-  List<String> _results = [];
-  List<Map<String, dynamic>> _krResults = [];
-  List<Stock> _usStocks = []; // 미국 주식 객체 저장용
-  bool _isLoading = false;
-  String _marketType = 'us';
   bool _showWidgets = true;
 
   void _refresh() {
     setState(() {
-      _controller.clear();
-      _results.clear();
-      _krResults.clear();
-      _usStocks.clear();
-      _isLoading = false;
       _showWidgets = true;
     });
-  }
-
-  String? _validateKeyword(String keyword) {
-    final trimmed = keyword.trim();
-    
-    // 빈 검색어만 체크, 나머지는 모두 허용
-    if (trimmed.isEmpty) {
-      return '검색어를 입력해주세요';
-    }
-    
-    return null; // 모든 검색어 허용
-  }
-
-  void _searchStocks() async {
-    final keyword = _controller.text.trim();
-    if (keyword.isEmpty) return;
-
-    final validationMessage = _validateKeyword(keyword);
-    if (validationMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(validationMessage)),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _results.clear();
-      _krResults.clear();
-      _usStocks.clear();
-      _showWidgets = false;
-    });
-
-    try {
-      if (_marketType == 'us') {
-        final stocks = await FMPService.fetchStocks(keyword);
-        setState(() {
-          _usStocks = stocks;
-          _results = stocks.map((s) => '${s.name} (${s.symbol}) - \$${s.price}').toList();
-        });
-      } else {
-        // 한국 주식 검색 기능은 현재 비활성화됨
-        setState(() {
-          _krResults = [];
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('한국 주식 검색 기능은 현재 테마별 추천 시스템으로 대체되었습니다.')),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _results = ['오류 발생: $e'];
-        _krResults = [];
-        _usStocks = [];
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
   Widget _infoRow(String title, String value) {
@@ -223,6 +146,16 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       );
                     },
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.search, color: Colors.white),
+                    title: const Text("미국 주식 검색", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const UsStockSearchPage()),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -242,47 +175,9 @@ class _StockSearchPageState extends State<StockSearchPage> {
               ),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("종류: ", style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 10),
-                DropdownButton<String>(
-                  value: _marketType,
-                  items: const [
-                    DropdownMenuItem(value: 'us', child: Text('미국주식')),
-                    DropdownMenuItem(value: 'kr', child: Text('국내주식')),
-                  ],
-                  onChanged: (value) => setState(() => _marketType = value!),
-                ),
-              ],
-            ),
             const SizedBox(height: 20),
-            TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: 'Search keyword',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onSubmitted: (_) => _searchStocks(),
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _searchStocks,
-                    icon: const Icon(Icons.search),
-                    label: const Text('검색'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[600],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -291,11 +186,11 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       );
                     },
                     icon: const Icon(Icons.trending_up),
-                    label: const Text('추천 종목'),
+                    label: const Text('테마별 추천 종목'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green[600],
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
                 ),
@@ -330,79 +225,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
                 ],
               ),
             ],
-            const SizedBox(height: 20),
-            
-            if (_isLoading)
-              const CircularProgressIndicator()
-            else
-              Expanded(
-                child: _marketType == 'us'
-                    ? _usStocks.isEmpty
-                        ? const Text('')
-                        : ListView.builder(
-                            itemCount: _usStocks.length,
-                            itemBuilder: (context, index) {
-                              final stock = _usStocks[index];
-                              return Card(
-                                color: Colors.grey[800],
-                                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                child: ListTile(
-                                  title: Text(
-                                    stock.name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    '${stock.symbol} - \$${stock.price?.toStringAsFixed(2) ?? 'N/A'}',
-                                    style: TextStyle(color: Colors.grey[300]),
-                                  ),
-                                  trailing: stock.changePercent != null
-                                      ? Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
-                                              style: TextStyle(
-                                                color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Icon(
-                                              stock.changePercent! >= 0 ? Icons.trending_up : Icons.trending_down,
-                                              color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
-                                              size: 16,
-                                            ),
-                                          ],
-                                        )
-                                      : null,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => UsStockDetailPage(stock: stock),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          )
-                    : _krResults.isEmpty
-                        ? const Text('')
-                        : ListView.builder(
-                            itemCount: _krResults.length,
-                            itemBuilder: (context, index) {
-                              final stock = _krResults[index];
-                              // StockCard 위젯을 사용하여 차트 포함
-                              return StockCard(
-                                stock: Stock.fromKrxData(stock),
-                              );
-                            },
-                          ),
-              ),
           ],
         ),
       ),
