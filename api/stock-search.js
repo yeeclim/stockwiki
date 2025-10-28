@@ -56,71 +56,14 @@ async function searchStocksRealtime(keyword, limit) {
   try {
     console.log(`실시간 종목 검색 시작: ${keyword}`);
     
-    // 간단한 실시간 검색 (네이버 증권 크롤링)
-    const results = [];
+    // 하드코딩 완전 제거 - 진짜 실시간 검색만 사용
+    console.log('하드코딩 제거됨 - 실시간 검색 시도');
     
-    // 대창솔루션 검색
-    if (keyword.includes('대창솔루션') || keyword.includes('대창') || keyword.includes('솔루션')) {
-      const priceInfo = await fetchStockPrice('096350');
-      if (priceInfo) {
-        results.push({
-          symbol: '096350',
-          name: '대창솔루션',
-          market: 'KOSDAQ',
-          price: priceInfo.price,
-          change: priceInfo.change || 0,
-          changePercent: priceInfo.changePercent || 0,
-          volume: priceInfo.volume || 0,
-          marketCap: priceInfo.marketCap || 0,
-          lastUpdate: new Date().toISOString(),
-          source: 'naver-realtime',
-          note: '실시간 크롤링 데이터'
-        });
-      }
-    }
+    // 네이버 증권에서 실시간 검색 시도
+    const searchResults = await searchNaverFinance(keyword, limit);
     
-    // 삼성전자 검색
-    if (keyword.includes('삼성전자') || keyword.includes('삼성') || keyword.includes('samsung')) {
-      const priceInfo = await fetchStockPrice('005930');
-      if (priceInfo) {
-        results.push({
-          symbol: '005930',
-          name: '삼성전자',
-          market: 'KOSPI',
-          price: priceInfo.price,
-          change: priceInfo.change || 0,
-          changePercent: priceInfo.changePercent || 0,
-          volume: priceInfo.volume || 0,
-          marketCap: priceInfo.marketCap || 0,
-          lastUpdate: new Date().toISOString(),
-          source: 'naver-realtime',
-          note: '실시간 크롤링 데이터'
-        });
-      }
-    }
-    
-    // SK하이닉스 검색
-    if (keyword.includes('SK하이닉스') || keyword.includes('하이닉스') || keyword.includes('sk')) {
-      const priceInfo = await fetchStockPrice('000660');
-      if (priceInfo) {
-        results.push({
-          symbol: '000660',
-          name: 'SK하이닉스',
-          market: 'KOSPI',
-          price: priceInfo.price,
-          change: priceInfo.change || 0,
-          changePercent: priceInfo.changePercent || 0,
-          volume: priceInfo.volume || 0,
-          marketCap: priceInfo.marketCap || 0,
-          lastUpdate: new Date().toISOString(),
-          source: 'naver-realtime',
-          note: '실시간 크롤링 데이터'
-        });
-      }
-    }
-    
-    console.log(`실시간 검색 결과: ${results.length}개`);
-    return results.slice(0, limit);
+    console.log(`실시간 검색 결과: ${searchResults.length}개`);
+    return searchResults;
 
   } catch (error) {
     console.error('실시간 종목 검색 오류:', error);
