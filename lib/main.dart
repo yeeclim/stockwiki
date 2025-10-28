@@ -13,6 +13,7 @@ import 'package:stockwiki/pages/us_stock_detail_page.dart';
 import 'package:stockwiki/pages/us_stock_search_page.dart';
 import 'package:stockwiki/pages/keyword_search_page.dart';
 import 'package:stockwiki/pages/ai_stock_recommend_page.dart';
+import 'package:stockwiki/pages/theme_recommendations_page.dart';
 import 'package:stockwiki/widgets/stock_card.dart';
 import 'package:stockwiki/models/stock.dart';
 
@@ -209,6 +210,16 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       );
                     },
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.trending_up, color: Colors.white),
+                    title: const Text("테마별 추천 종목", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ThemeRecommendationsPage()),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -252,6 +263,40 @@ class _StockSearchPageState extends State<StockSearchPage> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onSubmitted: (_) => _searchStocks(),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _searchStocks,
+                    icon: const Icon(Icons.search),
+                    label: const Text('검색'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ThemeRecommendationsPage()),
+                      );
+                    },
+                    icon: const Icon(Icons.trending_up),
+                    label: const Text('추천 종목'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             if (_showWidgets) ...[
