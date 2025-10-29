@@ -465,18 +465,50 @@ function getMostCommonVolumeTrend(trends) {
   return Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
 }
 
+// 특정 종목이 속한 테마들 찾기
+function getStockThemes(symbol) {
+  const themes = [];
+  for (const theme in themeStocks) {
+    const stocks = themeStocks[theme];
+    if (stocks.some(stock => stock.symbol === symbol)) {
+      themes.push(theme);
+    }
+  }
+  return themes;
+}
+
 // 모든 테마 분석 결과 가져오기
 function getAllThemeAnalysis() {
   return getThemes().map(theme => getThemeAnalysis(theme));
 }
 
-// 전체 추천 종목 랭킹 (모든 테마 통합)
+// 전체 추천 종목 랭킹 (모든 테마 통합, 중복 제거)
 function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
   const allStocks = getAllRecommendedStocks();
-  const analyses = allStocks.map(stock => ({
-    ...stock,
-    ...getComprehensiveAnalysis(stock.symbol)
-  }));
+  
+  // 중복 제거: 같은 symbol을 가진 종목 중 가장 높은 점수를 가진 것만 선택
+  const uniqueStocks = {};
+  
+  for (const stock of allStocks) {
+    const symbol = stock.symbol;
+    const analysis = getComprehensiveAnalysis(symbol);
+    const combinedStock = {
+      ...stock,
+      ...analysis
+    };
+    
+    // 해당 symbol이 없거나, 현재 종목의 점수가 더 높으면 업데이트
+    if (!uniqueStocks[symbol] || 
+        combinedStock.totalScore > uniqueStocks[symbol].totalScore) {
+      // 해당 종목이 속한 모든 테마 정보 추가
+      const themes = getStockThemes(symbol);
+      combinedStock.themes = themes;
+      combinedStock.themeCount = themes.length;
+      uniqueStocks[symbol] = combinedStock;
+    }
+  }
+  
+  const analyses = Object.values(uniqueStocks);
   
   // 정렬
   analyses.sort((a, b) => {
