@@ -307,21 +307,50 @@ class KrxLoader {
     return counts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
 
+  // 특정 종목이 속한 테마들 찾기
+  static List<String> _getStockThemes(String symbol) {
+    final themes = <String>[];
+    for (final theme in _themeStocks.keys) {
+      final stocks = _themeStocks[theme]!;
+      if (stocks.any((stock) => stock['symbol'] == symbol)) {
+        themes.add(theme);
+      }
+    }
+    return themes;
+  }
+
   // 모든 테마 분석 결과 가져오기
   static List<Map<String, dynamic>> getAllThemeAnalysis() {
     return getThemes().map((theme) => getThemeAnalysis(theme)).toList();
   }
 
-  // 전체 추천 종목 랭킹 (모든 테마 통합)
+  // 전체 추천 종목 랭킹 (모든 테마 통합, 중복 제거)
   static List<Map<String, dynamic>> getTopRecommendations({int limit = 10, String sortBy = 'totalScore'}) {
     final allStocks = getAllRecommendedStocks();
-    final analyses = allStocks.map((stock) {
-      final analysis = getComprehensiveAnalysis(stock['symbol']);
-      return {
+    
+    // 중복 제거: 같은 symbol을 가진 종목 중 가장 높은 점수를 가진 것만 선택
+    final Map<String, Map<String, dynamic>> uniqueStocks = {};
+    
+    for (final stock in allStocks) {
+      final symbol = stock['symbol'] as String;
+      final analysis = getComprehensiveAnalysis(symbol);
+      final combinedStock = {
         ...stock,
         ...analysis,
       };
-          }).toList();
+      
+      // 해당 symbol이 없거나, 현재 종목의 점수가 더 높으면 업데이트
+      if (!uniqueStocks.containsKey(symbol) || 
+          (combinedStock['totalScore'] as int) > (uniqueStocks[symbol]!['totalScore'] as int)) {
+        // 해당 종목이 속한 모든 테마 정보 추가
+        final themes = _getStockThemes(symbol);
+        combinedStock['themes'] = themes;
+        combinedStock['themeCount'] = themes.length;
+        uniqueStocks[symbol] = combinedStock;
+      }
+    }
+    
+    final analyses = uniqueStocks.values.toList();
           
     // 정렬
     analyses.sort((a, b) {

@@ -414,11 +414,37 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          '${stock['symbol']} • ${stock['sector']}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                      Text(
+                        '${stock['symbol']} • ${stock['sector']}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (stock['themes'] != null && (stock['themes'] as List).isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
+                            children: (stock['themes'] as List<String>).take(3).map((theme) => 
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue[300]!),
+                                ),
+                                child: Text(
+                                  theme,
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    color: Colors.blue[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ).toList(),
                           ),
                         ),
                       ],
