@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/krx_loader.dart';
 import '../widgets/stock_card.dart';
 import '../models/stock.dart';
@@ -75,9 +76,39 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   }
 
   void _navigateToStockDetail(String symbol) {
-    // 인베스팅 주식종합 정보 페이지로 네비게이션
-    // TODO: 실제 주식 상세 페이지로 네비게이션 구현
-    print('주식 상세 페이지로 이동: $symbol');
+    // Yahoo Finance 한국 주식 페이지로 이동
+    String yahooUrl;
+    
+    // KOSPI는 .KS, KOSDAQ은 .KQ 형식 사용
+    if (symbol.length == 6) {
+      // KOSPI는 보통 000000~099999, KOSDAQ은 100000~999999 범위
+      int code = int.tryParse(symbol) ?? 0;
+      if (code < 100000) {
+        // KOSPI (000000~099999)
+        yahooUrl = 'https://finance.yahoo.com/quote/$symbol.KS';
+      } else {
+        // KOSDAQ (100000~999999)
+        yahooUrl = 'https://finance.yahoo.com/quote/$symbol.KQ';
+      }
+    } else {
+      yahooUrl = 'https://finance.yahoo.com/quote/$symbol';
+    }
+    
+    // URL 열기
+    _launchURL(yahooUrl);
+  }
+
+  void _launchURL(String url) async {
+    try {
+      // url_launcher 패키지 사용
+      if (await canLaunch(url)) {
+        await launch(url);
+      } else {
+        print('URL을 열 수 없습니다: $url');
+      }
+    } catch (e) {
+      print('URL 실행 오류: $e');
+    }
   }
 
   String _getRecommendationReason(Map<String, dynamic> stock, String theme) {
@@ -141,6 +172,10 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     final technicalScore = stock['technicalScore'] as int;
     final fundamentalScore = stock['fundamentalScore'] as int;
     final marketCap = stock['marketCap'] as int;
+    final symbol = stock['symbol'] as String;
+    
+    // 종목별 고유성을 위해 symbol 해시값 사용
+    final symbolHash = symbol.hashCode.abs();
     
     // 점수와 시가총액을 종합하여 보유 기간 결정
     int baseMonths = 3;
@@ -162,20 +197,43 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
       baseMonths = (baseMonths * 1.5).round();
     }
     
-    // 테마별 조정
+    // 테마별 조정 (실제 테마명 사용)
     switch (theme) {
       case 'AI':
-      case '반도체':
+        baseMonths = (baseMonths * 1.2).round(); // 장기 성장 테마
+        break;
+      case '반도체장비':
         baseMonths = (baseMonths * 1.2).round(); // 장기 성장 테마
         break;
       case '바이오':
         baseMonths = (baseMonths * 1.5).round(); // 매우 장기적
         break;
-      case '배터리':
-      case '로봇':
+      case '2차전지':
         baseMonths = (baseMonths * 1.1).round(); // 중장기
         break;
+      case '전기차':
+        baseMonths = (baseMonths * 1.1).round(); // 중장기
+        break;
+      case '수소차':
+        baseMonths = (baseMonths * 1.1).round(); // 중장기
+        break;
+      case '자동차부품':
+        baseMonths = (baseMonths * 1.0).round(); // 단기
+        break;
+      case '의료기기':
+        baseMonths = (baseMonths * 1.3).round(); // 장기
+        break;
+      case '방산주':
+        baseMonths = (baseMonths * 1.4).round(); // 매우 장기
+        break;
+      case '밸류업':
+        baseMonths = (baseMonths * 1.0).round(); // 단기
+        break;
     }
+    
+    // 종목별 고유성 추가 (symbol 해시값 기반)
+    final variation = (symbolHash % 6) - 2; // -2 ~ +3 개월 변동
+    baseMonths = (baseMonths + variation).clamp(1, 24); // 1~24개월 범위
     
     return '${baseMonths}개월';
   }
@@ -193,8 +251,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           isScrollable: true,
           tabAlignment: TabAlignment.start,
           indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: const TextStyle(fontSize: 10),
+          labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontSize: 13),
           tabs: [
             const Tab(text: '전체'),
             const Tab(text: '안전'),
@@ -331,11 +389,19 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
-        label: Text(label),
+        label: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.blue[800] : Colors.grey[700],
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
         selected: isSelected,
         onSelected: (selected) => _onSortChanged(value),
         selectedColor: Colors.blue[100],
         checkmarkColor: Colors.blue[800],
+        backgroundColor: Colors.grey[200],
+        disabledColor: Colors.grey[200],
       ),
     );
   }
