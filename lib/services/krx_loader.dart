@@ -15,9 +15,9 @@ class KrxLoader {
     '반도체장비': [
       {'symbol': '000660', 'name': 'SK하이닉스', 'sector': '반도체장비', 'marketCap': 55000000000000, 'description': '메모리 반도체'},
       {'symbol': '005930', 'name': '삼성전자', 'sector': '반도체장비', 'marketCap': 45000000000000, 'description': '시스템 반도체'},
-      {'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '반도체장비', 'marketCap': 42000000000000, 'description': '반도체 장비'},
-      {'symbol': '051910', 'name': 'LG화학', 'sector': '반도체장비', 'marketCap': 18000000000000, 'description': '반도체 소재'},
-      {'symbol': '006400', 'name': '삼성SDI', 'sector': '반도체장비', 'marketCap': 15000000000000, 'description': '반도체 소재'},
+      {'symbol': '240810', 'name': '원익IPS', 'sector': '반도체장비', 'marketCap': 8000000000000, 'description': '반도체 장비'},
+      {'symbol': '095610', 'name': '테스', 'sector': '반도체장비', 'marketCap': 5000000000000, 'description': '반도체 테스트 장비'},
+      {'symbol': '042700', 'name': '한미반도체', 'sector': '반도체장비', 'marketCap': 9000000000000, 'description': '반도체 장비'},
     ],
     '전기차': [
       {'symbol': '000270', 'name': '기아', 'sector': '전기차', 'marketCap': 35000000000000, 'description': '전기차 제조'},
@@ -36,9 +36,9 @@ class KrxLoader {
     'AI': [
       {'symbol': '005930', 'name': '삼성전자', 'sector': 'AI', 'marketCap': 45000000000000, 'description': 'AI 반도체'},
       {'symbol': '000660', 'name': 'SK하이닉스', 'sector': 'AI', 'marketCap': 42000000000000, 'description': 'AI 메모리'},
-      {'symbol': '207940', 'name': '삼성바이오로직스', 'sector': 'AI', 'marketCap': 38000000000000, 'description': 'AI 의료'},
-      {'symbol': '051910', 'name': 'LG화학', 'sector': 'AI', 'marketCap': 18000000000000, 'description': 'AI 소재'},
-      {'symbol': '006400', 'name': '삼성SDI', 'sector': 'AI', 'marketCap': 15000000000000, 'description': 'AI 시스템'},
+      {'symbol': '035420', 'name': 'NAVER', 'sector': 'AI', 'marketCap': 30000000000000, 'description': 'AI 플랫폼 및 서비스'},
+      {'symbol': '035720', 'name': '카카오', 'sector': 'AI', 'marketCap': 25000000000000, 'description': 'AI 플랫폼 및 서비스'},
+      {'symbol': '036570', 'name': '엔씨소프트', 'sector': 'AI', 'marketCap': 8000000000000, 'description': 'AI 게임 및 엔터테인먼트'},
     ],
     '바이오': [
       {'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '바이오', 'marketCap': 42000000000000, 'description': '바이오 의약품'},
