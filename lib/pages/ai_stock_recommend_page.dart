@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 
 class AiStockRecommendPage extends StatefulWidget {
   const AiStockRecommendPage({super.key});
@@ -14,20 +15,39 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   List<StockRecommendation> _recommendations = [];
   bool _isLoading = true;
   String? _error;
-
-  // 더미 데이터 완전 제거 - 실시간 API 데이터만 사용
+  DateTime? _lastUpdated;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadRecommendations();
+    // 1분마다 자동 갱신
+    _startAutoRefresh();
   }
 
-  Future<void> _loadRecommendations() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        _loadRecommendations(silent: true);
+      }
     });
+  }
+
+  Future<void> _loadRecommendations({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     // 환경 구분 및 로깅
     final baseUrl = Uri.base.origin;
@@ -50,11 +70,12 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     try {
       print('🚀 운영 환경에서 API 호출 시작');
       // 실제 API 데이터만 사용
-      final recommendations = await _fetchFromAPI();
+      final result = await _fetchFromAPI();
       
-      print('✅ API 호출 성공: ${recommendations.length}개 추천 받음');
+      print('✅ API 호출 성공: ${result.recommendations.length}개 추천 받음');
       setState(() {
-        _recommendations = recommendations;
+        _recommendations = result.recommendations;
+        _lastUpdated = result.lastUpdated;
         _isLoading = false;
       });
     } catch (e) {
@@ -63,18 +84,20 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       print('🔍 에러 타입: ${e.runtimeType}');
       print('📋 에러 상세: ${e.toString()}');
       
-      setState(() {
-        _recommendations = [];
-        _isLoading = false;
-        _error = 'AI 추천 서비스를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.';
-      });
+      if (!silent) {
+        setState(() {
+          _recommendations = [];
+          _isLoading = false;
+          _error = 'AI 추천 서비스를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.';
+        });
+      }
     }
   }
 
 
   Future<int?> _getRealTimePrice(String symbol) async {
     try {
-      // 네이버 증권에서 실시간 주가 크롤링 시도
+      // 네이버 증권에서 최신 주가 크롤링 시도
       final baseUrl = Uri.base.origin;
       final url = '$baseUrl/api/naver-stock?symbol=$symbol';
       
@@ -90,17 +113,17 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           final price = data['data']['price'] as int?;
-          print('📊 $symbol 실시간 주가: ₩${price?.toString() ?? 'N/A'}');
+          print('📊 $symbol 최신 주가: ₩${price?.toString() ?? 'N/A'}');
           return price;
         }
       }
     } catch (e) {
-      print('⚠️ $symbol 실시간 주가 조회 실패: $e');
+      print('⚠️ $symbol 최신 주가 조회 실패: $e');
     }
     return null;
   }
 
-  Future<List<StockRecommendation>> _fetchFromAPI() async {
+  Future<({List<StockRecommendation> recommendations, DateTime? lastUpdated})> _fetchFromAPI() async {
     // 실제 API 호출 (새로고침 플래그 포함)
     final baseUrl = Uri.base.origin;
     final url = '$baseUrl/api/ai_recommend_list?limit=20&refresh=true';
@@ -167,7 +190,17 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
         print('⚠️ 추천 데이터가 비어있음');
       }
       
-      return results.map((item) => StockRecommendation(
+      // 마지막 업데이트 시간 파싱
+      DateTime? lastUpdated;
+      if (data['lastUpdated'] != null) {
+        try {
+          lastUpdated = DateTime.parse(data['lastUpdated']);
+        } catch (e) {
+          print('⚠️ lastUpdated 파싱 실패: $e');
+        }
+      }
+      
+      final recommendations = results.map((item) => StockRecommendation(
         stockName: item['stockName'] ?? '',
         stockCode: item['stockCode'] ?? '',
         currentPrice: item['currentPrice'] ?? 0, // null이면 0으로 처리
@@ -209,6 +242,8 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
             : null,
       )).toList();
       
+      return (recommendations: recommendations, lastUpdated: lastUpdated);
+      
     } catch (e) {
       print('❌ API 호출 중 예외 발생: $e');
       print('🔍 예외 타입: ${e.runtimeType}');
@@ -223,7 +258,21 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.grey[900],
-        title: const Text('🤖 AI 종목 추천', style: TextStyle(color: Colors.white)),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('🤖 AI 종목 추천', style: TextStyle(color: Colors.white)),
+            if (_lastUpdated != null)
+              Text(
+                '마지막 업데이트: ${_formatLastUpdated(_lastUpdated!)}',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 11,
+                ),
+              ),
+          ],
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
@@ -279,14 +328,14 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
             Text(
               isLocalDev 
                 ? 'AI 추천 서비스는 운영서버에서만 지원됩니다'
-                : '실시간 데이터를 불러오는 중입니다',
+                : '최신 데이터를 불러오는 중입니다',
               style: const TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 8),
             Text(
               isLocalDev
-                ? '실제 서비스에서는 실시간 주가 데이터를 기반으로 한\nAI 종목 추천을 제공합니다'
-                : '실제 주가 데이터를 기반으로 한 AI 추천이 곧 표시됩니다',
+                ? '실제 서비스에서는 최신 주가 데이터를 기반으로 한\nAI 종목 추천을 제공합니다'
+                : '최신 주가 데이터를 기반으로 한 AI 추천이 곧 표시됩니다',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -440,7 +489,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '실시간 데이터 없음',
+                          '최신 데이터 없음',
                           style: TextStyle(
                             color: Colors.orange[400],
                             fontSize: 13,
@@ -839,6 +888,21 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       return '${difference.inDays}일 전';
     } else {
       return '${dateTime.month}월 ${dateTime.day}일';
+    }
+  }
+
+  String _formatLastUpdated(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return '방금 전';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}분 전';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}시간 전';
+    } else {
+      return '${dateTime.month}/${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     }
   }
 }
