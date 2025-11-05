@@ -1,10 +1,12 @@
 // AI 종목 추천 목록 조회 API
-// GET으로 저장된 추천 목록을 반환 (실시간 주가 데이터 포함)
+// GET으로 저장된 추천 목록을 반환 (최신 주가 데이터 포함)
 
 // import fetch from 'node-fetch'; // Vercel에서는 내장 fetch 사용
 
 // 메모리 저장소 참조
 let recommendationsStore = [];
+let lastUpdatedAt = null; // 마지막 업데이트 시간
+const AUTO_REFRESH_INTERVAL = 60 * 1000; // 1분 (밀리초)
 
 export default async function handler(req, res) {
   // 디버깅 로그 추가
@@ -35,34 +37,40 @@ export default async function handler(req, res) {
     
     console.log('📊 요청 파라미터:', { limit, offset, refresh });
     
-  // refresh=true이거나 저장소가 비어있으면 데이터 로드
-  if (refresh === 'true' || recommendationsStore.length === 0) {
-    console.log('🔄 추천 데이터 로드 중...');
-    try {
-      // 먼저 폴백 데이터로 빠르게 응답
-      recommendationsStore = getFallbackRecommendations();
-      console.log('✅ 폴백 데이터 로드 완료:', recommendationsStore.length, '개 추천');
-      
-      // 백그라운드에서 실시간 데이터 시도 (사용자 응답에는 영향 없음)
-      if (refresh === 'true') {
-        setTimeout(async () => {
-          try {
-            console.log('🔄 백그라운드에서 실시간 데이터 시도 중...');
-            const realTimeData = await getSampleRecommendationsWithRealPrices();
-            if (realTimeData.length > 0) {
-              recommendationsStore = realTimeData;
-              console.log('📊 백그라운드 실시간 데이터 업데이트 완료');
+    // 자동 갱신 체크: 마지막 업데이트가 1분 이상 지났으면 자동 갱신
+    const needsAutoRefresh = lastUpdatedAt && 
+      (Date.now() - lastUpdatedAt) > AUTO_REFRESH_INTERVAL;
+    
+    // refresh=true이거나 저장소가 비어있거나 자동 갱신이 필요하면 데이터 로드
+    if (refresh === 'true' || recommendationsStore.length === 0 || needsAutoRefresh) {
+      console.log('🔄 추천 데이터 로드 중...', needsAutoRefresh ? '(자동 갱신)' : '');
+      try {
+        // 먼저 폴백 데이터로 빠르게 응답
+        recommendationsStore = getFallbackRecommendations();
+        lastUpdatedAt = Date.now();
+        console.log('✅ 폴백 데이터 로드 완료:', recommendationsStore.length, '개 추천');
+        
+        // 백그라운드에서 최신 데이터 시도 (사용자 응답에는 영향 없음)
+        if (refresh === 'true' || needsAutoRefresh) {
+          setTimeout(async () => {
+            try {
+              console.log('🔄 백그라운드에서 최신 데이터 시도 중...');
+              const realTimeData = await getSampleRecommendationsWithRealPrices();
+              if (realTimeData.length > 0) {
+                recommendationsStore = realTimeData;
+                lastUpdatedAt = Date.now();
+                console.log('📊 백그라운드 최신 데이터 업데이트 완료');
+              }
+            } catch (error) {
+              console.log('⚠️ 백그라운드 최신 데이터 실패 (폴백 데이터 유지)');
             }
-          } catch (error) {
-            console.log('⚠️ 백그라운드 실시간 데이터 실패 (폴백 데이터 유지)');
-          }
-        }, 100);
+          }, 100);
+        }
+      } catch (error) {
+        console.error('❌ 데이터 로드 실패:', error.message);
+        recommendationsStore = []; // 빈 배열로 초기화
       }
-    } catch (error) {
-      console.error('❌ 데이터 로드 실패:', error.message);
-      recommendationsStore = []; // 빈 배열로 초기화
     }
-  }
     
     const limitNum = parseInt(limit);
     const offsetNum = parseInt(offset);
@@ -85,7 +93,8 @@ export default async function handler(req, res) {
       total: recommendationsStore.length,
       count: paginatedResults.length,
       data: paginatedResults,
-      lastUpdated: recommendationsStore.length > 0 ? recommendationsStore[0].lastUpdate : null
+      lastUpdated: lastUpdatedAt ? new Date(lastUpdatedAt).toISOString() : null,
+      nextAutoRefresh: lastUpdatedAt ? new Date(lastUpdatedAt + AUTO_REFRESH_INTERVAL).toISOString() : null
     };
 
     console.log('📤 응답 데이터:', JSON.stringify(responseData, null, 2));
