@@ -429,7 +429,7 @@ class KrxLoader {
   }
 
   // 위험도별 추천 종목
-  static List<Map<String, dynamic>> getRecommendationsByRisk(String riskLevel, {int limit = 10}) {
+  static List<Map<String, dynamic>> getRecommendationsByRisk(String riskLevel, {int limit = 10, String sortBy = 'totalScore'}) {
     final allStocks = getAllRecommendedStocks();
     final analyses = allStocks.map((stock) {
       final analysis = getComprehensiveAnalysis(stock['symbol']);
@@ -463,7 +463,26 @@ class KrxLoader {
       ).toList();
     }
     
-    filtered.sort((a, b) => (b['totalScore'] as int).compareTo(a['totalScore'] as int));
+    // 정렬 기준에 따라 정렬
+    filtered.sort((a, b) {
+      switch (sortBy) {
+        case 'totalScore':
+          return (b['totalScore'] as int).compareTo(a['totalScore'] as int);
+        case 'technicalScore':
+          return (b['technicalScore'] as int).compareTo(a['technicalScore'] as int);
+        case 'fundamentalScore':
+          return (b['fundamentalScore'] as int).compareTo(a['fundamentalScore'] as int);
+        case 'marketCap':
+          return (b['marketCap'] as int).compareTo(a['marketCap'] as int);
+        case 'volume':
+          return (b['volume'] as int).compareTo(a['volume'] as int);
+        case 'tradingValue':
+          return (b['tradingValue'] as int).compareTo(a['tradingValue'] as int);
+        default:
+          return (b['totalScore'] as int).compareTo(a['totalScore'] as int);
+      }
+    });
+    
     return filtered.take(limit).toList();
   }
 }

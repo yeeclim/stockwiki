@@ -17,6 +17,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   List<String> _themes = [];
   Map<String, List<Map<String, dynamic>>> _themeRecommendations = {};
   List<Map<String, dynamic>> _topRecommendations = [];
+  List<Map<String, dynamic>> _safeRecommendations = [];
   bool _isLoading = false;
   String _selectedSortBy = 'totalScore';
   String _selectedRiskLevel = 'medium';
@@ -41,6 +42,9 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     try {
       // 전체 추천 종목 로드
       _topRecommendations = KrxLoader.getTopRecommendations(limit: 10, sortBy: _selectedSortBy);
+
+      // 안전 테마 추천 종목 로드
+      _safeRecommendations = KrxLoader.getRecommendationsByRisk('low', limit: 10, sortBy: _selectedSortBy);
 
       // 각 테마별 추천 종목 로드
       for (String theme in _themes) {
@@ -147,6 +151,16 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     
     // 테마별 특화 사유
     switch (theme) {
+      case '안전':
+        // 안전 테마는 대형주 중심의 안정적인 종목
+        if (marketCap >= 50000000000000) { // 5조원 이상
+          reasons.add('대형주 안정성');
+        }
+        if (fundamentalScore >= 70) {
+          reasons.add('재무 건전성 우수');
+        }
+        reasons.add('리스크 낮은 안전 투자');
+        break;
       case 'AI':
         reasons.add('AI 기술 발전과 시장 확대');
         break;
@@ -199,6 +213,9 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     
     // 테마별 조정 (실제 테마명 사용)
     switch (theme) {
+      case '안전':
+        baseMonths = (baseMonths * 1.3).round(); // 안정적인 대형주는 장기 보유
+        break;
       case 'AI':
         baseMonths = (baseMonths * 1.2).round(); // 장기 성장 테마
         break;
@@ -319,17 +336,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   }
 
   Widget _buildSafeRecommendations() {
-    final safeStocks = KrxLoader.getRecommendationsByRisk('low', limit: 10);
-    
     return Column(
       children: [
         _buildFilterChips(),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: safeStocks.length,
+            itemCount: _safeRecommendations.length,
             itemBuilder: (context, index) {
-              final stock = safeStocks[index];
+              final stock = _safeRecommendations[index];
               return _buildRecommendationCard(stock, index + 1, '안전');
             },
           ),
@@ -370,9 +385,9 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildChip('전체', 'totalScore'),
-                  _buildChip('기술적', 'technicalScore'),
-                  _buildChip('펀더멘털', 'fundamentalScore'),
+                  _buildChip('종합 점수', 'totalScore'),
+                  _buildChip('기술적 점수', 'technicalScore'),
+                  _buildChip('펀더멘털 점수', 'fundamentalScore'),
                   _buildChip('시가총액', 'marketCap'),
                   _buildChip('거래량', 'volume'),
                 ],

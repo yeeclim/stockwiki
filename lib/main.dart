@@ -10,6 +10,7 @@ import 'package:stockwiki/pages/interest_news_page.dart';
 import 'package:stockwiki/pages/us_stock_search_page.dart';
 import 'package:stockwiki/pages/ai_stock_recommend_page.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
+import 'package:stockwiki/pages/ai_algorithm_explain_page.dart';
 
 void main() {
   // 캐시 무효화를 위한 설정
@@ -126,6 +127,16 @@ class _StockSearchPageState extends State<StockSearchPage> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  ListTile(
+                    leading: const Icon(Icons.info_outline, color: Colors.white),
+                    title: const Text("알고리즘 설명", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const AiAlgorithmExplainPage()),
+                      );
+                    },
+                  ),
                   ListTile(
                     leading: const Icon(Icons.auto_graph, color: Colors.white),
                     title: const Text("AI 종목 추천", style: TextStyle(color: Colors.white)),
