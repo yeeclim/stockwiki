@@ -39,35 +39,31 @@ export default async function handler(req, res) {
 
     console.log(`✅ KRX 검색 결과: ${matchingStocks.length}개`);
 
-    // 2단계: 주요 종목에 대해서만 실시간 가격 업데이트
+    // 2단계: 실시간 가격 업데이트 시도 (모든 결과 대상, 실패 시 폴백)
     const results = await Promise.all(matchingStocks.map(async (stock) => {
       const code = stock['단축코드'];
-      
-      // 주요 종목만 실시간 크롤링
-      if (isMajorStock(code)) {
-        try {
-          console.log(`🌐 실시간 크롤링: ${stock['한글 종목명']} (${code})`);
-          const realTimeData = await fetchStockData(code);
-          
-          if (realTimeData && realTimeData.price > 0) {
-            return {
-              symbol: code,
-              name: stock['한글 종목명'],
-              shortName: stock['한글 종목약명'],
-              market: stock['시장구분'],
-              price: realTimeData.price,
-              change: realTimeData.change,
-              changePercent: realTimeData.changePercent,
-              volume: realTimeData.volume,
-              marketCap: realTimeData.marketCap,
-              lastUpdate: new Date().toISOString(),
-              source: 'naver-finance',
-              note: '실시간 크롤링 데이터'
-            };
-          }
-        } catch (error) {
-          console.error(`❌ 실시간 크롤링 실패: ${stock['한글 종목명']}`, error.message);
+      try {
+        console.log(`🌐 실시간 크롤링 시도: ${stock['한글 종목명']} (${code})`);
+        const realTimeData = await fetchStockData(code);
+        
+        if (realTimeData && realTimeData.price > 0) {
+          return {
+            symbol: code,
+            name: stock['한글 종목명'],
+            shortName: stock['한글 종목약명'],
+            market: stock['시장구분'],
+            price: realTimeData.price,
+            change: realTimeData.change,
+            changePercent: realTimeData.changePercent,
+            volume: realTimeData.volume,
+            marketCap: realTimeData.marketCap,
+            lastUpdate: new Date().toISOString(),
+            source: 'naver-finance',
+            note: '실시간 크롤링 데이터'
+          };
         }
+      } catch (error) {
+        console.error(`❌ 실시간 크롤링 실패: ${stock['한글 종목명']} (${code})`, error.message);
       }
       
       // 실시간 데이터 실패 시 추정 가격 제공
@@ -124,8 +120,34 @@ async function loadKRXData() {
 
   try {
     console.log('📁 KRX 데이터 로드 중...');
-    const filePath = path.join(process.cwd(), 'assets', 'data', 'krx_basic_info.json');
-    const fileContent = fs.readFileSync(filePath, 'utf8');
+    // 여러 경로 시도
+    const possiblePaths = [
+      path.join(process.cwd(), 'assets', 'krx_basic_info.json'),
+      path.join(process.cwd(), 'assets', 'data', 'krx_basic_info.json'),
+      path.join(process.cwd(), 'web', 'assets', 'krx_basic_info.json'),
+    ];
+    
+    let fileContent = null;
+    let filePath = null;
+    
+    for (const tryPath of possiblePaths) {
+      try {
+        if (fs.existsSync(tryPath)) {
+          filePath = tryPath;
+          fileContent = fs.readFileSync(tryPath, 'utf8');
+          console.log(`✅ KRX 데이터 파일 찾음: ${tryPath}`);
+          break;
+        }
+      } catch (e) {
+        // 다음 경로 시도
+        continue;
+      }
+    }
+    
+    if (!fileContent) {
+      throw new Error(`KRX 데이터 파일을 찾을 수 없습니다. 시도한 경로: ${possiblePaths.join(', ')}`);
+    }
+    
     const data = JSON.parse(fileContent);
     
     // 캐시 저장
@@ -142,17 +164,29 @@ async function loadKRXData() {
 
 // KRX 데이터에서 검색
 function searchInKRXData(allStocks, keyword, limit) {
-  const lowerKeyword = keyword.toLowerCase();
+  // 한글 검색을 위해 toLowerCase() 제거 (한글은 대소문자가 없음)
+  const searchKeyword = keyword.trim();
+  
+  console.log(`🔍 검색 키워드: "${searchKeyword}"`);
+  console.log(`📊 전체 종목 수: ${allStocks.length}`);
   
   const matchingStocks = allStocks.filter(stock => {
-    const name = stock['한글 종목명']?.toLowerCase() || '';
-    const shortName = stock['한글 종목약명']?.toLowerCase() || '';
+    const name = stock['한글 종목명'] || '';
+    const shortName = stock['한글 종목약명'] || '';
     const code = stock['단축코드'] || '';
     
-    return name.includes(lowerKeyword) || 
-           shortName.includes(lowerKeyword) ||
-           code.includes(lowerKeyword);
+    // 정확한 매칭 우선, 부분 매칭도 허용
+    const nameMatch = name.includes(searchKeyword) || name === searchKeyword;
+    const shortNameMatch = shortName.includes(searchKeyword) || shortName === searchKeyword;
+    const codeMatch = code.includes(searchKeyword) || code === searchKeyword;
+    
+    return nameMatch || shortNameMatch || codeMatch;
   });
+
+  console.log(`✅ 매칭된 종목 수: ${matchingStocks.length}개`);
+  if (matchingStocks.length > 0) {
+    console.log(`📋 첫 번째 결과: ${matchingStocks[0]['한글 종목명']} (${matchingStocks[0]['단축코드']})`);
+  }
 
   // 시장구분별 우선순위 (KOSPI > KOSDAQ)
   const sortedStocks = matchingStocks.sort((a, b) => {

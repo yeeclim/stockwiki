@@ -227,37 +227,50 @@ class _WtiWidgetState extends State<WtiWidget> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.teal.shade700,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        height: 80,
-        child: Center(
-          child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-              : _error != null
-                  ? Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 14))
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'WTI 유가 (USD/bbl)',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        Text(
-                          _wtiPrice != null ? '\$${_wtiPrice!.toStringAsFixed(2)}' : 'N/A',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.teal.shade600,
+              Colors.teal.shade800,
+            ],
+          ),
+        ),
+        child: SizedBox(
+          height: 80,
+          child: Center(
+            child: _isLoading
+                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                : _error != null
+                    ? Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 14))
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'WTI 유가 (USD/bbl)',
+                            style: TextStyle(color: Colors.white70, fontSize: 14),
                           ),
-                        ),
-                        if (_date != null)
                           Text(
-                            _date!,
-                            style: const TextStyle(color: Colors.white60, fontSize: 12),
+                            _wtiPrice != null ? '\$${_wtiPrice!.toStringAsFixed(2)}' : 'N/A',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                      ],
-                    ),
+                          if (_date != null)
+                            Text(
+                              _date!,
+                              style: const TextStyle(color: Colors.white60, fontSize: 12),
+                            ),
+                        ],
+                      ),
+          ),
         ),
       ),
     );

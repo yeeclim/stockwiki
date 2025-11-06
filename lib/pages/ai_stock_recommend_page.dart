@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import '../services/bookmark_service.dart';
 
 class AiStockRecommendPage extends StatefulWidget {
   const AiStockRecommendPage({super.key});
@@ -17,13 +19,25 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   String? _error;
   DateTime? _lastUpdated;
   Timer? _autoRefreshTimer;
+  // 좋아요 및 북마크 상태 관리
+  final Set<String> _likedStocks = {};
+  final Set<String> _bookmarkedStocks = {};
 
   @override
   void initState() {
     super.initState();
     _loadRecommendations();
+    _loadBookmarks();
     // 1분마다 자동 갱신
     _startAutoRefresh();
+  }
+
+  Future<void> _loadBookmarks() async {
+    final bookmarks = await BookmarkService.getBookmarkedStocks();
+    setState(() {
+      _bookmarkedStocks.clear();
+      _bookmarkedStocks.addAll(bookmarks);
+    });
   }
 
   @override
@@ -551,9 +565,9 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                   ),
                 ),
 
-                // 투자 전략 (단타/스윙/중장기)
+                // 투자 전략 (단타/스윙/중장기) - 현재가 기준으로 동적 계산
                 const SizedBox(height: 12),
-                _buildTradingStrategies(rec),
+                _buildTradingStrategies(rec, rec.currentPrice),
               ],
             ),
           ),
@@ -570,26 +584,96 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                   icon: Icons.comment_outlined,
                   count: rec.comments,
                   color: Colors.grey[500]!,
-                  onTap: () {},
+                  onTap: () {
+                    // 댓글 기능 (추후 구현)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${rec.stockName} 댓글 기능은 준비 중입니다.'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
                 ),
                 _buildInteractionButton(
                   icon: Icons.repeat,
                   count: rec.shares,
                   color: Colors.grey[500]!,
-                  onTap: () {},
+                  onTap: () {
+                    // 공유 기능
+                    _shareRecommendation(rec);
+                  },
                 ),
                 _buildInteractionButton(
-                  icon: Icons.favorite_border,
-                  count: rec.likes,
-                  color: Colors.grey[500]!,
+                  icon: _likedStocks.contains(rec.stockCode) 
+                      ? Icons.favorite 
+                      : Icons.favorite_border,
+                  count: rec.likes + (_likedStocks.contains(rec.stockCode) ? 1 : 0),
+                  color: _likedStocks.contains(rec.stockCode) 
+                      ? Colors.red 
+                      : Colors.grey[500]!,
                   activeColor: Colors.red,
-                  onTap: () {},
+                  onTap: () {
+                    setState(() {
+                      if (_likedStocks.contains(rec.stockCode)) {
+                        _likedStocks.remove(rec.stockCode);
+                      } else {
+                        _likedStocks.add(rec.stockCode);
+                      }
+                    });
+                  },
                 ),
                 _buildInteractionButton(
-                  icon: Icons.bookmark_border,
+                  icon: _bookmarkedStocks.contains(rec.stockCode)
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
                   count: null,
-                  color: Colors.grey[500]!,
-                  onTap: () {},
+                  color: _bookmarkedStocks.contains(rec.stockCode)
+                      ? Colors.blue
+                      : Colors.grey[500]!,
+                  onTap: () async {
+                    if (_bookmarkedStocks.contains(rec.stockCode)) {
+                      // 북마크 제거
+                      final success = await BookmarkService.removeBookmark(rec.stockCode);
+                      if (success) {
+                        setState(() {
+                          _bookmarkedStocks.remove(rec.stockCode);
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${rec.stockName} 북마크에서 제거되었습니다.'),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      }
+                    } else {
+                      // 북마크 추가
+                      final details = {
+                        'stockName': rec.stockName,
+                        'stockCode': rec.stockCode,
+                        'currentPrice': rec.currentPrice,
+                        'targetPrice': rec.targetPrice,
+                        'recommendation': rec.action, // 'action' 필드 사용
+                        'reason': rec.reasons.join('\n'), // 'reasons' 리스트를 문자열로 변환
+                        'likes': rec.likes,
+                      };
+                      final success = await BookmarkService.addBookmark(rec.stockCode, details);
+                      if (success) {
+                        setState(() {
+                          _bookmarkedStocks.add(rec.stockCode);
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${rec.stockName} 북마크에 추가되었습니다.'),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
                 ),
               ],
             ),
@@ -599,38 +683,49 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     );
   }
 
-  Widget _buildTradingStrategies(StockRecommendation rec) {
+  Widget _buildTradingStrategies(StockRecommendation rec, int currentPrice) {
     final strategies = <Widget>[];
 
-    // 단타
-    if (rec.dayTrading != null) {
-      strategies.add(_buildStrategyCard(
-        title: '🎯 단타',
-        subtitle: rec.dayTrading!.period,
-        strategy: rec.dayTrading!,
-        color: Colors.orange,
-      ));
+    // 현재가가 0이면 계산하지 않음
+    if (currentPrice <= 0) {
+      return const SizedBox.shrink();
     }
 
-    // 스윙
-    if (rec.swingTrading != null) {
-      strategies.add(_buildStrategyCard(
-        title: '📊 스윙',
-        subtitle: rec.swingTrading!.period,
-        strategy: rec.swingTrading!,
-        color: Colors.blue,
-      ));
-    }
+    // 단타 전략 (현재가 기준으로 동적 계산)
+    strategies.add(_buildStrategyCard(
+      title: '🎯 단타',
+      subtitle: '1~3일',
+      currentPrice: currentPrice,
+      buyPricePercent: 99.5,
+      sellPricePercent: 103.0,
+      stopLossPercent: 98.0,
+      expectedReturn: 3.0,
+      color: Colors.orange,
+    ));
 
-    // 중장기
-    if (rec.longTerm != null) {
-      strategies.add(_buildStrategyCard(
-        title: '📈 중장기',
-        subtitle: rec.longTerm!.period,
-        strategy: rec.longTerm!,
-        color: Colors.green,
-      ));
-    }
+    // 스윙 전략
+    strategies.add(_buildStrategyCard(
+      title: '📊 스윙',
+      subtitle: '1주~1개월',
+      currentPrice: currentPrice,
+      buyPricePercent: 98.5,
+      sellPricePercent: 108.0,
+      stopLossPercent: 96.0,
+      expectedReturn: 8.5,
+      color: Colors.blue,
+    ));
+
+    // 중장기 전략
+    strategies.add(_buildStrategyCard(
+      title: '📈 중장기',
+      subtitle: '3개월~1년',
+      currentPrice: currentPrice,
+      buyPricePercent: 100.0,
+      sellPricePercent: 120.0,
+      stopLossPercent: 93.0,
+      expectedReturn: 20.0,
+      color: Colors.green,
+    ));
 
     if (strategies.isEmpty) return const SizedBox.shrink();
 
@@ -662,9 +757,18 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   Widget _buildStrategyCard({
     required String title,
     required String subtitle,
-    required TradingStrategy strategy,
+    required int currentPrice,
+    required double buyPricePercent,
+    required double sellPricePercent,
+    required double stopLossPercent,
+    required double expectedReturn,
     required Color color,
   }) {
+    // 현재가 기준으로 동적 계산
+    final buyPrice = (currentPrice * buyPricePercent / 100).round();
+    final sellPrice = (currentPrice * sellPricePercent / 100).round();
+    final stopLoss = (currentPrice * stopLossPercent / 100).round();
+    
     return Container(
       width: 180,
       padding: const EdgeInsets.all(12),
@@ -695,7 +799,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  '+${strategy.expectedReturn.toStringAsFixed(1)}%',
+                  '+${expectedReturn.toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: color,
                     fontSize: 10,
@@ -727,7 +831,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                 ),
               ),
               Text(
-                '₩${_formatPrice(strategy.buyPrice)}',
+                '₩${_formatPrice(buyPrice)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -750,7 +854,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                 ),
               ),
               Text(
-                '₩${_formatPrice(strategy.sellPrice)}',
+                '₩${_formatPrice(sellPrice)}',
                 style: TextStyle(
                   color: color,
                   fontSize: 12,
@@ -761,29 +865,27 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
           ),
           
           // 손절가
-          if (strategy.stopLoss != null) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '손절',
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 11,
-                  ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '손절',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 11,
                 ),
-                Text(
-                  '₩${_formatPrice(strategy.stopLoss!)}',
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              Text(
+                '₩${_formatPrice(stopLoss)}',
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -904,6 +1006,31 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     } else {
       return '${dateTime.month}/${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     }
+  }
+
+  void _shareRecommendation(StockRecommendation rec) {
+    final shareText = '''
+🤖 AI 종목 추천: ${rec.stockName} (${rec.stockCode})
+
+현재가: ₩${_formatPrice(rec.currentPrice)}
+추천: ${rec.action}
+목표가: ₩${_formatPrice(rec.targetPrice)}
+
+추천 근거:
+${rec.reasons.map((r) => '• $r').join('\n')}
+
+StockWiki AI 추천
+    ''';
+
+    // 클립보드에 복사
+    Clipboard.setData(ClipboardData(text: shareText));
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('추천 내용이 클립보드에 복사되었습니다.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 }
 
