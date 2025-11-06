@@ -56,15 +56,13 @@ class _SilverWidgetState extends State<SilverWidget> {
   }
 
   Future<void> _fetchSilverPrice() async {
-    // 여러 API를 병렬로 호출하고 첫 번째 유효한 값 사용
+    // 최적화: 주요 API만 사용 (3개로 줄임)
     try {
       final results = await Future.wait([
         _tryYahooFinance(),
-        _trySimpleAPI(),
         _tryTwelveData(),
         _tryGoldAPI(),
-        _tryFixerIO(),
-      ], eagerError: false).timeout(const Duration(seconds: 8));
+      ], eagerError: false).timeout(const Duration(seconds: 5));
 
       // 첫 번째 유효한 가격 찾기
       for (final price in results) {
@@ -275,41 +273,54 @@ class _SilverWidgetState extends State<SilverWidget> {
     }
 
     return Card(
-      color: Colors.grey.shade800,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        height: 80,
-        child: Center(
-          child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-              : _error != null
-                  ? Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 14))
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'Silver (XAG/USD)',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        Text(
-                          '\$${_silverPrice!.toStringAsFixed(2)} / oz',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.grey.shade700,
+              Colors.grey.shade900,
+            ],
+          ),
+        ),
+        child: SizedBox(
+          height: 80,
+          child: Center(
+            child: _isLoading
+                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                : _error != null
+                    ? Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 14))
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Silver (XAG/USD)',
+                            style: TextStyle(color: Colors.white70, fontSize: 14),
                           ),
-                        ),
-                        if (krwPerDon != null)
                           Text(
-                            '약 ${krwPerDon.toStringAsFixed(0)}KRW / 돈',
+                            '\$${_silverPrice!.toStringAsFixed(2)} / oz',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                      ],
-                    ),
+                          if (krwPerDon != null)
+                            Text(
+                              '약 ${krwPerDon.toStringAsFixed(0)}KRW / 돈',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
+                      ),
+          ),
         ),
       ),
     );
