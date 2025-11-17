@@ -6,7 +6,6 @@ import 'package:stockwiki/widgets/gold_widget.dart';
 import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
-import 'package:stockwiki/pages/interest_news_page.dart';
 import 'package:stockwiki/pages/us_stock_search_page.dart';
 import 'package:stockwiki/pages/ai_stock_recommend_page.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
@@ -56,39 +55,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
     });
   }
 
-  Widget _infoRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(width: 80, child: Text('$title:', style: const TextStyle(fontWeight: FontWeight.bold))),
-          const SizedBox(width: 10),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
-  }
-
-  String _formatWon(dynamic raw) {
-    if (raw == null) return 'N/A';
-    final str = raw.toString();
-    if (str.isEmpty || str == 'null') return 'N/A';
-    
-    // double 값 처리
-    final doubleValue = double.tryParse(str);
-    if (doubleValue != null) {
-      final intValue = doubleValue.toInt();
-      return '₩${intValue.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
-    }
-    
-    // int 값 처리
-    final intValue = int.tryParse(str);
-    if (intValue != null) {
-      return '₩${intValue.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
-    }
-    
-    return 'N/A';
-  }
 
   @override
   Widget build(BuildContext context) {

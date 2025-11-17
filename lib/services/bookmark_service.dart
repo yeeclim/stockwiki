@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 /// 북마크 서비스
@@ -17,7 +18,7 @@ class BookmarkService {
         return bookmarks.map((e) => e.toString()).toSet();
       }
     } catch (e) {
-      print('북마크 로드 오류: $e');
+      debugPrint('북마크 로드 오류: $e');
     }
     return <String>{};
   }
@@ -46,7 +47,7 @@ class BookmarkService {
       
       return true;
     } catch (e) {
-      print('북마크 추가 오류: $e');
+      debugPrint('북마크 추가 오류: $e');
       return false;
     }
   }
@@ -71,7 +72,7 @@ class BookmarkService {
       
       return true;
     } catch (e) {
-      print('북마크 제거 오류: $e');
+      debugPrint('북마크 제거 오류: $e');
       return false;
     }
   }
@@ -92,7 +93,7 @@ class BookmarkService {
         return allDetails[stockCode];
       }
     } catch (e) {
-      print('북마크 상세 정보 로드 오류: $e');
+      debugPrint('북마크 상세 정보 로드 오류: $e');
     }
     return null;
   }
@@ -128,7 +129,7 @@ class BookmarkService {
       
       return result;
     } catch (e) {
-      print('북마크 상세 정보 로드 오류: $e');
+      debugPrint('북마크 상세 정보 로드 오류: $e');
       return [];
     }
   }

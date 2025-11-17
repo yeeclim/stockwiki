@@ -20,7 +20,7 @@ class UsStockNewsService {
   /// 미국 주식 관련 뉴스 조회 (Finnhub API 사용 - 무료, CORS 지원)
   static Future<List<News>> fetchStockNews(String symbol, {int limit = 10}) async {
     try {
-      print('📰 [News] 뉴스 조회 시작 (Finnhub): $symbol');
+      debugPrint('📰 [News] 뉴스 조회 시작 (Finnhub): $symbol');
       
       // Finnhub company news API (최근 30일)
       final fromDate = DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T')[0];
@@ -30,27 +30,27 @@ class UsStockNewsService {
         '$_finnhubBaseUrl/company-news?symbol=$symbol&from=$fromDate&to=$toDate&token=$_finnhubApiKey'
       );
       
-      print('🌐 [News] 뉴스 URL: $newsUrl');
+      debugPrint('🌐 [News] 뉴스 URL: $newsUrl');
       
       final response = await http.get(newsUrl);
-      print('📊 [News] 뉴스 응답 상태: ${response.statusCode}');
+      debugPrint('📊 [News] 뉴스 응답 상태: ${response.statusCode}');
       
       if (response.statusCode != 200) {
-        print('❌ [News] 뉴스 조회 실패 - 상태 코드: ${response.statusCode}');
+        debugPrint('❌ [News] 뉴스 조회 실패 - 상태 코드: ${response.statusCode}');
         return [];
       }
 
       final data = json.decode(response.body);
-      print('📋 [News] 뉴스 데이터 파싱 완료: ${data.runtimeType}');
+      debugPrint('📋 [News] 뉴스 데이터 파싱 완료: ${data.runtimeType}');
       
       // Finnhub는 배열로 직접 반환
       if (data is List) {
         if (data.isEmpty) {
-          print('⚠️ [News] 뉴스 리스트가 비어있음');
+          debugPrint('⚠️ [News] 뉴스 리스트가 비어있음');
           return [];
         }
         
-        print('📰 [News] 첫 번째 뉴스 샘플: ${data[0]}');
+        debugPrint('📰 [News] 첫 번째 뉴스 샘플: ${data[0]}');
         
         try {
           final newsList = data
@@ -66,7 +66,7 @@ class UsStockNewsService {
                         datetime * 1000,
                       ).toIso8601String();
                     } catch (e) {
-                      print('⚠️ [News] datetime 파싱 오류: $e');
+                      debugPrint('⚠️ [News] datetime 파싱 오류: $e');
                     }
                   }
                   
@@ -78,24 +78,24 @@ class UsStockNewsService {
                     publishedAt: publishedAt,
                   );
                 } catch (e) {
-                  print('⚠️ [News] 개별 뉴스 파싱 오류: $e, item: $item');
+                  debugPrint('⚠️ [News] 개별 뉴스 파싱 오류: $e, item: $item');
                   rethrow;
                 }
               })
               .toList();
-          print('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
+          debugPrint('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
           return newsList;
         } catch (e) {
-          print('💥 [News] 뉴스 파싱 오류: $e');
-          print('📄 [News] 오류 스택: ${StackTrace.current}');
+          debugPrint('💥 [News] 뉴스 파싱 오류: $e');
+          debugPrint('📄 [News] 오류 스택: ${StackTrace.current}');
           return [];
         }
       }
       
-      print('⚠️ [News] 뉴스 데이터가 리스트가 아님: $data');
+      debugPrint('⚠️ [News] 뉴스 데이터가 리스트가 아님: $data');
       return [];
     } catch (e) {
-      print('💥 [News] 뉴스 조회 오류: $e');
+      debugPrint('💥 [News] 뉴스 조회 오류: $e');
       return [];
     }
   }

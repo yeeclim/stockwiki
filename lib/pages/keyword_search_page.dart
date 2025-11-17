@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/stock.dart';
 import '../services/fmp_service.dart';
-import '../services/krx_loader.dart';
 import '../widgets/stock_card.dart';
 
 class KeywordSearchPage extends StatefulWidget {

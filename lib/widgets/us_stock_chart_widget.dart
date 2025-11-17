@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../services/chart_scraper_service.dart';
@@ -40,7 +41,7 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     });
 
     try {
-      print('🔍 [Chart Widget] 차트 URL 로드 시작: ${widget.symbol}');
+      debugPrint('🔍 [Chart Widget] 차트 URL 로드 시작: ${widget.symbol}');
       
       // 차트 스크래핑 서비스를 통해 사용 가능한 차트들 가져오기
       final availableCharts = await ChartScraperService.getAvailableCharts(widget.symbol);
@@ -52,13 +53,13 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
         _selectedChartType = _chartUrls!.keys.first;
       }
 
-      print('📊 [Chart Widget] 로드된 차트: ${_chartUrls!.keys.toList()}');
+      debugPrint('📊 [Chart Widget] 로드된 차트: ${_chartUrls!.keys.toList()}');
       
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
-      print('❌ [Chart Widget] 차트 로드 실패: $e');
+      debugPrint('❌ [Chart Widget] 차트 로드 실패: $e');
       setState(() {
         _isLoading = false;
         _error = '차트 데이터를 불러올 수 없습니다: $e';

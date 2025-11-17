@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../services/fmp_service.dart';
 import 'package:http/http.dart' as http;
@@ -64,7 +65,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             }
           }
         } catch (e) {
-          print('추천 종목 로드 실패: ${stockInfo['name']} - $e');
+          debugPrint('추천 종목 로드 실패: ${stockInfo['name']} - $e');
         }
       }
 
@@ -74,7 +75,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         _isLoading = false;
       });
     } catch (e) {
-      print('추천 종목 로드 오류: $e');
+      debugPrint('추천 종목 로드 오류: $e');
       setState(() {
         _isLoading = false;
       });
@@ -103,28 +104,28 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       // 미국 주식인지 국내 주식인지 판단 (영문/숫자 조합은 미국 주식으로 가정)
       final isUSStock = RegExp(r'^[A-Za-z0-9]+$').hasMatch(query);
       
-      print('🔍 주식 검색 시작: $query (${isUSStock ? "미국" : "국내"} 주식)');
+      debugPrint('🔍 주식 검색 시작: $query (${isUSStock ? "미국" : "국내"} 주식)');
       
       if (isUSStock) {
         // 미국 주식 검색
-        print('🇺🇸 미국 주식 검색 중...');
+        debugPrint('🇺🇸 미국 주식 검색 중...');
         stocks = await FMPService.fetchStocks(query);
-        print('✅ 미국 주식 검색 결과: ${stocks.length}개');
+        debugPrint('✅ 미국 주식 검색 결과: ${stocks.length}개');
         if (stocks.isNotEmpty) {
-          print('📊 첫 번째 결과: ${stocks[0].name} (${stocks[0].symbol}), 가격: ${stocks[0].price}, 변동률: ${stocks[0].changePercent}');
+          debugPrint('📊 첫 번째 결과: ${stocks[0].name} (${stocks[0].symbol}), 가격: ${stocks[0].price}, 변동률: ${stocks[0].changePercent}');
         }
       } else {
         // 국내 주식 검색
-        print('🇰🇷 국내 주식 검색 중...');
+        debugPrint('🇰🇷 국내 주식 검색 중...');
         stocks = await _searchKoreanStock(query);
-        print('✅ 국내 주식 검색 결과: ${stocks.length}개');
+        debugPrint('✅ 국내 주식 검색 결과: ${stocks.length}개');
         if (stocks.isNotEmpty) {
-          print('📊 첫 번째 결과: ${stocks[0].name} (${stocks[0].symbol}), 가격: ${stocks[0].price}, 변동률: ${stocks[0].changePercent}');
+          debugPrint('📊 첫 번째 결과: ${stocks[0].name} (${stocks[0].symbol}), 가격: ${stocks[0].price}, 변동률: ${stocks[0].changePercent}');
         }
       }
 
       if (stocks.isEmpty) {
-        print('⚠️ 검색 결과가 없습니다.');
+        debugPrint('⚠️ 검색 결과가 없습니다.');
         setState(() {
           _error = '검색 결과가 없습니다. 다른 키워드로 검색해주세요.';
           _isLoading = false;
@@ -135,9 +136,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
       // 첫 번째 검색 결과에 대해 AI 검증위원회에 질문
       final stock = stocks[0];
-      print('🤖 AI 검증위원회에 질문 전송 중...');
+      debugPrint('🤖 AI 검증위원회에 질문 전송 중...');
       final committeeResult = await _askAiCommittee(stock);
-      print('✅ AI 검증위원회 응답 수신 완료');
+      debugPrint('✅ AI 검증위원회 응답 수신 완료');
 
       setState(() {
         _recommendations = [committeeResult];
@@ -146,8 +147,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         _isSearching = false;
       });
     } catch (e) {
-      print('💥 검색 중 오류 발생: $e');
-      print('📚 오류 타입: ${e.runtimeType}');
+      debugPrint('💥 검색 중 오류 발생: $e');
+      debugPrint('📚 오류 타입: ${e.runtimeType}');
       setState(() {
         _error = '검색 중 오류가 발생했습니다: $e';
         _isLoading = false;
@@ -172,8 +173,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     final encodedKeyword = Uri.encodeComponent(keyword);
     final url = '$apiBaseUrl/api/stock-search-full?keyword=$encodedKeyword&limit=1';
     
-    print('🔍 국내 주식 검색 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
-    print('🔍 국내 주식 검색 URL: $url');
+    debugPrint('🔍 국내 주식 검색 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
+    debugPrint('🔍 국내 주식 검색 URL: $url');
     
     try {
         final response = await http.get(
@@ -186,53 +187,53 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
           const Duration(seconds: 10),
         );
 
-        print('📊 국내 주식 검색 응답 상태: ${response.statusCode}');
-        print('📄 국내 주식 검색 응답 Content-Type: ${response.headers['content-type']}');
+        debugPrint('📊 국내 주식 검색 응답 상태: ${response.statusCode}');
+        debugPrint('📄 국내 주식 검색 응답 Content-Type: ${response.headers['content-type']}');
         
         // 응답이 HTML인지 확인
         final contentType = response.headers['content-type'] ?? '';
         if (contentType.contains('text/html') || response.body.trim().startsWith('<!DOCTYPE') || response.body.trim().startsWith('<html')) {
-          print('❌ 국내 주식 검색 실패: API가 HTML을 반환했습니다 (404 또는 서버 오류)');
-          print('💡 Vercel dev 서버가 실행 중인지 확인하세요: vercel dev');
-          print('📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+          debugPrint('❌ 국내 주식 검색 실패: API가 HTML을 반환했습니다 (404 또는 서버 오류)');
+          debugPrint('💡 Vercel dev 서버가 실행 중인지 확인하세요: vercel dev');
+          debugPrint('📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
           return [];
         }
 
         if (response.statusCode == 200) {
           try {
             final data = json.decode(response.body);
-            print('📋 국내 주식 검색 데이터: $data');
+            debugPrint('📋 국내 주식 검색 데이터: $data');
             
             if (data['success'] == true && data['data'] != null) {
               final stocks = (data['data'] as List)
                   .map((item) => Stock.fromKrxData(item))
                   .toList();
-              print('✅ 국내 주식 검색 성공: ${stocks.length}개');
+              debugPrint('✅ 국내 주식 검색 성공: ${stocks.length}개');
               return stocks;
             } else {
-              print('⚠️ 국내 주식 검색 실패: success=${data['success']}, error=${data['error']}');
+              debugPrint('⚠️ 국내 주식 검색 실패: success=${data['success']}, error=${data['error']}');
             }
           } catch (e) {
-            print('❌ JSON 파싱 오류: $e');
-            print('📄 응답 본문 (처음 500자): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+            debugPrint('❌ JSON 파싱 오류: $e');
+            debugPrint('📄 응답 본문 (처음 500자): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
             return [];
           }
         } else {
-          print('❌ 국내 주식 검색 실패: HTTP ${response.statusCode}');
-          print('📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+          debugPrint('❌ 국내 주식 검색 실패: HTTP ${response.statusCode}');
+          debugPrint('📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
         }
         return [];
       } on http.ClientException catch (e) {
-        print('❌ 네트워크 오류 (API 서버에 연결할 수 없음): $e');
-        print('💡 Vercel dev 서버가 실행 중인지 확인하세요:');
-        print('   1. 터미널에서 "vercel dev" 또는 "npm run dev" 실행');
-        print('   2. API 서버가 http://localhost:3000 에서 실행 중인지 확인');
+        debugPrint('❌ 네트워크 오류 (API 서버에 연결할 수 없음): $e');
+        debugPrint('💡 Vercel dev 서버가 실행 중인지 확인하세요:');
+        debugPrint('   1. 터미널에서 "vercel dev" 또는 "npm run dev" 실행');
+        debugPrint('   2. API 서버가 http://localhost:3000 에서 실행 중인지 확인');
         return [];
       } catch (e) {
-        print('💥 국내 주식 검색 오류: $e');
-        print('📚 오류 타입: ${e.runtimeType}');
+        debugPrint('💥 국내 주식 검색 오류: $e');
+        debugPrint('📚 오류 타입: ${e.runtimeType}');
         if (e.toString().contains('XMLHttpRequest') || e.toString().contains('CORS')) {
-          print('💡 CORS 오류일 수 있습니다. API 서버의 CORS 설정을 확인하세요.');
+          debugPrint('💡 CORS 오류일 수 있습니다. API 서버의 CORS 설정을 확인하세요.');
         }
         return [];
       }
@@ -252,7 +253,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       
       final url = '$apiBaseUrl/api/ai-committee-verify';
       
-      print('🔍 AI 검증위원회 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
+      debugPrint('🔍 AI 검증위원회 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
       
       // 가격 포맷 (국내 주식은 원화, 미국 주식은 달러)
       final isKorean = RegExp(r'^\d+ ?\d* ?$').hasMatch(stock.symbol) || RegExp(r'^\d+$').hasMatch(stock.symbol);
@@ -265,9 +266,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
           ? '현재 ${stock.changePercent! >= 0 ? '상승' : '하락'}률: ${(stock.changePercent!).abs().toStringAsFixed(2)}%'
           : '가격 변동 정보 없음';
       
-      final question = '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n' +
-          '현재 가격: $priceFormat\n' +
-          '$changeInfo\n\n' +
+      final question = '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n'
+          '현재 가격: $priceFormat\n'
+          '$changeInfo\n\n'
           '다음 관점에서 종합적으로 분석해주세요:\n' +
           '1. 재무 건전성 및 수익성\n' +
           '2. 성장 가능성 및 시장 전망\n' +
@@ -276,8 +277,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
           '5. 투자 가치 평가\n\n' +
           '위 분석을 바탕으로 투자 의견을 제시해주세요.';
       
-      print('🎯 AI 검증위원회 질문: $question');
-      print('📊 주식 정보: ${stock.name} (${stock.symbol}), 가격: ${stock.price}, 변동률: ${stock.changePercent}');
+      debugPrint('🎯 AI 검증위원회 질문: $question');
+      debugPrint('📊 주식 정보: ${stock.name} (${stock.symbol}), 가격: ${stock.price}, 변동률: ${stock.changePercent}');
       
       final response = await http.post(
         Uri.parse(url),
@@ -293,12 +294,12 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         }),
       ).timeout(const Duration(seconds: 60));
 
-      print('📊 AI 검증위원회 응답 상태: ${response.statusCode}');
-      print('📄 AI 검증위원회 응답 본문: ${response.body}');
+      debugPrint('📊 AI 검증위원회 응답 상태: ${response.statusCode}');
+      debugPrint('📄 AI 검증위원회 응답 본문: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('📋 AI 검증위원회 데이터: $data');
+        debugPrint('📋 AI 검증위원회 데이터: $data');
         
         // success 필드 확인
         if (data['success'] == false) {
@@ -317,12 +318,12 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         );
       } else {
         final errorBody = response.body;
-        print('❌ AI 검증위원회 API 호출 실패: HTTP ${response.statusCode}, 응답: $errorBody');
+        debugPrint('❌ AI 검증위원회 API 호출 실패: HTTP ${response.statusCode}, 응답: $errorBody');
         throw Exception('API 호출 실패: ${response.statusCode} - $errorBody');
       }
     } catch (e) {
-      print('💥 AI 검증위원회 오류: $e');
-      print('📚 오류 타입: ${e.runtimeType}');
+      debugPrint('💥 AI 검증위원회 오류: $e');
+      debugPrint('📚 오류 타입: ${e.runtimeType}');
       
       // 에러 시 기본 응답 반환
       return CommitteeRecommendation(
@@ -758,7 +759,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       ),
                       decoration: BoxDecoration(
                         color: _getVerificationColor(rec.verificationScore)
-                            .withOpacity(0.2),
+                            .withValues(alpha:0.2),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: _getVerificationColor(rec.verificationScore),
@@ -842,7 +843,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue[900]?.withOpacity(0.2),
+                      color: Colors.blue[900]?.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: Colors.blue[700] ?? Colors.blue,
@@ -913,7 +914,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey[700]?.withOpacity(0.3),
+                        color: Colors.grey[700]?.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -928,7 +929,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _getModelColor(model.modelName)
-                                      .withOpacity(0.2),
+                                      .withValues(alpha:0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -948,7 +949,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _getActionColor(model.recommendation)
-                                      .withOpacity(0.2),
+                                      .withValues(alpha:0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -984,7 +985,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: (Colors.grey[700] ?? Colors.grey).withOpacity(0.3),
+                    color: (Colors.grey[700] ?? Colors.grey).withValues(alpha:0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(

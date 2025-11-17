@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/news.dart';
 import 'naver_news_service.dart';
 
@@ -24,7 +25,7 @@ class NewsService {
     if (_newsCache.containsKey(cacheKey) && 
         _cacheTime.containsKey(cacheKey) &&
         now.difference(_cacheTime[cacheKey]!) < _cacheExpiry) {
-      print('뉴스 캐시 사용: $stockName');
+      debugPrint('뉴스 캐시 사용: $stockName');
       return _newsCache[cacheKey]!;
     }
 
@@ -38,21 +39,21 @@ class NewsService {
       // 네이버 뉴스 (국내주식만)
       if (isKoreanStock) {
         futures.add(NaverNewsService.searchNaverNews(stockName, maxResults: 3).catchError((e) {
-          print('네이버 뉴스 크롤링 실패: $e');
+          debugPrint('네이버 뉴스 크롤링 실패: $e');
           return <News>[];
         }));
       }
       
       // 다음 뉴스 (항상 시도)
       futures.add(_fetchFromDaumNews(stockName).catchError((e) {
-        print('다음 뉴스 크롤링 실패: $e');
+        debugPrint('다음 뉴스 크롤링 실패: $e');
         return <News>[];
       }));
       
       // 병렬로 실행 (타임아웃 5초로 단축)
       final results = await Future.wait(futures, eagerError: false)
           .timeout(Duration(seconds: 5), onTimeout: () {
-        print('뉴스 로딩 타임아웃 (5초)');
+        debugPrint('뉴스 로딩 타임아웃 (5초)');
         return <List<News>>[];
       });
       
@@ -71,10 +72,10 @@ class NewsService {
             final mkRssNews = await _fetchFromMkRss(baseUrl, stockName);
             if (mkRssNews.isNotEmpty) {
               allNews.addAll(mkRssNews);
-              print('MK Stock RSS 성공: ${mkRssNews.length}개');
+              debugPrint('MK Stock RSS 성공: ${mkRssNews.length}개');
             }
           } catch (e) {
-            print('MK Stock RSS 실패: $e');
+            debugPrint('MK Stock RSS 실패: $e');
           }
         } else {
           // 미국주식: 해외 뉴스 API들을 병렬로 호출 (3초 타임아웃)
@@ -89,7 +90,7 @@ class NewsService {
               allNews.addAll(result);
             }
           } catch (e) {
-            print('미국 뉴스 API 타임아웃: $e');
+            debugPrint('미국 뉴스 API 타임아웃: $e');
           }
         }
       }
@@ -105,7 +106,7 @@ class NewsService {
       // 최대 결과 수로 제한
       final finalNews = uniqueNews.values.take(_maxResults).toList();
       
-      print('최종 뉴스 결과: ${finalNews.length}개 (StockWiki: ${allNews.where((n) => n.source == 'StockWiki News').length}개)');
+      debugPrint('최종 뉴스 결과: ${finalNews.length}개 (StockWiki: ${allNews.where((n) => n.source == 'StockWiki News').length}개)');
       
       // 캐시에 저장
       _newsCache[cacheKey] = finalNews;
@@ -113,7 +114,7 @@ class NewsService {
       
       return finalNews;
     } catch (e) {
-      print('뉴스 검색 오류: $e');
+      debugPrint('뉴스 검색 오류: $e');
       return [];
     }
   }
@@ -133,7 +134,7 @@ class NewsService {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['results'] as List<dynamic>? ?? [];
         
-        print('NewsData.io: ${results.length}개 결과');
+        debugPrint('NewsData.io: ${results.length}개 결과');
         
         return results.map<News>((item) => News.fromJson({
               'title': item['title']?.toString() ?? '',
@@ -143,10 +144,10 @@ class NewsService {
               'publishedAt': item['pubDate']?.toString(),
             })).toList();
       } else {
-        print('NewsData.io HTTP 오류: ${response.statusCode}');
+        debugPrint('NewsData.io HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
-      print('NewsData.io 오류: $e');
+      debugPrint('NewsData.io 오류: $e');
     }
     return [];
   }
@@ -166,7 +167,7 @@ class NewsService {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['articles'] as List<dynamic>? ?? [];
         
-        print('GNews: ${results.length}개 결과');
+        debugPrint('GNews: ${results.length}개 결과');
         
         return results.map<News>((item) => News.fromJson({
               'title': item['title']?.toString() ?? '',
@@ -176,10 +177,10 @@ class NewsService {
               'publishedAt': item['publishedAt']?.toString(),
             })).toList();
       } else {
-        print('GNews HTTP 오류: ${response.statusCode}');
+        debugPrint('GNews HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
-      print('GNews 오류: $e');
+      debugPrint('GNews 오류: $e');
     }
     return [];
   }
@@ -199,7 +200,7 @@ class NewsService {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['data'] as List<dynamic>? ?? [];
         
-        print('MediaStack: ${results.length}개 결과');
+        debugPrint('MediaStack: ${results.length}개 결과');
         
         return results.map<News>((item) => News.fromJson({
               'title': item['title']?.toString() ?? '',
@@ -209,10 +210,10 @@ class NewsService {
               'publishedAt': item['published_at']?.toString(),
             })).toList();
       } else {
-        print('MediaStack HTTP 오류: ${response.statusCode}');
+        debugPrint('MediaStack HTTP 오류: ${response.statusCode}');
       }
     } catch (e) {
-      print('MediaStack 오류: $e');
+      debugPrint('MediaStack 오류: $e');
     }
     return [];
   }
@@ -231,7 +232,7 @@ class NewsService {
         // 응답이 HTML인지 JSON인지 확인
         final responseText = utf8.decode(response.bodyBytes);
         if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-          print('MK Stock RSS: HTML 응답 받음, JSON이 아님');
+          debugPrint('MK Stock RSS: HTML 응답 받음, JSON이 아님');
           return [];
         }
         
@@ -255,7 +256,7 @@ class NewsService {
             })).toList();
       }
     } catch (e) {
-      print('MK Stock RSS 오류: $e');
+      debugPrint('MK Stock RSS 오류: $e');
     }
     return [];
   }
@@ -297,10 +298,10 @@ class NewsService {
         }
       }
       
-      print('다음 뉴스 API 응답 오류: ${response.statusCode}');
+      debugPrint('다음 뉴스 API 응답 오류: ${response.statusCode}');
       return [];
     } catch (e) {
-      print('다음 뉴스 API 오류: $e');
+      debugPrint('다음 뉴스 API 오류: $e');
       return [];
     }
   }

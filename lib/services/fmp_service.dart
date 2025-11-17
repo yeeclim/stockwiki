@@ -1,19 +1,25 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../models/news.dart';
 
 class FMPService {
-  static const String _apiKey = '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh'; // 실제 키로 교체
+  // 환경변수에서 API 키 가져오기 (없으면 기본값 사용)
+  static String get _apiKey {
+    // Flutter 웹에서는 환경변수 접근이 제한적이므로
+    // 실제 배포 시에는 서버 사이드에서 처리하거나
+    // Vercel 환경변수 등을 활용해야 함
+    const envKey = String.fromEnvironment('FMP_API_KEY');
+    return envKey.isNotEmpty ? envKey : '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh';
+  }
   static const String _baseUrl = 'https://financialmodelingprep.com/api/v3';
   static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
 
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
   static Future<List<Stock>> fetchStocks(String keyword) async {
     try {
-      print('🔍 [FMP] 검색 시작: $keyword');
+      debugPrint('🔍 [FMP] 검색 시작: $keyword');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       
       // 웹에서 CORS 문제 해결을 위한 프록시 사용
@@ -21,23 +27,23 @@ class FMPService {
         ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp')}')
         : Uri.parse('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp');
       
-      print('🌐 [FMP] 검색 URL: $searchUrl');
-      print('📱 [FMP] 웹 모드: $kIsWeb');
+      debugPrint('🌐 [FMP] 검색 URL: $searchUrl');
+      debugPrint('📱 [FMP] 웹 모드: $kIsWeb');
       
       final searchRes = await http.get(searchUrl);
-      print('📊 [FMP] 검색 응답 상태: ${searchRes.statusCode}');
-      print('📄 [FMP] 검색 응답 본문: ${searchRes.body}');
+      debugPrint('📊 [FMP] 검색 응답 상태: ${searchRes.statusCode}');
+      debugPrint('📄 [FMP] 검색 응답 본문: ${searchRes.body}');
 
       if (searchRes.statusCode != 200) {
-        print('❌ [FMP] 검색 실패 - 상태 코드: ${searchRes.statusCode}');
+        debugPrint('❌ [FMP] 검색 실패 - 상태 코드: ${searchRes.statusCode}');
         throw Exception('검색 실패: ${searchRes.statusCode}');
       }
 
       final searchData = json.decode(searchRes.body);
-      print('📋 [FMP] 검색 데이터 파싱 완료: ${searchData.runtimeType}');
+      debugPrint('📋 [FMP] 검색 데이터 파싱 완료: ${searchData.runtimeType}');
       
       if (searchData is! List || searchData.isEmpty) {
-        print('⚠️ [FMP] 검색 결과가 비어있음');
+        debugPrint('⚠️ [FMP] 검색 결과가 비어있음');
         return [];
       }
 
@@ -48,10 +54,10 @@ class FMPService {
                        e['exchangeShortName'] == 'AMEX')
           .map<String>((e) => e['symbol'] as String)
           .toList();
-      print('🏷️ [FMP] 추출된 심볼들 (미국 주식만): $symbols');
+      debugPrint('🏷️ [FMP] 추출된 심볼들 (미국 주식만): $symbols');
       
       if (symbols.isEmpty) {
-        print('⚠️ [FMP] 미국 주식이 없음');
+        debugPrint('⚠️ [FMP] 미국 주식이 없음');
         return [];
       }
 
@@ -60,21 +66,21 @@ class FMPService {
         ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp')}')
         : Uri.parse('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp');
       
-      print('💰 [FMP] 시세 URL: $quoteUrl');
+      debugPrint('💰 [FMP] 시세 URL: $quoteUrl');
       final quoteRes = await http.get(quoteUrl);
-      print('📊 [FMP] 시세 응답 상태: ${quoteRes.statusCode}');
-      print('📄 [FMP] 시세 응답 본문: ${quoteRes.body}');
+      debugPrint('📊 [FMP] 시세 응답 상태: ${quoteRes.statusCode}');
+      debugPrint('📄 [FMP] 시세 응답 본문: ${quoteRes.body}');
 
       if (quoteRes.statusCode != 200) {
-        print('❌ [FMP] 시세 조회 실패 - 상태 코드: ${quoteRes.statusCode}');
+        debugPrint('❌ [FMP] 시세 조회 실패 - 상태 코드: ${quoteRes.statusCode}');
         throw Exception('시세 조회 실패: ${quoteRes.statusCode}');
       }
 
       final quoteData = json.decode(quoteRes.body);
-      print('📋 [FMP] 시세 데이터 파싱 완료: ${quoteData.runtimeType}');
+      debugPrint('📋 [FMP] 시세 데이터 파싱 완료: ${quoteData.runtimeType}');
       
       if (quoteData is! List) {
-        print('⚠️ [FMP] 시세 데이터가 리스트가 아님');
+        debugPrint('⚠️ [FMP] 시세 데이터가 리스트가 아님');
         return [];
       }
 
@@ -82,11 +88,11 @@ class FMPService {
           .map<Stock>((item) => Stock.fromJson(item))
           .toList();
       
-      print('✅ [FMP] 최종 결과: ${stocks.length}개 주식');
+      debugPrint('✅ [FMP] 최종 결과: ${stocks.length}개 주식');
       return stocks;
     } catch (e) {
-      print('💥 [FMP] 전체 오류: $e');
-      print('📚 [FMP] 오류 타입: ${e.runtimeType}');
+      debugPrint('💥 [FMP] 전체 오류: $e');
+      debugPrint('📚 [FMP] 오류 타입: ${e.runtimeType}');
       return [];
     }
   }
@@ -154,7 +160,7 @@ class FMPService {
   /// AI 추천 주식 목록 가져오기 (상승률, 거래량, 시가총액 기준)
   static Future<List<StockRecommendation>> fetchRecommendedStocks({int limit = 20}) async {
     try {
-      print('🤖 [FMP] AI 추천 주식 조회 시작 (limit: $limit)');
+      debugPrint('🤖 [FMP] AI 추천 주식 조회 시작 (limit: $limit)');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       
       // 주요 미국 주식 심볼 목록 (S&P 500 상위 종목)
@@ -170,17 +176,17 @@ class FMPService {
         ? Uri.parse('$_corsProxy${Uri.encodeComponent('$_baseUrl/quote/$symbols?apikey=$_apiKey&t=$timestamp')}')
         : Uri.parse('$_baseUrl/quote/$symbols?apikey=$_apiKey&t=$timestamp');
       
-      print('💰 [FMP] 추천 주식 시세 URL: $quoteUrl');
+      debugPrint('💰 [FMP] 추천 주식 시세 URL: $quoteUrl');
       final quoteRes = await http.get(quoteUrl);
       
       if (quoteRes.statusCode != 200) {
-        print('❌ [FMP] 추천 주식 시세 조회 실패: ${quoteRes.statusCode}');
+        debugPrint('❌ [FMP] 추천 주식 시세 조회 실패: ${quoteRes.statusCode}');
         return [];
       }
 
       final quoteData = json.decode(quoteRes.body);
       if (quoteData is! List || quoteData.isEmpty) {
-        print('⚠️ [FMP] 추천 주식 데이터가 비어있음');
+        debugPrint('⚠️ [FMP] 추천 주식 데이터가 비어있음');
         return [];
       }
 
@@ -205,10 +211,10 @@ class FMPService {
       // AI 점수 기준으로 정렬
       recommendations.sort((a, b) => b.score.compareTo(a.score));
 
-      print('✅ [FMP] AI 추천 주식: ${recommendations.length}개');
+      debugPrint('✅ [FMP] AI 추천 주식: ${recommendations.length}개');
       return recommendations.take(limit).toList();
     } catch (e) {
-      print('💥 [FMP] AI 추천 주식 조회 오류: $e');
+      debugPrint('💥 [FMP] AI 추천 주식 조회 오류: $e');
       return [];
     }
   }
@@ -310,7 +316,7 @@ class FMPService {
   /// Sector별 추천 주식 가져오기
   static Future<List<Stock>> fetchStocksBySector(String sector, {int limit = 10}) async {
     try {
-      print('📊 [FMP] Sector별 주식 조회: $sector (limit: $limit)');
+      debugPrint('📊 [FMP] Sector별 주식 조회: $sector (limit: $limit)');
       
       // Sector별 주요 주식 심볼 매핑
       final sectorStocks = {
@@ -324,7 +330,7 @@ class FMPService {
       
       final symbols = sectorStocks[sector] ?? [];
       if (symbols.isEmpty) {
-        print('⚠️ [FMP] 알 수 없는 Sector: $sector');
+        debugPrint('⚠️ [FMP] 알 수 없는 Sector: $sector');
         return [];
       }
 
@@ -357,10 +363,10 @@ class FMPService {
         return bChange.compareTo(aChange);
       });
 
-      print('✅ [FMP] Sector별 주식: ${stocks.length}개');
+      debugPrint('✅ [FMP] Sector별 주식: ${stocks.length}개');
       return stocks;
     } catch (e) {
-      print('💥 [FMP] Sector별 주식 조회 오류: $e');
+      debugPrint('💥 [FMP] Sector별 주식 조회 오류: $e');
       return [];
     }
   }

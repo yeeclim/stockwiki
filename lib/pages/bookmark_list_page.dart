@@ -301,10 +301,10 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                   ),
                   decoration: BoxDecoration(
                     color: recommendation == '매수'
-                        ? Colors.green.withOpacity(0.2)
+                        ? Colors.green.withValues(alpha: 0.2)
                         : recommendation == '매도'
-                            ? Colors.red.withOpacity(0.2)
-                            : Colors.grey.withOpacity(0.2),
+                            ? Colors.red.withValues(alpha: 0.2)
+                            : Colors.grey.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
