@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
@@ -8,7 +7,7 @@ class ChartScraperService {
   /// Yahoo Finance에서 차트 이미지 스크랩
   static Future<String?> getYahooChartImage(String symbol) async {
     try {
-      print('📊 [Chart Scraper] Yahoo 차트 이미지 스크랩 시작: $symbol');
+      debugPrint('📊 [Chart Scraper] Yahoo 차트 이미지 스크랩 시작: $symbol');
       
       // 여러 Yahoo Finance 차트 이미지 URL 시도
       final chartUrls = [
@@ -24,14 +23,14 @@ class ChartScraperService {
       if (kIsWeb) {
         // 웹에서는 CORS 프록시 사용
         final proxyUrl = '$_corsProxy${Uri.encodeComponent(chartUrl)}';
-        print('🌐 [Chart Scraper] 프록시 URL: $proxyUrl');
+        debugPrint('🌐 [Chart Scraper] 프록시 URL: $proxyUrl');
         return proxyUrl;
       } else {
         // 모바일/데스크톱에서는 직접 접근
         return chartUrl;
       }
     } catch (e) {
-      print('❌ [Chart Scraper] Yahoo 차트 스크랩 실패: $e');
+      debugPrint('❌ [Chart Scraper] Yahoo 차트 스크랩 실패: $e');
       return null;
     }
   }
@@ -64,15 +63,15 @@ class ChartScraperService {
   /// 차트 이미지가 실제로 로드되는지 테스트
   static Future<bool> testChartImage(String imageUrl) async {
     try {
-      print('🧪 [Chart Scraper] 차트 이미지 테스트: $imageUrl');
+      debugPrint('🧪 [Chart Scraper] 차트 이미지 테스트: $imageUrl');
       
       final response = await http.head(Uri.parse(imageUrl));
       final isSuccess = response.statusCode == 200;
       
-      print('📊 [Chart Scraper] 테스트 결과: ${isSuccess ? "성공" : "실패"} (${response.statusCode})');
+      debugPrint('📊 [Chart Scraper] 테스트 결과: ${isSuccess ? "성공" : "실패"} (${response.statusCode})');
       return isSuccess;
     } catch (e) {
-      print('❌ [Chart Scraper] 테스트 실패: $e');
+      debugPrint('❌ [Chart Scraper] 테스트 실패: $e');
       return false;
     }
   }
@@ -82,7 +81,7 @@ class ChartScraperService {
     final charts = <String, String>{};
     
     try {
-      print('🔍 [Chart Scraper] 사용 가능한 차트 찾기: $symbol');
+      debugPrint('🔍 [Chart Scraper] 사용 가능한 차트 찾기: $symbol');
       
       // Yahoo 차트 이미지 테스트
       final yahooImage = await getYahooChartImage(symbol);
@@ -90,7 +89,7 @@ class ChartScraperService {
         final isWorking = await testChartImage(yahooImage);
         if (isWorking) {
           charts['yahoo_image'] = yahooImage;
-          print('✅ [Chart Scraper] Yahoo 차트 이미지 사용 가능');
+          debugPrint('✅ [Chart Scraper] Yahoo 차트 이미지 사용 가능');
         }
       }
       
@@ -112,13 +111,13 @@ class ChartScraperService {
       // 차트 이미지가 없는 경우 간단한 차트 위젯 표시
       if (charts.isEmpty) {
         charts['simple_chart'] = 'simple_chart';
-        print('⚠️ [Chart Scraper] 차트 이미지 없음, 간단한 차트 위젯 사용');
+        debugPrint('⚠️ [Chart Scraper] 차트 이미지 없음, 간단한 차트 위젯 사용');
       }
       
-      print('📊 [Chart Scraper] 총 ${charts.length}개 차트 소스 준비 완료');
+      debugPrint('📊 [Chart Scraper] 총 ${charts.length}개 차트 소스 준비 완료');
       return charts;
     } catch (e) {
-      print('❌ [Chart Scraper] 차트 소스 준비 실패: $e');
+      debugPrint('❌ [Chart Scraper] 차트 소스 준비 실패: $e');
       // 오류가 발생해도 기본 차트는 제공
       charts['simple_chart'] = 'simple_chart';
       return charts;

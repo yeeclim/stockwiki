@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/krx_loader.dart';
-import '../widgets/stock_card.dart';
-import '../models/stock.dart';
 
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
@@ -15,12 +14,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
   List<String> _themes = [];
-  Map<String, List<Map<String, dynamic>>> _themeRecommendations = {};
+  final Map<String, List<Map<String, dynamic>>> _themeRecommendations = {};
   List<Map<String, dynamic>> _topRecommendations = [];
   List<Map<String, dynamic>> _safeRecommendations = [];
   bool _isLoading = false;
   String _selectedSortBy = 'totalScore';
-  String _selectedRiskLevel = 'medium';
 
   @override
   void initState() {
@@ -55,7 +53,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         );
       }
     } catch (e) {
-      print('데이터 로드 오류: $e');
+      debugPrint('데이터 로드 오류: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -65,15 +63,6 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     if (value != null) {
       setState(() {
         _selectedSortBy = value;
-      });
-      _loadData();
-    }
-  }
-
-  void _onRiskLevelChanged(String? value) {
-    if (value != null) {
-      setState(() {
-        _selectedRiskLevel = value;
       });
       _loadData();
     }
@@ -105,13 +94,14 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   void _launchURL(String url) async {
     try {
       // url_launcher 패키지 사용
-      if (await canLaunch(url)) {
-        await launch(url);
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
       } else {
-        print('URL을 열 수 없습니다: $url');
+        debugPrint('URL을 열 수 없습니다: $url');
       }
     } catch (e) {
-      print('URL 실행 오류: $e');
+      debugPrint('URL 실행 오류: $e');
     }
   }
 
@@ -183,8 +173,6 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
 
   String _getHoldingPeriod(Map<String, dynamic> stock, String theme) {
     final totalScore = stock['totalScore'] as int;
-    final technicalScore = stock['technicalScore'] as int;
-    final fundamentalScore = stock['fundamentalScore'] as int;
     final marketCap = stock['marketCap'] as int;
     final symbol = stock['symbol'] as String;
     
@@ -534,7 +522,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: getRecommendationColor().withOpacity(0.1),
+                      color: getRecommendationColor().withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: getRecommendationColor()),
                     ),
@@ -659,7 +647,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color),
           ),

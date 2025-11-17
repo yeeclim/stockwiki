@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../services/fmp_service.dart';
-import '../widgets/stock_card.dart';
-import '../widgets/us_stock_chart_widget.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockSearchPage extends StatefulWidget {
@@ -22,7 +21,7 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
     final keyword = _controller.text.trim();
     if (keyword.isEmpty) return;
 
-    print('🚀 [US Stock Search] 검색 시작: $keyword');
+    debugPrint('🚀 [US Stock Search] 검색 시작: $keyword');
     
     setState(() {
       _isLoading = true;
@@ -30,19 +29,19 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
     });
 
     try {
-      print('📞 [US Stock Search] FMPService.fetchStocks 호출');
+      debugPrint('📞 [US Stock Search] FMPService.fetchStocks 호출');
       // 미국 주식 검색
       final results = await FMPService.fetchStocks(keyword);
-      print('📊 [US Stock Search] 검색 결과: ${results.length}개');
+      debugPrint('📊 [US Stock Search] 검색 결과: ${results.length}개');
       
       setState(() => _results = results);
-      print('✅ [US Stock Search] UI 업데이트 완료');
+      debugPrint('✅ [US Stock Search] UI 업데이트 완료');
     } catch (e) {
-      print('❌ [US Stock Search] 오류 발생: $e');
+      debugPrint('❌ [US Stock Search] 오류 발생: $e');
       setState(() => _error = '검색 중 오류 발생: $e');
     } finally {
       setState(() => _isLoading = false);
-      print('🏁 [US Stock Search] 검색 완료');
+      debugPrint('🏁 [US Stock Search] 검색 완료');
     }
   }
 

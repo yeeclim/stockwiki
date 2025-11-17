@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/news.dart';
 
 class NaverNewsService {
@@ -13,7 +14,7 @@ class NaverNewsService {
       final String baseUrl = Uri.base.origin;
       final uri = Uri.parse('$baseUrl/api/naver_news_python');
       
-      print('네이버 뉴스 API 호출: $keyword, maxResults: $maxResults');
+      debugPrint('네이버 뉴스 API 호출: $keyword, maxResults: $maxResults');
       
       final response = await http.post(
         uri,
@@ -26,15 +27,15 @@ class NaverNewsService {
         }),
       ).timeout(const Duration(seconds: 3));
 
-      print('네이버 뉴스 API 응답 상태: ${response.statusCode}');
+      debugPrint('네이버 뉴스 API 응답 상태: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        print('네이버 뉴스 API 응답 데이터: $jsonData');
+        debugPrint('네이버 뉴스 API 응답 데이터: $jsonData');
         
         if (jsonData['success'] == true && jsonData['results'] != null) {
           final results = jsonData['results'] as List<dynamic>;
-          print('네이버 뉴스 크롤링 성공: ${results.length}개');
+          debugPrint('네이버 뉴스 크롤링 성공: ${results.length}개');
           
           return results.map<News>((item) => News.fromJson({
                 'title': item['title']?.toString() ?? '',
@@ -44,16 +45,16 @@ class NaverNewsService {
                 'publishedAt': item['published_at']?.toString(),
               })).toList();
         } else {
-          print('네이버 뉴스 API 실패: ${jsonData['error']}');
+          debugPrint('네이버 뉴스 API 실패: ${jsonData['error']}');
         }
       } else {
-        print('네이버 뉴스 API HTTP 오류: ${response.statusCode}');
-        print('응답 본문: ${response.body}');
+        debugPrint('네이버 뉴스 API HTTP 오류: ${response.statusCode}');
+        debugPrint('응답 본문: ${response.body}');
       }
       
       return [];
     } catch (e) {
-      print('네이버 뉴스 크롤링 오류: $e');
+      debugPrint('네이버 뉴스 크롤링 오류: $e');
       return [];
     }
   }
@@ -67,14 +68,14 @@ class NaverNewsService {
       final naverNews = await searchNaverNews(keyword, maxResults: maxResults);
       
       if (naverNews.isNotEmpty) {
-        print('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
+        debugPrint('네이버 뉴스 크롤링 성공: ${naverNews.length}개');
         return naverNews;
       }
       
-      print('네이버 뉴스 크롤링 실패, 빈 결과 반환');
+      debugPrint('네이버 뉴스 크롤링 실패, 빈 결과 반환');
       return [];
     } catch (e) {
-      print('네이버 뉴스 크롤링 전체 실패: $e');
+      debugPrint('네이버 뉴스 크롤링 전체 실패: $e');
       return [];
     }
   }

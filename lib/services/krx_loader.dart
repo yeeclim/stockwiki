@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'dart:developer' as dev;
 
 class KrxLoader {
   // 테마별 추천 종목 데이터 (주달 기준 상위 10개 테마)
@@ -194,18 +191,30 @@ class KrxLoader {
     int score = 50; // 기본 점수
     
     // 이평선 분석
-    if (current > ma5) score += 10;
-    if (ma5 > ma20) score += 10;
-    if (ma20 > ma60) score += 10;
+    if (current > ma5) {
+      score += 10;
+    }
+    if (ma5 > ma20) {
+      score += 10;
+    }
+    if (ma20 > ma60) {
+      score += 10;
+    }
     
     // 거래량 분석
-    if (volume > 1500000) score += 10;
-    else if (volume < 800000) score -= 10;
+    if (volume > 1500000) {
+      score += 10;
+    } else if (volume < 800000) {
+      score -= 10;
+    }
     
     // 가격 위치 분석
     final pricePosition = (current - ma60) / ma60;
-    if (pricePosition > 0.1) score += 10;
-    else if (pricePosition < -0.1) score -= 10;
+    if (pricePosition > 0.1) {
+      score += 10;
+    } else if (pricePosition < -0.1) {
+      score -= 10;
+    }
     
     return score.clamp(0, 100);
   }
@@ -216,31 +225,49 @@ class KrxLoader {
     
     // 수익성 분석
     final profitMargin = profit / revenue;
-    if (profitMargin > 0.1) score += 20;
-    else if (profitMargin > 0.05) score += 10;
-    else if (profitMargin < 0) score -= 20;
+    if (profitMargin > 0.1) {
+      score += 20;
+    } else if (profitMargin > 0.05) {
+      score += 10;
+    } else if (profitMargin < 0) {
+      score -= 20;
+    }
     
     // 성장성 분석 (임시)
     final growthRate = 0.1 + (marketCap % 100) / 1000; // 10-20% 성장률 가정
-    if (growthRate > 0.15) score += 15;
-    else if (growthRate > 0.1) score += 10;
+    if (growthRate > 0.15) {
+      score += 15;
+    } else if (growthRate > 0.1) {
+      score += 10;
+    }
     
     // 안정성 분석 (시가총액 기반)
-    if (marketCap > 50000000000000) score += 15; // 대형주
-    else if (marketCap > 10000000000000) score += 10; // 중형주
+    if (marketCap > 50000000000000) {
+      score += 15; // 대형주
+    } else if (marketCap > 10000000000000) {
+      score += 10; // 중형주
+    }
     
     return score.clamp(0, 100);
   }
 
   // 추천 결정
   static String _getRecommendation(int totalScore) {
-    if (totalScore >= 80) return '강력매수';
-    else if (totalScore >= 70) return '매수';
-    else if (totalScore >= 60) return '약한매수';
-    else if (totalScore >= 50) return '관망';
-    else if (totalScore >= 40) return '약한매도';
-    else if (totalScore >= 30) return '매도';
-    else return '강력매도';
+    if (totalScore >= 80) {
+      return '강력매수';
+    } else if (totalScore >= 70) {
+      return '매수';
+    } else if (totalScore >= 60) {
+      return '약한매수';
+    } else if (totalScore >= 50) {
+      return '관망';
+    } else if (totalScore >= 40) {
+      return '약한매도';
+    } else if (totalScore >= 30) {
+      return '매도';
+    } else {
+      return '강력매도';
+    }
   }
 
   // 테마별 종합 투자 분석

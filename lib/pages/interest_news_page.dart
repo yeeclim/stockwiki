@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter/foundation.dart';
 import 'package:stockwiki/services/naver_news_service.dart';
 
 class InterestNewsPage extends StatefulWidget {
@@ -36,9 +35,9 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
           // News 객체를 Map으로 변환
           final newsMap = naverNews.map((news) => {
             'title': news.title,
-            'description': news.description ?? '',
+            'description': news.description,
             'link': news.link,
-            'source': news.source ?? '네이버 뉴스',
+            'source': news.source,
           }).toList();
           setState(() => _newsList = newsMap);
           debugPrint('네이버 뉴스 우선 표시: ${newsMap.length}개');
@@ -63,7 +62,6 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
   }
 
   Future<void> _fetchNewsFromAPIs(String keyword) async {
-    final lowerKeyword = keyword.toLowerCase();
     final String baseUrl = Uri.base.origin;
     final mkStockRssUri = Uri.parse('$baseUrl/api/mk_stock_rss');
 
@@ -230,7 +228,7 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.1),
+                                    color: Colors.blue.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -247,7 +245,7 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.withOpacity(0.1),
+                                      color: Colors.grey.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(

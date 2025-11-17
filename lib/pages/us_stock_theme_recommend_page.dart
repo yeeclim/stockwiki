@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../services/fmp_service.dart';
 import 'us_stock_detail_page.dart';
@@ -15,7 +16,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
   List<String> _sectors = [];
-  Map<String, List<Stock>> _sectorStocks = {};
+  final Map<String, List<Stock>> _sectorStocks = {};
   bool _isLoading = false;
 
   @override
@@ -43,7 +44,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
         });
       }
     } catch (e) {
-      print('Sector별 주식 로드 오류: $e');
+      debugPrint('Sector별 주식 로드 오류: $e');
     } finally {
       setState(() => _isLoading = false);
     }
