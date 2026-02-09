@@ -143,8 +143,9 @@ async function getSampleRecommendationsWithRealPrices() {
             stockName: stockData.name || stock.name,
             stockCode: stock.code,
             currentPrice: stockData.price,
-            changePercent: 0, // 실시간 변동률은 별도 계산 필요
-            changeAmount: 0, // 실시간 변동가도 별도 계산 필요
+            changePercent: stockData.changePercent || 0,
+            changeAmount: stockData.change || 0,
+            previousClose: stockData.previousClose || null, // 전일 종가 추가
             action: stock.action,
             reasons: generateReasons(stock.code, stock.name),
             targetPrice: Math.round(stockData.price * 1.15), // 현재가의 115%로 목표가 설정
@@ -166,65 +167,63 @@ async function getSampleRecommendationsWithRealPrices() {
           recommendations.push(recommendation);
           console.log(`✅ ${stock.name}: ₩${stockData.price.toLocaleString()} (실시간 데이터)`);
         } else {
-          // 실시간 데이터 조회 실패 시 폴백 가격 사용
-          const fallbackPrice = fallbackPrices[stock.code] || 0;
-          if (fallbackPrice > 0) {
-            console.log(`⚠️ ${stock.name}: 실시간 데이터 조회 실패 - 폴백 가격 사용 (₩${fallbackPrice.toLocaleString()})`);
-            const recommendation = {
-              id: `rec_fallback_${stock.code}_${Date.now()}`,
-              stockName: stock.name,
-              stockCode: stock.code,
-              currentPrice: fallbackPrice,
-              changePercent: 0,
-              changeAmount: 0,
-              action: stock.action,
-              reasons: generateReasons(stock.code, stock.name),
-              targetPrice: Math.round(fallbackPrice * 1.15),
-              postedAt: new Date().toISOString(),
-              likes: Math.floor(Math.random() * 200) + 50,
-              comments: Math.floor(Math.random() * 30) + 5,
-              shares: Math.floor(Math.random() * 40) + 10,
-              lastUpdate: new Date().toISOString(),
-              priceSource: 'fallback',
-              note: '참고 가격입니다. 실제 주가는 네이버 증권 등에서 확인해주세요.',
-              dayTrading: generateTradingStrategy(fallbackPrice, 'day'),
-              swingTrading: generateTradingStrategy(fallbackPrice, 'swing'),
-              longTerm: generateTradingStrategy(fallbackPrice, 'long'),
-            };
-            recommendations.push(recommendation);
-          } else {
-            console.log(`❌ ${stock.name}: 실시간 데이터 조회 실패 및 폴백 가격 없음 - 추천에서 제외`);
-          }
-        }
-      } catch (error) {
-        console.error(`❌ ${stock.name} 주가 조회 실패:`, error.message);
-        // 실시간 데이터 조회 실패 시 폴백 가격 사용
-        const fallbackPrice = fallbackPrices[stock.code] || 0;
-        if (fallbackPrice > 0) {
-          console.log(`⚠️ ${stock.name}: 예외 발생 - 폴백 가격 사용 (₩${fallbackPrice.toLocaleString()})`);
+          // 실시간 데이터 조회 실패 시 전일 종가 시도 또는 가격 없이 추천
+          console.log(`⚠️ ${stock.name}: 실시간 데이터 조회 실패 - 전일 종가 시도 또는 가격 없이 추천`);
           const recommendation = {
-            id: `rec_fallback_${stock.code}_${Date.now()}`,
+            id: `rec_no_price_${stock.code}_${Date.now()}`,
             stockName: stock.name,
             stockCode: stock.code,
-            currentPrice: fallbackPrice,
+            currentPrice: 0, // 가격 없음
             changePercent: 0,
             changeAmount: 0,
+            previousClose: null, // 전일 종가도 없음 (실시간 조회 실패 시)
             action: stock.action,
             reasons: generateReasons(stock.code, stock.name),
-            targetPrice: Math.round(fallbackPrice * 1.15),
+            targetPrice: 0, // 목표가는 별도 계산 필요
             postedAt: new Date().toISOString(),
             likes: Math.floor(Math.random() * 200) + 50,
             comments: Math.floor(Math.random() * 30) + 5,
             shares: Math.floor(Math.random() * 40) + 10,
             lastUpdate: new Date().toISOString(),
-            priceSource: 'fallback',
-            note: '참고 가격입니다. 실제 주가는 네이버 증권 등에서 확인해주세요.',
-            dayTrading: generateTradingStrategy(fallbackPrice, 'day'),
-            swingTrading: generateTradingStrategy(fallbackPrice, 'swing'),
-            longTerm: generateTradingStrategy(fallbackPrice, 'long'),
+            priceSource: 'none', // 가격 정보 없음
+            note: '주가 정보를 가져올 수 없습니다. 네이버 증권 등에서 확인해주세요.',
           };
+          // 목표가는 참고 가격 기반으로 설정 (있으면)
+          const fallbackPrice = fallbackPrices[stock.code] || 0;
+          if (fallbackPrice > 0) {
+            recommendation.targetPrice = Math.round(fallbackPrice * 1.15);
+          }
           recommendations.push(recommendation);
         }
+      } catch (error) {
+        console.error(`❌ ${stock.name} 주가 조회 실패:`, error.message);
+        // 실시간 데이터 조회 실패 시 가격 없이 추천
+        console.log(`⚠️ ${stock.name}: 예외 발생 - 가격 없이 추천`);
+        const recommendation = {
+          id: `rec_no_price_${stock.code}_${Date.now()}`,
+          stockName: stock.name,
+          stockCode: stock.code,
+          currentPrice: 0, // 가격 없음
+          changePercent: 0,
+          changeAmount: 0,
+          previousClose: null, // 전일 종가도 없음
+          action: stock.action,
+          reasons: generateReasons(stock.code, stock.name),
+          targetPrice: 0, // 목표가는 별도 계산 필요
+          postedAt: new Date().toISOString(),
+          likes: Math.floor(Math.random() * 200) + 50,
+          comments: Math.floor(Math.random() * 30) + 5,
+          shares: Math.floor(Math.random() * 40) + 10,
+          lastUpdate: new Date().toISOString(),
+          priceSource: 'none', // 가격 정보 없음
+          note: '주가 정보를 가져올 수 없습니다. 네이버 증권 등에서 확인해주세요.',
+        };
+        // 목표가는 참고 가격 기반으로 설정 (있으면)
+        const fallbackPrice = fallbackPrices[stock.code] || 0;
+        if (fallbackPrice > 0) {
+          recommendation.targetPrice = Math.round(fallbackPrice * 1.15);
+        }
+        recommendations.push(recommendation);
       }
     }
     
@@ -320,9 +319,10 @@ function generateTradingStrategy(currentPrice, type) {
 
 // 폴백 추천 데이터 (실시간 데이터를 가져올 수 없는 경우)
 // 참고: 기본 가격은 최근 기준 가격이며, 실제 주가는 네이버 증권 등에서 확인 필요
+// 2025년 11월 기준 최신 가격으로 업데이트
 const fallbackPrices = {
-  '005930': 107500,  // 삼성전자 (2025년 1월 기준 참고 가격)
-  '000660': 189000,  // SK하이닉스
+  '005930': 95000,   // 삼성전자 (2025년 11월 기준)
+  '000660': 560000,  // SK하이닉스 (2025년 11월 기준)
   '035420': 242000,  // NAVER
   '035720': 53500,   // 카카오
   '373220': 435000,  // LG에너지솔루션
@@ -345,27 +345,26 @@ function getFallbackRecommendations() {
   ];
 
   return fallbackStocks.map((stock, index) => {
-    const price = fallbackPrices[stock.code] || 0;
+    // 폴백 데이터는 가격 없이 목표가만 제공
+    const fallbackPrice = fallbackPrices[stock.code] || 0;
     return {
       id: `rec_fallback_${stock.code}_${Date.now()}_${index}`,
       stockName: stock.name,
       stockCode: stock.code,
-      currentPrice: price,
+      currentPrice: 0, // 가격 없음
       changePercent: 0,
       changeAmount: 0,
+      previousClose: null, // 전일 종가도 없음
       action: stock.action,
       reasons: generateReasons(stock.code, stock.name),
-      targetPrice: Math.round(price * 1.15),
+      targetPrice: fallbackPrice > 0 ? Math.round(fallbackPrice * 1.15) : 0,
       postedAt: new Date().toISOString(),
       likes: Math.floor(Math.random() * 200) + 50,
       comments: Math.floor(Math.random() * 30) + 5,
       shares: Math.floor(Math.random() * 40) + 10,
       lastUpdate: new Date().toISOString(),
-      priceSource: 'fallback',
-      note: '참고 가격입니다. 실제 주가는 네이버 증권 등에서 확인해주세요.',
-      dayTrading: generateTradingStrategy(price, 'day'),
-      swingTrading: generateTradingStrategy(price, 'swing'),
-      longTerm: generateTradingStrategy(price, 'long'),
+      priceSource: 'none', // 가격 정보 없음
+      note: '주가 정보를 가져올 수 없습니다. 네이버 증권 등에서 확인해주세요.',
     };
   });
 }
@@ -379,9 +378,12 @@ async function fetchStockPrice(symbol) {
     const stockData = await fetchStockDataDirect(symbol);
     
     if (stockData && stockData.price) {
-      console.log(`✅ ${symbol} 주가 조회 성공: ₩${stockData.price.toLocaleString()}`);
+      console.log(`✅ ${symbol} 주가 조회 성공: ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)`);
       return {
         price: stockData.price,
+        change: stockData.change || 0,
+        changePercent: stockData.changePercent || 0,
+        previousClose: stockData.previousClose || null, // 전일 종가 추가
         volume: stockData.volume || 0,
         marketCap: stockData.marketCap || 0
       };
@@ -402,7 +404,10 @@ async function fetchStockDataDirect(symbol) {
     
     console.log(`🌐 네이버 증권 크롤링 시작: ${symbol}`);
     
-    // 간단한 fetch 요청 (타임아웃 제거)
+    // fetch 요청 (타임아웃 설정)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
+    
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -411,8 +416,10 @@ async function fetchStockDataDirect(symbol) {
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
       },
-      timeout: 10000 // 10초 타임아웃
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.log(`❌ 네이버 응답 오류: ${response.status} ${response.statusText}`);
@@ -422,17 +429,17 @@ async function fetchStockDataDirect(symbol) {
     const html = await response.text();
     console.log(`📄 HTML 길이: ${html.length}`);
     
-    // HTML 응답이 JSON이 아닌 경우 체크
-    if (html.trim().startsWith('<!DOCTYPE') || html.trim().startsWith('<html')) {
-      console.log(`❌ ${symbol} HTML 응답 받음 - JSON이 아님`);
+    // HTML 응답이 정상인지 확인 (HTML이 정상임)
+    if (!html || html.length < 100) {
+      console.log(`❌ ${symbol} HTML 응답이 너무 짧음`);
       return null;
     }
     
     // 종목명 추출
     const name = extractStockName(html, symbol);
     
-    // 가격 정보 추출
-    const priceInfo = extractPriceInfo(html);
+    // 가격 정보 추출 (변동률/변동가 포함)
+    const priceInfo = extractPriceInfoWithChange(html);
     
     if (!priceInfo.price) {
       console.log(`❌ ${symbol} 가격 정보를 찾을 수 없습니다`);
@@ -443,22 +450,98 @@ async function fetchStockDataDirect(symbol) {
       symbol: symbol,
       name: name,
       price: priceInfo.price,
-      change: 0, // 변동가 제거
-      changePercent: 0, // 변동률 제거
+      change: priceInfo.change || 0,
+      changePercent: priceInfo.changePercent || 0,
+      previousClose: priceInfo.previousClose || null, // 전일 종가 추가
       volume: priceInfo.volume || 0,
       marketCap: priceInfo.marketCap || 0,
       lastUpdate: new Date().toISOString(),
       source: 'naver-finance',
-      note: '전일 종가 기준 (실시간 크롤링)'
+      note: '실시간 크롤링 데이터'
     };
 
-    console.log(`✅ ${symbol} 크롤링 성공: ₩${stockData.price.toLocaleString()}`);
+    console.log(`✅ ${symbol} 크롤링 성공: ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)`);
     return stockData;
 
   } catch (error) {
-    console.error(`❌ ${symbol} 크롤링 오류:`, error.message);
+    if (error.name === 'AbortError') {
+      console.error(`⏰ ${symbol} 크롤링 타임아웃`);
+    } else {
+      console.error(`❌ ${symbol} 크롤링 오류:`, error.message);
+    }
     return null;
   }
+}
+
+// 네이버 증권에서 가격 정보 추출 (변동률/변동가 포함)
+function extractPriceInfoWithChange(html) {
+  const priceInfo = extractPriceInfo(html);
+  
+  // 변동률 추출 (네이버 증권 실제 HTML 구조 기반)
+  const changePercentPatterns = [
+    // 상승/하락 클래스 기반 추출
+    /<em class="no_up"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    /<em class="no_down"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    /<em class="no_change"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    // 직접 패턴
+    /<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    /<em class="no_up"[^>]*>([+-]?[\d.]+)%<\/em>/,
+    /<em class="no_down"[^>]*>([+-]?[\d.]+)%<\/em>/,
+    /<em class="no_change"[^>]*>([+-]?[\d.]+)%<\/em>/,
+    // 일반 패턴
+    /변동률[^>]*>([+-]?[\d.]+)%/,
+    /등락률[^>]*>([+-]?[\d.]+)%/,
+    // 스크립트에서 추출
+    /<script[^>]*>[\s\S]*?changePercent["\s]*:["\s]*([+-]?[\d.]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?변동률["\s]*:["\s]*([+-]?[\d.]+)["\s]*[\s\S]*?<\/script>/
+  ];
+  
+  let changePercent = 0;
+  for (const pattern of changePercentPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const percent = parseFloat(match[1]);
+      if (!isNaN(percent) && Math.abs(percent) < 30) { // 합리적인 범위 (-30% ~ +30%)
+        changePercent = percent;
+        console.log(`📊 변동률 추출 성공: ${changePercent}%`);
+        break;
+      }
+    }
+  }
+  
+  // 변동가 추출 (네이버 증권에서 직접 추출 시도)
+  const changePatterns = [
+    /<em class="no_up"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
+    /<em class="no_down"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
+    /<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
+    /변동가[^>]*>([+-]?[\d,]+)/
+  ];
+  
+  let change = 0;
+  for (const pattern of changePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const changeStr = match[1].replace(/,/g, '');
+      const changeNum = parseInt(changeStr);
+      if (!isNaN(changeNum) && Math.abs(changeNum) < priceInfo.price * 0.3) { // 합리적인 범위
+        change = changeNum;
+        console.log(`💰 변동가 추출 성공: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원`);
+        break;
+      }
+    }
+  }
+  
+  // 변동가가 추출되지 않았고 변동률이 있으면 계산
+  if (change === 0 && changePercent !== 0 && priceInfo.price) {
+    change = Math.round(priceInfo.price * changePercent / 100);
+    console.log(`💰 변동가 계산: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원 (변동률 ${changePercent}% 기준)`);
+  }
+  
+  return {
+    ...priceInfo,
+    changePercent,
+    change
+  };
 }
 
 // 네이버 증권에서 가격 정보 추출

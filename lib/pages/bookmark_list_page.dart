@@ -108,34 +108,21 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey[900],
-        title: const Text(
-          '📑 북마크 목록',
-          style: TextStyle(color: Colors.white),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadBookmarks,
-            tooltip: '새로고침',
-          ),
-        ],
+        title: const Text('📑 북마크 목록'),
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.blue),
+      return Center(
+        child: CircularProgressIndicator(color: theme.colorScheme.primary),
       );
     }
 
@@ -147,22 +134,20 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
             Icon(
               Icons.bookmark_border,
               size: 64,
-              color: Colors.grey[600],
+              color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 16),
             Text(
               '북마크된 종목이 없습니다',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 18,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'AI 종목 추천에서 관심 종목을 북마크하세요',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -172,7 +157,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
     return RefreshIndicator(
       onRefresh: _loadBookmarks,
-      color: Colors.blue,
+      color: theme.colorScheme.primary,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _bookmarks.length,
@@ -185,6 +170,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
   }
 
   Widget _buildBookmarkCard(Map<String, dynamic> bookmark) {
+    final theme = Theme.of(context);
     final stockName = bookmark['stockName'] as String? ?? 'N/A';
     final stockCode = bookmark['stockCode'] as String? ?? 'N/A';
     final currentPrice = bookmark['currentPrice'] as int? ?? 0;
@@ -200,7 +186,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.grey[900],
+      elevation: theme.cardTheme.elevation,
+      color: theme.cardTheme.color,
+      shape: theme.cardTheme.shape,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -215,31 +203,29 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                     children: [
                       Text(
                         stockName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
+                        style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         stockCode,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.bookmark, color: Colors.blue),
+                  icon: Icon(Icons.bookmark, color: theme.colorScheme.primary),
                   onPressed: () => _removeBookmark(stockCode, stockName),
                   tooltip: '북마크 제거',
                 ),
               ],
             ),
-            const Divider(color: Colors.grey),
+            Divider(color: theme.dividerColor),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -249,18 +235,16 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                   children: [
                     Text(
                       '현재가',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _formatPrice(currentPrice),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -270,20 +254,18 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                   children: [
                     Text(
                       '목표가',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _formatPrice(targetPrice),
-                      style: TextStyle(
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                         color: priceDiffPercent > 0
                             ? Colors.green
                             : Colors.red,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -301,10 +283,10 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                   ),
                   decoration: BoxDecoration(
                     color: recommendation == '매수'
-                        ? Colors.green.withValues(alpha: 0.2)
+                        ? Colors.green.withOpacity(0.2)
                         : recommendation == '매도'
-                            ? Colors.red.withValues(alpha: 0.2)
-                            : Colors.grey.withValues(alpha: 0.2),
+                            ? Colors.red.withOpacity(0.2)
+                            : Colors.grey.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -323,11 +305,10 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                 if (priceDiffPercent != 0)
                   Text(
                     '${priceDiffPercent > 0 ? '+' : ''}${priceDiffPercent.toStringAsFixed(1)}%',
-                    style: TextStyle(
+                    style: theme.textTheme.bodyLarge?.copyWith(
                       color: priceDiffPercent > 0
                           ? Colors.green
                           : Colors.red,
-                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -335,21 +316,19 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
             ),
             if (reason.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Divider(color: Colors.grey),
+              Divider(color: theme.dividerColor),
               const SizedBox(height: 8),
               Text(
                 '추천 근거',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 reason,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
                 ),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -357,12 +336,12 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
             ],
             if (bookmarkedAt != null) ...[
               const SizedBox(height: 12),
-              const Divider(color: Colors.grey),
+              Divider(color: theme.dividerColor),
               const SizedBox(height: 8),
               Text(
                 '북마크한 시간: ${_formatDate(bookmarkedAt)}',
-                style: TextStyle(
-                  color: Colors.grey[500],
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),

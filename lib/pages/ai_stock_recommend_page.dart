@@ -192,6 +192,8 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
         currentPrice: item['currentPrice'] ?? 0, // null이면 0으로 처리
         changePercent: (item['changePercent'] ?? 0).toDouble(),
         changeAmount: item['changeAmount'] ?? 0,
+        previousClose: item['previousClose'], // 전일 종가 추가
+        priceSource: item['priceSource'], // 가격 출처 추가 (real-time, fallback 등)
         action: item['action'] ?? '보유',
         reasons: List<String>.from(item['reasons'] ?? []),
         targetPrice: item['targetPrice'] ?? 0,
@@ -240,27 +242,37 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        foregroundColor: theme.appBarTheme.foregroundColor,
+        elevation: 0,
         title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('🤖 AI 종목 추천', style: TextStyle(color: Colors.white)),
+            Text(
+              '🤖 AI 종목 추천',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
             if (_lastUpdated != null)
               Text(
                 '마지막 업데이트: ${_formatLastUpdated(_lastUpdated!)}',
-                style: TextStyle(
-                  color: Colors.grey[400],
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
           ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -353,301 +365,453 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   }
 
   Widget _buildRecommendationCard(StockRecommendation rec) {
-    final isPositive = rec.changePercent >= 0;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[800]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 헤더 (AI 프로필 + 시간)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.blue[700],
-                    borderRadius: BorderRadius.circular(20),
+    // Determine card color and border based on recommendation action
+    Color actionColor;
+    switch (rec.action) {
+      case '강력매수':
+      case '매수':
+        actionColor = Colors.red;
+        break;
+      case '매도':
+      case '강력매도':
+        actionColor = Colors.blue;
+        break;
+      default:
+        actionColor = Colors.grey;
+    }
+
+    return Card(
+      elevation: theme.cardTheme.elevation,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.cardTheme.color,
+      shape: theme.cardTheme.shape,
+      child: Padding(
+        padding: const EdgeInsets.all(0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 헤더 (AI 프로필 + 시간)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(Icons.auto_graph, color: theme.colorScheme.primary, size: 24),
                   ),
-                  child: const Icon(Icons.auto_graph, color: Colors.white, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'StockWiki AI',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'StockWiki AI',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatTimeAgo(rec.postedAt),
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 13,
+                        Text(
+                          _formatTimeAgo(rec.postedAt),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                _buildActionBadge(rec.action),
-              ],
+                  _buildActionBadge(rec.action),
+                ],
+              ),
             ),
-          ),
 
-          // 종목 정보
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 종목명
-                Row(
-                  children: [
-                    const Text(
-                      '🎯 ',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    Text(
-                      '${rec.stockName} (${rec.stockCode})',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+            Divider(height: 1, color: theme.dividerColor),
 
-                // 가격 정보
-                Row(
-                  children: [
-                    Text(
-                      '현재가: ',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (rec.currentPrice > 0) ...[
-                      Text(
-                        '₩${_formatPrice(rec.currentPrice)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isPositive ? Colors.red[900]?.withValues(alpha: 0.3) : Colors.blue[900]?.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${isPositive ? '▲' : '▼'} ${rec.changePercent.abs().toStringAsFixed(2)}% (${isPositive ? '+' : ''}${_formatPrice(rec.changeAmount)})',
-                          style: TextStyle(
-                            color: isPositive ? Colors.red[400] : Colors.blue[400],
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[900]?.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '최신 데이터 없음',
-                          style: TextStyle(
-                            color: Colors.orange[400],
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // 추천 근거
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[850],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            // 종목 정보
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 종목명과 현재가
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '📊 추천 근거',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...rec.reasons.map((reason) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
+                      Expanded(
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '• ',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 14,
+                              rec.stockName,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
-                            Expanded(
-                              child: Text(
-                                reason,
-                                style: TextStyle(
-                                  color: Colors.grey[300],
-                                  fontSize: 14,
-                                  height: 1.4,
-                                ),
+                            const SizedBox(width: 8),
+                            Text(
+                              rec.stockCode,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
-                      )),
-                      const SizedBox(height: 8),
+                      ),
+                      /* 현재가 표시 (옵션)
+                      if (rec.currentPrice > 0)
+                        Text(
+                          '₩${_formatPrice(rec.currentPrice)}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: rec.changePercent >= 0 ? Colors.red : Colors.blue,
+                          ),
+                        ),
+                      */
                     ],
                   ),
-                ),
+                  const SizedBox(height: 16),
 
-                // 투자 전략 (단타/스윙/중장기) - 현재가 기준으로 동적 계산
-                const SizedBox(height: 12),
-                _buildTradingStrategies(rec, rec.currentPrice),
-              ],
+                  // 기간별 목표가 표시 (단타/스윙/중장기)
+                  _buildTargetPrices(rec),
+                  const SizedBox(height: 16),
+
+                  // 추천 근거
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.lightbulb_outline, 
+                              size: 16, 
+                              color: theme.colorScheme.primary
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '추천 근거',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...rec.reasons.map((reason) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '• ',
+                                style: TextStyle(
+                                  color: theme.colorScheme.secondary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  reason,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    height: 1.4,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+
+                  // 투자 전략 (단타/스윙/중장기)
+                  const SizedBox(height: 12),
+                  _buildTradingStrategies(rec, rec.currentPrice > 0 ? rec.currentPrice : (rec.previousClose ?? 0)),
+                ],
+              ),
+            ),
+            
+            // 인터랙션 버튼 (하단 바)
+            Container(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: theme.dividerColor)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildInteractionButton(
+                    icon: Icons.comment_outlined,
+                    count: rec.comments,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${rec.stockName} 댓글 기능은 준비 중입니다.'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildInteractionButton(
+                    icon: Icons.repeat,
+                    count: rec.shares,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    onTap: () => _shareRecommendation(rec),
+                  ),
+                  _buildInteractionButton(
+                    icon: _likedStocks.contains(rec.stockCode) 
+                        ? Icons.favorite 
+                        : Icons.favorite_border,
+                    count: rec.likes + (_likedStocks.contains(rec.stockCode) ? 1 : 0),
+                    color: _likedStocks.contains(rec.stockCode) 
+                        ? Colors.red 
+                        : theme.colorScheme.onSurfaceVariant,
+                    activeColor: Colors.red,
+                    onTap: () {
+                      setState(() {
+                        if (_likedStocks.contains(rec.stockCode)) {
+                          _likedStocks.remove(rec.stockCode);
+                        } else {
+                          _likedStocks.add(rec.stockCode);
+                        }
+                      });
+                    },
+                  ),
+                  _buildInteractionButton(
+                    icon: _bookmarkedStocks.contains(rec.stockCode)
+                        ? Icons.bookmark
+                        : Icons.bookmark_border,
+                    count: null,
+                    color: _bookmarkedStocks.contains(rec.stockCode)
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                    onTap: () async {
+                      if (_bookmarkedStocks.contains(rec.stockCode)) {
+                        final success = await BookmarkService.removeBookmark(rec.stockCode);
+                        if (success) {
+                          setState(() => _bookmarkedStocks.remove(rec.stockCode));
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${rec.stockName} 북마크에서 제거되었습니다.')),
+                            );
+                          }
+                        }
+                      } else {
+                        final details = {
+                          'stockName': rec.stockName,
+                          'stockCode': rec.stockCode,
+                          'currentPrice': rec.currentPrice,
+                          'targetPrice': rec.targetPrice,
+                          'recommendation': rec.action,
+                          'reason': rec.reasons.join('\n'),
+                          'likes': rec.likes,
+                        };
+                        final success = await BookmarkService.addBookmark(rec.stockCode, details);
+                        if (success) {
+                          setState(() => _bookmarkedStocks.add(rec.stockCode));
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${rec.stockName} 북마크에 추가되었습니다.')),
+                            );
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 기간별 목표가 표시
+  Widget _buildTargetPrices(StockRecommendation rec) {
+    final theme = Theme.of(context);
+    // 기준 가격 계산 (현재가 > 전일 종가 > 참고 가격)
+    int basePrice = 0;
+    String priceLabel = '';
+    
+    if (rec.currentPrice > 0 && rec.priceSource == 'real-time') {
+      basePrice = rec.currentPrice;
+      priceLabel = '현재가 기준';
+    } else if (rec.previousClose != null && rec.previousClose! > 0) {
+      basePrice = rec.previousClose!;
+      priceLabel = '전일 종가 기준';
+    } else {
+      // 참고 가격 사용 (fallbackPrices에서 가져오거나 targetPrice 역산)
+      if (rec.targetPrice > 0) {
+        basePrice = (rec.targetPrice / 1.15).round(); // 목표가의 역산
+        priceLabel = '참고 가격 기준';
+      } else {
+        // 가격 정보가 전혀 없으면 기본 목표가만 표시
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '🎯 목표가',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '주가 정보를 가져올 수 없어 목표가를 계산할 수 없습니다.\n네이버 증권 등에서 확인해주세요.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+    }
+
+    // 기간별 목표가 계산
+    final dayTarget = (basePrice * 1.03).round(); // 단타: +3%
+    final swingTarget = (basePrice * 1.08).round(); // 스윙: +8%
+    final longTarget = (basePrice * 1.20).round(); // 중장기: +20%
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              '🎯 기간별 목표가',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (priceLabel.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  priceLabel,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildTargetPriceCard(
+                title: '단타',
+                period: '1~3일',
+                targetPrice: dayTarget,
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildTargetPriceCard(
+                title: '스윙',
+                period: '1주~1개월',
+                targetPrice: swingTarget,
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildTargetPriceCard(
+                title: '중장기',
+                period: '3개월~1년',
+                targetPrice: longTarget,
+                color: Colors.green,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTargetPriceCard({
+    required String title,
+    required String period,
+    required int targetPrice,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            period,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 10,
             ),
           ),
-
-          const SizedBox(height: 16),
-
-          // 인터랙션 버튼 (트위터 스타일)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildInteractionButton(
-                  icon: Icons.comment_outlined,
-                  count: rec.comments,
-                  color: Colors.grey[500]!,
-                  onTap: () {
-                    // 댓글 기능 (추후 구현)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${rec.stockName} 댓글 기능은 준비 중입니다.'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                ),
-                _buildInteractionButton(
-                  icon: Icons.repeat,
-                  count: rec.shares,
-                  color: Colors.grey[500]!,
-                  onTap: () {
-                    // 공유 기능
-                    _shareRecommendation(rec);
-                  },
-                ),
-                _buildInteractionButton(
-                  icon: _likedStocks.contains(rec.stockCode) 
-                      ? Icons.favorite 
-                      : Icons.favorite_border,
-                  count: rec.likes + (_likedStocks.contains(rec.stockCode) ? 1 : 0),
-                  color: _likedStocks.contains(rec.stockCode) 
-                      ? Colors.red 
-                      : Colors.grey[500]!,
-                  activeColor: Colors.red,
-                  onTap: () {
-                    setState(() {
-                      if (_likedStocks.contains(rec.stockCode)) {
-                        _likedStocks.remove(rec.stockCode);
-                      } else {
-                        _likedStocks.add(rec.stockCode);
-                      }
-                    });
-                  },
-                ),
-                _buildInteractionButton(
-                  icon: _bookmarkedStocks.contains(rec.stockCode)
-                      ? Icons.bookmark
-                      : Icons.bookmark_border,
-                  count: null,
-                  color: _bookmarkedStocks.contains(rec.stockCode)
-                      ? Colors.blue
-                      : Colors.grey[500]!,
-                  onTap: () async {
-                    if (_bookmarkedStocks.contains(rec.stockCode)) {
-                      // 북마크 제거
-                      final success = await BookmarkService.removeBookmark(rec.stockCode);
-                      if (success) {
-                        setState(() {
-                          _bookmarkedStocks.remove(rec.stockCode);
-                        });
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${rec.stockName} 북마크에서 제거되었습니다.'),
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        }
-                      }
-                    } else {
-                      // 북마크 추가
-                      final details = {
-                        'stockName': rec.stockName,
-                        'stockCode': rec.stockCode,
-                        'currentPrice': rec.currentPrice,
-                        'targetPrice': rec.targetPrice,
-                        'recommendation': rec.action, // 'action' 필드 사용
-                        'reason': rec.reasons.join('\n'), // 'reasons' 리스트를 문자열로 변환
-                        'likes': rec.likes,
-                      };
-                      final success = await BookmarkService.addBookmark(rec.stockCode, details);
-                      if (success) {
-                        setState(() {
-                          _bookmarkedStocks.add(rec.stockCode);
-                        });
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${rec.stockName} 북마크에 추가되었습니다.'),
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                ),
-              ],
+          const SizedBox(height: 8),
+          Text(
+            '₩${_formatPrice(targetPrice)}',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -655,19 +819,20 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     );
   }
 
-  Widget _buildTradingStrategies(StockRecommendation rec, int currentPrice) {
+  Widget _buildTradingStrategies(StockRecommendation rec, int basePrice) {
+    final theme = Theme.of(context);
     final strategies = <Widget>[];
 
-    // 현재가가 0이면 계산하지 않음
-    if (currentPrice <= 0) {
+    // 기준 가격(현재가 또는 전일 종가)이 0이면 계산하지 않음
+    if (basePrice <= 0) {
       return const SizedBox.shrink();
     }
 
-    // 단타 전략 (현재가 기준으로 동적 계산)
+    // 단타 전략 (기준 가격으로 동적 계산)
     strategies.add(_buildStrategyCard(
       title: '🎯 단타',
       subtitle: '1~3일',
-      currentPrice: currentPrice,
+      currentPrice: basePrice,
       buyPricePercent: 99.5,
       sellPricePercent: 103.0,
       stopLossPercent: 98.0,
@@ -679,7 +844,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     strategies.add(_buildStrategyCard(
       title: '📊 스윙',
       subtitle: '1주~1개월',
-      currentPrice: currentPrice,
+      currentPrice: basePrice,
       buyPricePercent: 98.5,
       sellPricePercent: 108.0,
       stopLossPercent: 96.0,
@@ -691,7 +856,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     strategies.add(_buildStrategyCard(
       title: '📈 중장기',
       subtitle: '3개월~1년',
-      currentPrice: currentPrice,
+      currentPrice: basePrice,
       buyPricePercent: 100.0,
       sellPricePercent: 120.0,
       stopLossPercent: 93.0,
@@ -706,9 +871,8 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       children: [
         Text(
           '💼 투자 전략',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 13,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -736,6 +900,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     required double expectedReturn,
     required Color color,
   }) {
+    final theme = Theme.of(context);
     // 현재가 기준으로 동적 계산
     final buyPrice = (currentPrice * buyPricePercent / 100).round();
     final sellPrice = (currentPrice * sellPricePercent / 100).round();
@@ -745,9 +910,16 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       width: 180,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[850],
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha:0.3), width: 1),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+         boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -757,9 +929,8 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
             children: [
               Text(
                 title,
-                style: TextStyle(
+                style: theme.textTheme.labelMedium?.copyWith(
                   color: color,
-                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -767,15 +938,15 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha:0.2),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '+${expectedReturn.toStringAsFixed(1)}%',
-                  style: TextStyle(
+                  style: theme.textTheme.labelSmall?.copyWith(
                     color: color,
-                    fontSize: 10,
                     fontWeight: FontWeight.bold,
+                    fontSize: 10,
                   ),
                 ),
               ),
@@ -784,8 +955,8 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: TextStyle(
-              color: Colors.grey[500],
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
               fontSize: 10,
             ),
           ),
@@ -797,16 +968,14 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
             children: [
               Text(
                 '매수',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
                 '₩${_formatPrice(buyPrice)}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -820,16 +989,14 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
             children: [
               Text(
                 '매도',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
                 '₩${_formatPrice(sellPrice)}',
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: color,
-                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -843,16 +1010,14 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
             children: [
               Text(
                 '손절',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
                 '₩${_formatPrice(stopLoss)}',
-                style: const TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.red,
-                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -866,23 +1031,24 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   Widget _buildActionBadge(String action) {
     Color bgColor;
     Color textColor;
+    final theme = Theme.of(context);
     
     switch (action) {
       case '매수':
-        bgColor = Colors.red[900]!.withValues(alpha:0.3);
-        textColor = Colors.red[400]!;
+        bgColor = Colors.red.withOpacity(0.1);
+        textColor = Colors.red;
         break;
       case '매도':
-        bgColor = Colors.blue[900]!.withValues(alpha:0.3);
-        textColor = Colors.blue[400]!;
+        bgColor = Colors.blue.withOpacity(0.1);
+        textColor = Colors.blue;
         break;
       case '보유':
-        bgColor = Colors.grey[800]!;
-        textColor = Colors.grey[400]!;
+        bgColor = theme.colorScheme.surfaceVariant;
+        textColor = theme.colorScheme.onSurfaceVariant;
         break;
       default:
-        bgColor = Colors.grey[800]!;
-        textColor = Colors.grey[400]!;
+        bgColor = theme.colorScheme.surfaceVariant;
+        textColor = theme.colorScheme.onSurfaceVariant;
     }
 
     return Container(
@@ -1013,6 +1179,8 @@ class StockRecommendation {
   final int currentPrice;
   final double changePercent;
   final int changeAmount;
+  final int? previousClose; // 전일 종가 추가
+  final String? priceSource; // 가격 출처 (real-time, fallback 등)
   final String action; // 매수, 매도, 보유
   final List<String> reasons;
   final int targetPrice;
@@ -1030,6 +1198,8 @@ class StockRecommendation {
     required this.currentPrice,
     required this.changePercent,
     required this.changeAmount,
+    this.previousClose,
+    this.priceSource,
     required this.action,
     required this.reasons,
     required this.targetPrice,

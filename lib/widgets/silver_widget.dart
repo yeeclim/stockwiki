@@ -272,55 +272,96 @@ class _SilverWidgetState extends State<SilverWidget> {
       krwPerDon = _silverPrice! * krwPerUsd * ozToDon;
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accentColor = Colors.blueGrey;
+
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      color: theme.cardTheme.color,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.colorScheme.outline.withOpacity(0.1),
+        ),
+      ),
       child: Container(
+        height: 110,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.grey.shade700,
-              Colors.grey.shade900,
-            ],
+            colors: isDark
+                ? [accentColor.withOpacity(0.15), Colors.transparent]
+                : [accentColor.withOpacity(0.1), Colors.transparent],
           ),
         ),
-        child: SizedBox(
-          height: 80,
-          child: Center(
-            child: _isLoading
-                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                : _error != null
-                    ? Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 14))
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Silver (XAG/USD)',
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
-                          ),
-                          Text(
-                            '\$${_silverPrice!.toStringAsFixed(2)} / oz',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (krwPerDon != null)
-                            Text(
-                              '약 ${krwPerDon.toStringAsFixed(0)}KRW / 돈',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.trending_neutral, // Or another icon
+                    color: accentColor,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Silver',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            if (_isLoading)
+               Center(
+                  child: SizedBox(
+                    width: 20, 
+                    height: 20, 
+                    child: CircularProgressIndicator(strokeWidth: 2, color: accentColor)
+                  )
+               )
+            else if (_error != null)
+              Center(
+                child: Text(
+                  _error!,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                )
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '\$${_silverPrice!.toStringAsFixed(2)}',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: accentColor, 
+                    ),
+                  ),
+                  if (krwPerDon != null)
+                    Text(
+                      '약 ${krwPerDon.toStringAsFixed(0)}원 / 돈',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
-          ),
+                    ),
+                ],
+              ),
+          ],
         ),
       ),
     );

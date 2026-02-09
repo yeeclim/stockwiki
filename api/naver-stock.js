@@ -47,9 +47,107 @@ export default async function handler(req, res) {
 
 async function fetchStockData(symbol) {
   try {
-    const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
+    // 1단계: 네이버 증권 실시간 API 시도 (여러 엔드포인트 시도)
+    const apiEndpoints = [
+      `https://api.finance.naver.com/service/itemSummary.nhn?itemcode=${symbol}`,
+      `https://m.stock.naver.com/api/item/stock.nhn?code=${symbol}`,
+      `https://finance.naver.com/item/main.nhn?code=${symbol}`
+    ];
+
+    for (const apiUrl of apiEndpoints) {
+      try {
+        console.log(`📡 네이버 실시간 API 시도: ${apiUrl}`);
+        
+        const apiResponse = await fetch(apiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://finance.naver.com/',
+          }
+        });
+
+        if (apiResponse.ok) {
+          const apiText = await apiResponse.text();
+          
+          // JSONP 형식일 수 있으므로 파싱 시도
+          try {
+            // JSONP 제거 시도
+            let jsonText = apiText.trim();
+            if (jsonText.startsWith('(') || jsonText.includes('(')) {
+              jsonText = jsonText.replace(/^[^(]*\(/, '').replace(/\);?$/, '');
+            }
+            
+            const apiData = JSON.parse(jsonText);
+            
+            // 다양한 응답 형식 처리
+            let price, change, changePercent, volume, name;
+            
+            if (apiData.nowVal) {
+              // itemSummary.nhn 형식
+              price = parseInt(apiData.nowVal.replace(/,/g, ''));
+              change = parseInt((apiData.diffVal || '0').replace(/,/g, ''));
+              changePercent = parseFloat(apiData.rate || '0');
+              volume = parseInt((apiData.quant || '0').replace(/,/g, ''));
+              name = apiData.itemName;
+              
+              // 전일 종가 계산 (현재가 - 변동가)
+              const previousClose = price - change;
+            } else if (apiData.result) {
+              // stock.nhn 형식
+              const result = apiData.result;
+              price = parseInt((result.now || result.price || '0').replace(/,/g, ''));
+              change = parseInt((result.diff || result.change || '0').replace(/,/g, ''));
+              changePercent = parseFloat(result.rate || result.changePercent || '0');
+              volume = parseInt((result.quant || result.volume || '0').replace(/,/g, ''));
+              name = result.name || result.itemName;
+            } else if (apiData.price) {
+              // 직접 price 필드
+              price = parseInt(apiData.price.toString().replace(/,/g, ''));
+              change = parseInt((apiData.change || apiData.diff || '0').toString().replace(/,/g, ''));
+              changePercent = parseFloat(apiData.changePercent || apiData.rate || '0');
+              volume = parseInt((apiData.volume || apiData.quant || '0').toString().replace(/,/g, ''));
+              name = apiData.name || apiData.itemName;
+            }
+            
+            if (price && price > 0) {
+              // 전일 종가 계산 (현재가 - 변동가)
+              const previousClose = change !== undefined && change !== null 
+                ? price - change 
+                : (changePercent !== 0 ? Math.round(price / (1 + changePercent / 100)) : null);
+              
+              const stockData = {
+                symbol: symbol,
+                name: name || getStockName(symbol),
+                price: price,
+                change: change || 0,
+                changePercent: changePercent || 0,
+                previousClose: previousClose || null, // 전일 종가
+                volume: volume || 0,
+                marketCap: 0, // API에서 제공하지 않음
+                lastUpdate: new Date().toISOString(),
+                source: 'naver-api',
+                note: '실시간 API 데이터'
+              };
+              
+              console.log(`✅ 실시간 API 성공: ${stockData.name} - ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)${previousClose ? ` | 전일종가: ₩${previousClose.toLocaleString()}` : ''}`);
+              return stockData;
+            }
+          } catch (parseError) {
+            // 다음 엔드포인트 시도
+            continue;
+          }
+        }
+      } catch (apiError) {
+        // 다음 엔드포인트 시도
+        continue;
+      }
+    }
     
-    console.log(`네이버 증권 크롤링: ${url}`);
+    console.log(`⚠️ 모든 실시간 API 실패, HTML 크롤링으로 전환`);
+
+    // 2단계: HTML 크롤링 (폴백)
+    const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
+    console.log(`🌐 네이버 증권 HTML 크롤링: ${url}`);
     
     const response = await fetch(url, {
       headers: {
@@ -63,44 +161,156 @@ async function fetchStockData(symbol) {
     });
 
     if (!response.ok) {
-      console.log(`네이버 응답 오류: ${response.status}`);
+      console.log(`❌ 네이버 응답 오류: ${response.status}`);
       return null;
     }
 
     const html = await response.text();
-    console.log(`HTML 길이: ${html.length}`);
+    console.log(`📄 HTML 길이: ${html.length}`);
     
     // 종목명 추출
     const name = extractStockName(html, symbol);
     
-    // 가격 정보 추출
-    const priceInfo = extractPriceInfo(html);
+    // 가격 정보 추출 (변동률/변동가 포함)
+    const priceInfo = extractPriceInfoWithChange(html);
     
     if (!priceInfo.price) {
-      console.log('가격 정보를 찾을 수 없습니다');
+      console.log('❌ 가격 정보를 찾을 수 없습니다');
       return null;
     }
+
+    // 전일 종가 계산 (현재가 - 변동가)
+    const previousClose = priceInfo.change !== undefined && priceInfo.change !== null && priceInfo.change !== 0
+      ? priceInfo.price - priceInfo.change
+      : (priceInfo.changePercent !== 0 && priceInfo.changePercent !== null
+          ? Math.round(priceInfo.price / (1 + priceInfo.changePercent / 100))
+          : null);
 
     const stockData = {
       symbol: symbol,
       name: name,
       price: priceInfo.price,
-      change: 0, // 변동가 제거
-      changePercent: 0, // 변동률 제거
+      change: priceInfo.change || 0,
+      changePercent: priceInfo.changePercent || 0,
+      previousClose: previousClose, // 전일 종가
       volume: priceInfo.volume || 0,
       marketCap: priceInfo.marketCap || 0,
       lastUpdate: new Date().toISOString(),
       source: 'naver-finance',
-      note: '전일 종가 기준 (실시간 크롤링)'
+      note: 'HTML 크롤링 데이터 (거의 실시간)'
     };
 
-    console.log('크롤링 성공:', stockData);
+    console.log(`✅ HTML 크롤링 성공: ${stockData.name} - ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)${previousClose ? ` | 전일종가: ₩${previousClose.toLocaleString()}` : ''}`);
     return stockData;
 
   } catch (error) {
-    console.error('크롤링 오류:', error);
+    console.error('❌ 크롤링 오류:', error);
     return null;
   }
+}
+
+// 네이버 증권에서 가격 정보 추출 (변동률/변동가/전일종가 포함)
+function extractPriceInfoWithChange(html) {
+  const priceInfo = extractPriceInfo(html);
+  
+  // 전일 종가 직접 추출 시도
+  const previousClosePatterns = [
+    /전일[^>]*>([\d,]+)/,
+    /종가[^>]*>([\d,]+)/,
+    /전일종가[^>]*>([\d,]+)/,
+    /<td[^>]*>전일[^>]*>([\d,]+)<\/td>/,
+    /<span[^>]*>전일[^>]*>([\d,]+)<\/span>/,
+    /<script[^>]*>[\s\S]*?previousClose["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?전일종가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?yesterdayClose["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/
+  ];
+  
+  let previousClose = null;
+  for (const pattern of previousClosePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const closeStr = match[1].replace(/,/g, '');
+      const closeNum = parseInt(closeStr);
+      if (!isNaN(closeNum) && closeNum > 0 && closeNum < 10000000) { // 합리적인 범위
+        previousClose = closeNum;
+        console.log(`📅 전일 종가 추출 성공: ₩${previousClose.toLocaleString()}`);
+        break;
+      }
+    }
+  }
+  
+  // 전일 종가가 추출되지 않았고 변동가가 있으면 계산
+  if (!previousClose && priceInfo.price && priceInfo.change !== undefined && priceInfo.change !== null && priceInfo.change !== 0) {
+    previousClose = priceInfo.price - priceInfo.change;
+    console.log(`📅 전일 종가 계산: ₩${previousClose.toLocaleString()} (현재가 ${priceInfo.price.toLocaleString()} - 변동가 ${priceInfo.change.toLocaleString()})`);
+  }
+  
+  // 변동률 추출 (네이버 증권 실제 HTML 구조 기반)
+  const changePercentPatterns = [
+    // 상승/하락 클래스 기반 추출
+    /<em class="no_up"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    /<em class="no_down"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    /<em class="no_change"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    // 직접 패턴
+    /<span class="blind"[^>]*>([+-]?[\d.]+)%<\/span>/,
+    /<em class="no_up"[^>]*>([+-]?[\d.]+)%<\/em>/,
+    /<em class="no_down"[^>]*>([+-]?[\d.]+)%<\/em>/,
+    /<em class="no_change"[^>]*>([+-]?[\d.]+)%<\/em>/,
+    // 일반 패턴
+    /변동률[^>]*>([+-]?[\d.]+)%/,
+    /등락률[^>]*>([+-]?[\d.]+)%/,
+    // 스크립트에서 추출
+    /<script[^>]*>[\s\S]*?changePercent["\s]*:["\s]*([+-]?[\d.]+)["\s]*[\s\S]*?<\/script>/,
+    /<script[^>]*>[\s\S]*?변동률["\s]*:["\s]*([+-]?[\d.]+)["\s]*[\s\S]*?<\/script>/
+  ];
+  
+  let changePercent = 0;
+  for (const pattern of changePercentPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const percent = parseFloat(match[1]);
+      if (!isNaN(percent) && Math.abs(percent) < 30) { // 합리적인 범위 (-30% ~ +30%)
+        changePercent = percent;
+        console.log(`📊 변동률 추출 성공: ${changePercent}%`);
+        break;
+      }
+    }
+  }
+  
+  // 변동가 추출 (네이버 증권에서 직접 추출 시도)
+  const changePatterns = [
+    /<em class="no_up"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
+    /<em class="no_down"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
+    /<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
+    /변동가[^>]*>([+-]?[\d,]+)/
+  ];
+  
+  let change = 0;
+  for (const pattern of changePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const changeStr = match[1].replace(/,/g, '');
+      const changeNum = parseInt(changeStr);
+      if (!isNaN(changeNum) && Math.abs(changeNum) < priceInfo.price * 0.3) { // 합리적인 범위
+        change = changeNum;
+        console.log(`💰 변동가 추출 성공: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원`);
+        break;
+      }
+    }
+  }
+  
+  // 변동가가 추출되지 않았고 변동률이 있으면 계산
+  if (change === 0 && changePercent !== 0 && priceInfo.price) {
+    change = Math.round(priceInfo.price * changePercent / 100);
+    console.log(`💰 변동가 계산: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원 (변동률 ${changePercent}% 기준)`);
+  }
+  
+  return {
+    ...priceInfo,
+    changePercent,
+    change,
+    previousClose
+  };
 }
 
 function extractStockName(html, symbol) {

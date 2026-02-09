@@ -1,5 +1,5 @@
-// 📄 lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:stockwiki/theme/app_theme.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
 import 'package:stockwiki/widgets/usdkrw_widget.dart';
 import 'package:stockwiki/widgets/gold_widget.dart';
@@ -15,10 +15,11 @@ import 'package:stockwiki/pages/us_stock_ai_recommend_page.dart';
 import 'package:stockwiki/pages/us_stock_theme_recommend_page.dart';
 import 'package:stockwiki/pages/us_stock_ai_committee_page.dart';
 
+// Global Theme Notifier
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+
 void main() {
-  // 캐시 무효화를 위한 설정
   WidgetsFlutterBinding.ensureInitialized();
-  
   runApp(const MyApp());
 }
 
@@ -27,14 +28,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'StockWiki',
-      theme: ThemeData.dark().copyWith(
-        textTheme: ThemeData.dark().textTheme.apply(
-          fontFamily: 'NotoSansKR',
-        ),
-      ),
-      home: const StockSearchPage(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        return MaterialApp(
+          title: 'StockWiki',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: currentMode,
+          debugShowCheckedModeBanner: false,
+          home: const StockSearchPage(),
+        );
+      },
     );
   }
 }
@@ -55,16 +60,29 @@ class _StockSearchPageState extends State<StockSearchPage> {
     });
   }
 
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
+        title: Text(
+          'StockWiki',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        centerTitle: false,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
         actions: [
           Builder(
             builder: (BuildContext innerContext) {
               return IconButton(
-                icon: const Icon(Icons.menu),
+                icon: Icon(Icons.menu, color: theme.colorScheme.onSurface),
                 onPressed: () {
                   Scaffold.of(innerContext).openEndDrawer();
                 },
@@ -74,36 +92,77 @@ class _StockSearchPageState extends State<StockSearchPage> {
         ],
       ),
       endDrawer: Drawer(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: theme.colorScheme.surface,
         child: Column(
           children: [
             Container(
-              color: Colors.grey[850],
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('📊 StockWiki 메뉴', style: TextStyle(fontSize: 20, color: Colors.white)),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () {
-                      Navigator.of(context).maybePop();
-                    },
-                  ),
-                ],
+              child: SafeArea(
+                bottom: false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '📊 메뉴',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
+                      onPressed: () {
+                        Navigator.of(context).maybePop();
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  // 테마 설정
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    child: Text(
+                      '설정',
+                      style: TextStyle(
+                        color: theme.colorScheme.secondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    title: Text(
+                      "다크 모드",
+                      style: TextStyle(color: theme.colorScheme.onSurface),
+                    ),
+                    secondary: Icon(
+                      Icons.dark_mode,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    value: themeNotifier.value == ThemeMode.dark,
+                    onChanged: (val) {
+                      themeNotifier.value =
+                          val ? ThemeMode.dark : ThemeMode.light;
+                    },
+                  ),
+
+                  Divider(height: 1, color: theme.dividerColor),
+
                   // 공통 기능 섹션
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                     child: Text(
                       '공통',
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: theme.colorScheme.secondary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
@@ -111,8 +170,8 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     ),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.psychology, color: Colors.white),
-                    title: const Text("알고리즘 설명", style: TextStyle(color: Colors.white)),
+                    leading: Icon(Icons.psychology, color: theme.colorScheme.onSurface),
+                    title: Text("알고리즘 설명", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
@@ -121,41 +180,36 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.bookmark_outline, color: Colors.white),
-                    title: const Text("북마크 목록", style: TextStyle(color: Colors.white)),
+                    leading: Icon(Icons.bookmark_outline, color: theme.colorScheme.onSurface),
+                    title: Text("북마크 목록", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const BookmarkListPage()),
                       );
                     },
                   ),
-                  
-                  // 구분선
-                  Divider(color: Colors.grey[800], height: 1),
-                  
+
+                  Divider(height: 1, color: theme.dividerColor),
+
                   // 한국 주식 섹션
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          '🇰🇷 한국 주식',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '🇰🇷 한국 주식',
+                      style: TextStyle(
+                        color: theme.colorScheme.secondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                   ListTile(
                     leading: const Icon(Icons.auto_graph, color: Colors.blue),
-                    title: const Text("AI 종목 추천", style: TextStyle(color: Colors.white)),
+                    title: Text("AI 종목 추천", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const AiStockRecommendPage()),
                       );
@@ -163,40 +217,35 @@ class _StockSearchPageState extends State<StockSearchPage> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.trending_up, color: Colors.blue),
-                    title: const Text("테마별 추천 종목", style: TextStyle(color: Colors.white)),
+                    title: Text("테마별 추천 종목", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const ThemeRecommendationsPage()),
                       );
                     },
                   ),
-                  
-                  // 구분선
-                  Divider(color: Colors.grey[800], height: 1),
-                  
+
+                  Divider(height: 1, color: theme.dividerColor),
+
                   // 미국 주식 섹션
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          '🇺🇸 미국 주식',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '🇺🇸 미국 주식',
+                      style: TextStyle(
+                        color: theme.colorScheme.secondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                   ListTile(
                     leading: const Icon(Icons.search, color: Colors.green),
-                    title: const Text("주식 검색", style: TextStyle(color: Colors.white)),
+                    title: Text("주식 검색", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const UsStockSearchPage()),
                       );
@@ -204,9 +253,9 @@ class _StockSearchPageState extends State<StockSearchPage> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.auto_graph, color: Colors.green),
-                    title: const Text("AI 종목 추천", style: TextStyle(color: Colors.white)),
+                    title: Text("AI 종목 추천", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const UsStockAiRecommendPage()),
                       );
@@ -214,9 +263,9 @@ class _StockSearchPageState extends State<StockSearchPage> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.trending_up, color: Colors.green),
-                    title: const Text("Sector별 추천 종목", style: TextStyle(color: Colors.white)),
+                    title: Text("Sector별 추천 종목", style: TextStyle(color: theme.colorScheme.onSurface)),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const UsStockThemeRecommendPage()),
                       );
@@ -224,13 +273,13 @@ class _StockSearchPageState extends State<StockSearchPage> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.groups, color: Colors.green),
-                    title: const Text("AI 검증위원회", style: TextStyle(color: Colors.white)),
+                    title: Text("AI 검증위원회", style: TextStyle(color: theme.colorScheme.onSurface)),
                     subtitle: Text(
                       '다중 AI 검증',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
                     ),
                     onTap: () {
-                      Navigator.of(context).pop(); // 드로어 닫기
+                      Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const UsStockAiCommitteePage()),
                       );
@@ -252,36 +301,54 @@ class _StockSearchPageState extends State<StockSearchPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
-              // 헤더 섹션
-              Center(
-                child: GestureDetector(
-                  onTap: _refresh,
-                  child: Column(
-                    children: [
-                      const Text(
-                        'StockWiki',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '실시간 시장 정보',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[400],
-                          fontWeight: FontWeight.w300,
-                        ),
-                      ),
-                    ],
+              // 헤더 섹션 (App Bar로 이동했으므로 제거하거나 환영 메시지로 변경)
+               Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [Colors.blueGrey.shade900, Colors.blueGrey.shade800]
+                        : [Colors.blue.shade50, Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '실시간 시장 정보',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '오늘의 시장 흐름을\n확인하세요.',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 30),
-              // 주요 기능 버튼
+
+              // 주요 기능 버튼 (디자인 개선)
               Row(
                 children: [
                   Expanded(
@@ -293,87 +360,88 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       },
                       icon: const Icon(Icons.trending_up),
                       label: const Text(
-                        '테마별 추천 종목',
+                        '테마별 추천 종목 확인하기',
                         textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[600],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 2,
-                        alignment: Alignment.center,
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
+
               // 금융 상품 섹션
               if (_showWidgets) ...[
-                Text(
-                  '금융 상품',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[300],
-                  ),
-                ),
-                const SizedBox(height: 12),
+                _buildSectionTitle(context, '금융 상품'),
+                const SizedBox(height: 16),
                 const Row(
                   children: [
                     Expanded(child: GoldWidget()),
-                    SizedBox(width: 12),
+                    SizedBox(width: 16),
                     Expanded(child: SilverWidget()),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 32),
+
                 // 시장 지표 섹션
-                Text(
-                  '시장 지표',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[300],
-                  ),
-                ),
-                const SizedBox(height: 12),
+                _buildSectionTitle(context, '시장 지표'),
+                const SizedBox(height: 16),
                 const Row(
                   children: [
                     Expanded(child: UsdKrwWidget()),
-                    SizedBox(width: 12),
+                    SizedBox(width: 16),
                     Expanded(child: FearGreedWidget()),
                   ],
                 ),
-              const SizedBox(height: 20),
-              // 에너지 섹션
-              Text(
-                '에너지',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[300],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const WtiWidget(),
-              const SizedBox(height: 20),
-              // 암호화폐 섹션
-              Text(
-                '암호화폐',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[300],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const BtcWidget(),
-              const SizedBox(height: 20),
+                const SizedBox(height: 32),
+
+                // 에너지 섹션
+                _buildSectionTitle(context, '에너지'),
+                const SizedBox(height: 16),
+                const WtiWidget(),
+                const SizedBox(height: 32),
+
+                // 암호화폐 섹션
+                _buildSectionTitle(context, '암호화폐'),
+                const SizedBox(height: 16),
+                const BtcWidget(),
+                const SizedBox(height: 40),
               ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+      ],
     );
   }
 }

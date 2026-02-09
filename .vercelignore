@@ -1,26 +1,13 @@
-# Flutter 관련 파일들 (빌드 결과물 제외)
-lib/
-test/
+# Vercel에서 무시할 파일들
 android/
 ios/
 linux/
 macos/
 windows/
-analysis_options.yaml
-pubspec.yaml
-pubspec.lock
-.dart_tool/
-.packages
-
-# 개발 관련 파일들
+test/
 scripts/
-node_modules/
-*.log
 *.md
-.git/
+!README.md
 .gitignore
-
-# 기타 불필요한 파일들
-*.iml
-.DS_Store
-Thumbs.db
+analysis_options.yaml
+pubspec.lock
