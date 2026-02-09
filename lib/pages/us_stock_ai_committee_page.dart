@@ -370,32 +370,40 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        foregroundColor: theme.appBarTheme.foregroundColor,
         title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('🎯 AI 검증위원회', style: TextStyle(color: Colors.white)),
+            Text(
+              '🎯 AI 검증위원회',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
             if (_lastUpdated != null)
               Text(
                 '마지막 업데이트: ${_formatLastUpdated(_lastUpdated!)}',
-                style: TextStyle(
-                  color: Colors.grey[400],
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
           ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
             onPressed: _searchQuery.isNotEmpty && !_isLoading
                 ? () => _searchStock(_searchQuery)
                 : null,
@@ -408,12 +416,13 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     return Column(
       children: [
         // 검색창
         Container(
           padding: const EdgeInsets.all(16),
-          color: Colors.grey[850],
+          color: theme.colorScheme.surface,
           child: Column(
             children: [
               Row(
@@ -421,20 +430,24 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      style: const TextStyle(color: Colors.white),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
                       decoration: InputDecoration(
                         hintText: '주식 검색 (예: AAPL, 삼성전자, 005930)',
-                        hintStyle: const TextStyle(color: Colors.grey),
+                        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         filled: true,
-                        fillColor: Colors.grey[800],
+                        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, color: Colors.grey),
+                                icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant),
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() {});
@@ -450,13 +463,16 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   ElevatedButton(
                     onPressed: _isLoading ? null : () => _searchStock(_searchController.text),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[600],
-                      foregroundColor: Colors.white,
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 16,
                       ),
-                      minimumSize: const Size(100, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      minimumSize: const Size(100, 56),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -479,9 +495,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               const SizedBox(height: 8),
               Text(
                 '💡 미국주식(예: AAPL) 또는 국내주식(예: 삼성전자, 005930)을 검색하세요',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -497,21 +512,22 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   }
 
   Widget _buildResults() {
+    final theme = Theme.of(context);
     if (_isLoading) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: Colors.blue),
+            CircularProgressIndicator(color: theme.colorScheme.primary),
             const SizedBox(height: 16),
             Text(
               'AI 검증위원회가 분석 중입니다...',
-              style: TextStyle(color: Colors.grey[400]),
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             Text(
               'ChatGPT, Gemini, Ollama 모델이 동시에 검증하고 있습니다',
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 12),
             ),
           ],
         ),
@@ -523,11 +539,11 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: const TextStyle(color: Colors.white70),
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -535,6 +551,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               onPressed: _searchQuery.isNotEmpty && !_isLoading
                   ? () => _searchStock(_searchQuery)
                   : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+              ),
               child: const Text('다시 시도'),
             ),
           ],
@@ -542,56 +562,57 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       );
     }
 
-    if (!_isSearching && _recommendations.isEmpty && !_isLoading) {
+    if (!_isSearching && _recommendations.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.verified_user, color: Colors.green[400], size: 64),
-            const SizedBox(height: 16),
-            const Text(
-              'AI 검증위원회',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.verified_user, color: Colors.green[400], size: 64),
+              const SizedBox(height: 16),
+              Text(
+                'AI 검증위원회',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '위 검색창에 주식을 입력하고\nAI 검증위원회의 검증을 받아보세요',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
+              const SizedBox(height: 8),
+              Text(
+                '위 검색창에 주식을 입력하고\nAI 검증위원회의 검증을 받아보세요',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '🔍 검증 프로세스',
-                    style: TextStyle(
-                      color: Colors.green[400],
-                      fontWeight: FontWeight.bold,
+              const SizedBox(height: 24),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '🔍 검증 프로세스',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.green[400],
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildProcessStep('1', '주식 검색', '미국주식 또는 국내주식 검색'),
-                  _buildProcessStep('2', 'AI 분석', 'ChatGPT, Gemini, Ollama가 동시 분석'),
-                  _buildProcessStep('3', '결과 검증', '여러 AI의 의견을 비교하여 검증도 계산'),
-                  _buildProcessStep('4', '리포팅', '종합 분석 결과를 리포트로 제공'),
-                ],
+                    const SizedBox(height: 12),
+                    _buildProcessStep('1', '주식 검색', '미국주식 또는 국내주식 검색'),
+                    _buildProcessStep('2', 'AI 분석', 'ChatGPT, Gemini, Ollama가 동시 분석'),
+                    _buildProcessStep('3', '결과 검증', '여러 AI의 의견을 비교하여 검증도 계산'),
+                    _buildProcessStep('4', '리포팅', '종합 분석 결과를 리포트로 제공'),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -619,11 +640,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               children: [
                 Icon(Icons.star, color: Colors.amber, size: 20),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   '추천 종목',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -634,9 +654,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       _recommendations = [];
                     });
                   },
-                  child: const Text(
+                  child: Text(
                     '숨기기',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -652,6 +672,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   }
 
   Widget _buildProcessStep(String number, String title, String description) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -661,15 +682,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: Colors.green[600],
+              color: theme.colorScheme.primary,
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
                 number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onPrimary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -682,17 +702,16 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   description,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -704,12 +723,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   }
 
   Widget _buildRecommendationCard(CommitteeRecommendation rec) {
+    final theme = Theme.of(context);
     final stock = rec.stock;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Card(
-        color: Colors.grey[800],
-        elevation: 2,
+        elevation: theme.cardTheme.elevation,
+        color: theme.cardTheme.color,
+        shape: theme.cardTheme.shape,
         child: InkWell(
           onTap: () {
             Navigator.push(
@@ -719,6 +740,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               ),
             );
           },
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -734,23 +756,22 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                         children: [
                           Text(
                             stock.name,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             stock.symbol,
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     // 검증도 배지
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -759,7 +780,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       ),
                       decoration: BoxDecoration(
                         color: _getVerificationColor(rec.verificationScore)
-                            .withValues(alpha:0.2),
+                            .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: _getVerificationColor(rec.verificationScore),
@@ -793,48 +814,46 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 
                 const SizedBox(height: 12),
                 
-                      // 가격 정보
+                // 가격 정보
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (stock.price != null) ...[
+                      Text(
+                        _formatPrice(stock),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                    if (stock.changePercent != null) ...[
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          if (stock.price != null) ...[
-                            Text(
-                              _formatPrice(stock),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          Icon(
+                            stock.changePercent! >= 0
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            color: stock.changePercent! >= 0
+                                ? Colors.green
+                                : Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: stock.changePercent! >= 0
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
-                          if (stock.changePercent != null) ...[
-                            Row(
-                              children: [
-                                Icon(
-                                  stock.changePercent! >= 0
-                                      ? Icons.trending_up
-                                      : Icons.trending_down,
-                                  color: stock.changePercent! >= 0
-                                      ? Colors.green
-                                      : Colors.red,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
-                                  style: TextStyle(
-                                    color: stock.changePercent! >= 0
-                                        ? Colors.green
-                                        : Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                          ),
                         ],
                       ),
+                    ],
+                  ],
+                ),
                 
                 const SizedBox(height: 12),
                 
@@ -843,10 +862,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue[900]?.withValues(alpha: 0.2),
+                      color: theme.colorScheme.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.blue[700] ?? Colors.blue,
+                        color: theme.colorScheme.primary.withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -857,15 +876,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                           children: [
                             Icon(
                               Icons.assessment,
-                              color: Colors.blue[400],
+                              color: theme.colorScheme.primary,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               '종합 분석 리포트',
-                              style: TextStyle(
-                                color: Colors.blue[400],
-                                fontSize: 15,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -874,9 +892,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                         const SizedBox(height: 12),
                         Text(
                           rec.summary,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface,
                             height: 1.6,
                           ),
                         ),
@@ -886,15 +903,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   const SizedBox(height: 12),
                 ],
                 
-                const Divider(color: Colors.grey, height: 1),
+                Divider(color: theme.dividerColor, height: 1),
                 const SizedBox(height: 12),
                 
                 // AI 모델별 상세 의견
                 Text(
                   'AI 위원회 상세 의견:',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -903,9 +919,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 if (rec.models.isEmpty)
                   Text(
                     'AI 모델 응답을 불러오는 중...',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   )
                 else
@@ -914,7 +929,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey[700]?.withValues(alpha: 0.3),
+                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -929,7 +944,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _getModelColor(model.modelName)
-                                      .withValues(alpha:0.2),
+                                      .withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -949,7 +964,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _getActionColor(model.recommendation)
-                                      .withValues(alpha:0.2),
+                                      .withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -967,9 +982,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                             const SizedBox(height: 8),
                             Text(
                               model.reasoning,
-                              style: TextStyle(
-                                color: Colors.grey[300],
-                                fontSize: 12,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                                 height: 1.4,
                               ),
                             ),
@@ -985,22 +999,21 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: (Colors.grey[700] ?? Colors.grey).withValues(alpha:0.3),
+                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.handshake,
-                        color: Colors.blue[400],
+                        color: theme.colorScheme.primary,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '합의도: ${rec.agreement}',
-                        style: TextStyle(
-                          color: Colors.grey[300],
-                          fontSize: 12,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],

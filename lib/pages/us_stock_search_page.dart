@@ -47,15 +47,23 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('StockWiki – 미국 주식 검색'),
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          'StockWiki – 미국 주식 검색',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        iconTheme: theme.iconTheme,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
             onPressed: () {
               _controller.clear();
               setState(() {
@@ -77,57 +85,82 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                   child: TextField(
                     controller: _controller,
                     onSubmitted: (_) => _search(),
-                    style: const TextStyle(color: Colors.white),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Search keyword (예: Apple, AAPL)',
-                      hintStyle: const TextStyle(color: Colors.grey),
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                       filled: true,
-                      fillColor: Colors.grey[900],
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                      ),
+                      prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
                       suffixIcon: IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white),
+                        icon: Icon(Icons.arrow_forward, color: theme.colorScheme.primary),
                         onPressed: _search,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  onPressed: _search,
-                  tooltip: '검색 새로고침',
                 ),
               ],
             ),
             const SizedBox(height: 20),
             if (_isLoading)
-              const CircularProgressIndicator()
+              Center(
+                child: CircularProgressIndicator(
+                  color: theme.colorScheme.primary,
+                ),
+              )
             else if (_error.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.red[900],
-                  borderRadius: BorderRadius.circular(8),
+                  color: theme.colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error, color: Colors.red),
+                    Icon(Icons.error, color: theme.colorScheme.error),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _error,
-                        style: const TextStyle(color: Colors.white),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
                       ),
                     ),
                   ],
                 ),
               )
             else if (_results.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: const Text(
-                  '미국 주식 검색 결과가 없습니다.',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    const SizedBox(height: 16),
+                    Text(
+                      '검색 결과가 없습니다.',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
@@ -138,53 +171,109 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                     final stock = _results[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Column(
-                        children: [
-                          Card(
-                            color: Colors.grey[800],
-                            child: ListTile(
-                              title: Text(
-                                stock.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      child: Card(
+                        elevation: theme.cardTheme.elevation,
+                        color: theme.cardTheme.color,
+                        shape: theme.cardTheme.shape,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UsStockDetailPage(stock: stock),
                               ),
-                              subtitle: Text(
-                                '${stock.symbol} - \$${stock.price?.toStringAsFixed(2) ?? 'N/A'}',
-                                style: TextStyle(color: Colors.grey[300]),
-                              ),
-                              trailing: stock.changePercent != null
-                                  ? Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
-                                          style: TextStyle(
-                                            color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Icon(
-                                          stock.changePercent! >= 0 ? Icons.trending_up : Icons.trending_down,
-                                          color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
-                                          size: 16,
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => UsStockDetailPage(stock: stock),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                );
-                              },
+                                  child: Center(
+                                    child: Text(
+                                      stock.symbol.substring(0, 1),
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        stock.name,
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${stock.symbol} • US',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '\$${stock.price?.toStringAsFixed(2) ?? '-'}',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    if (stock.changePercent != null) ...[
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (stock.changePercent! >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              stock.changePercent! >= 0 ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                                              color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                              size: 16,
+                                            ),
+                                            Text(
+                                              '${stock.changePercent!.abs().toStringAsFixed(2)}%',
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     );
                   },

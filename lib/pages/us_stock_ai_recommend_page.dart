@@ -61,32 +61,41 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        foregroundColor: theme.appBarTheme.foregroundColor,
+        elevation: 0,
         title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('🤖 AI 미국 주식 추천', style: TextStyle(color: Colors.white)),
+            Text(
+              '🤖 AI 미국 주식 추천',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
             if (_lastUpdated != null)
               Text(
                 '마지막 업데이트: ${_formatLastUpdated(_lastUpdated!)}',
-                style: TextStyle(
-                  color: Colors.grey[400],
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
           ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
             onPressed: _loadRecommendations,
             tooltip: '새로고침',
           ),
@@ -97,9 +106,10 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.blue),
+      return Center(
+        child: CircularProgressIndicator(color: theme.colorScheme.primary),
       );
     }
 
@@ -108,16 +118,20 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: const TextStyle(color: Colors.white70),
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadRecommendations,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+              ),
               child: const Text('다시 시도'),
             ),
           ],
@@ -130,11 +144,11 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.refresh, color: Colors.blue, size: 48),
+            Icon(Icons.refresh, color: theme.colorScheme.primary, size: 48),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '추천 주식을 불러오는 중입니다',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 8),
             TextButton(
@@ -148,6 +162,7 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
 
     return RefreshIndicator(
       onRefresh: _loadRecommendations,
+      color: theme.colorScheme.primary,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _recommendations.length,
@@ -157,8 +172,9 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Card(
-              color: Colors.grey[800],
-              elevation: 2,
+              elevation: theme.cardTheme.elevation,
+              color: theme.cardTheme.color,
+              shape: theme.cardTheme.shape,
               child: InkWell(
                 onTap: () {
                   Navigator.push(
@@ -168,6 +184,7 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                     ),
                   );
                 },
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -183,18 +200,16 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                               children: [
                                 Text(
                                   stock.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    color: theme.colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   stock.symbol,
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -207,7 +222,7 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _getScoreColor(rec.score).withValues(alpha: 0.2),
+                              color: _getScoreColor(rec.score).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: _getScoreColor(rec.score),
@@ -248,10 +263,9 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                           if (stock.price != null) ...[
                             Text(
                               '\$${stock.price!.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
+                              style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -270,12 +284,11 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                                 const SizedBox(width: 4),
                                 Text(
                                   '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
-                                  style: TextStyle(
+                                  style: theme.textTheme.titleMedium?.copyWith(
                                     color: stock.changePercent! >= 0
                                         ? Colors.green
                                         : Colors.red,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 16,
                                   ),
                                 ),
                               ],
@@ -288,13 +301,12 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                       
                       // 추천 이유
                       if (rec.reasons.isNotEmpty) ...[
-                        const Divider(color: Colors.grey, height: 1),
+                        Divider(color: theme.dividerColor, height: 1),
                         const SizedBox(height: 8),
                         Text(
                           '추천 이유:',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 12,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -314,9 +326,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                               Expanded(
                                 child: Text(
                                   reason,
-                                  style: TextStyle(
-                                    color: Colors.grey[300],
-                                    fontSize: 12,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),

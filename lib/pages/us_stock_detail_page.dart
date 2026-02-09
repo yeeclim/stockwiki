@@ -79,18 +79,22 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           '${widget.stock.name} (${widget.stock.symbol})',
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        backgroundColor: Colors.grey[900],
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        iconTheme: theme.appBarTheme.iconTheme,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
             onPressed: () {
               _loadStockDetail();
               _loadStockNews();
@@ -120,6 +124,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   }
 
   Widget _buildStockInfoCard() {
+    final theme = Theme.of(context);
     final stock = _stockDetail ?? widget.stock;
     final price = stock.price ?? 0.0;
     final change = stock.change ?? 0.0;
@@ -127,7 +132,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     final isPositive = change >= 0;
 
     return Card(
-      color: Colors.grey[800],
+      elevation: theme.cardTheme.elevation,
+      color: theme.cardTheme.color,
+      shape: theme.cardTheme.shape,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -142,34 +149,31 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                     children: [
                       Text(
                         stock.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
+                        style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       Text(
                         stock.symbol,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 16,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
                 if (_isLoadingDetail)
-                  const CircularProgressIndicator()
+                  CircularProgressIndicator(color: theme.colorScheme.primary)
                 else
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
                         '\$${price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
+                        style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       Row(
@@ -183,9 +187,8 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                           const SizedBox(width: 4),
                           Text(
                             '${change >= 0 ? '+' : ''}${change.toStringAsFixed(2)} (${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%)',
-                            style: TextStyle(
+                            style: theme.textTheme.titleMedium?.copyWith(
                               color: isPositive ? Colors.green : Colors.red,
-                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -199,7 +202,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             
             // 추가 정보
             if (stock.volume != null || stock.marketCap != null) ...[
-              const Divider(color: Colors.grey),
+              Divider(color: theme.dividerColor),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -228,17 +231,17 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red[900],
+                  color: theme.colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error, color: Colors.red, size: 20),
+                    Icon(Icons.error, color: theme.colorScheme.onErrorContainer, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: theme.colorScheme.onErrorContainer),
                       ),
                     ),
                   ],
@@ -252,23 +255,22 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   }
 
   Widget _buildInfoItem(String label, String value) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 12,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
           ),
         ),
       ],
@@ -276,8 +278,11 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   }
 
   Widget _buildNewsSection() {
+    final theme = Theme.of(context);
     return Card(
-      color: Colors.grey[800],
+      elevation: theme.cardTheme.elevation,
+      color: theme.cardTheme.color,
+      shape: theme.cardTheme.shape,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -286,23 +291,25 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   '관련 뉴스',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 if (_isLoadingNews)
-                  const SizedBox(
+                  SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary,
+                    ),
                   )
                 else
                   IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
                     onPressed: _loadStockNews,
                   ),
               ],
@@ -312,12 +319,11 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             if (_newsList.isEmpty && !_isLoadingNews)
               Container(
                 padding: const EdgeInsets.all(20),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '뉴스를 불러올 수 없습니다',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -331,11 +337,12 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   }
 
   Widget _buildNewsItem(News news) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[700],
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(8),
       ),
       child: InkWell(
@@ -345,10 +352,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
           children: [
             Text(
               news.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -357,9 +363,8 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
               const SizedBox(height: 8),
               Text(
                 news.description,
-                style: TextStyle(
-                  color: Colors.grey[300],
-                  fontSize: 12,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -371,17 +376,15 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
               children: [
                 Text(
                   news.source,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 11,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 if (news.publishedAt != null && news.publishedAt!.isNotEmpty)
                   Text(
                     _formatDate(news.publishedAt!),
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 11,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],
@@ -403,7 +406,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('링크를 열 수 없습니다: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }

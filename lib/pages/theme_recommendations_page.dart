@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/krx_loader.dart';
+import 'us_stock_search_page.dart';
+import 'ai_stock_recommend_page.dart';
+import 'us_stock_ai_recommend_page.dart';
+import 'us_stock_theme_recommend_page.dart';
+import 'us_stock_ai_committee_page.dart';
+import 'ai_algorithm_explain_page.dart';
+import 'bookmark_list_page.dart';
 
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
@@ -245,53 +252,52 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('테마별 추천 종목'),
-        backgroundColor: Colors.blue[600],
-        foregroundColor: Colors.white,
-        toolbarHeight: 48, // 기본 높이에서 5px 정도 줄임
+        title: Text(
+          '테마별 추천 종목',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        foregroundColor: theme.appBarTheme.foregroundColor,
+        toolbarHeight: 48, 
+        iconTheme: theme.iconTheme,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
           indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: const TextStyle(fontSize: 13),
+          labelStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: theme.textTheme.labelMedium,
+          labelColor: theme.colorScheme.primary,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+          indicatorColor: theme.colorScheme.primary,
           tabs: [
             const Tab(text: '전체'),
             const Tab(text: '안전'),
-            ..._themes.map((theme) => Tab(text: theme.length > 4 ? theme.substring(0, 4) : theme)),
+            ..._themes.map((themeName) => Tab(text: themeName.length > 4 ? themeName.substring(0, 4) : themeName)),
           ],
         ),
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value.startsWith('theme_')) {
-                final theme = value.substring(6);
-                final themeIndex = _themes.indexOf(theme) + 2; // +2 for '전체' and '안전' tabs
-                _tabController.animateTo(themeIndex);
-              } else {
-                _onSortChanged(value);
-              }
+          Builder(
+            builder: (BuildContext innerContext) {
+              return IconButton(
+                icon: Icon(Icons.menu, color: theme.colorScheme.onSurface),
+                onPressed: () {
+                  Scaffold.of(innerContext).openEndDrawer();
+                },
+              );
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'totalScore', child: Text('종합 점수')),
-              const PopupMenuItem(value: 'technicalScore', child: Text('기술적 점수')),
-              const PopupMenuItem(value: 'fundamentalScore', child: Text('펀더멘털 점수')),
-              const PopupMenuItem(value: 'marketCap', child: Text('시가총액')),
-              const PopupMenuItem(value: 'volume', child: Text('거래량')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'themes', child: Text('테마 선택', style: TextStyle(fontWeight: FontWeight.bold))),
-              ..._themes.map((theme) => PopupMenuItem(
-                value: 'theme_$theme',
-                child: Text(theme),
-              )),
-            ],
-            child: const Icon(Icons.more_vert),
           ),
         ],
       ),
+      endDrawer: _buildMenuDrawer(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
@@ -302,6 +308,174 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 ..._themes.map((theme) => _buildThemeRecommendations(theme)),
               ],
             ),
+    );
+  }
+
+  Widget _buildMenuDrawer() {
+    final theme = Theme.of(context);
+    return Drawer(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          Container(
+            color: theme.colorScheme.surface,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('📊 StockWiki 메뉴', style: theme.textTheme.titleLarge),
+                IconButton(
+                  icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
+                  onPressed: () {
+                    Navigator.of(context).maybePop();
+                  },
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: theme.dividerColor),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                // 공통 기능 섹션
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  child: Text(
+                    '공통',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(Icons.psychology, color: theme.colorScheme.onSurface),
+                  title: Text("알고리즘 설명", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AiAlgorithmExplainPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.bookmark_outline, color: theme.colorScheme.onSurface),
+                  title: Text("북마크 목록", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BookmarkListPage()),
+                    );
+                  },
+                ),
+                
+                // 구분선
+                Divider(color: theme.dividerColor, height: 1),
+                
+                // 한국 주식 섹션
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        '🇰🇷 한국 주식',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.auto_graph, color: Colors.blue),
+                  title: Text("AI 종목 추천", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AiStockRecommendPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.trending_up, color: Colors.blue),
+                  title: Text("테마별 추천 종목", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                
+                // 구분선
+                Divider(color: theme.dividerColor, height: 1),
+                
+                // 미국 주식 섹션
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        '🇺🇸 미국 주식',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.search, color: Colors.green),
+                  title: Text("주식 검색", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const UsStockSearchPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.auto_graph, color: Colors.green),
+                  title: Text("AI 종목 추천", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const UsStockAiRecommendPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.trending_up, color: Colors.green),
+                  title: Text("Sector별 추천 종목", style: theme.textTheme.bodyLarge),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const UsStockThemeRecommendPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.groups, color: Colors.green),
+                  title: Text("AI 검증위원회", style: theme.textTheme.bodyLarge),
+                  subtitle: Text(
+                    '다중 AI 검증',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const UsStockAiCommitteePage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -388,28 +562,32 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   }
 
   Widget _buildChip(String label, String value) {
+    final theme = Theme.of(context);
     final isSelected = _selectedSortBy == value;
+    
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.blue[800] : Colors.grey[700],
+            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         selected: isSelected,
         onSelected: (selected) => _onSortChanged(value),
-        selectedColor: Colors.blue[100],
-        checkmarkColor: Colors.blue[800],
-        backgroundColor: Colors.grey[200],
-        disabledColor: Colors.grey[200],
+        selectedColor: theme.colorScheme.primary,
+        checkmarkColor: theme.colorScheme.onPrimary,
+        backgroundColor: theme.colorScheme.surfaceVariant,
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
 
   Widget _buildRecommendationCard(Map<String, dynamic> stock, int rank, String theme) {
+    final themeData = Theme.of(context);
     final recommendation = stock['recommendation'] as String;
     final totalScore = stock['totalScore'] as int;
     final technicalScore = stock['technicalScore'] as int;
@@ -442,10 +620,12 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      elevation: 2,
+      elevation: themeData.cardTheme.elevation,
+      color: themeData.cardTheme.color,
+      shape: themeData.cardTheme.shape,
       child: InkWell(
         onTap: () => _navigateToStockDetail(symbol),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -478,51 +658,49 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                       children: [
                         Text(
                           stock['name'] as String,
-                          style: const TextStyle(
-                            fontSize: 16,
+                          style: themeData.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: themeData.colorScheme.onSurface,
                           ),
                         ),
-                      Text(
-                        '${stock['symbol']} • ${stock['sector']}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                        Text(
+                          '${stock['symbol']} • ${stock['sector']}',
+                          style: themeData.textTheme.bodySmall?.copyWith(
+                            color: themeData.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      if (stock['themes'] != null && (stock['themes'] as List).isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Wrap(
-                            spacing: 4,
-                            runSpacing: 2,
-                            children: (stock['themes'] as List<String>).take(3).map((theme) => 
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.blue[300]!),
-                                ),
-                                child: Text(
-                                  theme,
-                                  style: TextStyle(
-                                    fontSize: 8,
-                                    color: Colors.blue[700],
-                                    fontWeight: FontWeight.w500,
+                        if (stock['themes'] != null && (stock['themes'] as List).isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Wrap(
+                              spacing: 4,
+                              runSpacing: 2,
+                              children: (stock['themes'] as List<String>).take(3).map((theme) => 
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: themeData.colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    theme,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: themeData.colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ).toList(),
+                              ).toList(),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: getRecommendationColor().withValues(alpha: 0.1),
+                      color: getRecommendationColor().withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: getRecommendationColor()),
                     ),
@@ -537,7 +715,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -551,7 +729,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -565,27 +743,25 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.blue[200]!),
+                  color: themeData.colorScheme.surfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.lightbulb_outline, size: 14, color: Colors.blue[700]),
+                        Icon(Icons.lightbulb_outline, size: 14, color: themeData.colorScheme.primary),
                         const SizedBox(width: 4),
                         Text(
                           '추천 사유',
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: themeData.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue[700],
+                            color: themeData.colorScheme.primary,
                           ),
                         ),
                       ],
@@ -593,31 +769,28 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                     const SizedBox(height: 4),
                     Text(
                       _getRecommendationReason(stock, theme),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[700],
+                      style: themeData.textTheme.bodySmall?.copyWith(
+                        color: themeData.colorScheme.onSurfaceVariant,
                         height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.schedule, size: 14, color: Colors.green[700]),
+                        Icon(Icons.schedule, size: 14, color: Colors.green),
                         const SizedBox(width: 4),
                         Text(
                           '권장 보유 기간: ',
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: themeData.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
+                            color: Colors.green,
                           ),
                         ),
                         Text(
                           _getHoldingPeriod(stock, theme),
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: themeData.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green[800],
+                            color: Colors.green[700],
                           ),
                         ),
                       ],
@@ -633,13 +806,14 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   }
 
   Widget _buildScoreItem(String label, int score, Color color) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
             fontSize: 9,
-            color: Colors.grey[600],
           ),
         ),
         const SizedBox(height: 1),
@@ -647,7 +821,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color),
           ),
@@ -667,22 +841,24 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   }
 
   Widget _buildInfoItem(String label, String value) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
             fontSize: 8,
-            color: Colors.grey[600],
           ),
         ),
         const SizedBox(height: 0),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 10,
+          style: theme.textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w500,
+            fontSize: 10,
+            color: theme.colorScheme.onSurface,
           ),
         ),
       ],
