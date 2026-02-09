@@ -16,6 +16,10 @@ class FMPService {
   static const String _baseUrl = 'https://financialmodelingprep.com/api/v3';
   // CORS Proxy 제거 (FMP API 직접 호출 시도)
   // static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
+  
+  // Finnhub API (Fallback)
+  static const String _finnhubApiKey = 'd3ecam1r01qrd38tq1c0d3ecam1r01qrd38tq1cg';
+  static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
 
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
   static Future<List<Stock>> fetchStocks(String keyword) async {
@@ -23,60 +27,111 @@ class FMPService {
       debugPrint('🔍 [FMP] 검색 시작: $keyword');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       
-      // 직접 호출 (CORS Proxy 제거)
+      // 1. FMP 검색 시도
       final searchUrl = Uri.parse('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp');
-      
-      debugPrint('🌐 [FMP] 검색 URL: $searchUrl');
-      
       final searchRes = await http.get(searchUrl);
-      debugPrint('📊 [FMP] 검색 응답 상태: ${searchRes.statusCode}');
 
-      if (searchRes.statusCode != 200) {
-        debugPrint('❌ [FMP] 검색 실패 - 상태 코드: ${searchRes.statusCode}');
-        throw Exception('검색 실패: ${searchRes.statusCode}');
+      if (searchRes.statusCode == 200) {
+        final searchData = json.decode(searchRes.body);
+        
+        if (searchData is List && searchData.isNotEmpty) {
+           // 미국 주식만 필터링
+          List<String> symbols = searchData
+              .where((e) => e['exchangeShortName'] == 'NASDAQ' || 
+                          e['exchangeShortName'] == 'NYSE' ||
+                          e['exchangeShortName'] == 'AMEX')
+              .map<String>((e) => e['symbol'] as String)
+              .toList();
+          
+          if (symbols.isNotEmpty) {
+            // 심볼 기반으로 실시간 정보 조회
+            final quoteUrl = Uri.parse('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp');
+            final quoteRes = await http.get(quoteUrl);
+
+            if (quoteRes.statusCode == 200) {
+              final quoteData = json.decode(quoteRes.body);
+              if (quoteData is List) {
+                return quoteData.map<Stock>((item) => Stock.fromJson(item)).toList();
+              }
+            }
+          }
+        }
       }
-
-      final searchData = json.decode(searchRes.body);
       
-      if (searchData is! List || searchData.isEmpty) {
-        return [];
-      }
+      debugPrint('⚠️ [FMP] 검색 실패 또는 결과 없음, Finnhub Fallback 시도');
+      return await _fetchStocksFinnhub(keyword);
+      
+    } catch (e) {
+      debugPrint('💥 [FMP] 검색 오류: $e, Finnhub Fallback 시도');
+      return await _fetchStocksFinnhub(keyword);
+    }
+  }
 
-      // 미국 주식만 필터링
-      List<String> symbols = searchData
-          .where((e) => e['exchangeShortName'] == 'NASDAQ' || 
-                       e['exchangeShortName'] == 'NYSE' ||
-                       e['exchangeShortName'] == 'AMEX')
-          .map<String>((e) => e['symbol'] as String)
+  /// Finnhub 검색 Fallback
+  static Future<List<Stock>> _fetchStocksFinnhub(String keyword) async {
+    try {
+      final searchUrl = Uri.parse('$_finnhubBaseUrl/search?q=$keyword&token=$_finnhubApiKey');
+      final response = await http.get(searchUrl);
+      
+      if (response.statusCode != 200) return [];
+      
+      final data = json.decode(response.body);
+      final results = data['result'] as List<dynamic>?;
+      
+      if (results == null || results.isEmpty) return [];
+      
+      // 상위 5개만 상세 조회 (Rate Limit 고려)
+      final symbols = results
+          .take(5)
+          .where((item) => item['type'] == 'Common Stock' && !item['symbol'].contains('.'))
+          .map((item) => item['symbol'] as String)
           .toList();
-      
-      if (symbols.isEmpty) {
-        return [];
+          
+      List<Stock> stocks = [];
+      for (final symbol in symbols) {
+        final detail = await _fetchStockDetailFinnhub(symbol);
+        if (detail != null) {
+          stocks.add(Stock.fromJson(detail));
+        }
       }
-
-      // 심볼 기반으로 실시간 정보 조회
-      final quoteUrl = Uri.parse('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp');
-      
-      final quoteRes = await http.get(quoteUrl);
-
-      if (quoteRes.statusCode != 200) {
-        throw Exception('시세 조회 실패: ${quoteRes.statusCode}');
-      }
-
-      final quoteData = json.decode(quoteRes.body);
-      
-      if (quoteData is! List) {
-        return [];
-      }
-
-      List<Stock> stocks = quoteData
-          .map<Stock>((item) => Stock.fromJson(item))
-          .toList();
-      
       return stocks;
     } catch (e) {
-      debugPrint('💥 [FMP] 전체 오류: $e');
+      debugPrint('💥 [Finnhub] 검색 오류: $e');
       return [];
+    }
+  }
+
+  /// Finnhub 단일 주식 상세 조회
+  static Future<Map<String, dynamic>?> _fetchStockDetailFinnhub(String symbol) async {
+    try {
+      // 1. Quote (Price)
+      final quoteUrl = Uri.parse('$_finnhubBaseUrl/quote?symbol=$symbol&token=$_finnhubApiKey');
+      final quoteRes = await http.get(quoteUrl);
+      
+      if (quoteRes.statusCode != 200) return null;
+      final quote = json.decode(quoteRes.body);
+      
+      if (quote['c'] == 0 && quote['pc'] == 0) return null; // 데이터 없음
+
+      // 2. Profile (Name, MarketCap)
+      final profileUrl = Uri.parse('$_finnhubBaseUrl/stock/profile2?symbol=$symbol&token=$_finnhubApiKey');
+      final profileRes = await http.get(profileUrl);
+      final profile = (profileRes.statusCode == 200) ? json.decode(profileRes.body) : {};
+
+      return {
+        'symbol': symbol,
+        'name': profile['name'] ?? symbol,
+        'price': quote['c']?.toDouble(),
+        'change': quote['d']?.toDouble(),
+        'changePercent': quote['dp']?.toDouble(),
+        'volume': 0, // Finnhub 무료 플랜은 거래량 제공 제한적
+        'marketCap': (profile['marketCapitalization'] != null) 
+            ? (profile['marketCapitalization'] * 1000000).toInt() 
+            : 0,
+        'exchange': profile['exchange'] ?? 'US',
+      };
+    } catch (e) {
+      return null;
     }
   }
 
@@ -88,18 +143,17 @@ class FMPService {
       
       final response = await http.get(quoteUrl);
 
-      if (response.statusCode != 200) {
-        return null;
-      }
-
-      final data = json.decode(response.body);
-      if (data is List && data.isNotEmpty) {
-        return data[0];
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) {
+          return data[0];
+        }
       }
       
-      return null;
+      // Fallback
+      return await _fetchStockDetailFinnhub(symbol);
     } catch (e) {
-      return null;
+      return await _fetchStockDetailFinnhub(symbol);
     }
   }
 
@@ -111,15 +165,12 @@ class FMPService {
       
       final response = await http.get(newsUrl);
 
-      if (response.statusCode != 200) {
-        return [];
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List) {
+          return data.map((item) => News.fromJson(item)).toList();
+        }
       }
-
-      final data = json.decode(response.body);
-      if (data is List) {
-        return data.map((item) => News.fromJson(item)).toList();
-      }
-      
       return [];
     } catch (e) {
       return [];
@@ -137,16 +188,16 @@ class FMPService {
 
   /// AI 추천 주식 목록 가져오기 (상승률, 거래량, 시가총액 기준)
   static Future<List<StockRecommendation>> fetchRecommendedStocks({int limit = 20}) async {
+    // 주요 미국 주식 심볼 목록 (S&P 500 상위 종목)
+    final majorStocks = [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B',
+      'UNH', 'JNJ', 'PFE', 'XOM', 'JPM', 'WMT', 'PG', 'MA', 'CVX', 'LLY',
+      'AVGO', 'PEP', 'COST', 'ABBV', 'MRK', 'AMD', 'MCD', 'TMO', 'NFLX'
+    ];
+
     try {
       debugPrint('🤖 [FMP] AI 추천 주식 조회 시작 (limit: $limit)');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      
-      // 주요 미국 주식 심볼 목록 (S&P 500 상위 종목)
-      final majorStocks = [
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B',
-        'UNH', 'JNJ', 'V', 'XOM', 'JPM', 'WMT', 'PG', 'MA', 'CVX', 'LLY',
-        'AVGO', 'PEP', 'COST', 'ABBV', 'MRK', 'AMD', 'MCD', 'TMO', 'NFLX'
-      ];
       
       // 실시간 시세 조회
       final symbols = majorStocks.join(',');
@@ -154,38 +205,51 @@ class FMPService {
       
       final quoteRes = await http.get(quoteUrl);
       
-      if (quoteRes.statusCode != 200) {
-        return [];
+      if (quoteRes.statusCode == 200) {
+        final quoteData = json.decode(quoteRes.body);
+        if (quoteData is List && quoteData.isNotEmpty) {
+           List<StockRecommendation> recommendations = quoteData
+              .where((item) => item['price'] != null && item['changePercent'] != null)
+              .map<StockRecommendation>((item) {
+                final stock = Stock.fromJson(item);
+                final score = _calculateAIScore(stock);
+                final reasons = _generateReasons(stock);
+                final action = _determineAction(stock, score);
+                
+                return StockRecommendation(
+                  stock: stock,
+                  score: score,
+                  reasons: reasons,
+                  action: action,
+                );
+              })
+              .toList();
+
+          recommendations.sort((a, b) => b.score.compareTo(a.score));
+          return recommendations.take(limit).toList();
+        }
       }
 
-      final quoteData = json.decode(quoteRes.body);
-      if (quoteData is! List || quoteData.isEmpty) {
-        return [];
+      // Fallback: Finnhub (상위 5개만 조회하여 추천)
+      debugPrint('⚠️ [FMP] 추천 조회 실패, Finnhub Fallback 시도');
+      List<StockRecommendation> recommendations = [];
+      for (var symbol in majorStocks.take(5)) {
+        final detail = await _fetchStockDetailFinnhub(symbol);
+        if (detail != null) {
+          final stock = Stock.fromJson(detail);
+          final score = _calculateAIScore(stock); // 거래량 누락으로 점수는 낮을 수 있음
+          recommendations.add(StockRecommendation(
+            stock: stock,
+            score: score,
+            reasons: ['시장 주도 대형주 (데이터 대체)'], 
+            action: 'Hold',
+          ));
+        }
       }
+      return recommendations;
 
-      // Stock 객체로 변환 및 AI 점수 계산
-      List<StockRecommendation> recommendations = quoteData
-          .where((item) => item['price'] != null && item['changePercent'] != null)
-          .map<StockRecommendation>((item) {
-            final stock = Stock.fromJson(item);
-            final score = _calculateAIScore(stock);
-            final reasons = _generateReasons(stock);
-            final action = _determineAction(stock, score);
-            
-            return StockRecommendation(
-              stock: stock,
-              score: score,
-              reasons: reasons,
-              action: action,
-            );
-          })
-          .toList();
-
-      // AI 점수 기준으로 정렬
-      recommendations.sort((a, b) => b.score.compareTo(a.score));
-
-      return recommendations.take(limit).toList();
     } catch (e) {
+      debugPrint('💥 [FMP] AI 추천 주식 조회 오류: $e');
       return [];
     }
   }
@@ -310,28 +374,34 @@ class FMPService {
       
       final quoteRes = await http.get(quoteUrl);
       
-      if (quoteRes.statusCode != 200) {
-        return [];
+      if (quoteRes.statusCode == 200) {
+        final quoteData = json.decode(quoteRes.body);
+        if (quoteData is List) {
+          List<Stock> stocks = quoteData
+              .where((item) => item['price'] != null)
+              .map<Stock>((item) => Stock.fromJson(item))
+              .toList();
+
+          stocks.sort((a, b) {
+            final aChange = a.changePercent ?? 0;
+            final bChange = b.changePercent ?? 0;
+            return bChange.compareTo(aChange);
+          });
+          return stocks;
+        }
       }
 
-      final quoteData = json.decode(quoteRes.body);
-      if (quoteData is! List) {
-        return [];
+      // Fallback: Finnhub (개별 조회)
+      debugPrint('⚠️ [FMP] Sector 조회 실패, Finnhub Fallback 시도');
+      List<Stock> stocks = [];
+      for (final symbol in symbols.take(5)) { // 상위 5개만
+        final detail = await _fetchStockDetailFinnhub(symbol);
+        if (detail != null) {
+          stocks.add(Stock.fromJson(detail));
+        }
       }
-
-      List<Stock> stocks = quoteData
-          .where((item) => item['price'] != null)
-          .map<Stock>((item) => Stock.fromJson(item))
-          .toList();
-
-      // 상승률 기준 정렬
-      stocks.sort((a, b) {
-        final aChange = a.changePercent ?? 0;
-        final bChange = b.changePercent ?? 0;
-        return bChange.compareTo(aChange);
-      });
-
       return stocks;
+
     } catch (e) {
       return [];
     }
