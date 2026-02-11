@@ -539,9 +539,11 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
                     ),
                   ),
 
-                  // 투자 전략 (단타/스윙/중장기)
-                  const SizedBox(height: 12),
-                  _buildTradingStrategies(rec, rec.currentPrice > 0 ? rec.currentPrice : (rec.previousClose ?? 0)),
+                  // 투자 전략 (단타/스윙/중장기) - 가격 정보 있을 때만 표시
+                  if (rec.currentPrice > 0) ...[
+                    const SizedBox(height: 12),
+                    _buildTradingStrategies(rec, rec.currentPrice),
+                  ],
                 ],
               ),
             ),
@@ -650,6 +652,11 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     int basePrice = 0;
     String priceLabel = '';
     
+    // 가격 정보가 없으면 아예 표시하지 않음 (사용자 요청)
+    if (rec.currentPrice <= 0) {
+      return const SizedBox.shrink();
+    }
+
     if (rec.currentPrice > 0 && rec.priceSource == 'real-time') {
       basePrice = rec.currentPrice;
       priceLabel = '현재가 기준';
@@ -657,39 +664,8 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       basePrice = rec.previousClose!;
       priceLabel = '전일 종가 기준';
     } else {
-      // 참고 가격 사용 (fallbackPrices에서 가져오거나 targetPrice 역산)
-      if (rec.targetPrice > 0) {
-        basePrice = (rec.targetPrice / 1.15).round(); // 목표가의 역산
-        priceLabel = '참고 가격 기준';
-      } else {
-        // 가격 정보가 전혀 없으면 기본 목표가만 표시
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '🎯 목표가',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '주가 정보를 가져올 수 없어 목표가를 계산할 수 없습니다.\n네이버 증권 등에서 확인해주세요.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        );
-      }
+       // 가격 정보가 없으면 아예 표시하지 않음
+       return const SizedBox.shrink();
     }
 
     // 기간별 목표가 계산
