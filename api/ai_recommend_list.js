@@ -323,8 +323,8 @@ function generateTradingStrategy(currentPrice, type) {
 const fallbackPrices = {
   '005930': 167600,  // 삼성전자 (사용자 제보)
   '000660': 867000,  // SK하이닉스 (사용자 제보)
-  '035420': 350000,  // NAVER
-  '035720': 85000,   // 카카오
+  '035420': 252000,  // NAVER (25만전자 회복)
+  '035720': 52000,   // 카카오 (5만카카오)
   '373220': 650000,  // LG에너지솔루션
   // 소형주
   '357780': 55000,
@@ -833,45 +833,45 @@ function getSampleRecommendations() {
       id: 'rec_sample_003',
       stockName: 'NAVER',
       stockCode: '035420',
-      currentPrice: 350000,
+      currentPrice: 252000,
       changePercent: 1.5,
-      changeAmount: 5000,
-      action: '보유',
+      changeAmount: 3500,
+      action: '매수',
       reasons: [
-        'AI 검색 서비스 강화 중',
-        '클라우드 사업 성장세 지속',
-        '단기 조정 후 반등 예상',
+        '하이퍼클로바X B2B 수익 본격화',
+        '치지직 등 신규 플랫폼 트래픽 급증',
+        '광고 시장 회복세로 실적 턴어라운드',
       ],
-      targetPrice: 390000,
+      targetPrice: 285000,
       postedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
       likes: 98,
       comments: 15,
       shares: 12,
-      dayTrading: generateTradingStrategy(350000, 'day'),
-      swingTrading: generateTradingStrategy(350000, 'swing'),
-      longTerm: generateTradingStrategy(350000, 'long'),
+      dayTrading: generateTradingStrategy(252000, 'day'),
+      swingTrading: generateTradingStrategy(252000, 'swing'),
+      longTerm: generateTradingStrategy(252000, 'long'),
     },
     {
       id: 'rec_sample_004',
       stockName: '카카오',
       stockCode: '035720',
-      currentPrice: 85000,
-      changePercent: 3.5,
-      changeAmount: 2800,
+      currentPrice: 52000,
+      changePercent: 2.1,
+      changeAmount: 1100,
       action: '매수',
       reasons: [
-        '카카오페이 IPO 기대감 확대',
-        '광고 매출 회복세 뚜렷',
-        '저평가 구간 진입으로 매수 타이밍',
+        '비경영 쇄신을 통한 리스크 해소',
+        '톡비즈 등 핵심 사업의 견조한 성장',
+        '금리 인하 기조로 밸류에이션 매력 증가',
       ],
-      targetPrice: 100000,
+      targetPrice: 62000,
       postedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       likes: 187,
       comments: 28,
       shares: 31,
-      dayTrading: generateTradingStrategy(85000, 'day'),
-      swingTrading: generateTradingStrategy(85000, 'swing'),
-      longTerm: generateTradingStrategy(85000, 'long'),
+      dayTrading: generateTradingStrategy(52000, 'day'),
+      swingTrading: generateTradingStrategy(52000, 'swing'),
+      longTerm: generateTradingStrategy(52000, 'long'),
     },
     {
       id: 'rec_sample_005',
