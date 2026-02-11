@@ -5,6 +5,7 @@ import '../services/fmp_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'us_stock_detail_page.dart';
+import '../models/committee_recommendation.dart';
 
 class UsStockAiCommitteePage extends StatefulWidget {
   const UsStockAiCommitteePage({super.key});
@@ -25,61 +26,13 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   @override
   void initState() {
     super.initState();
-    // 초기 추천 종목 로드
-    _loadRecommendedStocks();
+    // 초기 로딩 제거: 사용자가 검색하기 전까지는 아무것도 로드하지 않음
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  // 초기 추천 종목 로드
-  Future<void> _loadRecommendedStocks() async {
-    // 인기 종목 리스트 (국내 주식)
-    final recommendedStocks = [
-      {'symbol': '005930', 'name': '삼성전자'},
-      {'symbol': '000660', 'name': 'SK하이닉스'},
-      {'symbol': '006400', 'name': '삼성SDI'},
-    ];
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final List<CommitteeRecommendation> recommendations = [];
-      
-      for (final stockInfo in recommendedStocks) {
-        try {
-          // 종목 검색
-          final stocks = await _searchKoreanStock(stockInfo['symbol']!);
-          if (stocks.isNotEmpty) {
-            final stock = stocks[0];
-            // AI 검증위원회에 질문
-            final committeeResult = await _askAiCommittee(stock);
-            // Buy만 추천 목록에 포함
-            if (committeeResult.finalRecommendation == 'Buy' || committeeResult.finalRecommendation == '매수') {
-              recommendations.add(committeeResult);
-            }
-          }
-        } catch (e) {
-          debugPrint('추천 종목 로드 실패: ${stockInfo['name']} - $e');
-        }
-      }
-
-      setState(() {
-        _recommendations = recommendations;
-        _lastUpdated = DateTime.now();
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('추천 종목 로드 오류: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
   Future<void> _searchStock(String query) async {
@@ -629,7 +582,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         },
       );
     } else if (!_isSearching && _recommendations.isNotEmpty) {
-      // 추천 종목 표시
+      // 추천 종목 표시 (현재는 사용되지 않음)
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -801,8 +754,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                           Text(
                             rec.finalRecommendation,
                             style: TextStyle(
-                              color: _getActionColor(rec.finalRecommendation),
-                              fontSize: 11,
+                              color: _getRecommendationColor(rec.finalRecommendation),
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -811,213 +764,90 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     ),
                   ],
                 ),
-                
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 
                 // 가격 정보
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (stock.price != null) ...[
-                      Text(
-                        _formatPrice(stock),
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
+                    Text(
+                      _formatPrice(stock),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (stock.changePercent != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (stock.changePercent! >= 0 ? Colors.green : Colors.red)
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                    ],
-                    if (stock.changePercent != null) ...[
-                      Row(
-                        children: [
-                          Icon(
-                            stock.changePercent! >= 0
-                                ? Icons.trending_up
-                                : Icons.trending_down,
-                            color: stock.changePercent! >= 0
-                                ? Colors.green
-                                : Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: stock.changePercent! >= 0
-                                  ? Colors.green
-                                  : Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
                 
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                Divider(color: theme.dividerColor),
+                const SizedBox(height: 16),
                 
-                // 종합 리포트
-                if (rec.summary.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: theme.colorScheme.primary.withOpacity(0.3),
-                        width: 1,
+                // AI 분석 요약
+                Row(
+                  children: [
+                    Icon(Icons.analytics_outlined, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'AI 분석 요약',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.assessment,
-                              color: theme.colorScheme.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '종합 분석 리포트',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          rec.summary,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface,
-                            height: 1.6,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                
-                Divider(color: theme.dividerColor, height: 1),
-                const SizedBox(height: 12),
-                
-                // AI 모델별 상세 의견
-                Text(
-                  'AI 위원회 상세 의견:',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                
-                if (rec.models.isEmpty)
-                  Text(
-                    'AI 모델 응답을 불러오는 중...',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  )
-                else
-                  ...rec.models.map((model) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getModelColor(model.modelName)
-                                      .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  model.modelName,
-                                  style: TextStyle(
-                                    color: _getModelColor(model.modelName),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getActionColor(model.recommendation)
-                                      .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  model.recommendation,
-                                  style: TextStyle(
-                                    color: _getActionColor(model.recommendation),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (model.reasoning.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              model.reasoning,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  )),
-                
-                const SizedBox(height: 8),
-                
-                // 합의도
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
+                Text(
+                  rec.summary,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    height: 1.5,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.handshake,
-                        color: theme.colorScheme.primary,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '합의도: ${rec.agreement}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // 모델별 의견 (간략히)
+                Row(
+                  children: rec.models.take(3).map((model) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Tooltip(
+                        message: '${model.modelName}: ${model.reasoning}',
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: _getRecommendationColor(model.recommendation).withOpacity(0.2),
+                          child: Text(
+                            model.modelName[0],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: _getRecommendationColor(model.recommendation),
+                            ),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -1028,79 +858,28 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   }
 
   Color _getVerificationColor(double score) {
-    if (score >= 75) return Colors.green;
+    if (score >= 70) return Colors.green;
     if (score >= 50) return Colors.blue;
     return Colors.orange;
   }
 
-  Color _getActionColor(String action) {
-    switch (action) {
-      case 'Buy':
+  Color _getRecommendationColor(String recommendation) {
+    switch (recommendation.toLowerCase()) {
+      case 'buy':
+      case 'strong buy':
       case '매수':
+      case '강력 매수':
         return Colors.green;
-      case 'Hold':
+      case 'sell':
+      case 'strong sell':
+      case '매도':
+      case '강력 매도':
+        return Colors.red;
+      case 'hold':
       case '보유':
         return Colors.blue;
-      case 'Watch':
-      case '관망':
-        return Colors.orange;
-      case 'Sell':
-      case '매도':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Color _getModelColor(String modelName) {
-    switch (modelName) {
-      case 'ChatGPT':
-        return Colors.green;
-      case 'Gemini':
-        return Colors.blue;
-      case 'Ollama':
-        return Colors.purple;
       default:
         return Colors.grey;
     }
   }
 }
-
-class CommitteeRecommendation {
-  final Stock stock;
-  final List<AiModelResponse> models;
-  final double verificationScore; // 0-100%
-  final String agreement; // 일치, 분산, 일부일치
-  final String finalRecommendation; // 최종 추천
-  final String summary; // 종합 리포트
-
-  CommitteeRecommendation({
-    required this.stock,
-    required this.models,
-    required this.verificationScore,
-    required this.agreement,
-    required this.finalRecommendation,
-    this.summary = '',
-  });
-}
-
-class AiModelResponse {
-  final String modelName;
-  final String recommendation; // Buy, Hold, Watch, Sell
-  final String reasoning;
-
-  AiModelResponse({
-    required this.modelName,
-    required this.recommendation,
-    required this.reasoning,
-  });
-
-  factory AiModelResponse.fromJson(Map<String, dynamic> json) {
-    return AiModelResponse(
-      modelName: json['modelName'] ?? '',
-      recommendation: json['recommendation'] ?? 'Watch',
-      reasoning: json['reasoning'] ?? '',
-    );
-  }
-}
-
