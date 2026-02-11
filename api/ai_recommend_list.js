@@ -319,16 +319,16 @@ function generateTradingStrategy(currentPrice, type) {
 
 // 폴백 추천 데이터 (실시간 데이터를 가져올 수 없는 경우)
 // 참고: 기본 가격은 최근 기준 가격이며, 실제 주가는 네이버 증권 등에서 확인 필요
-// 2026년 2월 기준 최신 가격 (참고용)
+// 2026년 2월 기준 최신 가격 (참고용 - 내부 로직에서만 사용)
 const fallbackPrices = {
-  '005930': 167600,  // 삼성전자 (사용자 제보)
-  '000660': 867000,  // SK하이닉스 (사용자 제보)
-  '035420': 252000,  // NAVER (25만전자 회복)
-  '035720': 52000,   // 카카오 (5만카카오)
+  '005930': 167600,  // 삼성전자
+  '000660': 867000,  // SK하이닉스
+  '035420': 252000,  // NAVER
+  '035720': 52000,   // 카카오
   '373220': 650000,  // LG에너지솔루션
   // 소형주
-  '357780': 55000,
-  '065350': 48000,
+  '357780': 390000,  // 솔브레인 (사용자 제보 반영)
+  '065350': 120000,  // 신성델타테크 (추정치 상향)
 };
 
 function getFallbackRecommendations() {
@@ -351,13 +351,13 @@ function getFallbackRecommendations() {
       id: `rec_fallback_${stock.code}_${Date.now()}_${index}`,
       stockName: stock.name,
       stockCode: stock.code,
-      currentPrice: fallbackPrice, // 폴백 가격 적용
-      changePercent: 1.5, // 기본 상승 추세 가정
-      changeAmount: Math.round(fallbackPrice * 0.015),
-      previousClose: Math.round(fallbackPrice / 1.015),
+      currentPrice: 0, // 폴백 데이터는 가격 절대 표시 안함 (사용자 요청)
+      changePercent: 0,
+      changeAmount: 0,
+      previousClose: null,
       action: stock.action,
       reasons: generateReasons(stock.code, stock.name),
-      targetPrice: fallbackPrice > 0 ? Math.round(fallbackPrice * 1.15) : 0,
+      targetPrice: 0, // 가격 없으면 목표가도 표시 안함
       postedAt: new Date().toISOString(),
       likes: Math.floor(Math.random() * 200) + 50,
       comments: Math.floor(Math.random() * 30) + 5,
@@ -365,9 +365,9 @@ function getFallbackRecommendations() {
       lastUpdate: new Date().toISOString(),
       priceSource: 'fallback', // 가격 정보 출처 명시
       note: '서버 예상 가격입니다 (실시간 연동 지연 시)',
-      dayTrading: generateTradingStrategy(fallbackPrice, 'day'),
-      swingTrading: generateTradingStrategy(fallbackPrice, 'swing'),
-      longTerm: generateTradingStrategy(fallbackPrice, 'long'),
+      dayTrading: generateTradingStrategy(0, 'day'),
+      swingTrading: generateTradingStrategy(0, 'swing'),
+      longTerm: generateTradingStrategy(0, 'long'),
     };
   });
 }
@@ -771,63 +771,45 @@ function getSampleRecommendations() {
       id: 'rec_sample_001',
       stockName: '삼성전자',
       stockCode: '005930',
-      currentPrice: 155000,
-      changePercent: 2.3,
-      changeAmount: 3500,
+      currentPrice: 0, // 샘플 데이터도 가격 미표시
+      changePercent: 0,
+      changeAmount: 0,
       action: '매수',
       reasons: [
         '반도체 업황 초호황 사이클 진입',
         'HBM4 시장 점유율 1위 탈환',
         '파운드리 흑자 전환 달성',
       ],
-      targetPrice: 180000,
+      targetPrice: 0,
       postedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
       likes: 156,
       comments: 12,
       shares: 23,
-      dayTrading: generateTradingStrategy(155000, 'day'),
-      swingTrading: generateTradingStrategy(155000, 'swing'),
-      longTerm: generateTradingStrategy(155000, 'long'),
+      dayTrading: generateTradingStrategy(0, 'day'),
+      swingTrading: generateTradingStrategy(0, 'swing'),
+      longTerm: generateTradingStrategy(0, 'long'),
     },
     {
       id: 'rec_sample_002',
       stockName: 'SK하이닉스',
       stockCode: '000660',
-      currentPrice: 820000,
-      changePercent: 1.8,
-      changeAmount: 14500,
+      currentPrice: 0,
+      changePercent: 0,
+      changeAmount: 0,
       action: '매수',
       reasons: [
         'AI 반도체 수요 폭발적 증가',
         'HBM 시장 지배력 지속',
         '역대 최대 영업이익 달성',
       ],
-      targetPrice: 210000,
+      targetPrice: 0,
       postedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
       likes: 243,
       comments: 34,
       shares: 45,
-      dayTrading: {
-        buyPrice: 184000,
-        sellPrice: 189500,
-        stopLoss: 181000,
-        period: '1~3일',
-        expectedReturn: 3.0,
-      },
-      swingTrading: {
-        buyPrice: 183000,
-        sellPrice: 198000,
-        stopLoss: 178000,
-        period: '1주~1개월',
-        expectedReturn: 8.2,
-      },
-      longTerm: {
-        buyPrice: 185000,
-        sellPrice: 230000,
-        stopLoss: 175000,
-        period: '3개월~1년',
-        expectedReturn: 24.3,
-      },
+      dayTrading: generateTradingStrategy(0, 'day'),
+      swingTrading: generateTradingStrategy(0, 'swing'),
+      longTerm: generateTradingStrategy(0, 'long'),
     },
     {
       id: 'rec_sample_003',
