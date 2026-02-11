@@ -216,13 +216,14 @@ class FMPService {
                 final reasons = _generateReasons(stock);
                 final action = _determineAction(stock, score);
                 
-                return StockRecommendation(
+                  return StockRecommendation(
                   stock: stock,
                   score: score,
                   reasons: reasons,
                   action: action,
                 );
               })
+              .where((rec) => rec.action == 'Buy') // Hold, Watch 제거
               .toList();
 
           recommendations.sort((a, b) => b.score.compareTo(a.score));
@@ -339,12 +340,17 @@ class FMPService {
   static String _determineAction(Stock stock, double score) {
     final changePercent = stock.changePercent ?? 0;
     
-    if (score >= 70 && changePercent > 2) {
+    // 점수가 높으면(60점 이상) 상승률이 낮아도 매수 추천
+    if (score >= 60) {
       return 'Buy';
-    } else if (score >= 50 && changePercent > 0) {
+    } 
+    // 점수가 준수(50점 이상)하고 상승세가 뚜렷하면 매수 추천
+    else if (score >= 50 && changePercent > 1.0) {
+      return 'Buy';
+    }
+    // 그 외에는 관망 (API에서 필터링됨)
+    else {
       return 'Hold';
-    } else {
-      return 'Watch';
     }
   }
 
