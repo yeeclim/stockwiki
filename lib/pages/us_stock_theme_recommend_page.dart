@@ -419,7 +419,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                         Icon(Icons.lightbulb, size: 16, color: themeData.colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
-                          'Investment Point',
+                          '투자 포인트',
                           style: themeData.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: themeData.colorScheme.primary,
@@ -446,7 +446,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                     Icon(Icons.article_outlined, size: 16, color: themeData.colorScheme.secondary),
                     const SizedBox(width: 8),
                     Text(
-                      'Related News (Tap to read)',
+                      '관련 뉴스',
                       style: themeData.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: themeData.colorScheme.secondary,
@@ -493,7 +493,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    'Yahoo Finance Real-time',
+                    '실시간 시세 (Yahoo Finance)',
                     style: themeData.textTheme.labelSmall?.copyWith(
                       color: themeData.colorScheme.primary,
                       fontWeight: FontWeight.bold,
