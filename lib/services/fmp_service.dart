@@ -468,27 +468,35 @@ class FMPService {
     }
   }
 
-  /// 주요 Sector 목록 가져오기
-  static List<String> getAvailableSectors() {
-    return ['Technology', 'Finance', 'Healthcare', 'Consumer', 'Energy', 'Industrial'];
-  }
-
+  static String debugLog = '';
 
   /// 주식 이력 데이터 조회 (차트용) - 다중 소스 Fallback 적용
   static Future<List<Map<String, dynamic>>> fetchHistoricalPrices(String symbol, {String timeseries = '5'}) async {
     List<Map<String, dynamic>> data = [];
+    debugLog = 'Start fetching $symbol... \n';
     
     // 1. FMP 시도
     data = await _fetchHistoricalFMP(symbol);
-    if (data.isNotEmpty) return data;
+    if (data.isNotEmpty) {
+      debugLog += 'Success: FMP\n';
+      return data;
+    }
 
     // 2. Finnhub 시도
     data = await _fetchHistoricalFinnhub(symbol);
-    if (data.isNotEmpty) return data;
+    if (data.isNotEmpty) {
+      debugLog += 'Success: Finnhub\n';
+      return data;
+    }
 
     // 3. Yahoo Finance 시도 (Proxy 사용)
     data = await _fetchHistoricalYahoo(symbol);
+    if (data.isNotEmpty) {
+      debugLog += 'Success: Yahoo\n';
+      return data;
+    }
     
+    debugLog += 'All failed.';
     return data;
   }
 
@@ -496,14 +504,14 @@ class FMPService {
   static Future<List<Map<String, dynamic>>> _fetchHistoricalFMP(String symbol) async {
     try {
       final url = Uri.parse('$_baseUrl/historical-price-full/$symbol?apikey=$_apiKey');
-      debugPrint('📈 [FMP] FMP 차트 시도: $url');
+      debugLog += 'Try FMP... ';
       final response = await http.get(url);
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['historical'] != null) {
           final List<dynamic> historical = data['historical'];
-          // 필요한 필드만 추출
+          debugLog += 'OK\n';
           return historical.map<Map<String, dynamic>>((e) => {
             'date': e['date'],
             'close': (e['close'] as num).toDouble(),
@@ -511,10 +519,10 @@ class FMPService {
           }).toList();
         }
       }
-      debugPrint('⚠️ [FMP] FMP 차트 데이터 없음/실패 (status: ${response.statusCode})');
+      debugLog += 'Fail (${response.statusCode})\n';
       return [];
     } catch (e) {
-      debugPrint('💥 [FMP] FMP 차트 오류: $e');
+      debugLog += 'Error ($e)\n';
       return [];
     }
   }
@@ -522,8 +530,7 @@ class FMPService {
   /// Finnhub 이력 데이터 조회
   static Future<List<Map<String, dynamic>>> _fetchHistoricalFinnhub(String symbol) async {
     try {
-      debugPrint('📈 [FMP] Finnhub 차트 시도: $symbol');
-      // 1년치 데이터 (Daily)
+      debugLog += 'Try Finnhub... ';
       final now = DateTime.now();
       final to = (now.millisecondsSinceEpoch / 1000).round();
       final from = (now.subtract(const Duration(days: 365)).millisecondsSinceEpoch / 1000).round();
@@ -538,7 +545,7 @@ class FMPService {
         if (data['s'] == 'ok') {
           List<Map<String, dynamic>> results = [];
           final closes = data['c'] as List;
-          final times = data['t'] as List; // Unix timestamp
+          final times = data['t'] as List; 
           
           for (int i = 0; i < closes.length; i++) {
             final dateObj = DateTime.fromMillisecondsSinceEpoch(times[i] * 1000);
@@ -548,13 +555,16 @@ class FMPService {
               'volume': 0, 
             });
           }
-          // 최신순 정렬 (날짜 내림차순)
+          debugLog += 'OK (${results.length})\n';
           return results.reversed.toList();
         }
+        debugLog += 'No Data (${data['s']})\n';
+      } else {
+        debugLog += 'Fail (${response.statusCode})\n';
       }
       return [];
     } catch (e) {
-      debugPrint('💥 [FMP] Finnhub 차트 오류: $e');
+      debugLog += 'Error ($e)\n';
       return [];
     }
   }
@@ -562,12 +572,12 @@ class FMPService {
   /// Yahoo Finance 이력 데이터 조회 (Proxy)
   static Future<List<Map<String, dynamic>>> _fetchHistoricalYahoo(String symbol) async {
     try {
-      debugPrint('📈 [FMP] Yahoo 차트 시도: $symbol');
-      // CORS Proxy 사용 (corsproxy.io)
+      debugLog += 'Try Yahoo... ';
       final range = '1y';
       final interval = '1d';
       final yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?range=$range&interval=$interval';
-      final proxyUrl = Uri.parse('https://corsproxy.io/?${Uri.encodeComponent(yahooUrl)}');
+      // Switch proxy to allorigins.win
+      final proxyUrl = Uri.parse('https://api.allorigins.win/raw?url=${Uri.encodeComponent(yahooUrl)}');
       
       final response = await http.get(proxyUrl);
       
@@ -589,12 +599,13 @@ class FMPService {
             'volume': 0,
           });
         }
-        // 최신순 정렬
+        debugLog += 'OK (${results.length})\n';
         return results.reversed.toList();
       }
+      debugLog += 'Fail (${response.statusCode})\n';
       return [];
     } catch (e) {
-      debugPrint('💥 [FMP] Yahoo 차트 오류: $e');
+      debugLog += 'Error ($e)\n';
       return [];
     }
   }
