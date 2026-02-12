@@ -476,67 +476,49 @@ class FMPService {
   /// 주식 이력 데이터 조회 (차트용)
   static Future<List<Map<String, dynamic>>> fetchHistoricalPrices(String symbol, {String timeseries = '5'}) async {
     try {
-      debugPrint('📈 [FMP] 차트 데이터 조회 시작: $symbol (기간: $timeseries일)');
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      
-      // timeseries에 따라 API 파라미터 또는 엔드포인트 조정
-      // 간단하게 Daily 차트만 우선 지원 (추후 확장 가능)
-      // https://financialmodelingprep.com/api/v3/historical-price-full/AAPL?apikey=...
-      
-      final url = Uri.parse('$_baseUrl/historical-price-full/$symbol?apikey=$_apiKey&t=$timestamp');
-      
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map && data['historical'] is List) {
-          final historical = List<Map<String, dynamic>>.from(data['historical']);
-          
-          // 필요한 데이터양만큼 자르기 (예: 최근 60개)
-          // timeseries 파라미터에 따라 로직 분기 가능
-          // 1D: intraday API 필요 (유료 또는 제한적), 여기서는 Daily 데이터 활용
-          
-          return historical; // 전체 반환하고 UI에서 가공
-        }
-      }
-      
-      // Fallback: Finnhub (Candles)
+      debugPrint('📈 [FMP] 차트 데이터 조회 (Finnhub 우선 사용): $symbol');
+      // FMP Legacy Endpoint 이슈로 인해 바로 Finnhub 사용
       return await _fetchHistoricalFinnhub(symbol);
-      
     } catch (e) {
       debugPrint('💥 [FMP] 차트 데이터 조회 오류: $e');
-      return await _fetchHistoricalFinnhub(symbol);
+      return [];
     }
   }
 
-  /// Finnhub 이력 데이터 조회 (Fallback)
+  /// Finnhub 이력 데이터 조회
   static Future<List<Map<String, dynamic>>> _fetchHistoricalFinnhub(String symbol) async {
     try {
       // 1년치 데이터 (Daily)
-      final to = (DateTime.now().millisecondsSinceEpoch / 1000).round();
-      final from = to - (365 * 24 * 60 * 60); // 1년 전
+      final now = DateTime.now();
+      final to = (now.millisecondsSinceEpoch / 1000).round();
+      final from = (now.subtract(const Duration(days: 365)).millisecondsSinceEpoch / 1000).round();
       
       final url = Uri.parse(
           '$_finnhubBaseUrl/stock/candle?symbol=$symbol&resolution=D&from=$from&to=$to&token=$_finnhubApiKey');
           
+      debugPrint('🌐 [Finnhub] Candle URL: $url');
+      
       final response = await http.get(url);
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['s'] == 'ok') {
           List<Map<String, dynamic>> results = [];
           final closes = data['c'] as List;
-          final times = data['t'] as List;
+          final times = data['t'] as List; // Unix timestamp
           
           for (int i = 0; i < closes.length; i++) {
+            final dateObj = DateTime.fromMillisecondsSinceEpoch(times[i] * 1000);
             results.add({
-              'date': DateTime.fromMillisecondsSinceEpoch(times[i] * 1000).toIso8601String().substring(0, 10),
-              'close': closes[i],
-              // 필요한 다른 필드(open, high, low, volume)도 추가 가능
-              'volume': data['v'][i],
+              'date': "${dateObj.year}-${dateObj.month.toString().padLeft(2,'0')}-${dateObj.day.toString().padLeft(2,'0')}",
+              'close': (closes[i] as num).toDouble(),
+              'volume': 0, // Finnhub candle may not have volume or it's in 'v'
             });
           }
-          // 최신순 정렬 (FMP와 통일)
+          // 최신순 정렬 (FMP와 통일 - 날짜 내림차순)
           return results.reversed.toList();
+        } else {
+             debugPrint('⚠️ [Finnhub] 데이터 없음 (status: ${data['s']})');
         }
       }
       return [];
@@ -545,7 +527,7 @@ class FMPService {
     }
   }
 
-  }
+}
 
   /// AI 추천 주식 모델
 class StockRecommendation {

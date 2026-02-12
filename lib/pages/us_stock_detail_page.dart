@@ -316,6 +316,12 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             ),
             const SizedBox(height: 12),
             
+            // 뉴스 감정 분석 요약 (매매 신호)
+            if (!_isLoadingNews && _newsList.isNotEmpty)
+              _buildSentimentSummary(),
+
+            const SizedBox(height: 12),
+            
             if (_newsList.isEmpty && !_isLoadingNews)
               Container(
                 padding: const EdgeInsets.all(20),
@@ -424,6 +430,101 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         );
       }
     }
+  }
+
+  Widget _buildSentimentSummary() {
+    int score = 0;
+    int positiveCount = 0;
+    int negativeCount = 0;
+
+    for (var news in _newsList) {
+      if (news.sentiment == 'Positive') {
+        score++;
+        positiveCount++;
+      } else if (news.sentiment == 'Negative') {
+        score--;
+        negativeCount++;
+      }
+    }
+
+    String signal;
+    Color signalColor;
+    IconData signalIcon;
+
+    if (score >= 3) {
+      signal = '강력 매수';
+      signalColor = Colors.green[700]!;
+      signalIcon = Icons.sentiment_very_satisfied;
+    } else if (score >= 1) {
+      signal = '매수';
+      signalColor = Colors.green;
+      signalIcon = Icons.sentiment_satisfied;
+    } else if (score <= -3) {
+      signal = '강력 매도';
+      signalColor = Colors.red[700]!;
+      signalIcon = Icons.sentiment_very_dissatisfied;
+    } else if (score <= -1) {
+      signal = '매도';
+      signalColor = Colors.red;
+      signalIcon = Icons.sentiment_dissatisfied;
+    } else {
+      signal = '관망 (중립)';
+      signalColor = Colors.grey;
+      signalIcon = Icons.sentiment_neutral;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: signalColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: signalColor, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: signalColor,
+            radius: 24,
+            child: Icon(signalIcon, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '뉴스 기반 매매 의견',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  signal,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: signalColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '호재 $positiveCount',
+                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '악재 $negativeCount',
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatNumber(double number) {
