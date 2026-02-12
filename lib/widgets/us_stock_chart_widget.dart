@@ -25,28 +25,10 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
   @override
   void initState() {
     super.initState();
-    // _loadChartData(); // Disable service call for isolation test
-    _loadHardcodedData();
-  }
-
-  void _loadHardcodedData() {
-    debugPrint('🧪 [DEBUG] Loading Hardcoded Data in Widget');
-    final now = DateTime.now();
-    _historicalData = List.generate(20, (index) {
-      final date = now.subtract(Duration(days: 20 - index));
-      return {
-        'date': "${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}",
-        'close': 150.0 + (index * 2), // Clear upward trend
-        'volume': 1000,
-      };
-    });
-    setState(() {
-      _isLoading = false;
-    });
+    _loadChartData();
   }
 
   Future<void> _loadChartData() async {
-    // ... existing implementation ...
     setState(() {
       _isLoading = true;
       _error = null;
@@ -134,13 +116,9 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
               ],
             ),
             const SizedBox(height: 24),
-            Container(
+            SizedBox(
               height: 250,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.red, width: 2), // DEBUG BORDER
-                color: Colors.yellow.withOpacity(0.1), // DEBUG BACKGROUND
-              ),
+              width: double.infinity, // Ensure chart spans full width
               child: _buildChartContent(filteredData),
             ),
           ],
