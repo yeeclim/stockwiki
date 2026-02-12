@@ -569,45 +569,62 @@ class FMPService {
     }
   }
 
-  /// Yahoo Finance 이력 데이터 조회 (Proxy)
+  /// Yahoo Finance 이력 데이터 조회 (Proxy Rotation)
   static Future<List<Map<String, dynamic>>> _fetchHistoricalYahoo(String symbol) async {
-    try {
-      debugLog += 'Try Yahoo... ';
-      final range = '1y';
-      final interval = '1d';
-      final yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?range=$range&interval=$interval';
-      // Switch proxy to allorigins.win
-      final proxyUrl = Uri.parse('https://api.allorigins.win/raw?url=${Uri.encodeComponent(yahooUrl)}');
-      
-      final response = await http.get(proxyUrl);
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = data['chart']['result'][0];
-        final timestamp = result['timestamp'] as List;
-        final quote = result['indicators']['quote'][0];
-        final closes = quote['close'] as List;
+    final proxies = [
+      (url) => 'https://corsproxy.io/?${Uri.encodeComponent(url)}',
+      (url) => 'https://api.codetabs.com/v1/proxy?quest=${Uri.encodeComponent(url)}',
+      (url) => 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(url)}',
+    ];
+
+    final range = '1y';
+    final interval = '1d';
+    final yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?range=$range&interval=$interval';
+
+    for (var i = 0; i < proxies.length; i++) {
+      try {
+        debugLog += 'Try Yahoo (Proxy ${i + 1})... ';
+        final proxyUrl = Uri.parse(proxies[i](yahooUrl));
+        final response = await http.get(proxyUrl);
         
-        List<Map<String, dynamic>> results = [];
-        for (int i = 0; i < timestamp.length; i++) {
-          if (closes[i] == null) continue;
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          // Yahoo 응답 구조 확인 (codetabs 등은 감싸서 줄 수도 있음에 유의)
+          // 보통 Proxy는 body를 그대로 전달함.
           
-          final dateObj = DateTime.fromMillisecondsSinceEpoch(timestamp[i] * 1000);
-          results.add({
-            'date': "${dateObj.year}-${dateObj.month.toString().padLeft(2,'0')}-${dateObj.day.toString().padLeft(2,'0')}",
-            'close': (closes[i] as num).toDouble(),
-            'volume': 0,
-          });
+          Map<String, dynamic> result;
+          if (data['chart'] != null) {
+            result = data['chart']['result'][0];
+          } else {
+             // 데이터 구조가 다를 경우 (Error or unexpected format)
+             debugLog += 'Format Err\n';
+             continue;
+          }
+
+          final timestamp = result['timestamp'] as List;
+          final quote = result['indicators']['quote'][0];
+          final closes = quote['close'] as List;
+          
+          List<Map<String, dynamic>> results = [];
+          for (int j = 0; j < timestamp.length; j++) {
+            if (closes[j] == null) continue;
+            
+            final dateObj = DateTime.fromMillisecondsSinceEpoch(timestamp[j] * 1000);
+            results.add({
+              'date': "${dateObj.year}-${dateObj.month.toString().padLeft(2,'0')}-${dateObj.day.toString().padLeft(2,'0')}",
+              'close': (closes[j] as num).toDouble(),
+              'volume': 0,
+            });
+          }
+          debugLog += 'OK (${results.length})\n';
+          return results.reversed.toList();
         }
-        debugLog += 'OK (${results.length})\n';
-        return results.reversed.toList();
+        debugLog += 'Fail (${response.statusCode})\n';
+      } catch (e) {
+        debugLog += 'Err\n'; // 상세 에러는 너무 길어질 수 있으므로 줄임
       }
-      debugLog += 'Fail (${response.statusCode})\n';
-      return [];
-    } catch (e) {
-      debugLog += 'Error ($e)\n';
-      return [];
     }
+    return [];
   }
 
 }
