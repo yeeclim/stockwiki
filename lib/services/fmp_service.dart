@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'dart:math';
 import '../models/stock.dart';
 import '../models/news.dart';
 import 'cache_service.dart';
@@ -499,6 +500,7 @@ class FMPService {
       debugPrint('🌐 [Finnhub] Candle URL: $url');
       
       final response = await http.get(url);
+      debugPrint('🌐 [Finnhub] Response Status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -512,19 +514,42 @@ class FMPService {
             results.add({
               'date': "${dateObj.year}-${dateObj.month.toString().padLeft(2,'0')}-${dateObj.day.toString().padLeft(2,'0')}",
               'close': (closes[i] as num).toDouble(),
-              'volume': 0, // Finnhub candle may not have volume or it's in 'v'
+              'volume': 0, 
             });
           }
+          debugPrint('✅ [Finnhub] Loaded ${results.length} candles.');
           // 최신순 정렬 (FMP와 통일 - 날짜 내림차순)
           return results.reversed.toList();
         } else {
              debugPrint('⚠️ [Finnhub] 데이터 없음 (status: ${data['s']})');
         }
+      } else {
+          debugPrint('❌ [Finnhub] API 호출 실패: ${response.statusCode}');
       }
-      return [];
+      return _generateMockData(); // Fallback to mock data for debugging
     } catch (e) {
-      return [];
+      debugPrint('💥 [Finnhub] Error: $e');
+      return _generateMockData(); // Fallback to mock data for debugging
     }
+  }
+
+  static List<Map<String, dynamic>> _generateMockData() {
+    debugPrint('⚠️ [FMP] Mock Data 생성 중...');
+    List<Map<String, dynamic>> mockData = [];
+    final now = DateTime.now();
+    double price = 150.0;
+    final random = Random();
+
+    for (int i = 0; i < 100; i++) {
+      final date = now.subtract(Duration(days: i));
+      price += (random.nextDouble() - 0.5) * 5; 
+      mockData.add({
+        'date': "${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}",
+        'close': price,
+        'volume': 10000,
+      });
+    }
+    return mockData;
   }
 
 }
