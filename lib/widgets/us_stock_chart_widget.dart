@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../services/chart_scraper_service.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import '../services/fmp_service.dart';
+import 'dart:math';
 
 class UsStockChartWidget extends StatefulWidget {
   final String symbol;
-  final String? chartUrl;
 
   const UsStockChartWidget({
     super.key,
     required this.symbol,
-    this.chartUrl,
   });
 
   @override
@@ -19,459 +17,87 @@ class UsStockChartWidget extends StatefulWidget {
 }
 
 class _UsStockChartWidgetState extends State<UsStockChartWidget> {
-  String? _selectedChartType = 'daily';
-  Map<String, String>? _chartUrls;
-  bool _isLoading = false;
+  List<Map<String, dynamic>> _historicalData = [];
+  bool _isLoading = true;
   String? _error;
+  String _selectedPeriod = '1M'; // 1W, 1M, 3M, 1Y
 
   @override
   void initState() {
     super.initState();
-    if (widget.chartUrl != null) {
-      _chartUrls = {'daily': widget.chartUrl!};
-    } else {
-      _loadChartUrls();
-    }
+    _loadChartData();
   }
 
-  Future<void> _loadChartUrls() async {
+  Future<void> _loadChartData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      debugPrint('🔍 [Chart Widget] 차트 URL 로드 시작: ${widget.symbol}');
-      
-      // 차트 스크래핑 서비스를 통해 사용 가능한 차트들 가져오기
-      final availableCharts = await ChartScraperService.getAvailableCharts(widget.symbol);
-      
-      _chartUrls = availableCharts;
-      
-      // 기본 차트 타입 설정
-      if (_chartUrls!.isNotEmpty) {
-        _selectedChartType = _chartUrls!.keys.first;
-      }
-
-      debugPrint('📊 [Chart Widget] 로드된 차트: ${_chartUrls!.keys.toList()}');
+      // 기간에 따른 데이터 개수 조정 (대략적인 값)
+      // 1W: 5일, 1M: 22일, 3M: 66일, 1Y: 252일
+      // FMPService는 전체 데이터를 가져오므로 받아온 후 자른다.
+      final data = await FMPService.fetchHistoricalPrices(widget.symbol);
       
       setState(() {
+        _historicalData = data;
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('❌ [Chart Widget] 차트 로드 실패: $e');
       setState(() {
+        _error = '차트 데이터를 불러올 수 없습니다.';
         _isLoading = false;
-        _error = '차트 데이터를 불러올 수 없습니다: $e';
       });
     }
   }
+
+  List<Map<String, dynamic>> _filterDataByPeriod() {
+    if (_historicalData.isEmpty) return [];
+
+    int count;
+    switch (_selectedPeriod) {
+      case '1W':
+        count = 5;
+        break;
+      case '1M':
+        count = 22;
+        break;
+      case '3M':
+        count = 66;
+        break;
+      case '1Y':
+        count = 252;
+        break;
+      default:
+        count = 22;
+    }
+
+    // 데이터가 부족하면 전체 반환
+    if (_historicalData.length < count) {
+      return List.from(_historicalData);
+    }
+    
+    // 최신 데이터가 앞쪽에 있으므로 앞쪽 데이터를 가져온 뒤,
+    // 차트 X축은 시간 순서대로 그려야 하므로 다시 역순(오래된 순)으로 정렬해야 함
+    // FMPService에서 최신순(내림차순)으로 준다고 가정.
+    // _historicalData[0]이 가장 최신 날짜.
+    
+    final subList = _historicalData.take(count).toList();
+    return subList.reversed.toList(); // 오래된 날짜 -> 최신 날짜 순서
+  }
+
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final filteredData = _filterDataByPeriod();
+
     return Card(
-      color: Colors.grey[900],
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: theme.cardTheme.elevation,
+      color: theme.cardTheme.color,
+      shape: theme.cardTheme.shape,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '차트 스냅샷 (${widget.symbol})',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                if (_chartUrls != null)
-                  DropdownButton<String>(
-                    value: _selectedChartType,
-                    dropdownColor: Colors.grey[800],
-                    style: const TextStyle(color: Colors.white),
-                    items: _chartUrls!.keys.map((String type) {
-                      return DropdownMenuItem<String>(
-                        value: type,
-                        child: Text(_getChartTypeName(type)),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedChartType = newValue;
-                      });
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_isLoading)
-              const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                ),
-              )
-            else if (_error != null)
-              Container(
-                width: double.infinity,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[800],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (_chartUrls != null && _selectedChartType != null)
-              _buildChartWidget()
-            else
-              Container(
-                width: double.infinity,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[800],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(
-                  child: Text(
-                    '차트 데이터를 불러오는 중...',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-            if (_chartUrls != null && _selectedChartType != null)
-              Text(
-                '차트 타입: ${_getChartTypeName(_selectedChartType!)}',
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 12,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChartWidget() {
-    final chartUrl = _chartUrls![_selectedChartType!]!;
-    
-    // 간단한 차트인 경우
-    if (_selectedChartType == 'simple_chart') {
-      return Container(
-        width: double.infinity,
-        height: 300,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[600]!),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            color: Colors.grey[850],
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.trending_up,
-                    color: Colors.blue,
-                    size: 64,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '${widget.symbol} 차트',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '차트 데이터를 불러오는 중...',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // Yahoo 차트 이미지인 경우
-    if (_selectedChartType == 'yahoo_image') {
-      return Container(
-        width: double.infinity,
-        height: 300,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[600]!),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            chartUrl,
-            fit: BoxFit.contain,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey[800],
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 48,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Yahoo 차트를 불러올 수 없습니다',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    }
-    
-    // MarketWatch 차트인 경우
-    if (_selectedChartType == 'marketwatch') {
-      return Container(
-        width: double.infinity,
-        height: 300,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[600]!),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.trending_up,
-                  color: Colors.blue,
-                  size: 48,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'MarketWatch 차트',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '웹에서 전체 차트를 확인하세요',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // TradingView 차트인 경우
-    if (_selectedChartType == 'tradingview') {
-      return Container(
-        width: double.infinity,
-        height: 400,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[600]!),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.trending_up,
-                  color: Colors.blue,
-                  size: 48,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'TradingView 차트',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '웹에서 전체 차트를 확인하세요',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Yahoo Finance API 데이터를 사용한 차트
-    return Container(
-      width: double.infinity,
-      height: 200,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[600]!),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: FutureBuilder<Map<String, dynamic>?>(
-          future: _fetchYahooChartData(chartUrl),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                ),
-              );
-            } else if (snapshot.hasError) {
-              return Container(
-                color: Colors.grey[800],
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 48,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '차트를 불러올 수 없습니다',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            } else if (snapshot.hasData) {
-              return _buildSimpleChart(snapshot.data!);
-            } else {
-              return Container(
-                color: Colors.grey[800],
-                child: const Center(
-                  child: Text(
-                    '차트 데이터 없음',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              );
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  Future<Map<String, dynamic>?> _fetchYahooChartData(String url) async {
-    try {
-      final response = await http.get(
-        Uri.parse(url),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data;
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Widget _buildSimpleChart(Map<String, dynamic> data) {
-    try {
-      final chart = data['chart'];
-      if (chart == null) return _buildErrorWidget();
-
-      final result = chart['result'] as List?;
-      if (result == null || result.isEmpty) return _buildErrorWidget();
-
-      final meta = result[0]['meta'] as Map<String, dynamic>?;
-      final quotes = result[0]['indicators']['quote'] as List?;
-      
-      if (meta == null || quotes == null) return _buildErrorWidget();
-
-      final currentPrice = meta['regularMarketPrice']?.toDouble() ?? 0.0;
-      final previousClose = meta['previousClose']?.toDouble() ?? 0.0;
-      final change = currentPrice - previousClose;
-      final changePercent = previousClose != 0 ? (change / previousClose) * 100 : 0.0;
-
-      return Container(
-        color: Colors.grey[850],
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,75 +106,19 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '\$${currentPrice.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
+                  '${widget.symbol} 주가 차트',
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${change >= 0 ? '+' : ''}${change.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: change >= 0 ? Colors.green : Colors.red,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
-                      style: TextStyle(
-                        color: change >= 0 ? Colors.green : Colors.red,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildPeriodSelector(),
               ],
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Center(
-                child: Text(
-                  '차트 데이터 로드됨\n${_getChartTypeName(_selectedChartType!)}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      return _buildErrorWidget();
-    }
-  }
-
-  Widget _buildErrorWidget() {
-    return Container(
-      color: Colors.grey[800],
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 48,
-            ),
-            SizedBox(height: 8),
-            Text(
-              '차트를 불러올 수 없습니다',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 250,
+              child: _buildChartContent(filteredData),
             ),
           ],
         ),
@@ -556,24 +126,229 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     );
   }
 
-  String _getChartTypeName(String type) {
-    switch (type) {
-      case 'simple_chart':
-        return '간단한 차트';
-      case 'yahoo_image':
-        return 'Yahoo 차트 이미지';
-      case 'tradingview':
-        return 'TradingView 차트';
-      case 'marketwatch':
-        return 'MarketWatch';
-      case 'google_finance':
-        return 'Google Finance';
-      case 'finviz':
-        return 'Finviz';
-      case 'investing':
-        return 'Investing.com';
-      default:
-        return type;
+  Widget _buildPeriodSelector() {
+    final periods = ['1W', '1M', '3M', '1Y'];
+    final theme = Theme.of(context);
+
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: periods.map((period) {
+          final isSelected = _selectedPeriod == period;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedPeriod = period;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                period,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isSelected 
+                      ? theme.colorScheme.onPrimary 
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildChartContent(List<Map<String, dynamic>> data) {
+    final theme = Theme.of(context);
+
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.colorScheme.primary),
+      );
     }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: theme.colorScheme.error),
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            TextButton(
+              onPressed: _loadChartData,
+              child: const Text('다시 시도'),
+            )
+          ],
+        ),
+      );
+    }
+
+    if (data.isEmpty) {
+      return Center(
+        child: Text(
+          '데이터가 없습니다',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+
+    // 데이터 전처리
+    final prices = data.map((e) => (e['close'] as num).toDouble()).toList();
+    final minPrice = prices.reduce(min);
+    final maxPrice = prices.reduce(max);
+    final priceRange = maxPrice - minPrice;
+    final buffer = priceRange * 0.1; // 위아래 여백 10%
+
+    // 상승/하락 색상 결정
+    final startPrice = prices.first;
+    final endPrice = prices.last;
+    final isRising = endPrice >= startPrice;
+    final chartColor = isRising ? Colors.redAccent : Colors.blueAccent; 
+    // 한국 주식 시장 관습: 상승=빨강, 하락=파랑
+    // 미국 주식 시장 관습: 상승=초록, 하락=빨강 (원하면 변경 가능)
+    // 여기서는 사용자가 한국인일 가능성이 높으므로 한국식 또는 글로벌(초록/빨강) 선택
+    // 테마 색상을 따르도록 수정
+    final lineColor = isRising ? const Color(0xFF4CAF50) : const Color(0xFFF44336); // Green / Red
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: priceRange / 4, // 4등분
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: theme.colorScheme.outlineVariant.withOpacity(0.2),
+              strokeWidth: 1,
+            );
+          },
+        ),
+        titlesData: FlTitlesData(
+          show: true,
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 24,
+              interval: max(1, (data.length / 4).floor()).toDouble(), // X축 라벨 간격
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < data.length) {
+                  final dateStr = data[index]['date'] as String;
+                  // 날짜 포맷팅 (예: 2023-10-25 -> 10/25)
+                  try {
+                    final date = DateTime.parse(dateStr);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        DateFormat('M/d').format(date),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 10,
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    return const SizedBox.shrink();
+                  }
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) {
+                if (value == minPrice - buffer || value == maxPrice + buffer) return const SizedBox.shrink();
+                return Text(
+                  '\$${value.toStringAsFixed(0)}', // 소수점 제거하여 깔끔하게
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.right,
+                );
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        minX: 0,
+        maxX: data.length.toDouble() - 1,
+        minY: minPrice - buffer,
+        maxY: maxPrice + buffer,
+        lineBarsData: [
+          LineChartBarData(
+            spots: List.generate(data.length, (index) {
+              return FlSpot(index.toDouble(), prices[index]);
+            }),
+            isCurved: true,
+            color: lineColor,
+            barWidth: 2,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                colors: [
+                  lineColor.withOpacity(0.2),
+                  lineColor.withOpacity(0.0),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+        ],
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+             getTooltipColor: (touchedSpot) => theme.cardTheme.color!,
+            getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
+              return touchedBarSpots.map((barSpot) {
+                final index = barSpot.x.toInt();
+                if (index < 0 || index >= data.length) return null;
+                
+                final item = data[index];
+                final date = item['date'];
+                final price = item['close'];
+                
+                return LineTooltipItem(
+                  '$date\n\$${price.toStringAsFixed(2)}',
+                  theme.textTheme.bodySmall!.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              }).toList();
+            },
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+          ),
+          handleBuiltInTouches: true, // 터치 핸들링 활성화
+        ),
+      ),
+    );
   }
 }

@@ -70,12 +70,16 @@ class UsStockNewsService {
                     }
                   }
                   
+                  final title = item['headline']?.toString() ?? '';
+                  final description = item['summary']?.toString() ?? '';
+                  
                   return News(
-                    title: item['headline']?.toString() ?? '',
-                    description: item['summary']?.toString() ?? '',
+                    title: title,
+                    description: description,
                     link: item['url']?.toString() ?? '',
                     source: item['source']?.toString() ?? '',
                     publishedAt: publishedAt,
+                    sentiment: _analyzeSentiment('$title $description'),
                   );
                 } catch (e) {
                   debugPrint('⚠️ [News] 개별 뉴스 파싱 오류: $e, item: $item');
@@ -121,7 +125,17 @@ class UsStockNewsService {
 
       final data = json.decode(response.body);
       if (data is List) {
-        return data.map((item) => News.fromJson(item)).toList();
+        return data.map((item) {
+          final news = News.fromJson(item);
+          return News(
+            title: news.title,
+            description: news.description,
+            link: news.link,
+            source: news.source,
+            publishedAt: news.publishedAt,
+            sentiment: _analyzeSentiment('${news.title} ${news.description}'),
+          );
+        }).toList();
       }
       
       return [];
@@ -267,5 +281,38 @@ class UsStockNewsService {
     } catch (e) {
       return [];
     }
+  }
+  /// 텍스트 감정 분석 (키워드 기반)
+  static String _analyzeSentiment(String text) {
+    if (text.isEmpty) return 'Neutral';
+    final lowerText = text.toLowerCase();
+    
+    // 긍정 키워드
+    final positiveKeywords = [
+      'surge', 'jump', 'rise', 'gain', 'climb', 'soar', 'profit', 'beat', 
+      'buy', 'upgrade', 'growth', 'record', 'bull', 'positive', 'high', 
+      'strong', 'success', 'deal', 'agreement', 'launch', 'win', 'rally'
+    ];
+    
+    // 부정 키워드
+    final negativeKeywords = [
+      'plunge', 'drop', 'fall', 'decline', 'tumble', 'loss', 'miss', 
+      'sell', 'downgrade', 'crisis', 'warn', 'bear', 'negative', 'crash', 
+      'fail', 'risk', 'problem', 'concern', 'weak', 'low', 'down'
+    ];
+    
+    int score = 0;
+    
+    for (final word in positiveKeywords) {
+      if (lowerText.contains(word)) score++;
+    }
+    
+    for (final word in negativeKeywords) {
+      if (lowerText.contains(word)) score--;
+    }
+    
+    if (score > 0) return 'Positive';
+    if (score < 0) return 'Negative';
+    return 'Neutral';
   }
 }

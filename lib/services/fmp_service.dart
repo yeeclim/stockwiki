@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../models/news.dart';
+import 'cache_service.dart';
 
 class FMPService {
   // 환경변수에서 API 키 가져오기 (없으면 기본값 사용)
@@ -23,6 +24,14 @@ class FMPService {
 
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
   static Future<List<Stock>> fetchStocks(String keyword) async {
+    // 1. 캐시 확인
+    final cacheKey = 'fmp_search_$keyword';
+    final cachedData = await CacheService.get(cacheKey);
+    if (cachedData != null) {
+      final List<dynamic> list = cachedData;
+      return list.map((e) => Stock.fromJson(e)).toList();
+    }
+
     try {
       debugPrint('🔍 [FMP] 검색 시작: $keyword');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -51,6 +60,8 @@ class FMPService {
             if (quoteRes.statusCode == 200) {
               final quoteData = json.decode(quoteRes.body);
               if (quoteData is List) {
+                // 2. 캐시 저장 (30분)
+                await CacheService.set(cacheKey, quoteData, expiration: const Duration(minutes: 30));
                 return quoteData.map<Stock>((item) => Stock.fromJson(item)).toList();
               }
             }
@@ -137,6 +148,13 @@ class FMPService {
 
   /// 단일 주식 상세 정보 조회 (차트용)
   static Future<Map<String, dynamic>?> fetchStockDetail(String symbol) async {
+    // 1. 캐시 확인
+    final cacheKey = 'fmp_stock_detail_$symbol';
+    final cachedData = await CacheService.get(cacheKey);
+    if (cachedData != null) {
+      return cachedData as Map<String, dynamic>;
+    }
+
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final quoteUrl = Uri.parse('$_baseUrl/quote/$symbol?apikey=$_apiKey&t=$timestamp');
@@ -146,7 +164,10 @@ class FMPService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is List && data.isNotEmpty) {
-          return data[0];
+          final result = data[0] as Map<String, dynamic>;
+          // 2. 캐시 저장 (10분)
+          await CacheService.set(cacheKey, result, expiration: const Duration(minutes: 10));
+          return result;
         }
       }
       
@@ -197,6 +218,36 @@ class FMPService {
 
     try {
       debugPrint('🤖 [FMP] AI 추천 주식 조회 시작 (limit: $limit)');
+      
+      // 1. 캐시 확인
+      final cacheKey = 'fmp_recommendations';
+      final cachedData = await CacheService.get(cacheKey);
+      
+      if (cachedData != null) {
+        final List<dynamic> quoteData = cachedData;
+        
+        List<StockRecommendation> recommendations = quoteData
+             .where((item) => item['price'] != null && item['changePercent'] != null)
+             .map<StockRecommendation>((item) {
+               final stock = Stock.fromJson(item);
+               final score = _calculateAIScore(stock);
+               final reasons = _generateReasons(stock);
+               final action = _determineAction(stock, score);
+               
+               return StockRecommendation(
+                 stock: stock,
+                 score: score,
+                 reasons: reasons,
+                 action: action,
+               );
+             })
+             .where((rec) => rec.action == 'Buy') 
+             .toList();
+
+        recommendations.sort((a, b) => b.score.compareTo(a.score));
+        return recommendations.take(limit).toList();
+      }
+      
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       
       // 실시간 시세 조회
@@ -208,6 +259,9 @@ class FMPService {
       if (quoteRes.statusCode == 200) {
         final quoteData = json.decode(quoteRes.body);
         if (quoteData is List && quoteData.isNotEmpty) {
+           // 2. 캐시 저장 (1시간) - 추천 정보는 자주 안 변해도 됨
+           await CacheService.set(cacheKey, quoteData, expiration: const Duration(hours: 1));
+           
            List<StockRecommendation> recommendations = quoteData
               .where((item) => item['price'] != null && item['changePercent'] != null)
               .map<StockRecommendation>((item) {
@@ -417,9 +471,83 @@ class FMPService {
   static List<String> getAvailableSectors() {
     return ['Technology', 'Finance', 'Healthcare', 'Consumer', 'Energy', 'Industrial'];
   }
-}
 
-/// AI 추천 주식 모델
+
+  /// 주식 이력 데이터 조회 (차트용)
+  static Future<List<Map<String, dynamic>>> fetchHistoricalPrices(String symbol, {String timeseries = '5'}) async {
+    try {
+      debugPrint('📈 [FMP] 차트 데이터 조회 시작: $symbol (기간: $timeseries일)');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      
+      // timeseries에 따라 API 파라미터 또는 엔드포인트 조정
+      // 간단하게 Daily 차트만 우선 지원 (추후 확장 가능)
+      // https://financialmodelingprep.com/api/v3/historical-price-full/AAPL?apikey=...
+      
+      final url = Uri.parse('$_baseUrl/historical-price-full/$symbol?apikey=$_apiKey&t=$timestamp');
+      
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map && data['historical'] is List) {
+          final historical = List<Map<String, dynamic>>.from(data['historical']);
+          
+          // 필요한 데이터양만큼 자르기 (예: 최근 60개)
+          // timeseries 파라미터에 따라 로직 분기 가능
+          // 1D: intraday API 필요 (유료 또는 제한적), 여기서는 Daily 데이터 활용
+          
+          return historical; // 전체 반환하고 UI에서 가공
+        }
+      }
+      
+      // Fallback: Finnhub (Candles)
+      return await _fetchHistoricalFinnhub(symbol);
+      
+    } catch (e) {
+      debugPrint('💥 [FMP] 차트 데이터 조회 오류: $e');
+      return await _fetchHistoricalFinnhub(symbol);
+    }
+  }
+
+  /// Finnhub 이력 데이터 조회 (Fallback)
+  static Future<List<Map<String, dynamic>>> _fetchHistoricalFinnhub(String symbol) async {
+    try {
+      // 1년치 데이터 (Daily)
+      final to = (DateTime.now().millisecondsSinceEpoch / 1000).round();
+      final from = to - (365 * 24 * 60 * 60); // 1년 전
+      
+      final url = Uri.parse(
+          '$_finnhubBaseUrl/stock/candle?symbol=$symbol&resolution=D&from=$from&to=$to&token=$_finnhubApiKey');
+          
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['s'] == 'ok') {
+          List<Map<String, dynamic>> results = [];
+          final closes = data['c'] as List;
+          final times = data['t'] as List;
+          
+          for (int i = 0; i < closes.length; i++) {
+            results.add({
+              'date': DateTime.fromMillisecondsSinceEpoch(times[i] * 1000).toIso8601String().substring(0, 10),
+              'close': closes[i],
+              // 필요한 다른 필드(open, high, low, volume)도 추가 가능
+              'volume': data['v'][i],
+            });
+          }
+          // 최신순 정렬 (FMP와 통일)
+          return results.reversed.toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  }
+
+  /// AI 추천 주식 모델
 class StockRecommendation {
   final Stock stock;
   final double score; // AI 점수 (0-100)

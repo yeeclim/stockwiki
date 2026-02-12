@@ -6,6 +6,7 @@ class News {
   final String link;
   final String source;
   final String? publishedAt;
+  final String sentiment; // 'Positive', 'Negative', 'Neutral'
 
   // url은 link의 별칭으로 사용
   String get url => link;
@@ -16,6 +17,7 @@ class News {
     required this.link,
     required this.source,
     this.publishedAt,
+    this.sentiment = 'Neutral',
   });
 
   factory News.fromJson(Map<String, dynamic> json) {
