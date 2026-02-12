@@ -111,9 +111,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             _buildStockInfoCard(),
             const SizedBox(height: 16),
             
-            // 차트 섹션 제거 - 차트가 제대로 작동하지 않음
-            // UsStockChartWidget(symbol: widget.stock.symbol),
-            // const SizedBox(height: 16),
+            // 차트 섹션
+            UsStockChartWidget(symbol: widget.stock.symbol),
+            const SizedBox(height: 16),
             
             // 뉴스 섹션
             _buildNewsSection(),
@@ -350,14 +350,38 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              news.title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                if (news.sentiment != 'Neutral')
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (news.sentiment == 'Positive' ? Colors.green : Colors.red).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: (news.sentiment == 'Positive' ? Colors.green : Colors.red), width: 1),
+                    ),
+                    child: Text(
+                      news.sentiment == 'Positive' ? '호재' : '악재',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: news.sentiment == 'Positive' ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    news.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Row(

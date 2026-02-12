@@ -4,6 +4,7 @@ import '../models/stock.dart';
 import '../services/fmp_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'us_stock_detail_page.dart';
 import '../models/committee_recommendation.dart';
 
@@ -678,12 +679,13 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   Widget _buildRecommendationCard(CommitteeRecommendation rec) {
     final theme = Theme.of(context);
     final stock = rec.stock;
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 24),
       child: Card(
-        elevation: theme.cardTheme.elevation,
+        elevation: 4,
         color: theme.cardTheme.color,
-        shape: theme.cardTheme.shape,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: InkWell(
           onTap: () {
             Navigator.push(
@@ -693,15 +695,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               ),
             );
           },
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 헤더
+                // 1. 헤더 및 게이지 섹션
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(
@@ -709,7 +711,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                         children: [
                           Text(
                             stock.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
+                            style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onSurface,
                             ),
@@ -717,97 +719,105 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                           const SizedBox(height: 4),
                           Text(
                             stock.symbol,
-                            style: theme.textTheme.bodySmall?.copyWith(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Text(
+                                _formatPrice(stock),
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (stock.changePercent != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: (stock.changePercent! >= 0 ? Colors.green : Colors.red)
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
+                                    style: TextStyle(
+                                      color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // 검증도 배지
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getVerificationColor(rec.verificationScore)
-                            .withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _getVerificationColor(rec.verificationScore),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '검증도 ${rec.verificationScore.toStringAsFixed(0)}%',
-                            style: TextStyle(
+                    // 게이지 위젯
+                    Column(
+                      children: [
+                        SizedBox(
+                          width: 80,
+                          height: 40,
+                          child: CustomPaint(
+                            painter: GaugePainter(
+                              score: rec.verificationScore,
                               color: _getVerificationColor(rec.verificationScore),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            rec.finalRecommendation,
-                            style: TextStyle(
-                              color: _getRecommendationColor(rec.finalRecommendation),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                // 가격 정보
-                Row(
-                  children: [
-                    Text(
-                      _formatPrice(stock),
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (stock.changePercent != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: (stock.changePercent! >= 0 ? Colors.green : Colors.red)
-                              .withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
+                        const SizedBox(height: 4),
+                        Text(
+                          '${rec.verificationScore.toStringAsFixed(0)}점',
                           style: TextStyle(
-                            color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                            color: _getVerificationColor(rec.verificationScore),
                             fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 16,
                           ),
                         ),
-                      ),
+                        Text(
+                          rec.finalRecommendation,
+                          style: TextStyle(
+                            color: _getRecommendationColor(rec.finalRecommendation),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+                
+                // 2. AI 투표 섹션 (Voting Plates)
+                Text(
+                  'AI 위원회 투표 결과',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: rec.models.map((model) => _buildVotingPlate(model)).toList(),
+                ),
+
+                const SizedBox(height: 24),
                 Divider(color: theme.dividerColor),
                 const SizedBox(height: 16),
                 
-                // AI 분석 요약
+                // 3. AI 분석 요약
                 Row(
                   children: [
-                    Icon(Icons.analytics_outlined, size: 20, color: theme.colorScheme.primary),
+                    Icon(Icons.auto_awesome, size: 20, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
-                      'AI 분석 요약',
+                      '위원회 종합 의견',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.primary,
@@ -816,38 +826,19 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  rec.summary,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    height: 1.5,
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // 모델별 의견 (간략히)
-                Row(
-                  children: rec.models.take(3).map((model) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Tooltip(
-                        message: '${model.modelName}: ${model.reasoning}',
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: _getRecommendationColor(model.recommendation).withOpacity(0.2),
-                          child: Text(
-                            model.modelName[0],
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: _getRecommendationColor(model.recommendation),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                  child: Text(
+                    rec.summary,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      height: 1.6,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -855,6 +846,80 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildVotingPlate(AiModelResponse model) {
+    final theme = Theme.of(context);
+    final color = _getRecommendationColor(model.recommendation);
+    
+    // 모델명 매핑 (영문 -> 한글)
+    String modelName = model.modelName;
+    if (modelName.contains('OpenAI') || modelName.contains('gpt')) modelName = '워렌 버핏';
+    else if (modelName.contains('Gemini')) modelName = '피터 린치';
+    else if (modelName.contains('Claude') || modelName.contains('Llama')) modelName = '짐 로저스';
+
+    return Tooltip(
+      message: model.reasoning,
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      triggerMode: TooltipTriggerMode.tap,
+      showDuration: const Duration(seconds: 5),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2),
+            ),
+            child: Center(
+              child: Icon(
+                _getRecommendationIcon(model.recommendation),
+                color: color,
+                size: 30,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            modelName,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          Text(
+            model.recommendation,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getRecommendationIcon(String recommendation) {
+    switch (recommendation.toLowerCase()) {
+      case 'buy':
+      case 'strong buy':
+      case '매수':
+      case '강력 매수':
+        return Icons.arrow_upward;
+      case 'sell':
+      case 'strong sell':
+      case '매도':
+      case '강력 매도':
+        return Icons.arrow_downward;
+      case 'hold':
+      case '보유':
+        return Icons.remove;
+      default:
+        return Icons.question_mark;
+    }
   }
 
   Color _getVerificationColor(double score) {
@@ -882,4 +947,53 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         return Colors.grey;
     }
   }
+}
+
+class GaugePainter extends CustomPainter {
+  final double score;
+  final Color color;
+
+  GaugePainter({required this.score, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height);
+    final radius = size.width / 2;
+    final strokeWidth = 10.0;
+
+    // 배경 아크
+    final bgPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
+      pi, // 180도에서 시작
+      pi, // 180도 그림 (반원)
+      false,
+      bgPaint,
+    );
+
+    // 점수 아크
+    final valuePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final sweepAngle = (score / 100) * pi;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
+      pi,
+      sweepAngle,
+      false,
+      valuePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
