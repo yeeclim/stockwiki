@@ -452,76 +452,81 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     IconData signalIcon;
 
     if (score >= 3) {
-      signal = '강력 매수';
+      signal = '긍정적 흐름 (Positive)';
       signalColor = Colors.green[700]!;
-      signalIcon = Icons.sentiment_very_satisfied;
+      signalIcon = Icons.trending_up;
     } else if (score >= 1) {
-      signal = '매수';
+      signal = '다소 긍정적';
       signalColor = Colors.green;
       signalIcon = Icons.sentiment_satisfied;
     } else if (score <= -3) {
-      signal = '강력 매도';
+      signal = '부정적 흐름 (Negative)';
       signalColor = Colors.red[700]!;
-      signalIcon = Icons.sentiment_very_dissatisfied;
+      signalIcon = Icons.trending_down;
     } else if (score <= -1) {
-      signal = '매도';
+      signal = '다소 부정적';
       signalColor = Colors.red;
       signalIcon = Icons.sentiment_dissatisfied;
     } else {
-      signal = '관망 (중립)';
+      signal = '중립 / 관망 (Neutral)';
       signalColor = Colors.grey;
-      signalIcon = Icons.sentiment_neutral;
+      signalIcon = Icons.remove_circle_outline;
     }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: signalColor.withOpacity(0.1),
+        color: signalColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: signalColor, width: 1.5),
+        border: Border.all(color: signalColor.withOpacity(0.5), width: 1),
       ),
-      child: Row(
+      child: Column(
         children: [
-          CircleAvatar(
-            backgroundColor: signalColor,
-            radius: 24,
-            child: Icon(signalIcon, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '뉴스 기반 매매 의견',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  signal,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: signalColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text(
-                '호재 $positiveCount',
-                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              Icon(signalIcon, color: signalColor, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '뉴스 감정 분석 동향',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               Text(
-                '악재 $negativeCount',
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                signal,
+                style: TextStyle(
+                  color: signalColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: positiveCount,
+                child: Container(height: 4, color: Colors.green),
+              ),
+              Expanded(
+                flex: negativeCount,
+                child: Container(height: 4, color: Colors.red),
+              ),
+              if (positiveCount == 0 && negativeCount == 0)
+                Expanded(child: Container(height: 4, color: Colors.grey)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('호재성 $positiveCount건', style: const TextStyle(fontSize: 12, color: Colors.green)),
+              Text('악재성 $negativeCount건', style: const TextStyle(fontSize: 12, color: Colors.red)),
+            ],
+          )
         ],
       ),
     );
