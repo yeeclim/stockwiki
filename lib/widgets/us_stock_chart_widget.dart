@@ -203,11 +203,25 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
 
     if (data.isEmpty) {
       return Center(
-        child: Text(
-          '데이터가 없습니다',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '데이터 데이터가 없습니다.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.black12,
+              child: Text(
+                FMPService.debugLog,
+                style: const TextStyle(fontSize: 10, color: Colors.red),
+              ),
+            ),
+          ],
         ),
       );
     }
