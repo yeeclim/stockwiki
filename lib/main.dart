@@ -170,26 +170,19 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     ),
                   ),
                   ListTile(
-                    leading: Icon(Icons.psychology, color: theme.colorScheme.onSurface),
-                    title: Text("알고리즘 설명", style: TextStyle(color: theme.colorScheme.onSurface)),
+                    leading: const Icon(Icons.groups, color: Colors.green),
+                    title: Text("AI 검증위원회", style: TextStyle(color: theme.colorScheme.onSurface)),
+                    subtitle: Text(
+                      '다중 AI 검증',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                    ),
                     onTap: () {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const AiAlgorithmExplainPage()),
+                        MaterialPageRoute(builder: (_) => const UsStockAiCommitteePage()),
                       );
                     },
                   ),
-                  ListTile(
-                    leading: Icon(Icons.bookmark_outline, color: theme.colorScheme.onSurface),
-                    title: Text("북마크 목록", style: TextStyle(color: theme.colorScheme.onSurface)),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const BookmarkListPage()),
-                      );
-                    },
-                  ),
-
                   Divider(height: 1, color: theme.dividerColor),
 
                   // 한국 주식 섹션
@@ -271,20 +264,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       );
                     },
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.groups, color: Colors.green),
-                    title: Text("AI 검증위원회", style: TextStyle(color: theme.colorScheme.onSurface)),
-                    subtitle: Text(
-                      '다중 AI 검증',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
-                    ),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const UsStockAiCommitteePage()),
-                      );
-                    },
-                  ),
                 ],
               ),
             ),
@@ -302,50 +281,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 헤더 섹션 (App Bar로 이동했으므로 제거하거나 환영 메시지로 변경)
-               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? [Colors.blueGrey.shade900, Colors.blueGrey.shade800]
-                        : [Colors.blue.shade50, Colors.white],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.shadowColor.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '실시간 시장 정보',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: theme.colorScheme.secondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '오늘의 시장 흐름을\n확인하세요.',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 30),
 
               // 주요 기능 버튼 (디자인 개선)
