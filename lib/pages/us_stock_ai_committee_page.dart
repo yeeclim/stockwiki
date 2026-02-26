@@ -55,9 +55,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     try {
       List<Stock> stocks = [];
       
-      // 미국 주식인지 국내 주식인지 판단 (영문/숫자 조합은 미국 주식으로 가정)
-      final isUSStock = RegExp(r'^[A-Za-z0-9]+$').hasMatch(query);
-      
+      // 미국 주식인지 국내 주식인지 판단 
+      // 한글이 포함되어 있거나 숫자만으로 6자리 등을 입력한 경우 국내 주식으로 간주
+      final isUSStock = !(RegExp(r'[가-힣]').hasMatch(query) || RegExp(r'^\d+$').hasMatch(query));      
       debugPrint('🔍 주식 검색 시작: $query (${isUSStock ? "미국" : "국내"} 주식)');
       
       if (isUSStock) {
@@ -210,7 +210,11 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       debugPrint('🔍 AI 검증위원회 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
       
       // 가격 포맷 (국내 주식은 원화, 미국 주식은 달러)
-      final isKorean = RegExp(r'^\d+ ?\d* ?$').hasMatch(stock.symbol) || RegExp(r'^\d+$').hasMatch(stock.symbol);
+      final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) || 
+                       stock.symbol.endsWith('.KS') || 
+                       stock.symbol.endsWith('.KQ') || 
+                       RegExp(r'[가-힣]').hasMatch(stock.name);
+      
       final priceFormat = isKorean 
           ? '₩${stock.price?.toStringAsFixed(0) ?? 'N/A'}'
           : '\$${stock.price?.toStringAsFixed(2) ?? 'N/A'}';
@@ -309,8 +313,11 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   String _formatPrice(Stock stock) {
     if (stock.price == null) return 'N/A';
     
-    // 국내 주식인지 판단 (숫자로만 구성된 심볼은 국내 주식)
-    final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol);
+    // 국내 주식인지 판단
+    final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) || 
+                     stock.symbol.endsWith('.KS') || 
+                     stock.symbol.endsWith('.KQ') || 
+                     RegExp(r'[가-힣]').hasMatch(stock.name);
     
     if (isKorean) {
       // 원화 표시
