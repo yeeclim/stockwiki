@@ -359,20 +359,6 @@ function generateTradingStrategy(currentPrice, type) {
   return strategies[type];
 }
 
-// 폴백 추천 데이터 (실시간 데이터를 가져올 수 없는 경우)
-// 참고: 기본 가격은 최근 기준 가격이며, 실제 주가는 네이버 증권 등에서 확인 필요
-// 2026년 2월 기준 최신 가격 (참고용 - 내부 로직에서만 사용)
-const fallbackPrices = {
-  '005930': 167600,  // 삼성전자
-  '000660': 867000,  // SK하이닉스
-  '035420': 252000,  // NAVER
-  '035720': 52000,   // 카카오
-  '373220': 650000,  // LG에너지솔루션
-  // 소형주
-  '357780': 390000,  // 솔브레인 (사용자 제보 반영)
-  '065350': 120000,  // 신성델타테크 (추정치 상향)
-};
-
 function getFallbackRecommendations() {
   // 대형주 + 중소형주 모두 포함
   const fallbackStocks = [
@@ -387,8 +373,7 @@ function getFallbackRecommendations() {
   ];
 
   return fallbackStocks.map((stock, index) => {
-    // 폴백 데이터는 가격 없이 목표가만 제공
-    const fallbackPrice = fallbackPrices[stock.code] || 0;
+    // 폴백 데이터는 가격을 0으로 처리
     return {
       id: `rec_fallback_${stock.code}_${Date.now()}_${index}`,
       stockName: stock.name,
@@ -449,17 +434,6 @@ async function fetchStockPrice(symbol) {
     return null;
   } catch (error) {
     console.error(`❌ 주가 조회 오류 (${symbol}):`, error);
-    // 오류 시에도 폴백 시도
-    if (fallbackPrices[symbol]) {
-      return {
-        price: fallbackPrices[symbol],
-        change: 0,
-        changePercent: 0,
-        previousClose: fallbackPrices[symbol],
-        volume: 0,
-        marketCap: 0
-      };
-    }
     return null;
   }
 }
