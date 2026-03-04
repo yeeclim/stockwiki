@@ -14,46 +14,51 @@ import time
 
 def get_krx_stock_list():
     """
-    KRX 상장기업 목록을 가져오는 함수
-    주요 대형주들을 중심으로 데이터 수집
+    네이버 증권 시가총액 상위 종목을 크롤링하여 KRX 종목 목록을 동적으로 가져옵니다.
     """
-    # 주요 KRX 상장기업 코드 (실제로는 더 많은 종목이 있지만 주요 종목들로 시작)
-    krx_stocks = [
-        # 삼성전자, SK하이닉스, LG에너지솔루션, NAVER, 카카오, 현대자동차 등
-        {"code": "005930", "name": "삼성전자", "market": "KOSPI"},
-        {"code": "000660", "name": "SK하이닉스", "market": "KOSPI"},
-        {"code": "373220", "name": "LG에너지솔루션", "market": "KOSPI"},
-        {"code": "035420", "name": "NAVER", "market": "KOSPI"},
-        {"code": "035720", "name": "카카오", "market": "KOSPI"},
-        {"code": "005380", "name": "현대자동차", "market": "KOSPI"},
-        {"code": "000270", "name": "기아", "market": "KOSPI"},
-        {"code": "207940", "name": "삼성바이오로직스", "market": "KOSPI"},
-        {"code": "006400", "name": "삼성SDI", "market": "KOSPI"},
-        {"code": "051910", "name": "LG화학", "market": "KOSPI"},
-        {"code": "068270", "name": "셀트리온", "market": "KOSPI"},
-        {"code": "323410", "name": "카카오뱅크", "market": "KOSPI"},
-        {"code": "012330", "name": "현대모비스", "market": "KOSPI"},
-        {"code": "066570", "name": "LG전자", "market": "KOSPI"},
-        {"code": "015760", "name": "한국전력", "market": "KOSPI"},
-        {"code": "017670", "name": "SK텔레콤", "market": "KOSPI"},
-        {"code": "030200", "name": "KT", "market": "KOSPI"},
-        {"code": "105560", "name": "KB금융", "market": "KOSPI"},
-        {"code": "055550", "name": "신한지주", "market": "KOSPI"},
-        {"code": "086280", "name": "현대글로비스", "market": "KOSPI"},
-        # KOSDAQ 주요 종목들
-        {"code": "207760", "name": "미래에셋대우", "market": "KOSDAQ"},
-        {"code": "035900", "name": "JYP Ent.", "market": "KOSDAQ"},
-        {"code": "086520", "name": "에코프로", "market": "KOSDAQ"},
-        {"code": "247540", "name": "에코프로비엠", "market": "KOSDAQ"},
-        {"code": "196170", "name": "알테오젠", "market": "KOSDAQ"},
-        {"code": "065350", "name": "신성델타테크", "market": "KOSDAQ"},
-        {"code": "357780", "name": "솔브레인", "market": "KOSDAQ"},
-        {"code": "196490", "name": "다이나믹디자인", "market": "KOSDAQ"},
-        {"code": "042700", "name": "한미반도체", "market": "KOSDAQ"},
-        {"code": "200470", "name": "에이펙스반도체", "market": "KOSDAQ"}
+    print("🌐 네이버 증권에서 상장 종목 리스트 가져오는 중...")
+    stocks = []
+    
+    # 코스피(KOSPI) 시가총액 상위 1페이지 (50종목)
+    # 코스닥(KOSDAQ) 시가총액 상위 1페이지 (50종목)
+    markets = [
+        {"name": "KOSPI", "url": "https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page=1"},
+        {"name": "KOSDAQ", "url": "https://finance.naver.com/sise/sise_market_sum.naver?sosok=1&page=1"}
     ]
     
-    return krx_stocks
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
+    for market in markets:
+        try:
+            response = requests.get(market['url'], headers=headers, timeout=10)
+            if response.status_code == 200:
+                # 간단한 정규표현식으로 종목코드와 이름 추출 (BeautifulSoup 없이)
+                import re
+                # <a href="/item/main.naver?code=005930" class="tltle">삼성전자</a>
+                pattern = r'code=(\d{6})".*?class="tltle">(.*?)</a>'
+                matches = re.findall(pattern, response.text)
+                
+                for code, name in matches:
+                    stocks.append({
+                        "code": code,
+                        "name": name,
+                        "market": market['name']
+                    })
+                print(f"✅ {market['name']} {len(matches)}개 종목 로드 완료")
+        except Exception as e:
+            print(f"⚠️ {market['name']} 로드 중 오류: {e}")
+            
+    if not stocks:
+        print("⚠️ 동적 로드 실패, 최소한의 폴백 데이터 사용")
+        return [
+            {"code": "005930", "name": "삼성전자", "market": "KOSPI"},
+            {"code": "000660", "name": "SK하이닉스", "market": "KOSPI"},
+            {"code": "373220", "name": "LG에너지솔루션", "market": "KOSPI"}
+        ]
+        
+    return stocks
 
 def get_stock_info_from_yahoo(symbol):
     """
@@ -105,7 +110,9 @@ def create_updated_krx_data():
         print(f"📊 처리 중 ({i+1}/{len(base_stocks)}): {stock['name']} ({stock['code']})")
         
         # Yahoo Finance에서 실시간 데이터 가져오기
-        yahoo_symbol = f"{stock['code']}.KS"
+        # 마켓에 따라 접미사 결정 (KOSPI -> .KS, KOSDAQ -> .KQ)
+        suffix = ".KS" if stock['market'] == "KOSPI" else ".KQ"
+        yahoo_symbol = f"{stock['code']}{suffix}"
         stock_info = get_stock_info_from_yahoo(yahoo_symbol)
         
         # 기본 정보 구성
@@ -204,7 +211,7 @@ def main():
             print(f"📅 업데이트 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             
             # 가격 정보가 있는 종목 수 확인
-            stocks_with_price = len([s for s in stocks_data if s.get('current_price', 0) > 0])
+            stocks_with_price = len([s for s in stocks_data if float(s.get('current_price', 0)) > 0])
             print(f"💰 가격 정보 포함 종목: {stocks_with_price}개")
         else:
             print("❌ KRX 데이터 업데이트 실패")
