@@ -14,44 +14,70 @@ from datetime import datetime
 API_URL = "http://localhost:3000"
 
 def test_upload_recommendation():
-    """추천 업로드 테스트"""
-    print("🧪 1. 추천 업로드 테스트...")
+    """추천 업로드 테스트 - 임의의 실시간 종목으로 테스트"""
+    print("🧪 1. 추천 업로드 테스트 (실시간 종목 자동 선택)...")
     
+    # 실시간 테마 중 하나 선택
+    try:
+        themes_res = requests.get(f"{API_URL}/api/theme-recommendations?action=themes")
+        themes = themes_res.json().get('data', [])
+        import random
+        selected_theme = random.choice(themes) if themes else "2차전지"
+        
+        # 해당 테마의 종목 중 하나 선택
+        stocks_res = requests.get(f"{API_URL}/api/theme-recommendations?action=theme-recommendations&theme={selected_theme}")
+        stocks = stocks_res.json().get('data', [])
+        selected_stock = random.choice(stocks) if stocks else {"symbol": "005930", "name": "삼성전자"}
+        
+        stock_name = selected_stock.get('name', '삼성전자')
+        stock_code = selected_stock.get('symbol', '005930')
+        # 가격을 반드시 정수형으로 변환 (Lint 에러 방지 및 연산 안전성 확보)
+        try:
+            price = int(float(selected_stock.get('price', 75000)))
+        except (ValueError, TypeError):
+            price = 75000
+    except Exception as e:
+        print(f"   ⚠️ 실시간 종목 로드 실패, 기본값 사용: {e}")
+        stock_name = "삼성전자"
+        stock_code = "005930"
+        price = 75000
+
     data = {
-        "stockName": "삼성전자",
-        "stockCode": "005930",
-        "currentPrice": 75000,
+        "stockName": stock_name,
+        "stockCode": stock_code,
+        "currentPrice": price,
         "changePercent": 2.3,
         "changeAmount": 1700,
         "action": "매수",
         "reasons": [
-            "반도체 업황 회복 신호 포착",
-            "HBM3E 양산 본격화로 수익성 개선 예상",
-            "4분기 실적 시장 컨센서스 상회 전망"
+            f"{stock_name}의 기술적 반등 구간 진입",
+            "동종 업계 대비 저평가 매력 부각",
+            "외국인 및 기관의 동반 순매수세 유입"
         ],
-        "targetPrice": 85000,
+        "targetPrice": int(price * 1.15),
         "dayTrading": {
-            "buyPrice": 74500,
-            "sellPrice": 76800,
-            "stopLoss": 73500,
+            "buyPrice": int(price * 0.99),
+            "sellPrice": int(price * 1.03),
+            "stopLoss": int(price * 0.97),
             "period": "1~3일",
-            "expectedReturn": 3.1
+            "expectedReturn": 3.0
         },
         "swingTrading": {
-            "buyPrice": 74000,
-            "sellPrice": 81000,
-            "stopLoss": 72000,
+            "buyPrice": int(price * 0.98),
+            "sellPrice": int(price * 1.10),
+            "stopLoss": int(price * 0.95),
             "period": "1주~1개월",
-            "expectedReturn": 9.5
+            "expectedReturn": 12.0
         },
         "longTerm": {
-            "buyPrice": 75000,
-            "sellPrice": 92000,
-            "stopLoss": 70000,
+            "buyPrice": price,
+            "sellPrice": int(price * 1.30),
+            "stopLoss": int(price * 0.90),
             "period": "3개월~1년",
-            "expectedReturn": 22.7
+            "expectedReturn": 30.0
         }
     }
+    print(f"   🎯 테스트 대상 선택됨: {stock_name} ({stock_code}) - 현재가 약 {price}원")
     
     try:
         # KV 버전 테스트 (실제 DB 필요)
