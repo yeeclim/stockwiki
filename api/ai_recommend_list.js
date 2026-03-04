@@ -117,14 +117,14 @@ async function getSampleRecommendationsWithRealPrices() {
   try {
     // 추천할 종목 목록 (대형주 + 중소형주)
     const stockSymbols = [
-      { code: '005930', name: '삼성전자', action: '매수' },
-      { code: '000660', name: 'SK하이닉스', action: '매수' },
-      { code: '035420', name: 'NAVER', action: '보유' },
-      { code: '035720', name: '카카오', action: '매수' },
-      { code: '373220', name: 'LG에너지솔루션', action: '매수' },
+      { code: '005930', name: '삼성전자' },
+      { code: '000660', name: 'SK하이닉스' },
+      { code: '035420', name: 'NAVER' },
+      { code: '035720', name: '카카오' },
+      { code: '373220', name: 'LG에너지솔루션' },
       // 소형주 추가 (시가총액 500억~3000억대, 상대적으로 안정적인 종목)
-      { code: '357780', name: '솔브레인', action: '매수' },
-      { code: '065350', name: '신성델타테크', action: '매수' }
+      { code: '357780', name: '솔브레인' },
+      { code: '065350', name: '신성델타테크' }
     ];
 
     const recommendations = [];
@@ -166,7 +166,11 @@ async function getSampleRecommendationsWithRealPrices() {
             changeAmount: stockData.change || 0,
             previousClose: stockData.previousClose || null, // 전일 종가 추가
             action: action,
-            reasons: aiReason || generateReasons(stock.code, stock.name),
+            reasons: aiReason || [
+              `${stockData.name || stock.name} 최신 동향 분석 중`,
+              '단기 모멘텀 및 수급 파악 대기',
+              '상세 분석 결과는 잠시 후 반영됩니다'
+            ],
             targetPrice: Math.round(stockData.price * 1.15), // 현재가의 115%로 목표가 설정
             postedAt: new Date().toISOString(),
             likes: Math.floor(Math.random() * 200) + 50,
@@ -196,8 +200,12 @@ async function getSampleRecommendationsWithRealPrices() {
             changePercent: 0,
             changeAmount: 0,
             previousClose: null, // 전일 종가도 없음 (실시간 조회 실패 시)
-            action: stock.action,
-            reasons: generateReasons(stock.code, stock.name),
+            action: 'Watch',
+            reasons: [
+              `${stock.name} 데이터 조회 지연`,
+              '네트워크 문제로 분석을 일시적으로 불러올 수 없습니다',
+              '잠시 후 다시 접속해주세요'
+            ],
             targetPrice: 0, // 목표가는 별도 계산 필요
             postedAt: new Date().toISOString(),
             likes: Math.floor(Math.random() * 200) + 50,
@@ -226,8 +234,12 @@ async function getSampleRecommendationsWithRealPrices() {
           changePercent: 0,
           changeAmount: 0,
           previousClose: null, // 전일 종가도 없음
-          action: stock.action,
-          reasons: generateReasons(stock.code, stock.name),
+          action: 'Watch',
+          reasons: [
+            `${stock.name} 데이터 조회 오류`,
+            '시스템 문제로 분석을 일시적으로 불러올 수 없습니다',
+            '잠시 후 다시 접속해주세요'
+          ],
           targetPrice: 0, // 목표가는 별도 계산 필요
           postedAt: new Date().toISOString(),
           likes: Math.floor(Math.random() * 200) + 50,
@@ -316,53 +328,7 @@ function parseRecommendation(response) {
 }
 
 
-// 종목별 추천 근거 생성
-function generateReasons(stockCode, stockName) {
-  const reasonMap = {
-    '005930': [
-      '반도체 업황 회복 신호 포착',
-      'HBM3E 양산 본격화로 수익성 개선',
-      '4분기 실적 시장 컨센서스 상회 전망'
-    ],
-    '000660': [
-      'AI 반도체 수요 급증',
-      'HBM 시장 점유율 1위 유지',
-      '영업이익률 지속 개선 중'
-    ],
-    '035420': [
-      'AI 검색 서비스 강화 중',
-      '클라우드 사업 성장세 지속',
-      '단기 조정 후 반등 예상'
-    ],
-    '035720': [
-      '카카오페이 IPO 기대감 확대',
-      '광고 매출 회복세 뚜렷',
-      '저평가 구간 진입으로 매수 타이밍'
-    ],
-    '373220': [
-      '북미 IRA 수혜주로 주목',
-      '전기차 배터리 점유율 확대 중',
-      '폴란드 신규 공장 가동 임박'
-    ],
-    // 소형주 추천 근거 (시가총액 500억~3000억대)
-    '357780': [
-      '반도체 소재 시장 성장',
-      '반도체 업황 회복 수혜',
-      '소형주 성장 잠재력'
-    ],
-    '065350': [
-      '반도체 소재 및 부품 시장',
-      '반도체 업황 개선 수혜',
-      '소형주 성장 가능성'
-    ]
-  };
 
-  return reasonMap[stockCode] || [
-    `${stockName} 실적 개선 전망`,
-    '업계 성장세 지속',
-    '기술적 분석상 매수 신호'
-  ];
-}
 
 // 현재가 기준으로 투자 전략 동적 생성
 function generateTradingStrategy(currentPrice, type) {
@@ -410,14 +376,14 @@ const fallbackPrices = {
 function getFallbackRecommendations() {
   // 대형주 + 중소형주 모두 포함
   const fallbackStocks = [
-    { code: '005930', name: '삼성전자', action: '매수' },
-    { code: '000660', name: 'SK하이닉스', action: '매수' },
-    { code: '035420', name: 'NAVER', action: '보유' },
-    { code: '035720', name: '카카오', action: '매수' },
-    { code: '373220', name: 'LG에너지솔루션', action: '매수' },
+    { code: '005930', name: '삼성전자' },
+    { code: '000660', name: 'SK하이닉스' },
+    { code: '035420', name: 'NAVER' },
+    { code: '035720', name: '카카오' },
+    { code: '373220', name: 'LG에너지솔루션' },
     // 소형주 (시가총액 500억~3000억대)
-    { code: '357780', name: '솔브레인', action: '매수' },
-    { code: '065350', name: '신성델타테크', action: '매수' }
+    { code: '357780', name: '솔브레인' },
+    { code: '065350', name: '신성델타테크' }
   ];
 
   return fallbackStocks.map((stock, index) => {
@@ -431,8 +397,12 @@ function getFallbackRecommendations() {
       changePercent: 0,
       changeAmount: 0,
       previousClose: null,
-      action: stock.action,
-      reasons: generateReasons(stock.code, stock.name),
+      action: 'Watch',
+      reasons: [
+        '실시간 주가 및 AI 연동 지연',
+        '현재 오프라인 또는 서버 부하 상태입니다',
+        '최신 데이터를 불러올 수 없습니다'
+      ],
       targetPrice: 0, // 가격 없으면 목표가도 표시 안함
       postedAt: new Date().toISOString(),
       likes: Math.floor(Math.random() * 200) + 50,
