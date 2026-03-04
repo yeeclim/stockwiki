@@ -18,10 +18,10 @@ export default async function handler(req, res) {
 
   try {
     console.log(`종목 ${symbol} 크롤링 시작...`);
-    
+
     // 네이버 증권에서 데이터 크롤링
     const stockData = await fetchStockData(symbol);
-    
+
     if (stockData) {
       return res.status(200).json({
         success: true,
@@ -57,7 +57,7 @@ async function fetchStockData(symbol) {
     for (const apiUrl of apiEndpoints) {
       try {
         console.log(`📡 네이버 실시간 API 시도: ${apiUrl}`);
-        
+
         const apiResponse = await fetch(apiUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -68,7 +68,7 @@ async function fetchStockData(symbol) {
 
         if (apiResponse.ok) {
           const apiText = await apiResponse.text();
-          
+
           // JSONP 형식일 수 있으므로 파싱 시도
           try {
             // JSONP 제거 시도
@@ -76,12 +76,12 @@ async function fetchStockData(symbol) {
             if (jsonText.startsWith('(') || jsonText.includes('(')) {
               jsonText = jsonText.replace(/^[^(]*\(/, '').replace(/\);?$/, '');
             }
-            
+
             const apiData = JSON.parse(jsonText);
-            
+
             // 다양한 응답 형식 처리
             let price, change, changePercent, volume, name;
-            
+
             if (apiData.nowVal) {
               // itemSummary.nhn 형식
               price = parseInt(apiData.nowVal.replace(/,/g, ''));
@@ -89,7 +89,7 @@ async function fetchStockData(symbol) {
               changePercent = parseFloat(apiData.rate || '0');
               volume = parseInt((apiData.quant || '0').replace(/,/g, ''));
               name = apiData.itemName;
-              
+
               // 전일 종가 계산 (현재가 - 변동가)
               const previousClose = price - change;
             } else if (apiData.result) {
@@ -108,16 +108,16 @@ async function fetchStockData(symbol) {
               volume = parseInt((apiData.volume || apiData.quant || '0').toString().replace(/,/g, ''));
               name = apiData.name || apiData.itemName;
             }
-            
+
             if (price && price > 0) {
               // 전일 종가 계산 (현재가 - 변동가)
-              const previousClose = change !== undefined && change !== null 
-                ? price - change 
+              const previousClose = change !== undefined && change !== null
+                ? price - change
                 : (changePercent !== 0 ? Math.round(price / (1 + changePercent / 100)) : null);
-              
+
               const stockData = {
                 symbol: symbol,
-                name: name || getStockName(symbol),
+                name: name || symbol,
                 price: price,
                 change: change || 0,
                 changePercent: changePercent || 0,
@@ -128,7 +128,7 @@ async function fetchStockData(symbol) {
                 source: 'naver-api',
                 note: '실시간 API 데이터'
               };
-              
+
               console.log(`✅ 실시간 API 성공: ${stockData.name} - ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)${previousClose ? ` | 전일종가: ₩${previousClose.toLocaleString()}` : ''}`);
               return stockData;
             }
@@ -142,13 +142,13 @@ async function fetchStockData(symbol) {
         continue;
       }
     }
-    
+
     console.log(`⚠️ 모든 실시간 API 실패, HTML 크롤링으로 전환`);
 
     // 2단계: HTML 크롤링 (폴백)
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
     console.log(`🌐 네이버 증권 HTML 크롤링: ${url}`);
-    
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -167,13 +167,13 @@ async function fetchStockData(symbol) {
 
     const html = await response.text();
     console.log(`📄 HTML 길이: ${html.length}`);
-    
+
     // 종목명 추출
     const name = extractStockName(html, symbol);
-    
+
     // 가격 정보 추출 (변동률/변동가 포함)
     const priceInfo = extractPriceInfoWithChange(html);
-    
+
     if (!priceInfo.price) {
       console.log('❌ 가격 정보를 찾을 수 없습니다');
       return null;
@@ -183,8 +183,8 @@ async function fetchStockData(symbol) {
     const previousClose = priceInfo.change !== undefined && priceInfo.change !== null && priceInfo.change !== 0
       ? priceInfo.price - priceInfo.change
       : (priceInfo.changePercent !== 0 && priceInfo.changePercent !== null
-          ? Math.round(priceInfo.price / (1 + priceInfo.changePercent / 100))
-          : null);
+        ? Math.round(priceInfo.price / (1 + priceInfo.changePercent / 100))
+        : null);
 
     const stockData = {
       symbol: symbol,
@@ -212,7 +212,7 @@ async function fetchStockData(symbol) {
 // 네이버 증권에서 가격 정보 추출 (변동률/변동가/전일종가 포함)
 function extractPriceInfoWithChange(html) {
   const priceInfo = extractPriceInfo(html);
-  
+
   // 전일 종가 직접 추출 시도
   const previousClosePatterns = [
     /전일[^>]*>([\d,]+)/,
@@ -224,7 +224,7 @@ function extractPriceInfoWithChange(html) {
     /<script[^>]*>[\s\S]*?전일종가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
     /<script[^>]*>[\s\S]*?yesterdayClose["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/
   ];
-  
+
   let previousClose = null;
   for (const pattern of previousClosePatterns) {
     const match = html.match(pattern);
@@ -238,13 +238,13 @@ function extractPriceInfoWithChange(html) {
       }
     }
   }
-  
+
   // 전일 종가가 추출되지 않았고 변동가가 있으면 계산
   if (!previousClose && priceInfo.price && priceInfo.change !== undefined && priceInfo.change !== null && priceInfo.change !== 0) {
     previousClose = priceInfo.price - priceInfo.change;
     console.log(`📅 전일 종가 계산: ₩${previousClose.toLocaleString()} (현재가 ${priceInfo.price.toLocaleString()} - 변동가 ${priceInfo.change.toLocaleString()})`);
   }
-  
+
   // 변동률 추출 (네이버 증권 실제 HTML 구조 기반)
   const changePercentPatterns = [
     // 상승/하락 클래스 기반 추출
@@ -263,7 +263,7 @@ function extractPriceInfoWithChange(html) {
     /<script[^>]*>[\s\S]*?changePercent["\s]*:["\s]*([+-]?[\d.]+)["\s]*[\s\S]*?<\/script>/,
     /<script[^>]*>[\s\S]*?변동률["\s]*:["\s]*([+-]?[\d.]+)["\s]*[\s\S]*?<\/script>/
   ];
-  
+
   let changePercent = 0;
   for (const pattern of changePercentPatterns) {
     const match = html.match(pattern);
@@ -276,7 +276,7 @@ function extractPriceInfoWithChange(html) {
       }
     }
   }
-  
+
   // 변동가 추출 (네이버 증권에서 직접 추출 시도)
   const changePatterns = [
     /<em class="no_up"[^>]*>[\s\S]*?<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
@@ -284,7 +284,7 @@ function extractPriceInfoWithChange(html) {
     /<span class="blind"[^>]*>([+-]?[\d,]+)<\/span>/,
     /변동가[^>]*>([+-]?[\d,]+)/
   ];
-  
+
   let change = 0;
   for (const pattern of changePatterns) {
     const match = html.match(pattern);
@@ -298,13 +298,13 @@ function extractPriceInfoWithChange(html) {
       }
     }
   }
-  
+
   // 변동가가 추출되지 않았고 변동률이 있으면 계산
   if (change === 0 && changePercent !== 0 && priceInfo.price) {
     change = Math.round(priceInfo.price * changePercent / 100);
     console.log(`💰 변동가 계산: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원 (변동률 ${changePercent}% 기준)`);
   }
-  
+
   return {
     ...priceInfo,
     changePercent,
@@ -356,7 +356,7 @@ function extractStockName(html, symbol) {
   }
 
   console.log('종목명 추출 실패 - 기본값 사용');
-  return getStockName(symbol);
+  return symbol;
 }
 
 function extractPriceInfo(html) {
@@ -369,7 +369,7 @@ function extractPriceInfo(html) {
     /<strong class="no_today"[^>]*>([^<]+)<\/strong>/,
     /<p class="no_today"[^>]*>([^<]+)<\/p>/,
     /<span[^>]*class="[^"]*no_today[^"]*"[^>]*>([^<]+)<\/span>/,
-    
+
     // 스크립트에서 가격 추출
     /<script[^>]*>[\s\S]*?price["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
     /<script[^>]*>[\s\S]*?현재가["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
@@ -379,7 +379,7 @@ function extractPriceInfo(html) {
     /<script[^>]*>[\s\S]*?close["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
     /<script[^>]*>[\s\S]*?last["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
     /<script[^>]*>[\s\S]*?final["\s]*:["\s]*([\d,]+)["\s]*[\s\S]*?<\/script>/,
-    
+
     // HTML 태그에서 가격 추출
     /<td[^>]*>([\d,]+)<\/td>/,
     /<span[^>]*>([\d,]+)<\/span>/,
@@ -394,11 +394,11 @@ function extractPriceInfo(html) {
     /<button[^>]*>([\d,]+)<\/button>/,
     /<input[^>]*value="([\d,]+)"/,
     /<meta[^>]*content="([\d,]+)"/,
-    
+
     // 테이블에서 가격 추출
     /<tr[^>]*>[\s\S]*?<td[^>]*>([\d,]+)<\/td>[\s\S]*?<\/tr>/,
     /<table[^>]*>[\s\S]*?<td[^>]*>([\d,]+)<\/td>[\s\S]*?<\/table>/,
-    
+
     // 특정 클래스에서 가격 추출
     /<span class="[^"]*price[^"]*"[^>]*>([\d,]+)<\/span>/,
     /<div class="[^"]*price[^"]*"[^>]*>([\d,]+)<\/div>/,
@@ -477,28 +477,4 @@ function extractPriceInfo(html) {
   return { price, volume, marketCap };
 }
 
-function getStockName(symbol) {
-  const names = {
-    '005930': '삼성전자',
-    '000660': 'SK하이닉스',
-    '035420': 'NAVER',
-    '035720': '카카오',
-    '207940': '삼성바이오로직스',
-    '006400': '삼성SDI',
-    '051910': 'LG화학',
-    '068270': '셀트리온',
-    '323410': '카카오뱅크',
-    '000270': '기아',
-    '086520': '에코프로',
-    '247540': '에코프로비엠',
-    '196170': '알테오젠',
-    '066970': '엘앤에프',
-    '091990': '셀트리온헬스케어',
-    '196300': '에이치엘비',
-    '196490': '다이나믹디자인',
-    '196700': '웹젠',
-    '196800': '아이에이',
-    '036200': '유니셈'
-  };
-  return names[symbol] || symbol;
-}
+
