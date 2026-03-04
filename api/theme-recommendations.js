@@ -1,3 +1,17 @@
+import fs from 'fs';
+import path from 'path';
+import { fetchStockDataDirect } from './naver-stock.js';
+import iconv from 'iconv-lite';
+import { JSDOM } from 'jsdom';
+
+let cachedThemes = null;
+let themesLastUpdate = 0;
+const THEME_CACHE_TTL = 30 * 60 * 1000; // 30분 캐시 (테마 목록은 자주 안변함)
+
+// 테마 데이터 캐시
+const themeStocksCache = {};
+const STOCKS_CACHE_TTL = 5 * 60 * 1000; // 5분 캐시 (종목 데이터는 자주 변할 수 있음)
+
 // 테마별 추천 종목 API
 export default async function handler(req, res) {
   // CORS 헤더 설정
@@ -19,9 +33,10 @@ export default async function handler(req, res) {
 
     if (action === 'themes') {
       // 테마 목록 반환
+      const themes = await getThemes();
       return res.status(200).json({
         success: true,
-        data: getThemes(),
+        data: themes.map(t => t.name),
         timestamp: new Date().toISOString(),
         source: 'theme-recommendations'
       });
@@ -30,7 +45,7 @@ export default async function handler(req, res) {
     if (action === 'analysis') {
       // 테마별 분석 결과 반환
       if (theme) {
-        const analysis = getThemeAnalysis(theme);
+        const analysis = await getThemeAnalysis(theme);
         return res.status(200).json({
           success: true,
           data: analysis,
@@ -38,7 +53,7 @@ export default async function handler(req, res) {
           source: 'theme-recommendations'
         });
       } else {
-        const allAnalysis = getAllThemeAnalysis();
+        const allAnalysis = await getAllThemeAnalysis();
         return res.status(200).json({
           success: true,
           data: allAnalysis,
@@ -57,7 +72,7 @@ export default async function handler(req, res) {
         });
       }
 
-      const stocks = getThemeStocks(theme);
+      const stocks = await getThemeStocks(theme);
       if (stocks.length === 0) {
         return res.status(404).json({
           success: false,
@@ -84,7 +99,31 @@ export default async function handler(req, res) {
         });
       }
 
-      const analysis = getComprehensiveAnalysis(symbol);
+      const analysis = {
+        symbol: symbol,
+        name: '종목명',
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        ma5: 0,
+        ma20: 0,
+        ma60: 0,
+        trend: '실시간 파싱 대기',
+        volume: 0,
+        tradingValue: 0,
+        marketCap: 0,
+        capital: 0,
+        quarterlyRevenue: 0,
+        quarterlyProfit: 0,
+        profitMargin: 0,
+        volumeTrend: '대기',
+        technicalScore: 0,
+        fundamentalScore: 0,
+        totalScore: 0,
+        recommendation: '관망',
+        confidence: 0,
+        lastUpdate: new Date().toISOString(),
+      };
       return res.status(200).json({
         success: true,
         symbol: symbol,
@@ -97,7 +136,7 @@ export default async function handler(req, res) {
     if (action === 'recommendations') {
       // 추천 종목 랭킹 반환
       const { limit = 10, sortBy = 'totalScore' } = req.query;
-      const recommendations = getTopRecommendations(parseInt(limit), sortBy);
+      const recommendations = await getTopRecommendations(parseInt(limit), sortBy);
 
       return res.status(200).json({
         success: true,
@@ -111,7 +150,7 @@ export default async function handler(req, res) {
 
     if (action === 'theme-recommendations') {
       // 특정 테마의 추천 종목 반환
-      if (!theme) {
+      if (!themeName) {
         return res.status(400).json({
           success: false,
           error: '테마가 필요합니다'
@@ -119,11 +158,11 @@ export default async function handler(req, res) {
       }
 
       const { limit = 5, sortBy = 'totalScore' } = req.query;
-      const recommendations = getThemeRecommendations(theme, parseInt(limit), sortBy);
+      const recommendations = await getThemeRecommendations(themeName, parseInt(limit), sortBy);
 
       return res.status(200).json({
         success: true,
-        theme: theme,
+        theme: themeName,
         data: recommendations,
         count: recommendations.length,
         sortBy: sortBy,
@@ -132,8 +171,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // 기본: 모든 추천 종목 반환
-    const allStocks = getAllRecommendedStocks();
+    // 기본: 모든 추천 종목 반환 (서버 부하 방지를 위해 랜덤 3개 테마만)
+    const allStocks = await getAllRecommendedStocks();
     return res.status(200).json({
       success: true,
       data: allStocks,
@@ -150,110 +189,167 @@ export default async function handler(req, res) {
   }
 }
 
-// 테마별 추천 종목 데이터 (실시간 시스템 연동 시 Seed 데이터 사용)
-const themeStocks = {
-  '2차전지': [
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '2차전지', 'description': '2차전지 소재 및 시스템' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '2차전지', 'description': '배터리 소재' },
-    { 'symbol': '003670', 'name': '포스코홀딩스', 'sector': '2차전지', 'description': '배터리 소재' },
-    { 'symbol': '000270', 'name': '기아', 'sector': '2차전지', 'description': '전기차 제조' },
-    { 'symbol': '005380', 'name': '현대차', 'sector': '2차전지', 'description': '전기차 제조' },
-  ],
-  '반도체장비': [
-    { 'symbol': '000660', 'name': 'SK하이닉스', 'sector': '반도체장비', 'description': '메모리 반도체' },
-    { 'symbol': '005930', 'name': '삼성전자', 'sector': '반도체장비', 'description': '시스템 반도체' },
-    { 'symbol': '240810', 'name': '원익IPS', 'sector': '반도체장비', 'description': '반도체 장비' },
-    { 'symbol': '095610', 'name': '테스', 'sector': '반도체장비', 'description': '반도체 테스트 장비' },
-    { 'symbol': '042700', 'name': '한미반도체', 'sector': '반도체장비', 'description': '반도체 장비' },
-  ],
-  '전기차': [
-    { 'symbol': '000270', 'name': '기아', 'sector': '전기차', 'description': '전기차 제조' },
-    { 'symbol': '005380', 'name': '현대차', 'sector': '전기차', 'description': '전기차 제조' },
-    { 'symbol': '003670', 'name': '포스코홀딩스', 'sector': '전기차', 'description': '자동차 소재' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '전기차', 'description': '배터리 소재' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '전기차', 'description': '배터리 시스템' },
-  ],
-  '수소차': [
-    { 'symbol': '000270', 'name': '기아', 'sector': '수소차', 'description': '수소차 제조' },
-    { 'symbol': '005380', 'name': '현대차', 'sector': '수소차', 'description': '수소차 제조' },
-    { 'symbol': '003670', 'name': '포스코홀딩스', 'sector': '수소차', 'description': '수소 소재' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '수소차', 'description': '수소 연료전지' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '수소차', 'description': '수소 시스템' },
-  ],
-  'AI': [
-    { 'symbol': '005930', 'name': '삼성전자', 'sector': 'AI', 'description': 'AI 반도체' },
-    { 'symbol': '000660', 'name': 'SK하이닉스', 'sector': 'AI', 'description': 'AI 메모리' },
-    { 'symbol': '035420', 'name': 'NAVER', 'sector': 'AI', 'description': 'AI 플랫폼 및 서비스' },
-    { 'symbol': '035720', 'name': '카카오', 'sector': 'AI', 'description': 'AI 플랫폼 및 서비스' },
-    { 'symbol': '036570', 'name': '엔씨소프트', 'sector': 'AI', 'description': 'AI 게임 및 엔터테인먼트' },
-  ],
-  '바이오': [
-    { 'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '바이오', 'description': '바이오 의약품' },
-    { 'symbol': '068270', 'name': '셀트리온', 'sector': '바이오', 'description': '바이오 의약품' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '바이오', 'description': '바이오 소재' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '바이오', 'description': '바이오 시스템' },
-    { 'symbol': '005930', 'name': '삼성전자', 'sector': '바이오', 'description': '바이오 장비' },
-  ],
-  '자동차부품': [
-    { 'symbol': '000270', 'name': '기아', 'sector': '자동차부품', 'description': '자동차 부품' },
-    { 'symbol': '005380', 'name': '현대차', 'sector': '자동차부품', 'description': '자동차 부품' },
-    { 'symbol': '003670', 'name': '포스코홀딩스', 'sector': '자동차부품', 'description': '자동차 소재' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '자동차부품', 'description': '자동차 소재' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '자동차부품', 'description': '자동차 전자' },
-  ],
-  '의료기기': [
-    { 'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '의료기기', 'description': '의료기기' },
-    { 'symbol': '068270', 'name': '셀트리온', 'sector': '의료기기', 'description': '의료기기' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '의료기기', 'description': '의료기기 소재' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '의료기기', 'description': '의료기기 시스템' },
-    { 'symbol': '005930', 'name': '삼성전자', 'sector': '의료기기', 'description': '의료기기 장비' },
-  ],
-  '방산주': [
-    { 'symbol': '005930', 'name': '삼성전자', 'sector': '방산주', 'description': '방산 전자' },
-    { 'symbol': '000660', 'name': 'SK하이닉스', 'sector': '방산주', 'description': '방산 전자' },
-    { 'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '방산주', 'description': '방산 시스템' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '방산주', 'description': '방산 소재' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '방산주', 'description': '방산 시스템' },
-  ],
-  '밸류업': [
-    { 'symbol': '005930', 'name': '삼성전자', 'sector': '밸류업', 'description': '밸류 종목' },
-    { 'symbol': '000660', 'name': 'SK하이닉스', 'sector': '밸류업', 'description': '밸류 종목' },
-    { 'symbol': '207940', 'name': '삼성바이오로직스', 'sector': '밸류업', 'description': '밸류 종목' },
-    { 'symbol': '051910', 'name': 'LG화학', 'sector': '밸류업', 'description': '밸류 종목' },
-    { 'symbol': '006400', 'name': '삼성SDI', 'sector': '밸류업', 'description': '밸류 종목' },
-  ],
-};
+// 네이버 증권 테마 목록 실시간 스크래핑
+async function scrapeNaverThemeList() {
+  try {
+    const response = await fetch('https://finance.naver.com/sise/theme.naver');
+    if (!response.ok) return [];
 
-// 테마 목록 가져오기
-function getThemes() {
-  return Object.keys(themeStocks);
-}
+    const arrayBuffer = await response.arrayBuffer();
+    const html = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
 
-// 특정 테마의 추천 종목 가져오기
-function getThemeStocks(theme) {
-  return themeStocks[theme] || [];
-}
+    const dom = new JSDOM(html);
+    const doc = dom.window.document;
 
-// 모든 테마의 추천 종목 가져오기
-function getAllRecommendedStocks() {
-  let allStocks = [];
-  for (const theme in themeStocks) {
-    allStocks = allStocks.concat(themeStocks[theme]);
+    const themes = [];
+    const rows = doc.querySelectorAll('table.type_1.theme tbody tr');
+
+    rows.forEach(row => {
+      const nameCol = row.querySelector('.col_type1 a');
+      const descCol = row.querySelector('.col_type2');
+      if (!nameCol) return;
+
+      const match = nameCol.href.match(/no=(\d+)/);
+      if (match) {
+        themes.push({
+          id: match[1],
+          name: nameCol.textContent.trim(),
+          description: descCol ? descCol.textContent.trim() : `${nameCol.textContent.trim()} 관련 테마`,
+          url: `https://finance.naver.com${nameCol.href}`
+        });
+      }
+    });
+
+    return themes;
+  } catch (error) {
+    console.error('테마 리스트 스크래핑 실패:', error);
+    return [];
   }
-  return allStocks;
 }
 
-// 종합 투자 분석 (가짜 데이터 생성 제외, 정보가 없을 경우 0 반환)
-function getComprehensiveAnalysis(symbol) {
+// 네이버 증권 특정 테마 소속 종목 실시간 스크래핑
+async function scrapeNaverThemeStocks(themeId, themeName) {
+  try {
+    const themeUrl = `https://finance.naver.com/sise/sise_group_detail.naver?type=theme&no=${themeId}`;
+    const response = await fetch(themeUrl);
+    if (!response.ok) return [];
+
+    const arrayBuffer = await response.arrayBuffer();
+    const html = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
+
+    const dom = new JSDOM(html);
+    const doc = dom.window.document;
+
+    const stocks = [];
+    const rows = doc.querySelectorAll('table.type_5 tbody tr');
+
+    rows.forEach(row => {
+      if (row.querySelector('.kline') || row.querySelector('.blank_08')) return;
+
+      const nameArea = row.querySelector('.name_area a');
+      if (!nameArea) return;
+
+      const name = nameArea.textContent.trim();
+      const symbolMatch = nameArea.href.match(/code=(\d+)/);
+      const symbol = symbolMatch ? symbolMatch[1] : '';
+
+      const numberCells = row.querySelectorAll('td.number');
+      if (numberCells.length < 3) return;
+
+      const price = parseInt(numberCells[0].textContent.replace(/,/g, '').trim()) || 0;
+      const changeText = numberCells[1].textContent.replace(/,/g, '').trim();
+      let change = parseInt(changeText) || 0;
+
+      // 하락인 경우 음수 처리
+      const nv01 = row.querySelector('.nv01'); // 하락 클래스
+      if (nv01 && change > 0) change = -change;
+
+      const percentText = numberCells[2].textContent.replace(/,/g, '').replace(/%/g, '').trim();
+      const changePercent = parseFloat(percentText) || 0;
+
+      if (symbol && name) {
+        stocks.push({
+          symbol,
+          name,
+          price,
+          change,
+          changePercent,
+          sector: themeName, // fallback용
+          description: `네이버 금융 ${themeName} 종목`
+        });
+      }
+    });
+
+    // 테마별 상위 5~10개만 리턴
+    return stocks.slice(0, 10);
+  } catch (error) {
+    console.error(`테마 ${themeId} 스크래핑 실패:`, error);
+    return [];
+  }
+}
+
+// 테마 목록 가져오기 (캐시 적용)
+async function getThemes() {
+  const now = Date.now();
+  if (cachedThemes && (now - themesLastUpdate < THEME_CACHE_TTL)) {
+    return cachedThemes;
+  }
+
+  const themes = await scrapeNaverThemeList();
+  if (themes && themes.length > 0) {
+    // 너무 많은 테마를 가져오면 느려지므로 상위 20개 정도만 사용
+    cachedThemes = themes.slice(0, 20);
+    themesLastUpdate = now;
+    return cachedThemes;
+  }
+  return [];
+}
+
+// 특정 테마명으로 테마 메타데이터 찾기
+async function getThemeByName(themeName) {
+  const themes = await getThemes();
+  return themes.find(t => t.name === themeName);
+}
+
+// 특정 테마의 추천 종목 가져오기 (캐시 적용)
+async function getThemeStocks(themeName) {
+  const now = Date.now();
+  if (themeStocksCache[themeName] && (now - themeStocksCache[themeName].lastUpdate < STOCKS_CACHE_TTL)) {
+    return themeStocksCache[themeName].data;
+  }
+
+  const themeMeta = await getThemeByName(themeName);
+  if (!themeMeta) {
+    console.warn(`테마를 찾을 수 없음: ${themeName}`);
+    return [];
+  }
+
+  const stocks = await scrapeNaverThemeStocks(themeMeta.id, themeName);
+  if (stocks && stocks.length > 0) {
+    themeStocksCache[themeName] = {
+      data: stocks,
+      lastUpdate: now
+    };
+  }
+  return stocks;
+}
+
+// 종합 투자 분석 
+// (실시간 크롤링된 데이터가 넘어올 것이므로 가짜 지표 생성 삭제)
+function getComprehensiveAnalysis(stockData) {
   return {
-    symbol: symbol,
+    symbol: stockData.symbol,
+    name: stockData.name,
+    price: stockData.price,
+    change: stockData.change,
+    changePercent: stockData.changePercent,
     ma5: 0,
     ma20: 0,
     ma60: 0,
-    trend: '분석 대기',
+    trend: '실시간 파싱 대기',
     volume: 0,
     tradingValue: 0,
-    marketCap: 0,
+    marketCap: 0, // 상세 파싱 전까지 대기
     capital: 0,
     quarterlyRevenue: 0,
     quarterlyProfit: 0,
@@ -268,9 +364,40 @@ function getComprehensiveAnalysis(symbol) {
   };
 }
 
+// 모든 테마의 최상위 추천 종목 가져오기
+async function getAllRecommendedStocks() {
+  const themes = await getThemes();
+  let allStocks = [];
+
+  // 전체 다 긁으면 네이버 IP 블록 가능성이 있으므로 랜덤하게 3~5개 테마만 골라서 스크래핑
+  const shuffledThemes = [...themes].sort(() => 0.5 - Math.random()).slice(0, 3);
+
+  for (const theme of shuffledThemes) {
+    const stocks = await getThemeStocks(theme.name);
+    // 각 테마별로 top 1~2개만 전체 목록에 추가
+    if (stocks.length > 0) {
+      allStocks = allStocks.concat(stocks.slice(0, 2));
+    }
+  }
+  return allStocks;
+}
+
+// 모든 테마의 최고 분석 가져오기
+async function getAllThemeAnalysis() {
+  const themesMeta = await getThemes();
+  const sortedThemes = [...themesMeta].slice(0, 5); // 주요 5개 테마만 분석 반환 (서버 부하 방지)
+  const analysisList = [];
+  for (const themeMeta of sortedThemes) {
+    analysisList.push(await getThemeAnalysis(themeMeta.name));
+  }
+  return analysisList;
+}
+
+
+
 // 테마별 종합 투자 분석
-function getThemeAnalysis(theme) {
-  const stocks = getThemeStocks(theme);
+async function getThemeAnalysis(theme) {
+  const stocks = await getThemeStocks(theme);
   if (stocks.length === 0) {
     return {
       theme: theme,
@@ -286,28 +413,6 @@ function getThemeAnalysis(theme) {
     };
   }
 
-  // 각 종목의 종합 분석 수행
-  const analyses = stocks.map(stock => getComprehensiveAnalysis(stock.symbol));
-
-  // 테마별 평균 점수 계산
-  const avgTechnicalScore = analyses.reduce((sum, a) => sum + a.technicalScore, 0) / analyses.length;
-  const avgFundamentalScore = analyses.reduce((sum, a) => sum + a.fundamentalScore, 0) / analyses.length;
-  const avgTotalScore = analyses.reduce((sum, a) => sum + a.totalScore, 0) / analyses.length;
-
-  // 최고 종목 선정
-  const topStockAnalysis = analyses.reduce((a, b) => a.totalScore > b.totalScore ? a : b);
-  const topStock = stocks.find(s => s.symbol === topStockAnalysis.symbol);
-
-  // 거래량 추세 분석
-  const volumeTrends = analyses.map(a => a.volumeTrend);
-  const volumeTrend = getMostCommonVolumeTrend(volumeTrends);
-
-  // 시가총액 합계
-  const totalMarketCap = analyses.reduce((sum, a) => sum + a.marketCap, 0);
-
-  // 추천 결정
-  const recommendation = getRecommendation(Math.round(avgTotalScore));
-
   return {
     theme: theme,
     score: 0,
@@ -316,8 +421,8 @@ function getThemeAnalysis(theme) {
     analysis: `실시간 테마 분석 데이터를 수집 중입니다.`,
     technicalScore: 0,
     fundamentalScore: 0,
-    volumeTrend: volumeTrend,
-    marketCap: totalMarketCap,
+    volumeTrend: '대기',
+    marketCap: 0,
     stockCount: stocks.length,
     lastUpdate: new Date().toISOString(),
   };
@@ -332,33 +437,34 @@ function getMostCommonVolumeTrend(trends) {
   return Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
 }
 
-// 특정 종목이 속한 테마들 찾기
-function getStockThemes(symbol) {
-  const themes = [];
-  for (const theme in themeStocks) {
-    const stocks = themeStocks[theme];
-    if (stocks.some(stock => stock.symbol === symbol)) {
-      themes.push(theme);
+// 특정 종목이 속한 테마들 찾기 (동적 환경에서는 모든 테마를 스크래핑해 검색해야 함 - 비용 높음)
+async function getStockThemes(symbol) {
+  const themesMeta = await getThemes();
+  const matchingThemes = [];
+
+  // 서버 보호를 위해 상위 10개 메타만 조사
+  const themesToCheck = themesMeta.slice(0, 10);
+
+  for (const t of themesToCheck) {
+    const list = await getThemeStocks(t.name);
+    if (list.some(stock => stock.symbol === symbol)) {
+      matchingThemes.push(t.name);
     }
   }
-  return themes;
+  return matchingThemes;
 }
 
-// 모든 테마 분석 결과 가져오기
-function getAllThemeAnalysis() {
-  return getThemes().map(theme => getThemeAnalysis(theme));
-}
 
 // 전체 추천 종목 랭킹 (모든 테마 통합, 중복 제거)
-function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
-  const allStocks = getAllRecommendedStocks();
+async function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
+  const allStocks = await getAllRecommendedStocks();
 
   // 중복 제거: 같은 symbol을 가진 종목 중 가장 높은 점수를 가진 것만 선택
   const uniqueStocks = {};
 
   for (const stock of allStocks) {
     const symbol = stock.symbol;
-    const analysis = getComprehensiveAnalysis(symbol);
+    const analysis = getComprehensiveAnalysis(stock);
     const combinedStock = {
       ...stock,
       ...analysis
@@ -368,7 +474,7 @@ function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
     if (!uniqueStocks[symbol] ||
       combinedStock.totalScore > uniqueStocks[symbol].totalScore) {
       // 해당 종목이 속한 모든 테마 정보 추가
-      const themes = getStockThemes(symbol);
+      const themes = await getStockThemes(symbol);
       combinedStock.themes = themes;
       combinedStock.themeCount = themes.length;
       uniqueStocks[symbol] = combinedStock;
@@ -399,15 +505,15 @@ function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
 }
 
 // 특정 테마의 추천 종목 랭킹
-function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') {
-  const stocks = getThemeStocks(theme);
+async function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') {
+  const stocks = await getThemeStocks(theme);
   if (stocks.length === 0) {
     return [];
   }
 
   const analyses = stocks.map(stock => ({
     ...stock,
-    ...getComprehensiveAnalysis(stock.symbol)
+    ...getComprehensiveAnalysis(stock)
   }));
 
   // 정렬
@@ -432,11 +538,11 @@ function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') {
 }
 
 // 추천 종목 필터링 (추천 등급별)
-function getRecommendationsByGrade(grade, limit = 10) {
-  const allStocks = getAllRecommendedStocks();
+async function getRecommendationsByGrade(grade, limit = 10) {
+  const allStocks = await getAllRecommendedStocks();
   const analyses = allStocks.map(stock => ({
     ...stock,
-    ...getComprehensiveAnalysis(stock.symbol)
+    ...getComprehensiveAnalysis(stock)
   }));
 
   const filtered = analyses.filter(analysis => analysis.recommendation === grade);
@@ -444,11 +550,11 @@ function getRecommendationsByGrade(grade, limit = 10) {
 }
 
 // 위험도별 추천 종목
-function getRecommendationsByRisk(riskLevel = 'medium', limit = 10) {
-  const allStocks = getAllRecommendedStocks();
+async function getRecommendationsByRisk(riskLevel = 'medium', limit = 10) {
+  const allStocks = await getAllRecommendedStocks();
   const analyses = allStocks.map(stock => ({
     ...stock,
-    ...getComprehensiveAnalysis(stock.symbol)
+    ...getComprehensiveAnalysis(stock)
   }));
 
   let filtered;

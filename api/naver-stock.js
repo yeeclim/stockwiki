@@ -477,4 +477,5 @@ function extractPriceInfo(html) {
   return { price, volume, marketCap };
 }
 
-
+// 서버 로직용 직접 호출 함수 익스포트
+export { fetchStockData as fetchStockDataDirect };
