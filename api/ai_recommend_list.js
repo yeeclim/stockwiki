@@ -137,7 +137,26 @@ async function getSampleRecommendationsWithRealPrices() {
         const stockData = await fetchStockPrice(stock.code);
 
         if (stockData && stockData.price) {
-          // 실시간 데이터로 추천 생성
+          // AI를 통한 실제 투자 의견 분석
+          let action = 'Watch';
+          let aiReason = null;
+          let aiReasonText = `${stock.name} 실적 개선 전망, 업계 성장세 지속, 기술적 분석상 매수 신호`; // Fallback
+
+          try {
+            const question = `현재 주가: ₩${stockData.price.toLocaleString()}, 변동률: ${stockData.changePercent.toFixed(2)}% 입니다. ${stock.name} 주식의 단기 및 중장기 전망을 간단히 2-3 문장으로 요약해주세요.`;
+            const chatResponse = await askChatGPT(question);
+            action = parseRecommendation(chatResponse);
+            // 전체 응답 중에서 핵심 이유를 3가지 Bullet point 형태로 추출하는 것은 복잡할 수 있으므로,
+            // 간단하게 문장 단위로 분리하여 최대 3문장을 사용.
+            const sentences = chatResponse.split(/(?<=[.?!])\s+/).filter(s => s.length > 5).slice(0, 3);
+            if (sentences.length > 0) {
+              aiReason = sentences;
+            }
+          } catch (e) {
+            console.error(`❌ AI 분석 실패 (${stock.name}):`, e.message);
+          }
+
+          // 실시간 데이터 및 AI 분석으로 추천 생성
           const recommendation = {
             id: `rec_real_${stock.code}_${Date.now()}`,
             stockName: stockData.name || stock.name,
@@ -146,8 +165,8 @@ async function getSampleRecommendationsWithRealPrices() {
             changePercent: stockData.changePercent || 0,
             changeAmount: stockData.change || 0,
             previousClose: stockData.previousClose || null, // 전일 종가 추가
-            action: stock.action,
-            reasons: generateReasons(stock.code, stock.name),
+            action: action,
+            reasons: aiReason || generateReasons(stock.code, stock.name),
             targetPrice: Math.round(stockData.price * 1.15), // 현재가의 115%로 목표가 설정
             postedAt: new Date().toISOString(),
             likes: Math.floor(Math.random() * 200) + 50,
@@ -239,6 +258,63 @@ async function getSampleRecommendationsWithRealPrices() {
     return [];
   }
 }
+
+// ChatGPT API 호출
+async function askChatGPT(question) {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('OPENAI_API_KEY 환경변수가 설정되지 않았습니다.');
+      throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{
+          role: 'user',
+          content: question + '\n\n위 주식에 대한 투자 의견을 분석 이유와 함께 3문장 이내로 답변해주세요. 답변 첫 줄의 시작은 반드시 다음 둥 하나로만 시작하세요 (Buy, Hold, Watch, Sell).'
+        }],
+        max_tokens: 300,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('ChatGPT 오류:', error);
+    return 'Watch; 판단 불가'; // 기본값
+  }
+}
+
+// AI 응답에서 추천 파싱 (Buy, Hold, Watch, Sell)
+function parseRecommendation(response) {
+  const text = response.substring(0, 10).toLowerCase();
+
+  if (text.includes('buy') || text.includes('매수')) {
+    return 'Buy';
+  } else if (text.includes('hold') || text.includes('보유')) {
+    return 'Hold';
+  } else if (text.includes('sell') || text.includes('매도')) {
+    return 'Sell';
+  } else if (text.includes('watch') || text.includes('관망')) {
+    return 'Watch';
+  }
+
+  return 'Watch'; // 기본값
+}
+
 
 // 종목별 추천 근거 생성
 function generateReasons(stockCode, stockName) {
