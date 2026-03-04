@@ -150,7 +150,7 @@ export default async function handler(req, res) {
 
     if (action === 'theme-recommendations') {
       // 특정 테마의 추천 종목 반환
-      if (!themeName) {
+      if (!theme) {
         return res.status(400).json({
           success: false,
           error: '테마가 필요합니다'
@@ -158,11 +158,11 @@ export default async function handler(req, res) {
       }
 
       const { limit = 5, sortBy = 'totalScore' } = req.query;
-      const recommendations = await getThemeRecommendations(themeName, parseInt(limit), sortBy);
+      const recommendations = await getThemeRecommendations(theme, parseInt(limit), sortBy);
 
       return res.status(200).json({
         success: true,
-        theme: themeName,
+        theme: theme,
         data: recommendations,
         count: recommendations.length,
         sortBy: sortBy,
@@ -297,8 +297,8 @@ async function getThemes() {
 
   const themes = await scrapeNaverThemeList();
   if (themes && themes.length > 0) {
-    // 너무 많은 테마를 가져오면 느려지므로 상위 20개 정도만 사용
-    cachedThemes = themes.slice(0, 20);
+    // 서버 부하/타이머 방지를 위해 상위 50개 정도만 사용
+    cachedThemes = themes.slice(0, 50);
     themesLastUpdate = now;
     return cachedThemes;
   }
