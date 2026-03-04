@@ -5,8 +5,6 @@ import '../pages/ai_stock_recommend_page.dart';
 import '../pages/us_stock_ai_recommend_page.dart';
 import '../pages/us_stock_theme_recommend_page.dart';
 import '../pages/us_stock_ai_committee_page.dart';
-import '../pages/ai_algorithm_explain_page.dart';
-import '../pages/bookmark_list_page.dart';
 import '../pages/theme_recommendations_page.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -50,6 +48,47 @@ class AppDrawer extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
+                // 테마 설정
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  child: Text(
+                    '설정',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ) ?? TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                ValueListenableBuilder<ThemeMode>(
+                  valueListenable: themeNotifier,
+                  builder: (context, currentMode, child) {
+                    return SwitchListTile(
+                      title: Text(
+                        "다크 모드",
+                        style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface),
+                      ),
+                      secondary: Icon(
+                        Icons.dark_mode,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      value: currentMode == ThemeMode.dark,
+                      onChanged: (val) {
+                        themeNotifier.value =
+                            val ? ThemeMode.dark : ThemeMode.light;
+                      },
+                    );
+                  },
+                ),
+                
+                // 구분선
+                Divider(color: theme.dividerColor, height: 1),
+
                 // 공통 기능 섹션
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
@@ -79,26 +118,6 @@ class AppDrawer extends StatelessWidget {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const UsStockAiCommitteePage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.psychology, color: theme.colorScheme.onSurface),
-                  title: Text("알고리즘 설명", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AiAlgorithmExplainPage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.bookmark_outline, color: theme.colorScheme.onSurface),
-                  title: Text("북마크 목록", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BookmarkListPage()),
                     );
                   },
                 ),
@@ -195,46 +214,6 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 
-                // 구분선
-                Divider(color: theme.dividerColor, height: 1),
-
-                // 테마 설정
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                  child: Text(
-                    '설정',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ) ?? TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                ValueListenableBuilder<ThemeMode>(
-                  valueListenable: themeNotifier,
-                  builder: (context, currentMode, child) {
-                    return SwitchListTile(
-                      title: Text(
-                        "다크 모드",
-                        style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface),
-                      ),
-                      secondary: Icon(
-                        Icons.dark_mode,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      value: currentMode == ThemeMode.dark,
-                      onChanged: (val) {
-                        themeNotifier.value =
-                            val ? ThemeMode.dark : ThemeMode.light;
-                      },
-                    );
-                  },
-                ),
                 const SizedBox(height: 20),
               ],
             ),
