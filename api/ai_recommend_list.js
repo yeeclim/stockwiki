@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       console.log('🔄 추천 데이터 로드 중...', needsAutoRefresh ? '(자동 갱신)' : '');
       try {
         // 먼저 폴백 데이터로 빠르게 응답
-        recommendationsStore = getFallbackRecommendations();
+        recommendationsStore = [];
         lastUpdatedAt = Date.now();
         console.log('✅ 폴백 데이터 로드 완료:', recommendationsStore.length, '개 추천');
 
@@ -115,17 +115,26 @@ async function getSampleRecommendationsWithRealPrices() {
   console.log('🔄 실시간 추천 데이터 생성 시작...');
 
   try {
-    // 추천할 종목 목록 (대형주 + 중소형주)
-    const stockSymbols = [
-      { code: '005930', name: '삼성전자' },
-      { code: '000660', name: 'SK하이닉스' },
-      { code: '035420', name: 'NAVER' },
-      { code: '035720', name: '카카오' },
-      { code: '373220', name: 'LG에너지솔루션' },
-      // 소형주 추가 (시가총액 500억~3000억대, 상대적으로 안정적인 종목)
-      { code: '357780', name: '솔브레인' },
-      { code: '065350', name: '신성델타테크' }
-    ];
+    // 추천할 종목 목록 동적 생성 (KRX 데이터에서 랜덤 6개 추출)
+    const krxResponse = await fetch(`https://${req.headers.host || 'stockwiki.vercel.app'}/api/stock-search-full?keyword=%20&limit=200`).catch(() => null);
+    let krxData = krxResponse && krxResponse.ok ? await krxResponse.json() : null;
+
+    let stockSymbols = [];
+    if (krxData && krxData.success && krxData.data && krxData.data.length > 10) {
+      // 섞어서 6개 랜덤 뽑기
+      const shuffled = krxData.data.sort(() => 0.5 - Math.random());
+      stockSymbols = shuffled.slice(0, 6).map(s => ({ code: s.symbol, name: s.name }));
+    } else {
+      // API 실패 시 최소한의 시드 데이터, 여기서만 한시적 사용
+      stockSymbols = [
+        { code: '005930', name: '삼성전자' },
+        { code: '000660', name: 'SK하이닉스' },
+        { code: '035420', name: 'NAVER' },
+        { code: '207940', name: '삼성바이오로직스' },
+        { code: '068270', name: '셀트리온' },
+        { code: '000270', name: '기아' }
+      ];
+    }
 
     const recommendations = [];
 
@@ -357,50 +366,6 @@ function generateTradingStrategy(currentPrice, type) {
   };
 
   return strategies[type];
-}
-
-function getFallbackRecommendations() {
-  // 대형주 + 중소형주 모두 포함
-  const fallbackStocks = [
-    { code: '005930', name: '삼성전자' },
-    { code: '000660', name: 'SK하이닉스' },
-    { code: '035420', name: 'NAVER' },
-    { code: '035720', name: '카카오' },
-    { code: '373220', name: 'LG에너지솔루션' },
-    // 소형주 (시가총액 500억~3000억대)
-    { code: '357780', name: '솔브레인' },
-    { code: '065350', name: '신성델타테크' }
-  ];
-
-  return fallbackStocks.map((stock, index) => {
-    // 폴백 데이터는 가격을 0으로 처리
-    return {
-      id: `rec_fallback_${stock.code}_${Date.now()}_${index}`,
-      stockName: stock.name,
-      stockCode: stock.code,
-      currentPrice: 0, // 폴백 데이터는 가격 절대 표시 안함 (사용자 요청)
-      changePercent: 0,
-      changeAmount: 0,
-      previousClose: null,
-      action: 'Watch',
-      reasons: [
-        '실시간 주가 및 AI 연동 지연',
-        '현재 오프라인 또는 서버 부하 상태입니다',
-        '최신 데이터를 불러올 수 없습니다'
-      ],
-      targetPrice: 0, // 가격 없으면 목표가도 표시 안함
-      postedAt: new Date().toISOString(),
-      likes: Math.floor(Math.random() * 200) + 50,
-      comments: Math.floor(Math.random() * 30) + 5,
-      shares: Math.floor(Math.random() * 40) + 10,
-      lastUpdate: new Date().toISOString(),
-      priceSource: 'fallback', // 가격 정보 출처 명시
-      note: '서버 예상 가격입니다 (실시간 연동 지연 시)',
-      dayTrading: generateTradingStrategy(0, 'day'),
-      swingTrading: generateTradingStrategy(0, 'swing'),
-      longTerm: generateTradingStrategy(0, 'long'),
-    };
-  });
 }
 
 // 실시간 주가 데이터 가져오기 (기존 naver-stock API 활용)
@@ -750,33 +715,7 @@ function extractStockName(html, symbol) {
   return getStockName(symbol);
 }
 
-// 종목 코드별 기본 종목명
-function getStockName(symbol) {
-  const names = {
-    '005930': '삼성전자',
-    '000660': 'SK하이닉스',
-    '035420': 'NAVER',
-    '035720': '카카오',
-    '207940': '삼성바이오로직스',
-    '006400': '삼성SDI',
-    '051910': 'LG화학',
-    '068270': '셀트리온',
-    '323410': '카카오뱅크',
-    '000270': '기아',
-    '086520': '에코프로',
-    '247540': '에코프로비엠',
-    '196170': '알테오젠',
-    '066970': '엘앤에프',
-    '091990': '셀트리온헬스케어',
-    '196300': '에이치엘비',
-    '196490': '다이나믹디자인',
-    '196700': '웹젠',
-    '196800': '아이에이',
-    '036200': '유니셈',
-    '373220': 'LG에너지솔루션'
-  };
-  return names[symbol] || symbol;
-}
+
 
 // 변동률 계산 (간단한 추정)
 function calculateChangePercent(currentPrice, previousPrice) {
