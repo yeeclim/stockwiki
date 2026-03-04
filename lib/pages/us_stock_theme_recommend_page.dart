@@ -8,6 +8,7 @@ import 'us_stock_ai_committee_page.dart';
 import 'ai_algorithm_explain_page.dart';
 import 'bookmark_list_page.dart';
 import 'theme_recommendations_page.dart';
+import '../widgets/app_drawer.dart';
 
 class UsStockThemeRecommendPage extends StatefulWidget {
   const UsStockThemeRecommendPage({super.key});
@@ -133,7 +134,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
           }).toList(),
         ),
       ),
-      endDrawer: _buildMenuDrawer(),
+      endDrawer: const AppDrawer(),
       body: TabBarView(
         controller: _tabController,
         children: _sectors.map((sector) {
@@ -143,173 +144,6 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     );
   }
 
-  Widget _buildMenuDrawer() {
-    final theme = Theme.of(context);
-    return Drawer(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          Container(
-            color: theme.colorScheme.surface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('📊 StockWiki 메뉴', style: theme.textTheme.titleLarge),
-                IconButton(
-                  icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
-                  onPressed: () {
-                    Navigator.of(context).maybePop();
-                  },
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: theme.dividerColor),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                // 공통 기능 섹션
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                  child: Text(
-                    '공통',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: Icon(Icons.psychology, color: theme.colorScheme.onSurface),
-                  title: Text("알고리즘 설명", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AiAlgorithmExplainPage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.bookmark_outline, color: theme.colorScheme.onSurface),
-                  title: Text("북마크 목록", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BookmarkListPage()),
-                    );
-                  },
-                ),
-                
-                // 구분선
-                Divider(color: theme.dividerColor, height: 1),
-                
-                // 한국 주식 섹션
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        '🇰🇷 한국 주식',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.auto_graph, color: Colors.blue),
-                  title: Text("AI 종목 추천", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AiStockRecommendPage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.trending_up, color: Colors.blue),
-                  title: Text("테마별 추천 종목", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ThemeRecommendationsPage()),
-                    );
-                  },
-                ),
-                
-                // 구분선
-                Divider(color: theme.dividerColor, height: 1),
-                
-                // 미국 주식 섹션
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        '🇺🇸 미국 주식',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.search, color: Colors.green),
-                  title: Text("주식 검색", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const UsStockSearchPage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.auto_graph, color: Colors.green),
-                  title: Text("AI 종목 추천", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const UsStockAiRecommendPage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.trending_up, color: Colors.green),
-                  title: Text("Sector별 추천 종목", style: theme.textTheme.bodyLarge),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.groups, color: Colors.green),
-                  title: Text("AI 검증위원회", style: theme.textTheme.bodyLarge),
-                  subtitle: Text(
-                    '다중 AI 검증',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const UsStockAiCommitteePage()),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSectorContent(String sector) {
     final stocks = _sectorStocks[sector] ?? [];

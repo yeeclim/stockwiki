@@ -25,11 +25,11 @@ export default async function handler(req, res) {
 
   try {
     console.log(`🔍 전체 종목 검색: ${keyword}`);
-    
+
     // 1단계: KRX 전체 데이터에서 검색
     const allStocks = await loadKRXData();
     const matchingStocks = searchInKRXData(allStocks, keyword, limit);
-    
+
     if (matchingStocks.length === 0) {
       return res.status(404).json({
         success: false,
@@ -43,9 +43,9 @@ export default async function handler(req, res) {
     const results = await Promise.all(matchingStocks.map(async (stock) => {
       const code = stock['단축코드'];
       try {
-        console.log(`🌐 실시간 크롤링 시도: ${stock['한글 종목명']} (${code})`);
-        const realTimeData = await fetchStockData(code);
-        
+        console.log(`🌐 실시간 실시간 가격 시도: ${stock['한글 종목명']} (${code})`);
+        const realTimeData = await fetchStockData(code, stock['시장구분']);
+
         if (realTimeData && realTimeData.price > 0) {
           return {
             symbol: code,
@@ -58,14 +58,14 @@ export default async function handler(req, res) {
             volume: realTimeData.volume,
             marketCap: realTimeData.marketCap,
             lastUpdate: new Date().toISOString(),
-            source: 'naver-finance',
-            note: '실시간 크롤링 데이터'
+            source: 'yahoo-finance',
+            note: '실시간 API 데이터'
           };
         }
       } catch (error) {
-        console.error(`❌ 실시간 크롤링 실패: ${stock['한글 종목명']} (${code})`, error.message);
+        console.error(`❌ 실시간 API 실패: ${stock['한글 종목명']} (${code})`, error.message);
       }
-      
+
       // 실시간 데이터 실패 시 추정 가격 제공
       const estimatedPrice = getEstimatedPrice(code, stock);
       return {
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     }));
 
     console.log(`🎯 최종 결과: ${results.length}개 종목`);
-    
+
     return res.status(200).json({
       success: true,
       keyword: keyword,
@@ -111,7 +111,7 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1시간
 
 async function loadKRXData() {
   const now = Date.now();
-  
+
   // 캐시 확인
   if (krxDataCache && krxDataCacheTime && (now - krxDataCacheTime) < CACHE_DURATION) {
     console.log('📦 KRX 데이터 캐시 사용');
@@ -126,10 +126,10 @@ async function loadKRXData() {
       path.join(process.cwd(), 'assets', 'data', 'krx_basic_info.json'),
       path.join(process.cwd(), 'web', 'assets', 'krx_basic_info.json'),
     ];
-    
+
     let fileContent = null;
     let filePath = null;
-    
+
     for (const tryPath of possiblePaths) {
       try {
         if (fs.existsSync(tryPath)) {
@@ -143,17 +143,17 @@ async function loadKRXData() {
         continue;
       }
     }
-    
+
     if (!fileContent) {
       throw new Error(`KRX 데이터 파일을 찾을 수 없습니다. 시도한 경로: ${possiblePaths.join(', ')}`);
     }
-    
+
     const data = JSON.parse(fileContent);
-    
+
     // 캐시 저장
     krxDataCache = data;
     krxDataCacheTime = now;
-    
+
     console.log(`✅ KRX 데이터 로드 완료: ${data.length}개 종목`);
     return data;
   } catch (error) {
@@ -166,20 +166,20 @@ async function loadKRXData() {
 function searchInKRXData(allStocks, keyword, limit) {
   // 한글 검색을 위해 toLowerCase() 제거 (한글은 대소문자가 없음)
   const searchKeyword = keyword.trim();
-  
+
   console.log(`🔍 검색 키워드: "${searchKeyword}"`);
   console.log(`📊 전체 종목 수: ${allStocks.length}`);
-  
+
   const matchingStocks = allStocks.filter(stock => {
     const name = stock['한글 종목명'] || '';
     const shortName = stock['한글 종목약명'] || '';
     const code = stock['단축코드'] || '';
-    
+
     // 정확한 매칭 우선, 부분 매칭도 허용
     const nameMatch = name.includes(searchKeyword) || name === searchKeyword;
     const shortNameMatch = shortName.includes(searchKeyword) || shortName === searchKeyword;
     const codeMatch = code.includes(searchKeyword) || code === searchKeyword;
-    
+
     return nameMatch || shortNameMatch || codeMatch;
   });
 
@@ -188,10 +188,31 @@ function searchInKRXData(allStocks, keyword, limit) {
     console.log(`📋 첫 번째 결과: ${matchingStocks[0]['한글 종목명']} (${matchingStocks[0]['단축코드']})`);
   }
 
-  // 시장구분별 우선순위 (KOSPI > KOSDAQ)
+  // 검색 우선순위 정렬 루틴
   const sortedStocks = matchingStocks.sort((a, b) => {
+    const aName = a['한글 종목명'] || '';
+    const aShortName = a['한글 종목약명'] || '';
+    const bName = b['한글 종목명'] || '';
+    const bShortName = b['한글 종목약명'] || '';
+    const aCode = a['단축코드'] || '';
+    const bCode = b['단축코드'] || '';
+
+    // 1위: 검색어와 완전히 일치하는 종목 최우선
+    const aExact = aName === searchKeyword || aShortName === searchKeyword || aCode === searchKeyword;
+    const bExact = bName === searchKeyword || bShortName === searchKeyword || bCode === searchKeyword;
+
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+
+    // 2위: 시장구분별 우선순위 (KOSPI > KOSDAQ)
     if (a['시장구분'] === 'KOSPI' && b['시장구분'] !== 'KOSPI') return -1;
     if (b['시장구분'] === 'KOSPI' && a['시장구분'] !== 'KOSPI') return 1;
+
+    // 3위: 이름이 짧은 문자 순서대로 정렬 (불필요한 파생 상품 배제)
+    if (aName.length !== bName.length) {
+      return aName.length - bName.length;
+    }
+
     return 0;
   });
 
@@ -203,7 +224,7 @@ function getEstimatedPrice(code, stock) {
   const stockName = stock['한글 종목명'] || '';
   const marketCap = stock['상장주식수'] || 0;
   const market = stock['시장구분'] || '';
-  
+
   // 알려진 가격 데이터 (2025년 10월 기준)
   const knownPrices = {
     // 대형주
@@ -247,7 +268,7 @@ function getEstimatedPrice(code, stock) {
     '267250': 80000,  // HD현대중공업
     '042700': 120000, // 한미반도체
     '047050': 45000,  // 포스코인터내셔널
-    
+
     // 기타 주요 종목
     '323410': 45000,  // 카카오뱅크
     '000270': 100000, // 기아
@@ -259,12 +280,12 @@ function getEstimatedPrice(code, stock) {
     '001045': 75000,  // CJ우
     '00104K': 70000,  // CJ4우
   };
-  
+
   // 알려진 가격이 있으면 반환
   if (knownPrices[code]) {
     return knownPrices[code];
   }
-  
+
   // 시가총액 기반 추정 가격
   if (marketCap > 0) {
     if (marketCap > 100000000000) { // 1000억 이상 (대형주)
@@ -275,7 +296,7 @@ function getEstimatedPrice(code, stock) {
       return Math.floor(marketCap / 10000000) * 100;
     }
   }
-  
+
   // 종목명 기반 추정
   if (stockName.includes('금융') || stockName.includes('은행')) {
     return 50000; // 금융주 평균
@@ -290,7 +311,7 @@ function getEstimatedPrice(code, stock) {
   } else if (stockName.includes('건설') || stockName.includes('부동산')) {
     return 30000; // 건설/부동산 평균
   }
-  
+
   // 기본 추정 가격
   return market === 'KOSPI' ? 50000 : 30000; // KOSPI 5만원, KOSDAQ 3만원
 }
@@ -342,18 +363,19 @@ function isMajorStock(code) {
   return majorCodes.includes(code);
 }
 
-// 네이버 증권에서 실시간 데이터 크롤링
-async function fetchStockData(symbol) {
+// Yahoo Finance API를 통한 실시간 가격 조회
+async function fetchStockData(symbol, market) {
   try {
-    const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
-    
-    const response = await fetch(url, {
+    const marketSuffix = market === 'KOSPI' ? '.KS' : '.KQ';
+    const yahooSymbol = `${symbol}${marketSuffix}`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
+
+    // node-fetch는 Vercel Edge나 Node 환경에서 글로벌 fetch로 대체되는 경우가 많음
+    const fetchFn = globalThis.fetch || (await import('node-fetch')).default;
+
+    const response = await fetchFn(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
       timeout: 8000
     });
@@ -362,49 +384,28 @@ async function fetchStockData(symbol) {
       return null;
     }
 
-    const html = await response.text();
-    
-    if (html.trim().startsWith('<!DOCTYPE') || html.trim().startsWith('<html')) {
-      const priceInfo = extractPriceInfo(html);
-      if (priceInfo.price > 0) {
-        return {
-          price: priceInfo.price,
-          change: priceInfo.change,
-          changePercent: priceInfo.changePercent,
-          volume: priceInfo.volume,
-          marketCap: priceInfo.marketCap
-        };
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`❌ ${symbol} 크롤링 오류:`, error.message);
-    return null;
-  }
-}
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
 
-// 가격 정보 추출
-function extractPriceInfo(html) {
-  try {
-    const priceMatch = html.match(/<p class="no_today"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/);
-    const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 0;
-    
-    const changeMatch = html.match(/<span class="tah[^"]*"[^>]*>([+-]?\d+\.?\d*)%?<\/span>/);
-    const changePercent = changeMatch ? parseFloat(changeMatch[1]) : 0;
-    
-    const volumeMatch = html.match(/<span class="tah[^"]*"[^>]*>([\d,]+)<\/span>/);
-    const volume = volumeMatch ? parseInt(volumeMatch[1].replace(/,/g, '')) : 0;
-    
-    return {
-      price: price,
-      change: Math.round(price * changePercent / 100),
-      changePercent: changePercent,
-      volume: volume,
-      marketCap: 0
-    };
+    if (result && result.meta && result.meta.regularMarketPrice > 0) {
+      const price = result.meta.regularMarketPrice;
+      const prevClose = result.meta.chartPreviousClose || price;
+      const change = price - prevClose;
+      const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
+      const volume = result.meta.regularMarketVolume || 0;
+
+      return {
+        price,
+        change,
+        changePercent,
+        volume,
+        marketCap: 0
+      };
+    }
+
+    return null;
   } catch (error) {
-    console.error('가격 정보 추출 오류:', error);
-    return { price: 0, change: 0, changePercent: 0, volume: 0, marketCap: 0 };
+    console.error(`❌ ${symbol} API 오류:`, error.message);
+    return null;
   }
 }

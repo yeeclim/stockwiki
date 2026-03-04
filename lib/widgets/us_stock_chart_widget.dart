@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 
 class UsStockChartWidget extends StatefulWidget {
   final String symbol;
@@ -14,13 +17,54 @@ class UsStockChartWidget extends StatefulWidget {
 
 class _UsStockChartWidgetState extends State<UsStockChartWidget> {
   String _selectedPeriod = 'Daily'; // Intraday, Daily, Weekly, Monthly
+  Uint8List? _imageBytes;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImage();
+  }
+
+  Future<void> _loadImage() async {
+    if (widget.symbol.isEmpty) {
+      setState(() {
+        _errorMessage = '유효하지 않은 종목입니다.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final url = _getChartUrl();
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _imageBytes = response.bodyBytes;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = '데이터 없음 (${response.statusCode})';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = '연결 오류 발생';
+        _isLoading = false;
+      });
+    }
+  }
 
   String _getChartUrl() {
-    // Finviz parameters:
-    // p=i15 : 15 min intraday (1일/단기)
-    // p=d   : Daily (일봉)
-    // p=w   : Weekly (주봉)
-    // p=m   : Monthly (월봉)
     String periodParam = 'd';
     switch (_selectedPeriod) {
       case 'Intraday':
@@ -37,9 +81,26 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
         break;
     }
     
-    // 캐시 방지를 위해 타임스탬프 추가
+    // 한국 주식 여부 판별
+    final isKorean = RegExp(r'^\d+$').hasMatch(widget.symbol) || 
+                     widget.symbol.endsWith('.KS') || 
+                     widget.symbol.endsWith('.KQ') || 
+                     RegExp(r'[가-힣]').hasMatch(widget.symbol);
+
+    // 환경별 API URL 설정
+    String baseUrl = 'https://stockwiki.vercel.app';
+    bool isLocalDev = false;
+    try {
+      if (kIsWeb) {
+        baseUrl = Uri.base.origin;
+        isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+      }
+    } catch (_) {}
+    
+    final apiBaseUrl = isLocalDev ? 'http://localhost:3000' : baseUrl;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'https://charts.finviz.com/chart.ashx?t=${widget.symbol}&ty=c&ta=0&p=$periodParam&cb=$timestamp';
+    
+    return '$apiBaseUrl/api/chart-proxy?symbol=${widget.symbol}&period=$periodParam&isKorean=$isKorean&cb=$timestamp';
   }
 
   @override
@@ -74,42 +135,44 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
               width: double.infinity,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  _getChartUrl(),
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: theme.colorScheme.primary,
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                (loadingProgress.expectedTotalBytes ?? 1)
-                            : null,
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.broken_image, color: theme.colorScheme.error, size: 48),
-                          const SizedBox(height: 8),
-                          Text(
-                            '차트 이미지를 불러올 수 없습니다.',
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                child: _buildImageContent(theme),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildImageContent(ThemeData theme) {
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          color: theme.colorScheme.primary,
+        ),
+      );
+    }
+
+    if (_errorMessage != null || _imageBytes == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.broken_image, color: theme.colorScheme.error, size: 48),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? '차트 이미지를 불러올 수 없습니다.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Image.memory(
+      _imageBytes!,
+      fit: BoxFit.contain,
     );
   }
 
@@ -130,9 +193,12 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
           final isSelected = _selectedPeriod == period;
           return GestureDetector(
             onTap: () {
-              setState(() {
-                _selectedPeriod = period;
-              });
+              if (_selectedPeriod != period) {
+                setState(() {
+                  _selectedPeriod = period;
+                });
+                _loadImage();
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),

@@ -170,7 +170,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '\$${price.toStringAsFixed(2)}',
+                        _formatPrice(price, stock),
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onSurface,
@@ -186,7 +186,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${change >= 0 ? '+' : ''}${change.toStringAsFixed(2)} (${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%)',
+                            '${change >= 0 ? '+' : ''}${_formatChange(change, stock)} (${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%)',
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: isPositive ? Colors.green : Colors.red,
                               fontWeight: FontWeight.bold,
@@ -252,6 +252,32 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         ),
       ),
     );
+  }
+
+  String _formatPrice(double price, Stock stock) {
+    final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) ||
+        stock.symbol.endsWith('.KS') ||
+        stock.symbol.endsWith('.KQ') ||
+        RegExp(r'[가-힣]').hasMatch(stock.name);
+
+    if (isKorean) {
+      return '₩${price.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+    } else {
+      return '\$${price.toStringAsFixed(2)}';
+    }
+  }
+
+  String _formatChange(double change, Stock stock) {
+    final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) ||
+        stock.symbol.endsWith('.KS') ||
+        stock.symbol.endsWith('.KQ') ||
+        RegExp(r'[가-힣]').hasMatch(stock.name);
+
+    if (isKorean) {
+      return '₩${change.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+    } else {
+      return '\$${change.toStringAsFixed(2)}';
+    }
   }
 
   Widget _buildInfoItem(String label, String value) {
