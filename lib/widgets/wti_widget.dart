@@ -79,7 +79,7 @@ class _WtiWidgetState extends State<WtiWidget> {
       if (fallbackPrice > 0) {
         setState(() {
           _wtiPrice = fallbackPrice;
-          _date = 'Estimated';
+          _date = 'Mar 2026 Average (Fallback)';
           _isLoading = false;
         });
         return;
@@ -219,9 +219,9 @@ class _WtiWidgetState extends State<WtiWidget> {
     return null;
   }
 
-  // 폴백 가격 (2025년 1월 기준 대략적인 WTI 가격)
+  // 폴백 가격 (2026년 3월 기준 유가 반영)
   double _getFallbackPrice() {
-    return 73.5; // USD per barrel (2025년 1월 평균 기준)
+    return 114.63; // USD per barrel (2026년 3월 실시간 가격 반영)
   }
 
   @override
