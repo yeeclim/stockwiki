@@ -23,6 +23,16 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
     _fetchIndex();
   }
 
+  // API 호출을 위한 베이스 URL 가져오기
+  String get _baseUrl {
+    try {
+      final origin = Uri.base.origin;
+      return origin;
+    } catch (e) {
+      return 'https://stockwiki.vercel.app';
+    }
+  }
+
   // 캐시된 인덱스 로드
   Future<void> _loadCachedIndex() async {
     try {
@@ -61,21 +71,20 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
 
   Future<void> _fetchIndex() async {
     try {
-      final uri = Uri.parse('https://api.alternative.me/fng/?limit=1');
-      final response = await http.get(uri);
+      final uri = Uri.parse('$_baseUrl/api/fear-greed-stock');
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
-        final data = json['data'][0];
-        final value = int.parse(data['value']);
-        final classification = data['value_classification'];
+        final value = json['value'] as int;
+        final classification = json['label'] as String;
         setState(() {
           _indexValue = value;
           _label = classification;
           _isLoading = false;
         });
-        await _cacheIndex(value, classification); // 인덱스 캐시 저장
+        await _cacheIndex(value, classification);
       } else {
-        throw Exception('Failed to fetch FNG');
+        throw Exception('Failed to fetch Stock FNG');
       }
     } catch (e) {
       setState(() {
@@ -133,7 +142,7 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Fear & Greed',
+                  'Fear & Greed (Stock)',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,
