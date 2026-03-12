@@ -29,49 +29,48 @@ export default async function handler(req, res) {
 
     console.log('🎯 AI 검증위원회 질문:', symbol, question.substring(0, 100) + '...');
 
-    // 5개 AI 모델에 동시에 질문 (GPT, Gemini, Claude, DeepSeek, Ollama)
-    const [
-      chatgptResult,
-      geminiResult,
-      claudeResult,
-      deepseekResult,
-      ollamaResult
-    ] = await Promise.allSettled([
-      askChatGPT(question),
-      askGemini(question),
-      askClaude(question),
-      askDeepSeek(question),
-      askOllama(question),
-    ]);
+    // 실행 가능한 작업 목록 구성
+    const tasks = [];
+    if (process.env.OPENAI_API_KEY) tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
+    if (process.env.GEMINI_API_KEY) tasks.push({ name: 'Gemini', fn: () => askGemini(question) });
+    if (process.env.ANTHROPIC_API_KEY) tasks.push({ name: 'Claude', fn: () => askClaude(question) });
+    if (process.env.DEEPSEEK_API_KEY) tasks.push({ name: 'DeepSeek', fn: () => askDeepSeek(question) });
+
+    // Ollama는 로컬이나 특정 URL이 있으면 추가
+    if (process.env.OLLAMA_URL || process.env.OLLAMA_USE_LOCAL === 'true') {
+      tasks.push({ name: 'Ollama', fn: () => askOllama(question) });
+    }
+
+    if (tasks.length === 0) {
+      // 기본적으로 서비스가 가능하도록 최소 1개(OpenAI 또는 Gemini)는 환경변수 설정을 권고하지만
+      // 아무것도 없을 경우 에러 처리
+      throw new Error('설정된 AI 모델 API 키가 없습니다. Vercel 환경 변수를 확인해주세요.');
+    }
+
+    // 설정된 모델들에 대해서만 병렬 질문 시작
+    const results = await Promise.allSettled(tasks.map(t => t.fn()));
 
     // 결과 수집
     const models = [];
-
-    // Helper to process results
-    const processResult = (result, name) => {
+    results.forEach((result, index) => {
+      const taskName = tasks[index].name;
       if (result.status === 'fulfilled' && result.value) {
         const rawResponse = result.value;
         const recommendation = parseRecommendation(rawResponse);
-        console.log(`🤖 ${name} 응답 완료:`, recommendation);
+        console.log(`🤖 ${taskName} 응답 완료:`, recommendation);
         models.push({
-          modelName: name,
+          modelName: taskName,
           recommendation: recommendation,
           reasoning: rawResponse.substring(0, 200),
           fullResponse: rawResponse,
         });
       } else {
-        console.error(`❌ ${name} 실패 또는 응답 없음:`, result.reason || 'No data');
+        console.error(`❌ ${taskName} 실패:`, result.reason || 'No response');
       }
-    };
-
-    processResult(chatgptResult, 'ChatGPT');
-    processResult(geminiResult, 'Gemini');
-    processResult(claudeResult, 'Claude');
-    processResult(deepseekResult, 'DeepSeek');
-    processResult(ollamaResult, 'Ollama');
+    });
 
     if (models.length === 0) {
-      throw new Error('모든 AI 모델 호출에 실패했습니다.');
+      throw new Error('활성화된 모든 AI 모델의 응답에 실패했습니다.');
     }
 
     // 검증도 계산
@@ -98,6 +97,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       models: models,
+      verificationCount: tasks.length,
+      activeCount: models.length,
       verificationScore: verification.score,
       agreement: verification.agreement,
       finalRecommendation: finalRecommendation,
