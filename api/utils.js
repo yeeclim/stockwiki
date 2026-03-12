@@ -1,4 +1,8 @@
+// Utility API
+// Charts, Commodity Prices, Fear & Greed Index
+
 export default async function handler(req, res) {
+    const fetch = globalThis.fetch || (await import('node-fetch')).default;
     // CORS 헤더 설정
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -77,22 +81,19 @@ async function handleCommodityPrice(req, res) {
 }
 
 async function handleFearGreed(req, res) {
-    const response = await fetch('https://fear-and-greed-index.p.rapidapi.com/fgi', {
-        headers: {
-            'X-RapidAPI-Key': 'YOUR_API_KEY', // Note: original code didn't have a key but called the endpoint
-            'X-RapidAPI-Host': 'fear-and-greed-index.p.rapidapi.com'
-        }
-    });
+    const fetch = globalThis.fetch || (await import('node-fetch')).default;
+    try {
+        const response = await fetch('https://alternative.me/crypto/fear-and-greed-index/');
+        const html = await response.text();
+        const valueMatch = html.match(/class="fng-value">\s*(\d+)/);
+        const labelMatch = html.match(/class="fng-text">\s*([^<]+)/);
 
-    // Actually, let's check fear-greed-stock.js content again. I'll use the original logic.
-    // Viewing fear-greed-stock.js
-    const fngResponse = await fetch('https://alternative.me/crypto/fear-and-greed-index/');
-    const html = await fngResponse.text();
-    const valueMatch = html.match(/class="fng-value">\s*(\d+)/);
-    const labelMatch = html.match(/class="fng-text">\s*([^<]+)/);
-
-    return res.status(200).json({
-        value: valueMatch ? parseInt(valueMatch[1]) : 50,
-        label: labelMatch ? labelMatch[1].trim() : 'Neutral'
-    });
+        return res.status(200).json({
+            value: valueMatch ? parseInt(valueMatch[1]) : 50,
+            label: labelMatch ? labelMatch[1].trim() : 'Neutral'
+        });
+    } catch (e) {
+        console.error('Fear & Greed Error:', e);
+        return res.status(200).json({ value: 50, label: 'Neutral' });
+    }
 }

@@ -863,15 +863,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     String displayName = model.modelName;
     
     final lowerName = model.modelName.toLowerCase();
-    if (lowerName.contains('gpt') || lowerName.contains('openai')) {
+    if (lowerName.contains('gpt') || lowerName.contains('openai') || lowerName.contains('warren')) {
       displayName = 'ChatGPT';
-    } else if (lowerName.contains('gemini')) {
+    } else if (lowerName.contains('gemini') || lowerName.contains('peter')) {
       displayName = 'Gemini';
-    } else if (lowerName.contains('claude')) {
+    } else if (lowerName.contains('claude') || lowerName.contains('ray dalio')) {
       displayName = 'Claude';
-    } else if (lowerName.contains('deepseek')) {
+    } else if (lowerName.contains('deepseek') || lowerName.contains('george soros')) {
       displayName = 'DeepSeek';
-    } else if (lowerName.contains('ollama') || lowerName.contains('llama')) {
+    } else if (lowerName.contains('ollama') || lowerName.contains('llama') || lowerName.contains('ray dalio')) {
       displayName = 'Ollama';
     }
 

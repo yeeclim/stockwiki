@@ -3,6 +3,7 @@ import Parser from 'rss-parser';
 const parser = new Parser();
 
 export default async function handler(req, res) {
+  const fetch = globalThis.fetch || (await import('node-fetch')).default;
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -71,7 +72,7 @@ async function handleDaumNews(req, res) {
 
   const encodedKeyword = encodeURIComponent(keyword.trim());
   const searchUrl = `https://search.daum.net/search?w=news&q=${encodedKeyword}&sort=recency`;
-  
+
   const response = await fetch(searchUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -98,7 +99,7 @@ async function handleDaumNews(req, res) {
     const itemHtml = items[i];
     const linkPattern = /<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/g;
     let linkMatch;
-    
+
     while ((linkMatch = linkPattern.exec(itemHtml)) !== null) {
       const link = linkMatch[1];
       const title = cleanText(linkMatch[2]);
@@ -134,12 +135,12 @@ async function handleNaverNews(req, res) {
 
   const encodedKeyword = encodeURIComponent(keyword.trim());
   const rssUrl = `https://news.naver.com/main/rss/section.naver?sid=101&query=${encodedKeyword}`;
-  
+
   const response = await fetch(rssUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     },
-    timeout: 10000 
+    timeout: 10000
   });
 
   if (!response.ok) return res.status(200).json({ success: true, count: 0, results: [] });
@@ -158,7 +159,7 @@ async function handleNaverNews(req, res) {
     const descMatch = itemXml.match(/<description[^>]*><!\[CDATA\[(.*?)\]\]><\/description>/) || itemXml.match(/<description[^>]*>(.*?)<\/description>/);
     const description = descMatch ? cleanText(descMatch[1]) : '';
     const pubDateMatch = itemXml.match(/<pubDate[^>]*>(.*?)<\/pubDate>/);
-    
+
     if (title && link) {
       newsList.push({
         title: title,
@@ -183,9 +184,9 @@ async function handleNaverNews(req, res) {
 function cleanText(text) {
   if (!text) return "";
   return text.replace(/<[^>]*>/g, '')
-             .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-             .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-             .replace(/\s+/g, ' ').trim();
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
 function detectLanguage(text) {
