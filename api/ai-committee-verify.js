@@ -15,6 +15,7 @@ function getEnv(key) {
 }
 
 export default async function handler(req, res) {
+  const fetch = globalThis.fetch || (await import('node-fetch')).default;
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
