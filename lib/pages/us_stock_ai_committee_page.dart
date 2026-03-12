@@ -871,7 +871,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       displayName = 'Claude';
     } else if (lowerName.contains('deepseek') || lowerName.contains('george') || lowerName.contains('soros') || lowerName.contains('조지') || lowerName.contains('소로스')) {
       displayName = 'DeepSeek';
-    } else if (lowerName.contains('ollama') || lowerName.contains('llama')) {
+    } else if (lowerName.contains('ollama') || lowerName.contains('llama') || lowerName.contains('올라마') || lowerName.contains('올라')) {
       displayName = 'Ollama';
     }
 
