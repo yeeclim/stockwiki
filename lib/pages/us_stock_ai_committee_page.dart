@@ -487,7 +487,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'ChatGPT, Gemini, Claude, DeepSeek, Ollama 모델이 동시에 검증하고 있습니다',
+              '다수의 최신 AI 모델이 동시에 동시 검증하고 있습니다',
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 12),
             ),
           ],
@@ -566,7 +566,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     ),
                     const SizedBox(height: 12),
                     _buildProcessStep('1', '주식 검색', '미국주식 또는 국내주식 검색'),
-                    _buildProcessStep('2', 'AI 분석', 'ChatGPT, Gemini, Claude, DeepSeek, Ollama가 동시 분석'),
+                    _buildProcessStep('2', 'AI 분석', 'ChatGPT, Gemini, DeepSeek 등 다수 AI의 동시 분석'),
                     _buildProcessStep('3', '결과 검증', '여러 AI의 의견을 비교하여 검증도 계산'),
                     _buildProcessStep('4', '리포팅', '종합 분석 결과를 리포트로 제공'),
                   ],
