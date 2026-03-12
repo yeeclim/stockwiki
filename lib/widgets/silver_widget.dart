@@ -60,8 +60,6 @@ class _SilverWidgetState extends State<SilverWidget> {
     try {
       final results = await Future.wait([
         _tryYahooFinance(),
-        _tryTwelveData(),
-        _tryGoldAPI(),
       ], eagerError: false).timeout(const Duration(seconds: 5));
 
       // 첫 번째 유효한 가격 찾기
@@ -139,115 +137,13 @@ class _SilverWidgetState extends State<SilverWidget> {
     return null;
   }
 
-  // TwelveData (기존 API 키 사용)
-  Future<double?> _tryTwelveData() async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://api.twelvedata.com/price?symbol=XAG/USD&apikey=105c740ebca44e2ba687cfe806fa6b98'),
-      ).timeout(const Duration(seconds: 3));
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final price = data['price'];
-        return price != null ? double.tryParse(price.toString()) : null;
-      }
-    } catch (e) {
-      // TwelveData error
-    }
-    return null;
-  }
+  // 외부 API 호출 제거 (CORS 문제)
+  // 외부 API 호출 제거 (CORS 문제로 프록시만 사용)
+  Future<double?> _tryTwelveData() async => null;
+  Future<double?> _tryGoldAPI() async => null;
+  Future<double?> _trySimpleAPI() async => null;
+  Future<double?> _tryFixerIO() async => null;
 
-  // GoldAPI.io (기존 API 키 사용)
-  Future<double?> _tryGoldAPI() async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://www.goldapi.io/api/XAG/USD'),
-        headers: {
-          'x-access-token': 'goldapi-1rjbsmdcfc6a2-io',
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 3));
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['price']?.toDouble();
-      }
-    } catch (e) {
-      // GoldAPI error
-    }
-    return null;
-  }
-
-
-  // Simple API (무료, API 키 불필요)
-  Future<double?> _trySimpleAPI() async {
-    try {
-      // 여러 무료 API를 병렬로 시도
-      final urls = [
-        'https://api.metals.live/v1/spot/silver',
-        'https://api.coinbase.com/v2/exchange-rates?currency=XAG',
-      ];
-      
-      final futures = urls.map((url) async {
-        try {
-          final response = await http.get(
-            Uri.parse(url),
-          ).timeout(const Duration(seconds: 3));
-          
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            
-            // 다양한 응답 형식 처리
-            double? price;
-            if (data['price'] != null) {
-              price = data['price'].toDouble();
-            } else if (data['data']?['rates']?['USD'] != null) {
-              price = 1.0 / data['data']['rates']['USD'].toDouble();
-            } else if (data['rates']?['USD'] != null) {
-              price = 1.0 / data['rates']['USD'].toDouble();
-            }
-            
-            if (price != null && price > 0) {
-              return price;
-            }
-          }
-        } catch (e) {
-          return null;
-        }
-        return null;
-      });
-
-      final results = await Future.wait(futures);
-      for (final price in results) {
-        if (price != null && price > 0) {
-          return price;
-        }
-      }
-    } catch (e) {
-      // Simple API error
-    }
-    return null;
-  }
-
-  // Fixer.io API (무료, API 키 불필요)
-  Future<double?> _tryFixerIO() async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://api.fixer.io/latest?base=XAG&symbols=USD'),
-      ).timeout(const Duration(seconds: 3));
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final rate = data['rates']?['USD'];
-        if (rate != null) {
-          return 1.0 / rate.toDouble(); // XAG to USD
-        }
-      }
-    } catch (e) {
-      // Fixer.io error
-    }
-    return null;
-  }
 
 
   @override
