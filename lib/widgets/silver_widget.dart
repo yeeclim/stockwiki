@@ -76,19 +76,12 @@ class _SilverWidgetState extends State<SilverWidget> {
         }
       }
     } catch (e) {
-      // 병렬 호출 실패 시, 폴백 가격 사용
-      try {
-        final fallbackPrice = await _tryFallbackPrice();
-        if (fallbackPrice != null && fallbackPrice > 0) {
-          setState(() {
-            _silverPrice = fallbackPrice;
-            _isLoading = false;
-          });
-          return;
-        }
-      } catch (e) {
-        // 폴백도 실패
-      }
+      // 병렬 호출 실패 시
+      setState(() {
+        _error = '데이터 로드 실패';
+        _isLoading = false;
+      });
+      return;
     }
 
     // 모든 시도 실패 시
@@ -103,8 +96,8 @@ class _SilverWidgetState extends State<SilverWidget> {
     try {
       // 병렬로 여러 Yahoo Finance 엔드포인트 시도
       final urls = [
-        'https://query1.finance.yahoo.com/v8/finance/chart/SI=F',
-        'https://query1.finance.yahoo.com/v8/finance/chart/XAGUSD=X',
+        '/api/commodity-price?symbol=SI=F',
+        '/api/commodity-price?symbol=XAGUSD=X',
       ];
       
       final futures = urls.map((url) async {
@@ -256,11 +249,6 @@ class _SilverWidgetState extends State<SilverWidget> {
     return null;
   }
 
-  // 폴백 가격 (모든 API 실패 시 대체값)
-  Future<double?> _tryFallbackPrice() async {
-    // 최근 은 가격 대략값 (2024년 기준)
-    return 24.50; // USD per ounce
-  }
 
   @override
   Widget build(BuildContext context) {
