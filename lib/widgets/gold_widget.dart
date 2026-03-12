@@ -55,10 +55,10 @@ class _GoldWidgetState extends State<GoldWidget> {
     }
   }
 
-  Future<void> _fetchGoldPrice() async {
     try {
+      final baseUrl = Uri.base.origin;
       final response = await http.get(
-        Uri.parse('/api/utils?type=commodity&symbol=GOLD'),
+        Uri.parse('$baseUrl/api/utils?type=commodity&symbol=GOLD'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {

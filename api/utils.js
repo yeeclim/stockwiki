@@ -72,12 +72,17 @@ async function handleCommodityPrice(req, res) {
     else if (s === 'BTC' || s === 'BITCOIN') targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD';
     else targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
 
+    const fetch = globalThis.fetch || (await import('node-fetch')).default;
     const response = await fetch(targetUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+        }
     });
 
     if (!response.ok) throw new Error(`API responded with status: ${response.status}`);
-    return res.status(200).json(await response.json());
+    const data = await response.json();
+    return res.status(200).json(data);
 }
 
 async function handleFearGreed(req, res) {
