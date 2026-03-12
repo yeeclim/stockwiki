@@ -137,7 +137,6 @@ class _SilverWidgetState extends State<SilverWidget> {
     return null;
   }
 
-  // 외부 API 호출 제거 (CORS 문제)
   // 외부 API 호출 제거 (CORS 문제로 프록시만 사용)
   Future<double?> _tryTwelveData() async => null;
   Future<double?> _tryGoldAPI() async => null;
