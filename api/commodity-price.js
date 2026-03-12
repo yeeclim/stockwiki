@@ -18,12 +18,20 @@ export default async function handler(req, res) {
 
     try {
         let targetUrl;
+        let isCoinGecko = false;
+
         if (symbol === 'WTI' || symbol === 'CL=F') {
             targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/CL=F';
         } else if (symbol === 'SILVER' || symbol === 'SI=F' || symbol === 'XAGUSD=X') {
             targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/SI=F';
         } else if (symbol === 'GOLD' || symbol === 'GC=F' || symbol === 'XAUUSD=X') {
             targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/GC=F';
+        } else if (symbol.toLowerCase() === 'btc' || symbol.toLowerCase() === 'bitcoin') {
+            // Option 1: Yahoo Finance BTC-USD
+            targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD';
+            // Option 2: CoinGecko (uncomment if preferred)
+            // targetUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd';
+            // isCoinGecko = true;
         } else {
             // General Yahoo Finance proxy
             targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
@@ -36,13 +44,13 @@ export default async function handler(req, res) {
         });
 
         if (!response.ok) {
-            throw new Error(`Yahoo API responded with status: ${response.status}`);
+            throw new Error(`API responded with status: ${response.status}`);
         }
 
         const data = await response.json();
         return res.status(200).json(data);
     } catch (error) {
         console.error('Proxy error:', error);
-        return res.status(500).json({ error: 'Failed to fetch data from Yahoo Finance', message: error.message });
+        return res.status(500).json({ error: 'Failed to fetch data', message: error.message });
     }
 }

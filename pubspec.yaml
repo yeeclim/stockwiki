@@ -27,11 +27,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  assets:
-    # 실시간 크롤링으로 변경되어 정적 데이터 파일 제거
-    # - assets/data/krx_basic_info.json (삭제됨)
-    # - assets/data/krx_price_info.json (삭제됨)
-    # 🔽 필요시 여기에 다른 asset 파일 추가 가능
+  # 🔽 필요시 여기에 다른 asset 파일 추가 가능
 
   fonts:
     - family: NotoSansKR

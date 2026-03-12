@@ -185,9 +185,9 @@ class _WtiWidgetState extends State<WtiWidget> {
   // Alternative API - Commodities API나 다른 소스
   Future<Map<String, dynamic>?> _tryAlternativeAPI() async {
     try {
-      // OANDA API 사용 (무료)
+      // Proxy 사용
       final response = await http.get(
-        Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/BZ=F'),
+        Uri.parse('/api/commodity-price?symbol=BZ=F'),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {

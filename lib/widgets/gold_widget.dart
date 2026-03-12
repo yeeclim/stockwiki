@@ -57,27 +57,26 @@ class _GoldWidgetState extends State<GoldWidget> {
 
   Future<void> _fetchGoldPrice() async {
     try {
-      final uri = Uri.parse(
-        'https://api.twelvedata.com/price?symbol=XAU/USD&apikey=105c740ebca44e2ba687cfe806fa6b98',
-      );
-      final response = await http.get(uri);
+      final response = await http.get(
+        Uri.parse('/api/commodity-price?symbol=GOLD'),
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['price'] != null) {
-          final price = double.tryParse(data['price']);
+        final result = data['chart']?['result']?[0];
+        if (result != null) {
+          final meta = result['meta'];
+          final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
           if (price != null) {
             setState(() {
-              _goldPrice = price;
+              _goldPrice = price.toDouble();
               _isLoading = false;
             });
-            await _cachePrice(price); // 가격 캐시 저장
-          } else {
-            throw Exception('가격 데이터 형식 오류');
+            await _cachePrice(price.toDouble());
+            return;
           }
-        } else {
-          throw Exception(data['message'] ?? '데이터 오류');
         }
+        throw Exception('가격 데이터 형식 오류');
       } else {
         throw Exception('HTTP 오류: ${response.statusCode}');
       }

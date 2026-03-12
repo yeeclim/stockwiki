@@ -57,26 +57,29 @@ class _BtcWidgetState extends State<BtcWidget> {
 
   Future<void> _fetchPrice() async {
     try {
-      final res = await http.get(Uri.parse(
-          'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'));
+      final res = await http.get(Uri.parse('/api/commodity-price?symbol=BTC'));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
-        final price = data['bitcoin']['usd']?.toDouble();
-        if (price != null) {
-          setState(() {
-            _btcPrice = price;
-            _isLoading = false;
-          });
-          await _cachePrice(price); // 가격 캐시 저장
-        } else {
-          throw Exception('가격 데이터 형식 오류');
+        final result = data['chart']?['result']?[0];
+        if (result != null) {
+          final meta = result['meta'];
+          final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+          if (price != null) {
+            setState(() {
+              _btcPrice = price.toDouble();
+              _isLoading = false;
+            });
+            await _cachePrice(price.toDouble());
+            return;
+          }
         }
+        throw Exception('가격 데이터 형식 오류');
       } else {
         throw Exception('HTTP ${res.statusCode}');
       }
     } catch (e) {
       setState(() {
-        _error = '에러: $e';
+        _error = '데이터 로드 실패';
         _isLoading = false;
       });
     }
