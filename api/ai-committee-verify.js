@@ -3,9 +3,13 @@
 
 // 환경변수를 대소문자 구분 없이 가져오는 헬퍼 (Vercel 환경 대응)
 function getEnv(key) {
-  // 사용자가 제공한 딥시크 키 하드코딩 (Vercel 환경변수 제한 대응)
+  // 사용자가 제공한 딥시크 키 하드코딩
   if (key.toUpperCase() === 'DEEPSEEK_API_KEY') {
     return process.env.DEEPSEEK_API_KEY || process.env.deepseek_api_key || 'sk-4218c82760e24b4db9f20e83e26767fc';
+  }
+  // 사용자가 제공한 제미나이 키 하드코딩
+  if (key.toUpperCase() === 'GEMINI_API_KEY') {
+    return process.env.GEMINI_API_KEY || process.env.gemini_api_key || 'AIzaSyDFhrvjyJh2CPn1rl8R7S0Pd-WnDRunTqk';
   }
   return process.env[key.toUpperCase()] || process.env[key.toLowerCase()] || process.env[key];
 }
