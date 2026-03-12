@@ -863,15 +863,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     String displayName = model.modelName;
     
     final lowerName = model.modelName.toLowerCase();
-    if (lowerName.contains('gpt') || lowerName.contains('openai') || lowerName.contains('warren')) {
+    if (lowerName.contains('gpt') || lowerName.contains('openai') || lowerName.contains('warren') || lowerName.contains('워렌') || lowerName.contains('버핏')) {
       displayName = 'ChatGPT';
-    } else if (lowerName.contains('gemini') || lowerName.contains('peter')) {
+    } else if (lowerName.contains('gemini') || lowerName.contains('peter') || lowerName.contains('피터') || lowerName.contains('린치')) {
       displayName = 'Gemini';
-    } else if (lowerName.contains('claude') || lowerName.contains('ray dalio')) {
+    } else if (lowerName.contains('claude') || lowerName.contains('anthropic') || lowerName.contains('레이') || lowerName.contains('달리오')) {
       displayName = 'Claude';
-    } else if (lowerName.contains('deepseek') || lowerName.contains('george soros')) {
+    } else if (lowerName.contains('deepseek') || lowerName.contains('george') || lowerName.contains('soros') || lowerName.contains('조지') || lowerName.contains('소로스')) {
       displayName = 'DeepSeek';
-    } else if (lowerName.contains('ollama') || lowerName.contains('llama') || lowerName.contains('ray dalio')) {
+    } else if (lowerName.contains('ollama') || lowerName.contains('llama')) {
       displayName = 'Ollama';
     }
 

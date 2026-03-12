@@ -93,12 +93,11 @@ class _WtiWidgetState extends State<WtiWidget> {
     });
   }
 
-  // 간단하고 안정적인 API
   Future<Map<String, dynamic>?> _trySimpleAPI() async {
     try {
-      // Yahoo Finance API 사용 (더 안정적)
+      final baseUrl = Uri.base.origin;
       final response = await http.get(
-        Uri.parse('/api/utils?type=commodity&symbol=CL=F'),
+        Uri.parse('$baseUrl/api/utils?type=commodity&symbol=CL=F'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {

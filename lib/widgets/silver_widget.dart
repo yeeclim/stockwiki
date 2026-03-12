@@ -92,10 +92,11 @@ class _SilverWidgetState extends State<SilverWidget> {
   // Yahoo Finance (무료, API 키 불필요)
   Future<double?> _tryYahooFinance() async {
     try {
+      final baseUrl = Uri.base.origin;
       // 병렬로 여러 Yahoo Finance 엔드포인트 시도
       final urls = [
-        '/api/utils?type=commodity&symbol=SI=F',
-        '/api/utils?type=commodity&symbol=XAGUSD=X',
+        '$baseUrl/api/utils?type=commodity&symbol=SI=F',
+        '$baseUrl/api/utils?type=commodity&symbol=XAGUSD=X',
       ];
       
       final futures = urls.map((url) async {
