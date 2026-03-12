@@ -859,11 +859,21 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     final theme = Theme.of(context);
     final color = _getRecommendationColor(model.recommendation);
     
-    // 모델명 매핑 (영문 -> 한글)
-    String modelName = model.modelName;
-    if (modelName.contains('OpenAI') || modelName.contains('gpt')) modelName = '워렌 버핏';
-    else if (modelName.contains('Gemini')) modelName = '피터 린치';
-    else if (modelName.contains('Claude') || modelName.contains('Llama')) modelName = '짐 로저스';
+    // 모델명 매핑 및 정규화
+    String displayName = model.modelName;
+    
+    final lowerName = model.modelName.toLowerCase();
+    if (lowerName.contains('gpt') || lowerName.contains('openai')) {
+      displayName = 'ChatGPT';
+    } else if (lowerName.contains('gemini')) {
+      displayName = 'Gemini';
+    } else if (lowerName.contains('claude')) {
+      displayName = 'Claude';
+    } else if (lowerName.contains('deepseek')) {
+      displayName = 'DeepSeek';
+    } else if (lowerName.contains('ollama') || lowerName.contains('llama')) {
+      displayName = 'Ollama';
+    }
 
     return Tooltip(
       message: model.reasoning,
@@ -891,7 +901,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
           ),
           const SizedBox(height: 8),
           Text(
-            modelName,
+            displayName,
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurface,
