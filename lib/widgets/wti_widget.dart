@@ -98,7 +98,7 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       // Yahoo Finance API 사용 (더 안정적)
       final response = await http.get(
-        Uri.parse('/api/commodity-price?symbol=CL=F'),
+        Uri.parse('/api/utils?type=commodity&symbol=CL=F'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -127,7 +127,7 @@ class _WtiWidgetState extends State<WtiWidget> {
   Future<Map<String, dynamic>?> _tryYahooFinance() async {
     try {
       final response = await http.get(
-        Uri.parse('/api/commodity-price?symbol=CL=F'),
+        Uri.parse('/api/utils?type=commodity&symbol=CL=F'),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
@@ -187,7 +187,7 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       // Proxy 사용
       final response = await http.get(
-        Uri.parse('/api/commodity-price?symbol=BZ=F'),
+        Uri.parse('/api/utils?type=commodity&symbol=BZ=F'),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {

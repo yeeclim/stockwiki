@@ -57,7 +57,7 @@ class _BtcWidgetState extends State<BtcWidget> {
 
   Future<void> _fetchPrice() async {
     try {
-      final res = await http.get(Uri.parse('/api/commodity-price?symbol=BTC'));
+      final res = await http.get(Uri.parse('/api/utils?type=commodity&symbol=BTC'));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final result = data['chart']?['result']?[0];

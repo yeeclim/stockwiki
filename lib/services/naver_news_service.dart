@@ -12,7 +12,7 @@ class NaverNewsService {
 
     try {
       final String baseUrl = Uri.base.origin;
-      final uri = Uri.parse('$baseUrl/api/naver_news_python');
+      final uri = Uri.parse('$baseUrl/api/news?source=naver');
       
       debugPrint('네이버 뉴스 API 호출: $keyword, maxResults: $maxResults');
       

@@ -94,8 +94,8 @@ class _SilverWidgetState extends State<SilverWidget> {
     try {
       // 병렬로 여러 Yahoo Finance 엔드포인트 시도
       final urls = [
-        '/api/commodity-price?symbol=SI=F',
-        '/api/commodity-price?symbol=XAGUSD=X',
+        '/api/utils?type=commodity&symbol=SI=F',
+        '/api/utils?type=commodity&symbol=XAGUSD=X',
       ];
       
       final futures = urls.map((url) async {
