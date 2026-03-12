@@ -1,6 +1,7 @@
 {
   "name": "stockwiki",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "build": "echo 'Using pre-built files from build/web'"
   },
