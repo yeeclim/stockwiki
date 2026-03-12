@@ -221,7 +221,7 @@ class NewsService {
   static Future<List<News>> _fetchFromMkRss(String baseUrl, String keyword) async {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final uri = Uri.parse('$baseUrl/api/mk_stock_rss?t=$timestamp');
+      final uri = Uri.parse('$baseUrl/api/news?source=mk_rss&t=$timestamp');
       final response = await http.get(uri, headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -265,7 +265,7 @@ class NewsService {
     try {
       final String baseUrl = Uri.base.origin;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final uri = Uri.parse('$baseUrl/api/daum_news_simple?t=$timestamp');
+      final uri = Uri.parse('$baseUrl/api/news?source=daum&t=$timestamp');
       
       final response = await http.post(
         uri,

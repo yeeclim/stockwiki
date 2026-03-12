@@ -100,7 +100,7 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     final apiBaseUrl = isLocalDev ? 'http://localhost:3000' : baseUrl;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     
-    return '$apiBaseUrl/api/chart-proxy?symbol=${widget.symbol}&period=$periodParam&isKorean=$isKorean&cb=$timestamp';
+    return '$apiBaseUrl/api/utils?type=chart&symbol=${widget.symbol}&period=$periodParam&isKorean=$isKorean&cb=$timestamp';
   }
 
   @override

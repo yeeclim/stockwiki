@@ -71,7 +71,7 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
 
   Future<void> _fetchIndex() async {
     try {
-      final uri = Uri.parse('$_baseUrl/api/fear-greed-stock');
+      final uri = Uri.parse('$_baseUrl/api/utils?type=fear-greed');
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
