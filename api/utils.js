@@ -13,21 +13,17 @@ export default async function handler(req, res) {
         return;
     }
 
-    const { type } = req.query;
-
     try {
-        if (type === 'chart') {
-            return await handleChartProxy(req, res);
-        } else if (type === 'commodity') {
-            return await handleCommodityPrice(req, res);
-        } else if (type === 'fear-greed') {
-            return await handleFearGreed(req, res);
-        } else {
-            res.status(400).json({ error: '유효하지 않은 유틸리티 타입입니다.' });
-        }
+        const { type } = req.query;
+
+        if (type === 'chart') return await handleChartProxy(req, res);
+        if (type === 'commodity') return await handleCommodityPrice(req, res);
+        if (type === 'fear-greed') return await handleFearGreed(req, res);
+
+        return res.status(400).json({ error: 'Invalid utility type' });
     } catch (error) {
-        console.error('Utils API 오류:', error);
-        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+        console.error('Utils API Error:', error);
+        return res.status(200).json({ success: false, error: 'Internal Server Error', fallback: true });
     }
 }
 
