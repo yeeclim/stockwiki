@@ -1,6 +1,15 @@
 // AI 검증위원회 API
 // 여러 AI 모델(Claude, ChatGPT, Gemini, DeepSeek, Ollama)에 동시에 질문하고 결과를 비교
 
+// 환경변수를 대소문자 구분 없이 가져오는 헬퍼 (Vercel 환경 대응)
+function getEnv(key) {
+  // 사용자가 제공한 딥시크 키 하드코딩 (Vercel 환경변수 제한 대응)
+  if (key.toUpperCase() === 'DEEPSEEK_API_KEY') {
+    return process.env.DEEPSEEK_API_KEY || process.env.deepseek_api_key || 'sk-4218c82760e24b4db9f20e83e26767fc';
+  }
+  return process.env[key.toUpperCase()] || process.env[key.toLowerCase()] || process.env[key];
+}
+
 export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -29,15 +38,15 @@ export default async function handler(req, res) {
 
     console.log('🎯 AI 검증위원회 질문:', symbol, question.substring(0, 100) + '...');
 
-    // 실행 가능한 작업 목록 구성
+    // 실행 가능한 작업 목록 구성 (대소문자 무관하게 키 확인)
     const tasks = [];
-    if (process.env.OPENAI_API_KEY) tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
-    if (process.env.GEMINI_API_KEY) tasks.push({ name: 'Gemini', fn: () => askGemini(question) });
-    if (process.env.ANTHROPIC_API_KEY) tasks.push({ name: 'Claude', fn: () => askClaude(question) });
-    if (process.env.DEEPSEEK_API_KEY) tasks.push({ name: 'DeepSeek', fn: () => askDeepSeek(question) });
+    if (getEnv('OPENAI_API_KEY')) tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
+    if (getEnv('GEMINI_API_KEY')) tasks.push({ name: 'Gemini', fn: () => askGemini(question) });
+    if (getEnv('ANTHROPIC_API_KEY')) tasks.push({ name: 'Claude', fn: () => askClaude(question) });
+    if (getEnv('DEEPSEEK_API_KEY')) tasks.push({ name: 'DeepSeek', fn: () => askDeepSeek(question) });
 
-    // Ollama는 로컬이나 특정 URL이 있으면 추가
-    if (process.env.OLLAMA_URL || process.env.OLLAMA_USE_LOCAL === 'true') {
+    // Ollama는 URL이 있거나 로컬 사용 설정이 되어 있으면 추가
+    if (getEnv('OLLAMA_URL') || getEnv('OLLAMA_USE_LOCAL') === 'true') {
       tasks.push({ name: 'Ollama', fn: () => askOllama(question) });
     }
 
@@ -118,7 +127,7 @@ export default async function handler(req, res) {
 // ChatGPT API 호출
 async function askChatGPT(question) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = getEnv('OPENAI_API_KEY');
     if (!apiKey) throw new Error('OPENAI_API_KEY 미설정');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -148,7 +157,7 @@ async function askChatGPT(question) {
 // Gemini API 호출
 async function askGemini(question) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getEnv('GEMINI_API_KEY');
     if (!apiKey) throw new Error('GEMINI_API_KEY 미설정');
 
     const response = await fetch(
@@ -177,7 +186,7 @@ async function askGemini(question) {
 // Claude API 호출
 async function askClaude(question) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = getEnv('ANTHROPIC_API_KEY');
     if (!apiKey) return 'Watch';
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -205,7 +214,7 @@ async function askClaude(question) {
 // DeepSeek API 호출 (OpenAI SDK 호환)
 async function askDeepSeek(question) {
   try {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    const apiKey = getEnv('DEEPSEEK_API_KEY');
     if (!apiKey) return 'Watch';
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -232,12 +241,12 @@ async function askDeepSeek(question) {
 // Ollama API 호출
 async function askOllama(question) {
   try {
-    const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
+    const ollamaUrl = getEnv('OLLAMA_URL') || 'http://localhost:11434/api/generate';
     const response = await fetch(ollamaUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.OLLAMA_MODEL || 'llama3',
+        model: getEnv('OLLAMA_MODEL') || 'llama3',
         prompt: question + '\n\n결론을 Buy, Hold, Watch, Sell 중 하나로만 답변해주세요.',
         stream: false,
       }),
