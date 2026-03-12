@@ -33,8 +33,9 @@ class _WtiWidgetState extends State<WtiWidget> {
       
       if (cachedPrice != null && cacheTime != null) {
         final now = DateTime.now().millisecondsSinceEpoch;
-        // 10분 이내 캐시된 데이터가 있으면 사용
-        if (now - cacheTime < 10 * 60 * 1000) {
+        // 10분 이내 캐시된 데이터가 있고, 'Fallback'이 포함되지 않은 경우만 사용
+        if (now - cacheTime < 10 * 60 * 1000 && 
+            (cachedDate == null || !cachedDate.contains('Fallback'))) {
           setState(() {
             _wtiPrice = cachedPrice;
             _date = cachedDate;
@@ -74,16 +75,12 @@ class _WtiWidgetState extends State<WtiWidget> {
         return;
       }
       
-      // API 실패 시 폴백 가격 사용
-      final fallbackPrice = _getFallbackPrice();
-      if (fallbackPrice > 0) {
-        setState(() {
-          _wtiPrice = fallbackPrice;
-          _date = 'Mar 2026 Average (Fallback)';
-          _isLoading = false;
-        });
-        return;
-      }
+      // API 실패 시
+      setState(() {
+        _error = '데이터 로드 실패';
+        _isLoading = false;
+      });
+      return;
     } catch (e) {
       // 모든 시도 실패 시
     }
@@ -100,10 +97,7 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       // Yahoo Finance API 사용 (더 안정적)
       final response = await http.get(
-        Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/CL=F'),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
+        Uri.parse('/api/commodity-price?symbol=CL=F'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -132,7 +126,7 @@ class _WtiWidgetState extends State<WtiWidget> {
   Future<Map<String, dynamic>?> _tryYahooFinance() async {
     try {
       final response = await http.get(
-        Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/CL=F'),
+        Uri.parse('/api/commodity-price?symbol=CL=F'),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
@@ -219,10 +213,6 @@ class _WtiWidgetState extends State<WtiWidget> {
     return null;
   }
 
-  // 폴백 가격 (2026년 3월 기준 유가 반영)
-  double _getFallbackPrice() {
-    return 114.63; // USD per barrel (2026년 3월 실시간 가격 반영)
-  }
 
   @override
   Widget build(BuildContext context) {
