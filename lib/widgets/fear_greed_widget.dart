@@ -27,6 +27,9 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
   String get _baseUrl {
     try {
       final origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        return 'http://localhost:3000';
+      }
       return origin;
     } catch (e) {
       return 'https://stockwiki.vercel.app';

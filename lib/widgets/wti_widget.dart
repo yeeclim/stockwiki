@@ -93,11 +93,22 @@ class _WtiWidgetState extends State<WtiWidget> {
     });
   }
 
+  String get _baseUrl {
+    try {
+      final origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        return 'http://localhost:3000';
+      }
+      return origin;
+    } catch (e) {
+      return 'https://stockwiki.vercel.app';
+    }
+  }
+
   Future<Map<String, dynamic>?> _trySimpleAPI() async {
     try {
-      final baseUrl = Uri.base.origin;
       final response = await http.get(
-        Uri.parse('$baseUrl/api/utils?type=commodity&symbol=CL=F'),
+        Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=CL=F'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -126,7 +137,7 @@ class _WtiWidgetState extends State<WtiWidget> {
   Future<Map<String, dynamic>?> _tryYahooFinance() async {
     try {
       final response = await http.get(
-        Uri.parse('/api/utils?type=commodity&symbol=CL=F'),
+        Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=CL=F'),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
@@ -186,7 +197,7 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       // Proxy 사용
       final response = await http.get(
-        Uri.parse('/api/utils?type=commodity&symbol=BZ=F'),
+        Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=BZ=F'),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {

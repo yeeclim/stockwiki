@@ -55,10 +55,21 @@ class _BtcWidgetState extends State<BtcWidget> {
     }
   }
 
+  String get _baseUrl {
+    try {
+      final origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        return 'http://localhost:3000';
+      }
+      return origin;
+    } catch (e) {
+      return 'https://stockwiki.vercel.app';
+    }
+  }
+
   Future<void> _fetchPrice() async {
     try {
-      final baseUrl = Uri.base.origin;
-      final res = await http.get(Uri.parse('$baseUrl/api/utils?type=commodity&symbol=BTC'));
+      final res = await http.get(Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=BTC'));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final result = data['chart']?['result']?[0];

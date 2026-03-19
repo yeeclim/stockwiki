@@ -55,27 +55,44 @@ class _UsdKrwWidgetState extends State<UsdKrwWidget> {
     }
   }
 
+  String get _baseUrl {
+    try {
+      final origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        return 'http://localhost:3000';
+      }
+      return origin;
+    } catch (e) {
+      return 'https://stockwiki.vercel.app';
+    }
+  }
+
   Future<void> _fetchUsdKrw() async {
-    const apiKey = 'f1767aef0a23b6402850f3d9';
-    final url = Uri.parse('https://v6.exchangerate-api.com/v6/$apiKey/latest/USD');
+    final url = Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=KRW=X');
 
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final rate = data['conversion_rates']?['KRW'];
-
-        if (rate != null && rate is num) {
-          final rateValue = rate.toDouble();
-          setState(() {
-            _usdKrw = rateValue;
-            _isLoading = false;
-          });
-          await _cacheRate(rateValue); // 환율 캐시 저장
-        } else {
-          throw Exception('API 응답에 KRW 없음');
+        final result = data['chart']?['result']?[0];
+        
+        if (result != null) {
+          final meta = result['meta'];
+          if (meta != null) {
+            final rate = meta['regularMarketPrice'] ?? meta['previousClose'];
+            if (rate != null) {
+              final rateValue = rate.toDouble();
+              setState(() {
+                _usdKrw = rateValue;
+                _isLoading = false;
+              });
+              await _cacheRate(rateValue); // 환율 캐시 저장
+              return;
+            }
+          }
         }
+        throw Exception('API 응답에 가격 정보 없음');
       } else {
         throw Exception('HTTP 오류: ${response.statusCode}');
       }
