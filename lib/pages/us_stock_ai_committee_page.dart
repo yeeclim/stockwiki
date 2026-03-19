@@ -809,8 +809,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
                   children: rec.models.map((model) => _buildVotingPlate(model)).toList(),
                 ),
 
@@ -878,7 +880,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     return Tooltip(
       message: model.reasoning,
       padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       triggerMode: TooltipTriggerMode.tap,
       showDuration: const Duration(seconds: 5),
       child: Column(
