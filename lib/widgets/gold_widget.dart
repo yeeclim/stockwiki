@@ -54,11 +54,22 @@ class _GoldWidgetState extends State<GoldWidget> {
       // 캐시 저장 실패 시 무시
     }
   }
-
+  String get _baseUrl {
     try {
-      final baseUrl = Uri.base.origin;
+      final origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        return 'http://localhost:3000';
+      }
+      return origin;
+    } catch (e) {
+      return 'https://stockwiki.vercel.app';
+    }
+  }
+
+  Future<void> _fetchGoldPrice() async {
+    try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/utils?type=commodity&symbol=GOLD'),
+        Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=GOLD'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {

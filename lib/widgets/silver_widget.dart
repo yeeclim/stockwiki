@@ -89,14 +89,25 @@ class _SilverWidgetState extends State<SilverWidget> {
     });
   }
 
+  String get _baseUrl {
+    try {
+      final origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        return 'http://localhost:3000';
+      }
+      return origin;
+    } catch (e) {
+      return 'https://stockwiki.vercel.app';
+    }
+  }
+
   // Yahoo Finance (무료, API 키 불필요)
   Future<double?> _tryYahooFinance() async {
     try {
-      final baseUrl = Uri.base.origin;
       // 병렬로 여러 Yahoo Finance 엔드포인트 시도
       final urls = [
-        '$baseUrl/api/utils?type=commodity&symbol=SI=F',
-        '$baseUrl/api/utils?type=commodity&symbol=XAGUSD=X',
+        '$_baseUrl/api/utils?type=commodity&symbol=SI=F',
+        '$_baseUrl/api/utils?type=commodity&symbol=XAGUSD=X',
       ];
       
       final futures = urls.map((url) async {
