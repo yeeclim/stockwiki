@@ -936,6 +936,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       case 'hold':
       case '보유':
         return Icons.remove;
+      case 'error':
+        return Icons.warning_amber_rounded;
       default:
         return Icons.question_mark;
     }
@@ -962,6 +964,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       case 'hold':
       case '보유':
         return Colors.blue;
+      case 'error':
+        return Colors.grey.shade400;
       default:
         return Colors.grey;
     }

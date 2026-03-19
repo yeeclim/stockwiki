@@ -40,17 +40,13 @@ export default async function handler(req, res) {
 
     console.log('🎯 AI 검증위원회 질문:', symbol, question.substring(0, 100) + '...');
 
-    // 실행 가능한 작업 목록 구성 (대소문자 무관하게 키 확인)
+    // 항상 5개의 작업을 실행하도록 변경 (UI에서 자리를 차지하게 하기 위함)
     const tasks = [];
-    if (getEnv('OPENAI_API_KEY')) tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
-    if (getEnv('GEMINI_API_KEY')) tasks.push({ name: 'Gemini', fn: () => askGemini(question) });
-    if (getEnv('ANTHROPIC_API_KEY')) tasks.push({ name: 'Claude', fn: () => askClaude(question) });
-    if (getEnv('DEEPSEEK_API_KEY')) tasks.push({ name: 'DeepSeek', fn: () => askDeepSeek(question) });
-
-    // Ollama는 URL이 있거나 로컬 사용 설정이 되어 있으면 추가
-    if (getEnv('OLLAMA_URL') || getEnv('OLLAMA_USE_LOCAL') === 'true') {
-      tasks.push({ name: 'Ollama', fn: () => askOllama(question) });
-    }
+    tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
+    tasks.push({ name: 'Gemini', fn: () => askGemini(question) });
+    tasks.push({ name: 'Claude', fn: () => askClaude(question) });
+    tasks.push({ name: 'DeepSeek', fn: () => askDeepSeek(question) });
+    tasks.push({ name: 'Ollama', fn: () => askOllama(question) });
 
     if (tasks.length === 0) {
       // 기본적으로 서비스가 가능하도록 최소 1개(OpenAI 또는 Gemini)는 환경변수 설정을 권고하지만
@@ -76,7 +72,14 @@ export default async function handler(req, res) {
           fullResponse: rawResponse,
         });
       } else {
-        console.error(`❌ ${taskName} 실패:`, result.reason || 'No response');
+        const errorMessage = result.reason?.message || '응답 실패';
+        console.error(`❌ ${taskName} 실패:`, errorMessage);
+        models.push({
+          modelName: taskName,
+          recommendation: 'Error',
+          reasoning: errorMessage,
+          fullResponse: errorMessage,
+        });
       }
     });
 
@@ -274,20 +277,23 @@ function parseRecommendation(response) {
 
 // 검증도 계산
 function calculateVerification(models) {
-  if (models.length === 0) return { score: 0, agreement: '오류' };
+  const validModels = models.filter(m => m.recommendation !== 'Error');
+  if (validModels.length === 0) return { score: 0, agreement: '오류' };
+
   const counts = {};
-  models.forEach(m => counts[m.recommendation] = (counts[m.recommendation] || 0) + 1);
+  validModels.forEach(m => counts[m.recommendation] = (counts[m.recommendation] || 0) + 1);
   const maxCount = Math.max(...Object.values(counts));
-  const rate = (maxCount / models.length) * 100;
+  const rate = (maxCount / validModels.length) * 100;
   let agreement = rate >= 80 ? '일치' : (rate >= 60 ? '높음' : (rate >= 40 ? '보통' : '낮음'));
   return { score: Math.round(rate), agreement };
 }
 
 // 최종 추천 결정
 function determineFinalRecommendation(models) {
-  if (models.length === 0) return 'Watch';
+  const validModels = models.filter(m => m.recommendation !== 'Error');
+  if (validModels.length === 0) return 'Watch';
   const counts = {};
-  models.forEach(m => counts[m.recommendation] = (counts[m.recommendation] || 0) + 1);
+  validModels.forEach(m => counts[m.recommendation] = (counts[m.recommendation] || 0) + 1);
   return Object.entries(counts).reduce((a, b) => b[1] > a[1] ? b : a)[0];
 }
 
