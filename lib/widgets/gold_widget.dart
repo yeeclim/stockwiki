@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/exchange_rate_service.dart';
 
 class GoldWidget extends StatefulWidget {
   const GoldWidget({super.key});
@@ -12,6 +13,7 @@ class GoldWidget extends StatefulWidget {
 
 class _GoldWidgetState extends State<GoldWidget> {
   double? _goldPrice;
+  double? _usdKrwRate;
   bool _isLoading = true;
   String? _error;
 
@@ -20,6 +22,16 @@ class _GoldWidgetState extends State<GoldWidget> {
     super.initState();
     _loadCachedPrice();
     _fetchGoldPrice();
+    _fetchExchangeRate();
+  }
+
+  Future<void> _fetchExchangeRate() async {
+    final rate = await ExchangeRateService.getUsdToKrw();
+    if (mounted) {
+      setState(() {
+        _usdKrwRate = rate;
+      });
+    }
   }
 
   // 캐시된 가격 로드
@@ -101,13 +113,11 @@ class _GoldWidgetState extends State<GoldWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 고정 환율 사용 또는 외부에서 주입 가능
-    const double krwPerUsd = 1383.66; // USD to KRW
     const double ozToDon = 1 / 7.5599; // 1 oz = 7.5599 돈
 
     double? krwPerDon;
-    if (_goldPrice != null) {
-      krwPerDon = _goldPrice! * krwPerUsd * ozToDon;
+    if (_goldPrice != null && _usdKrwRate != null && _usdKrwRate! > 0) {
+      krwPerDon = _goldPrice! * _usdKrwRate! * ozToDon;
     }
 
     final theme = Theme.of(context);

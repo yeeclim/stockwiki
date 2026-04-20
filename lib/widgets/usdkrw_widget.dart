@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/exchange_rate_service.dart';
 
 class UsdKrwWidget extends StatefulWidget {
   const UsdKrwWidget({super.key});
@@ -18,89 +17,30 @@ class _UsdKrwWidgetState extends State<UsdKrwWidget> {
   @override
   void initState() {
     super.initState();
-    _loadCachedRate();
     _fetchUsdKrw();
   }
 
-  // 캐시된 환율 로드
-  Future<void> _loadCachedRate() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedRate = prefs.getDouble('usd_krw_rate');
-      final cacheTime = prefs.getInt('usd_krw_cache_time');
-      
-      if (cachedRate != null && cacheTime != null) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        // 10분 이내 캐시된 데이터가 있으면 사용
-        if (now - cacheTime < 10 * 60 * 1000) {
-          setState(() {
-            _usdKrw = cachedRate;
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      // 캐시 로드 실패 시 무시
-    }
-  }
-
-  // 환율 캐시 저장
-  Future<void> _cacheRate(double rate) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('usd_krw_rate', rate);
-      await prefs.setInt('usd_krw_cache_time', DateTime.now().millisecondsSinceEpoch);
-    } catch (e) {
-      // 캐시 저장 실패 시 무시
-    }
-  }
-
-  String get _baseUrl {
-    try {
-      final origin = Uri.base.origin;
-      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
-        return 'http://localhost:3000';
-      }
-      return origin;
-    } catch (e) {
-      return 'https://stockwiki.vercel.app';
-    }
-  }
-
   Future<void> _fetchUsdKrw() async {
-    final url = Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=KRW=X');
-
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = data['chart']?['result']?[0];
-        
-        if (result != null) {
-          final meta = result['meta'];
-          if (meta != null) {
-            final rate = meta['regularMarketPrice'] ?? meta['previousClose'];
-            if (rate != null) {
-              final rateValue = rate.toDouble();
-              setState(() {
-                _usdKrw = rateValue;
-                _isLoading = false;
-              });
-              await _cacheRate(rateValue); // 환율 캐시 저장
-              return;
-            }
+      final rate = await ExchangeRateService.getUsdToKrw();
+      if (mounted) {
+        setState(() {
+          if (rate != null) {
+            _usdKrw = rate;
+            _isLoading = false;
+          } else {
+            _error = '데이터 없음';
+            _isLoading = false;
           }
-        }
-        throw Exception('API 응답에 가격 정보 없음');
-      } else {
-        throw Exception('HTTP 오류: ${response.statusCode}');
+        });
       }
     } catch (e) {
-      setState(() {
-        _error = '데이터 없음';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = '데이터 로드 실패';
+          _isLoading = false;
+        });
+      }
     }
   }
 
