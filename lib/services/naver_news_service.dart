@@ -1,9 +1,9 @@
 // lib/services/naver_news_service.dart
 
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/news.dart';
+import 'http_client.dart';
 
 class NaverNewsService {
   /// 네이버 뉴스 크롤링을 통해 뉴스를 검색합니다
@@ -16,16 +16,12 @@ class NaverNewsService {
       
       debugPrint('네이버 뉴스 API 호출: $keyword, maxResults: $maxResults');
       
-      final response = await http.post(
+      final response = await postWithRetry(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'keyword': keyword,
-          'max_results': maxResults,
-        }),
-      ).timeout(const Duration(seconds: 3));
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'keyword': keyword, 'max_results': maxResults}),
+        timeout: const Duration(seconds: 6),
+      );
 
       debugPrint('네이버 뉴스 API 응답 상태: ${response.statusCode}');
       

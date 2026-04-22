@@ -1,24 +1,23 @@
-// import fetch from 'node-fetch'; // Vercel에서는 내장 fetch 사용
+import { checkRateLimit, getClientIp, validateSymbol, fail } from './shared.js';
 
 export default async function handler(req, res) {
-  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/json');
 
-  const { symbol } = req.query;
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
+  if (!checkRateLimit(getClientIp(req), 60, 60_000)) {
+    return fail(res, 429, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+  }
+
+  const symbol = validateSymbol(req.query.symbol);
   if (!symbol) {
-    return res.status(400).json({
-      success: false,
-      error: '종목 코드가 필요합니다'
-    });
+    return fail(res, 400, '유효한 종목 코드가 필요합니다 (영문/숫자/점/하이픈, 최대 20자)');
   }
 
   try {
-    console.log(`종목 ${symbol} 크롤링 시작...`);
-
     // 네이버 증권에서 데이터 크롤링
     const stockData = await fetchStockData(symbol);
 
@@ -56,8 +55,6 @@ async function fetchStockData(symbol) {
 
     for (const apiUrl of apiEndpoints) {
       try {
-        console.log(`📡 네이버 실시간 API 시도: ${apiUrl}`);
-
         const apiResponse = await fetch(apiUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -129,7 +126,6 @@ async function fetchStockData(symbol) {
                 note: '실시간 API 데이터'
               };
 
-              console.log(`✅ 실시간 API 성공: ${stockData.name} - ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)${previousClose ? ` | 전일종가: ₩${previousClose.toLocaleString()}` : ''}`);
               return stockData;
             }
           } catch (parseError) {
@@ -143,11 +139,8 @@ async function fetchStockData(symbol) {
       }
     }
 
-    console.log(`⚠️ 모든 실시간 API 실패, HTML 크롤링으로 전환`);
-
     // 2단계: HTML 크롤링 (폴백)
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
-    console.log(`🌐 네이버 증권 HTML 크롤링: ${url}`);
 
     const response = await fetch(url, {
       headers: {
@@ -161,12 +154,10 @@ async function fetchStockData(symbol) {
     });
 
     if (!response.ok) {
-      console.log(`❌ 네이버 응답 오류: ${response.status}`);
       return null;
     }
 
     const html = await response.text();
-    console.log(`📄 HTML 길이: ${html.length}`);
 
     // 종목명 추출
     const name = extractStockName(html, symbol);
@@ -175,7 +166,6 @@ async function fetchStockData(symbol) {
     const priceInfo = extractPriceInfoWithChange(html);
 
     if (!priceInfo.price) {
-      console.log('❌ 가격 정보를 찾을 수 없습니다');
       return null;
     }
 
@@ -200,7 +190,6 @@ async function fetchStockData(symbol) {
       note: 'HTML 크롤링 데이터 (거의 실시간)'
     };
 
-    console.log(`✅ HTML 크롤링 성공: ${stockData.name} - ₩${stockData.price.toLocaleString()} (${stockData.changePercent >= 0 ? '+' : ''}${stockData.changePercent.toFixed(2)}%)${previousClose ? ` | 전일종가: ₩${previousClose.toLocaleString()}` : ''}`);
     return stockData;
 
   } catch (error) {
@@ -233,7 +222,6 @@ function extractPriceInfoWithChange(html) {
       const closeNum = parseInt(closeStr);
       if (!isNaN(closeNum) && closeNum > 0 && closeNum < 10000000) { // 합리적인 범위
         previousClose = closeNum;
-        console.log(`📅 전일 종가 추출 성공: ₩${previousClose.toLocaleString()}`);
         break;
       }
     }
@@ -242,7 +230,6 @@ function extractPriceInfoWithChange(html) {
   // 전일 종가가 추출되지 않았고 변동가가 있으면 계산
   if (!previousClose && priceInfo.price && priceInfo.change !== undefined && priceInfo.change !== null && priceInfo.change !== 0) {
     previousClose = priceInfo.price - priceInfo.change;
-    console.log(`📅 전일 종가 계산: ₩${previousClose.toLocaleString()} (현재가 ${priceInfo.price.toLocaleString()} - 변동가 ${priceInfo.change.toLocaleString()})`);
   }
 
   // 변동률 추출 (네이버 증권 실제 HTML 구조 기반)
@@ -271,7 +258,6 @@ function extractPriceInfoWithChange(html) {
       const percent = parseFloat(match[1]);
       if (!isNaN(percent) && Math.abs(percent) < 30) { // 합리적인 범위 (-30% ~ +30%)
         changePercent = percent;
-        console.log(`📊 변동률 추출 성공: ${changePercent}%`);
         break;
       }
     }
@@ -293,7 +279,6 @@ function extractPriceInfoWithChange(html) {
       const changeNum = parseInt(changeStr);
       if (!isNaN(changeNum) && Math.abs(changeNum) < priceInfo.price * 0.3) { // 합리적인 범위
         change = changeNum;
-        console.log(`💰 변동가 추출 성공: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원`);
         break;
       }
     }
@@ -302,7 +287,6 @@ function extractPriceInfoWithChange(html) {
   // 변동가가 추출되지 않았고 변동률이 있으면 계산
   if (change === 0 && changePercent !== 0 && priceInfo.price) {
     change = Math.round(priceInfo.price * changePercent / 100);
-    console.log(`💰 변동가 계산: ${change >= 0 ? '+' : ''}${change.toLocaleString()}원 (변동률 ${changePercent}% 기준)`);
   }
 
   return {
@@ -350,12 +334,10 @@ function extractStockName(html, symbol) {
     const match = html.match(pattern);
     if (match && match[1] && match[1].trim() && match[1] !== '최근조회') {
       const name = match[1].trim();
-      console.log(`종목명 추출 성공: ${name}`);
       return name;
     }
   }
 
-  console.log('종목명 추출 실패 - 기본값 사용');
   return symbol;
 }
 
@@ -420,7 +402,6 @@ function extractPriceInfo(html) {
       const priceNum = parseInt(priceStr);
       if (priceNum && priceNum > 0 && priceNum < 10000000) { // 합리적인 가격 범위
         price = priceNum;
-        console.log(`가격 추출 성공: ${price}`);
         break;
       }
     }
@@ -441,7 +422,6 @@ function extractPriceInfo(html) {
       const volumeNum = parseInt(volumeStr);
       if (volumeNum && volumeNum > 1000) { // 합리적인 거래량 범위
         volume = volumeNum;
-        console.log(`거래량 추출 성공: ${volume}`);
         break;
       }
     }
@@ -463,12 +443,10 @@ function extractPriceInfo(html) {
       if (marketCapStr.includes('억')) {
         const value = parseFloat(marketCapStr.replace(/[억,]/g, ''));
         marketCap = Math.round(value * 100000000);
-        console.log(`시가총액 추출 성공: ${marketCap}`);
         break;
       } else if (marketCapStr.includes('조')) {
         const value = parseFloat(marketCapStr.replace(/[조,]/g, ''));
         marketCap = Math.round(value * 1000000000000);
-        console.log(`시가총액 추출 성공: ${marketCap}`);
         break;
       }
     }

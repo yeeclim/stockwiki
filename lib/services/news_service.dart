@@ -65,33 +65,21 @@ class NewsService {
       // 2. 뉴스가 부족하면 추가 뉴스 소스로 보완
       if (allNews.length < _maxResults) {
         final String baseUrl = Uri.base.origin;
-        
+
         if (isKoreanStock) {
           // 국내주식: 국내 뉴스 API만 사용
           try {
             final mkRssNews = await _fetchFromMkRss(baseUrl, stockName);
             if (mkRssNews.isNotEmpty) {
               allNews.addAll(mkRssNews);
-              debugPrint('MK Stock RSS 성공: ${mkRssNews.length}개');
             }
-          } catch (e) {
-            debugPrint('MK Stock RSS 실패: $e');
-          }
+          } catch (_) {}
         } else {
-          // 미국주식: 해외 뉴스 API들을 병렬로 호출 (3초 타임아웃)
+          // 미국주식: 백엔드 프록시를 통해 외부 뉴스 조회
           try {
-            final results = await Future.wait([
-              _fetchFromNewsData(stockName),
-              _fetchFromGNews(stockName),
-              _fetchFromMediaStack(stockName),
-            ], eagerError: false).timeout(const Duration(seconds: 3));
-
-            for (final result in results) {
-              allNews.addAll(result);
-            }
-          } catch (e) {
-            debugPrint('미국 뉴스 API 타임아웃: $e');
-          }
+            final proxyNews = await _fetchFromNewsProxy(baseUrl, stockName);
+            allNews.addAll(proxyNews);
+          } catch (_) {}
         }
       }
 
@@ -119,102 +107,25 @@ class NewsService {
     }
   }
 
-  static Future<List<News>> _fetchFromNewsData(String keyword) async {
+  static Future<List<News>> _fetchFromNewsProxy(String baseUrl, String keyword) async {
     try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final uri = Uri.parse(
-          'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword&language=ko,en&country=kr&t=$timestamp');
-      final response = await http.get(uri, headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }).timeout(const Duration(seconds: 3));
-      
+      final encoded = Uri.encodeQueryComponent(keyword);
+      final uri = Uri.parse('$baseUrl/api/news-search?keyword=$encoded&lang=ko,en');
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['results'] as List<dynamic>? ?? [];
-        
-        debugPrint('NewsData.io: ${results.length}개 결과');
-        
-        return results.map<News>((item) => News.fromJson({
-              'title': item['title']?.toString() ?? '',
-              'description': item['description']?.toString() ?? '',
-              'link': item['link']?.toString() ?? '',
-              'source': 'NewsData.io',
-              'publishedAt': item['pubDate']?.toString(),
-            })).toList();
-      } else {
-        debugPrint('NewsData.io HTTP 오류: ${response.statusCode}');
+        if (jsonData['success'] == true) {
+          final results = jsonData['results'] as List<dynamic>? ?? [];
+          return results.map<News>((item) => News.fromJson({
+                'title': item['title']?.toString() ?? '',
+                'description': item['description']?.toString() ?? '',
+                'link': item['link']?.toString() ?? '',
+                'source': item['source']?.toString() ?? 'News',
+                'publishedAt': item['publishedAt']?.toString(),
+              })).toList();
+        }
       }
-    } catch (e) {
-      debugPrint('NewsData.io 오류: $e');
-    }
-    return [];
-  }
-
-  static Future<List<News>> _fetchFromGNews(String keyword) async {
-    try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final uri = Uri.parse(
-          'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword&lang=ko,en&country=kr&t=$timestamp');
-      final response = await http.get(uri, headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }).timeout(const Duration(seconds: 3));
-      
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['articles'] as List<dynamic>? ?? [];
-        
-        debugPrint('GNews: ${results.length}개 결과');
-        
-        return results.map<News>((item) => News.fromJson({
-              'title': item['title']?.toString() ?? '',
-              'description': item['description']?.toString() ?? '',
-              'link': item['url']?.toString() ?? '',
-              'source': 'GNews',
-              'publishedAt': item['publishedAt']?.toString(),
-            })).toList();
-      } else {
-        debugPrint('GNews HTTP 오류: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('GNews 오류: $e');
-    }
-    return [];
-  }
-
-  static Future<List<News>> _fetchFromMediaStack(String keyword) async {
-    try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final uri = Uri.parse(
-          'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword&languages=ko,en&countries=kr&timestamp=$timestamp');
-      final response = await http.get(uri, headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }).timeout(const Duration(seconds: 3));
-      
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['data'] as List<dynamic>? ?? [];
-        
-        debugPrint('MediaStack: ${results.length}개 결과');
-        
-        return results.map<News>((item) => News.fromJson({
-              'title': item['title']?.toString() ?? '',
-              'description': item['description']?.toString() ?? '',
-              'link': item['url']?.toString() ?? '',
-              'source': 'MediaStack',
-              'publishedAt': item['published_at']?.toString(),
-            })).toList();
-      } else {
-        debugPrint('MediaStack HTTP 오류: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('MediaStack 오류: $e');
-    }
+    } catch (_) {}
     return [];
   }
 

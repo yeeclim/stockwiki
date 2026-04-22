@@ -1,26 +1,21 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'dart:math';
 import '../models/stock.dart';
 import '../models/news.dart';
 import 'cache_service.dart';
+import 'http_client.dart';
 
 class FMPService {
   // 환경변수에서 API 키 가져오기 (없으면 기본값 사용)
   static String get _apiKey {
-    // Flutter 웹에서는 환경변수 접근이 제한적이므로
-    // 실제 배포 시에는 서버 사이드에서 처리하거나
-    // Vercel 환경변수 등을 활용해야 함
     const envKey = String.fromEnvironment('FMP_API_KEY');
-    return envKey.isNotEmpty ? envKey : '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh';
+    return envKey;
   }
   static const String _baseUrl = 'https://financialmodelingprep.com/api/v3';
-  // CORS Proxy 제거 (FMP API 직접 호출 시도)
-  // static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
-  
+
   // Finnhub API (Fallback)
-  static const String _finnhubApiKey = 'd3ecam1r01qrd38tq1c0d3ecam1r01qrd38tq1cg';
+  static const String _finnhubApiKey = String.fromEnvironment('FINNHUB_API_KEY');
   static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
 
   /// 키워드 기반 검색 후 실시간 가격 정보 추가
@@ -39,7 +34,7 @@ class FMPService {
       
       // 1. FMP 검색 시도
       final searchUrl = Uri.parse('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp');
-      final searchRes = await http.get(searchUrl);
+      final searchRes = await getWithRetry(searchUrl);
 
       if (searchRes.statusCode == 200) {
         final searchData = json.decode(searchRes.body);
@@ -56,7 +51,7 @@ class FMPService {
           if (symbols.isNotEmpty) {
             // 심볼 기반으로 실시간 정보 조회
             final quoteUrl = Uri.parse('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp');
-            final quoteRes = await http.get(quoteUrl);
+            final quoteRes = await getWithRetry(quoteUrl);
 
             if (quoteRes.statusCode == 200) {
               final quoteData = json.decode(quoteRes.body);
@@ -83,7 +78,7 @@ class FMPService {
   static Future<List<Stock>> _fetchStocksFinnhub(String keyword) async {
     try {
       final searchUrl = Uri.parse('$_finnhubBaseUrl/search?q=$keyword&token=$_finnhubApiKey');
-      final response = await http.get(searchUrl);
+      final response = await getWithRetry(searchUrl);
       
       if (response.statusCode != 200) return [];
       
@@ -118,7 +113,7 @@ class FMPService {
     try {
       // 1. Quote (Price)
       final quoteUrl = Uri.parse('$_finnhubBaseUrl/quote?symbol=$symbol&token=$_finnhubApiKey');
-      final quoteRes = await http.get(quoteUrl);
+      final quoteRes = await getWithRetry(quoteUrl);
       
       if (quoteRes.statusCode != 200) return null;
       final quote = json.decode(quoteRes.body);
@@ -127,7 +122,7 @@ class FMPService {
 
       // 2. Profile (Name, MarketCap)
       final profileUrl = Uri.parse('$_finnhubBaseUrl/stock/profile2?symbol=$symbol&token=$_finnhubApiKey');
-      final profileRes = await http.get(profileUrl);
+      final profileRes = await getWithRetry(profileUrl);
       final profile = (profileRes.statusCode == 200) ? json.decode(profileRes.body) : {};
 
       return {
@@ -160,7 +155,7 @@ class FMPService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final quoteUrl = Uri.parse('$_baseUrl/quote/$symbol?apikey=$_apiKey&t=$timestamp');
       
-      final response = await http.get(quoteUrl);
+      final response = await getWithRetry(quoteUrl);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -185,7 +180,7 @@ class FMPService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final newsUrl = Uri.parse('$_baseUrl/stock_news?tickers=$symbol&limit=10&apikey=$_apiKey&t=$timestamp');
       
-      final response = await http.get(newsUrl);
+      final response = await getWithRetry(newsUrl);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -255,7 +250,7 @@ class FMPService {
       final symbols = majorStocks.join(',');
       final quoteUrl = Uri.parse('$_baseUrl/quote/$symbols?apikey=$_apiKey&t=$timestamp');
       
-      final quoteRes = await http.get(quoteUrl);
+      final quoteRes = await getWithRetry(quoteUrl);
       
       if (quoteRes.statusCode == 200) {
         final quoteData = json.decode(quoteRes.body);
@@ -433,7 +428,7 @@ class FMPService {
       final symbolList = symbols.take(limit).join(',');
       final quoteUrl = Uri.parse('$_baseUrl/quote/$symbolList?apikey=$_apiKey&t=$timestamp');
       
-      final quoteRes = await http.get(quoteUrl);
+      final quoteRes = await getWithRetry(quoteUrl);
       
       if (quoteRes.statusCode == 200) {
         final quoteData = json.decode(quoteRes.body);
@@ -505,7 +500,7 @@ class FMPService {
     try {
       final url = Uri.parse('$_baseUrl/historical-price-full/$symbol?apikey=$_apiKey');
       debugLog += 'Try FMP... ';
-      final response = await http.get(url);
+      final response = await getWithRetry(url);
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -538,7 +533,7 @@ class FMPService {
       final url = Uri.parse(
           '$_finnhubBaseUrl/stock/candle?symbol=$symbol&resolution=D&from=$from&to=$to&token=$_finnhubApiKey');
       
-      final response = await http.get(url);
+      final response = await getWithRetry(url);
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -585,7 +580,7 @@ class FMPService {
       try {
         debugLog += 'Try Yahoo (Proxy ${i + 1})... ';
         final proxyUrl = Uri.parse(proxies[i](yahooUrl));
-        final response = await http.get(proxyUrl);
+        final response = await getWithRetry(proxyUrl);
         
         if (response.statusCode == 200) {
           final data = json.decode(response.body);

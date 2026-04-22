@@ -63,110 +63,52 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
 
   Future<void> _fetchNewsFromAPIs(String keyword) async {
     final String baseUrl = Uri.base.origin;
-    final mkStockRssUri = Uri.parse('$baseUrl/api/mk_stock_rss');
-
-    final newsdataUri = Uri.parse(
-        'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword');
-    final gnewsUri = Uri.parse(
-        'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword');
-    final mediastackUri = Uri.parse(
-        'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword');
-
-    List<Map<String, String>> allNews = [];
+    final List<Map<String, String>> allNews = [];
 
     try {
-      debugPrint('기존 API들 호출 시작: $keyword');
-      
-      // 각 API를 개별적으로 호출하여 오류 격리
-      final futures = [
-        _fetchFromNewsData(newsdataUri),
-        _fetchFromGNews(gnewsUri),
-        _fetchFromMediaStack(mediastackUri),
-        _fetchFromMkRss(mkStockRssUri),
-      ];
-      
-      final results = await Future.wait(futures, eagerError: false);
-      
+      final results = await Future.wait([
+        _fetchFromNewsProxy(baseUrl, keyword),
+        _fetchFromMkRss(Uri.parse('$baseUrl/api/mk_stock_rss')),
+      ], eagerError: false);
+
       for (final result in results) {
         allNews.addAll(result);
       }
 
-      // 필터링 제거: API에서 받은 모든 뉴스 표시
       setState(() => _newsList = allNews);
-      debugPrint('기존 API 결과: ${allNews.length}개 (필터링 없음)');
-    } catch (e) {
-      debugPrint('API 뉴스 검색 오류: $e');
-    }
+    } catch (_) {}
   }
 
-  // 개별 API 호출 함수들
-  Future<List<Map<String, String>>> _fetchFromNewsData(Uri uri) async {
+  Future<List<Map<String, String>>> _fetchFromNewsProxy(
+      String baseUrl, String keyword) async {
     try {
-      final response = await http.get(uri);
+      final encoded = Uri.encodeQueryComponent(keyword);
+      final uri = Uri.parse('$baseUrl/api/news-search?keyword=$encoded');
+      final response =
+          await http.get(uri).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['results'] as List<dynamic>? ?? [];
-        debugPrint('NewsData.io: ${results.length}개 결과');
-        return results.map<Map<String, String>>((item) => {
-              'title': item['title']?.toString() ?? '',
-              'description': item['description']?.toString() ?? '',
-              'link': item['link']?.toString() ?? '',
-              'source': 'NewsData.io',
-            }).toList();
+        if (jsonData['success'] == true) {
+          final results = jsonData['results'] as List<dynamic>? ?? [];
+          return results.map<Map<String, String>>((item) => {
+                'title': item['title']?.toString() ?? '',
+                'description': item['description']?.toString() ?? '',
+                'link': item['link']?.toString() ?? '',
+                'source': item['source']?.toString() ?? 'News',
+              }).toList();
+        }
       }
-    } catch (e) {
-      debugPrint('NewsData.io 오류: $e');
-    }
-    return [];
-  }
-
-  Future<List<Map<String, String>>> _fetchFromGNews(Uri uri) async {
-    try {
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['articles'] as List<dynamic>? ?? [];
-        debugPrint('GNews: ${results.length}개 결과');
-        return results.map<Map<String, String>>((item) => {
-              'title': item['title']?.toString() ?? '',
-              'description': item['description']?.toString() ?? '',
-              'link': item['url']?.toString() ?? '',
-              'source': 'GNews',
-            }).toList();
-      }
-    } catch (e) {
-      debugPrint('GNews 오류: $e');
-    }
-    return [];
-  }
-
-  Future<List<Map<String, String>>> _fetchFromMediaStack(Uri uri) async {
-    try {
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['data'] as List<dynamic>? ?? [];
-        debugPrint('MediaStack: ${results.length}개 결과');
-        return results.map<Map<String, String>>((item) => {
-              'title': item['title']?.toString() ?? '',
-              'description': item['description']?.toString() ?? '',
-              'link': item['url']?.toString() ?? '',
-              'source': 'MediaStack',
-            }).toList();
-      }
-    } catch (e) {
-      debugPrint('MediaStack 오류: $e');
-    }
+    } catch (_) {}
     return [];
   }
 
   Future<List<Map<String, String>>> _fetchFromMkRss(Uri uri) async {
     try {
-      final response = await http.get(uri);
+      final response =
+          await http.get(uri).timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['results'] as List<dynamic>? ?? [];
-        debugPrint('매일경제 RSS: ${results.length}개 결과');
         return results.map<Map<String, String>>((item) => {
               'title': item['title']?.toString() ?? '',
               'description': item['summary']?.toString() ?? '',
@@ -174,10 +116,14 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
               'source': '매일경제',
             }).toList();
       }
-    } catch (e) {
-      debugPrint('매일경제 RSS 오류: $e');
-    }
+    } catch (_) {}
     return [];
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override

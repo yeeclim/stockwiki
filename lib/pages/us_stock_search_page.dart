@@ -46,6 +46,12 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
