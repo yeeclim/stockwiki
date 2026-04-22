@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:stockwiki/providers/bookmark_provider.dart';
 import 'package:stockwiki/theme/app_theme.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
 import 'package:stockwiki/widgets/usdkrw_widget.dart';
@@ -21,7 +23,12 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => BookmarkProvider()..load(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

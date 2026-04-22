@@ -1,31 +1,26 @@
-// import fetch from 'node-fetch'; // Vercel에서는 내장 fetch 사용
-import fs from 'fs';
+import { readFile, access } from 'fs/promises';
 import path from 'path';
+import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './shared.js';
 
 export default async function handler(req, res) {
-  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/json');
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+
+  if (!checkRateLimit(getClientIp(req), 60, 60_000)) {
+    return fail(res, 429, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
   }
 
-  const { keyword, limit = 10 } = req.query;
-
+  const keyword = validateString(req.query.keyword, { minLen: 1, maxLen: 50 });
   if (!keyword) {
-    return res.status(400).json({
-      success: false,
-      error: '검색어가 필요합니다'
-    });
+    return fail(res, 400, '검색어가 필요합니다 (1~50자)');
   }
+  const limit = validateInt(req.query.limit, { min: 1, max: 30 }) ?? 10;
 
   try {
-    console.log(`🔍 전체 종목 검색: ${keyword}`);
-
     // 1단계: KRX 전체 데이터에서 검색
     const allStocks = await loadKRXData();
     const matchingStocks = searchInKRXData(allStocks, keyword, limit);
@@ -37,13 +32,10 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`✅ KRX 검색 결과: ${matchingStocks.length}개`);
-
     // 2단계: 실시간 가격 업데이트 시도 (모든 결과 대상, 실패 시 폴백)
     const results = await Promise.all(matchingStocks.map(async (stock) => {
       const code = stock['단축코드'];
       try {
-        console.log(`🌐 실시간 실시간 가격 시도: ${stock['한글 종목명']} (${code})`);
         const realTimeData = await fetchStockData(code, stock['시장구분']);
 
         if (realTimeData && realTimeData.price > 0) {
@@ -84,8 +76,6 @@ export default async function handler(req, res) {
       };
     }));
 
-    console.log(`🎯 최종 결과: ${results.length}개 종목`);
-
     return res.status(200).json({
       success: true,
       keyword: keyword,
@@ -114,12 +104,10 @@ async function loadKRXData() {
 
   // 캐시 확인
   if (krxDataCache && krxDataCacheTime && (now - krxDataCacheTime) < CACHE_DURATION) {
-    console.log('📦 KRX 데이터 캐시 사용');
     return krxDataCache;
   }
 
   try {
-    console.log('📁 KRX 데이터 로드 중...');
     // 여러 경로 시도
     const possiblePaths = [
       path.join(process.cwd(), 'assets', 'krx_basic_info.json'),
@@ -132,14 +120,11 @@ async function loadKRXData() {
 
     for (const tryPath of possiblePaths) {
       try {
-        if (fs.existsSync(tryPath)) {
-          filePath = tryPath;
-          fileContent = fs.readFileSync(tryPath, 'utf8');
-          console.log(`✅ KRX 데이터 파일 찾음: ${tryPath}`);
-          break;
-        }
-      } catch (e) {
-        // 다음 경로 시도
+        await access(tryPath);
+        fileContent = await readFile(tryPath, 'utf8');
+        filePath = tryPath;
+        break;
+      } catch {
         continue;
       }
     }
@@ -154,7 +139,6 @@ async function loadKRXData() {
     krxDataCache = data;
     krxDataCacheTime = now;
 
-    console.log(`✅ KRX 데이터 로드 완료: ${data.length}개 종목`);
     return data;
   } catch (error) {
     console.error('❌ KRX 데이터 로드 실패:', error);
@@ -167,8 +151,6 @@ function searchInKRXData(allStocks, keyword, limit) {
   // 한글 검색을 위해 toLowerCase() 제거 (한글은 대소문자가 없음)
   const searchKeyword = keyword.trim();
 
-  console.log(`🔍 검색 키워드: "${searchKeyword}"`);
-  console.log(`📊 전체 종목 수: ${allStocks.length}`);
 
   const matchingStocks = allStocks.filter(stock => {
     const name = stock['한글 종목명'] || '';
@@ -182,11 +164,6 @@ function searchInKRXData(allStocks, keyword, limit) {
 
     return nameMatch || shortNameMatch || codeMatch;
   });
-
-  console.log(`✅ 매칭된 종목 수: ${matchingStocks.length}개`);
-  if (matchingStocks.length > 0) {
-    console.log(`📋 첫 번째 결과: ${matchingStocks[0]['한글 종목명']} (${matchingStocks[0]['단축코드']})`);
-  }
 
   // 검색 우선순위 정렬 루틴
   const sortedStocks = matchingStocks.sort((a, b) => {

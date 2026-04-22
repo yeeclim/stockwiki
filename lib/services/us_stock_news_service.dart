@@ -5,17 +5,12 @@ import 'package:flutter/foundation.dart';
 import '../models/news.dart';
 
 class UsStockNewsService {
-  static const String _fmpApiKey = '0Zuh2twrNdDI5HsaBnG9jeSU3d1UNCEh';
+  static const String _fmpApiKey = String.fromEnvironment('FMP_API_KEY');
   static const String _fmpBaseUrl = 'https://financialmodelingprep.com/api/v3';
-  static const String _corsProxy = 'https://api.codetabs.com/v1/proxy?quest=';
-  
+
   // Finnhub API (무료, CORS 지원)
-  static const String _finnhubApiKey = 'd3ecam1r01qrd38tq1c0d3ecam1r01qrd38tq1cg';
+  static const String _finnhubApiKey = String.fromEnvironment('FINNHUB_API_KEY');
   static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
-  
-  // Alpha Vantage API (무료, 안정적)
-  static const String _alphaVantageApiKey = 'demo'; // 실제 키로 교체 필요
-  static const String _alphaVantageBaseUrl = 'https://www.alphavantage.co/query';
 
   /// 미국 주식 관련 뉴스 조회 (Finnhub API 사용 - 무료, CORS 지원)
   static Future<List<News>> fetchStockNews(String symbol, {int limit = 10}) async {
@@ -144,113 +139,28 @@ class UsStockNewsService {
     }
   }
 
-  /// 키워드 기반 뉴스 검색 (다양한 뉴스 API 사용)
+  /// 키워드 기반 뉴스 검색 (백엔드 프록시 사용)
   static Future<List<News>> searchNewsByKeyword(String keyword, {int limit = 20}) async {
-    List<News> allNews = [];
-
     try {
-      // 1. NewsData.io API
-      final newsdataNews = await _fetchFromNewsData(keyword, limit: limit ~/ 3);
-      allNews.addAll(newsdataNews);
+      final baseUrl = Uri.base.origin;
+      final encoded = Uri.encodeQueryComponent(keyword.trim());
+      final uri = Uri.parse('$baseUrl/api/news-search?keyword=$encoded&lang=en&limit=$limit');
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
 
-      // 2. GNews API
-      final gnewsNews = await _fetchFromGNews(keyword, limit: limit ~/ 3);
-      allNews.addAll(gnewsNews);
-
-      // 3. MediaStack API
-      final mediastackNews = await _fetchFromMediaStack(keyword, limit: limit ~/ 3);
-      allNews.addAll(mediastackNews);
-
-      // 중복 제거 (제목 기준)
-      final uniqueNews = <String, News>{};
-      for (final news in allNews) {
-        final title = news.title.toLowerCase().trim();
-        if (!uniqueNews.containsKey(title)) {
-          uniqueNews[title] = news;
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(utf8.decode(response.bodyBytes));
+        if (jsonData['success'] == true) {
+          final results = jsonData['results'] as List<dynamic>? ?? [];
+          return results.map<News>((item) => News(
+            title: item['title']?.toString() ?? '',
+            description: item['description']?.toString() ?? '',
+            link: item['link']?.toString() ?? '',
+            publishedAt: item['publishedAt']?.toString() ?? '',
+            source: item['source']?.toString() ?? 'News',
+          )).take(limit).toList();
         }
       }
-
-      return uniqueNews.values.take(limit).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// NewsData.io API 호출
-  static Future<List<News>> _fetchFromNewsData(String keyword, {int limit = 10}) async {
-    try {
-      final uri = Uri.parse(
-        'https://newsdata.io/api/1/news?apikey=pub_482bf5f3aa4249f7850c5818558ed551&q=$keyword&language=en&category=business&size=$limit',
-      );
-      
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['results'] as List<dynamic>? ?? [];
-        
-        return results.map<News>((item) => News(
-          title: item['title']?.toString() ?? '',
-          description: item['description']?.toString() ?? '',
-          link: item['link']?.toString() ?? '',
-          publishedAt: item['pubDate']?.toString() ?? '',
-          source: item['source_id']?.toString() ?? 'NewsData.io',
-        )).toList();
-      }
-    } catch (e) {
-      // NewsData.io 오류
-    }
-    return [];
-  }
-
-  /// GNews API 호출
-  static Future<List<News>> _fetchFromGNews(String keyword, {int limit = 10}) async {
-    try {
-      final uri = Uri.parse(
-        'https://gnews.io/api/v4/search?token=6c6fdfc93ae9225b3bd4210978798fc1&q=$keyword&lang=en&country=us&max=$limit',
-      );
-      
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['articles'] as List<dynamic>? ?? [];
-        
-        return results.map<News>((item) => News(
-          title: item['title']?.toString() ?? '',
-          description: item['description']?.toString() ?? '',
-          link: item['url']?.toString() ?? '',
-          publishedAt: item['publishedAt']?.toString() ?? '',
-          source: item['source']['name']?.toString() ?? 'GNews',
-        )).toList();
-      }
-    } catch (e) {
-      // GNews 오류
-    }
-    return [];
-  }
-
-  /// MediaStack API 호출
-  static Future<List<News>> _fetchFromMediaStack(String keyword, {int limit = 10}) async {
-    try {
-      final uri = Uri.parse(
-        'http://api.mediastack.com/v1/news?access_key=fe222fa0883ffaceee36f639a9cd82b4&keywords=$keyword&languages=en&countries=us&limit=$limit',
-      );
-      
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(utf8.decode(response.bodyBytes));
-        final results = jsonData['data'] as List<dynamic>? ?? [];
-        
-        return results.map<News>((item) => News(
-          title: item['title']?.toString() ?? '',
-          description: item['description']?.toString() ?? '',
-          link: item['url']?.toString() ?? '',
-          publishedAt: item['published_at']?.toString() ?? '',
-          source: item['source']?.toString() ?? 'MediaStack',
-        )).toList();
-      }
-    } catch (e) {
-      // MediaStack 오류
-    }
+    } catch (_) {}
     return [];
   }
 

@@ -29,8 +29,6 @@ export default async function handler(req, res) {
   const { theme, action = 'list' } = req.query;
 
   try {
-    console.log(`테마 추천 API 호출: ${theme || 'all'}, 액션: ${action}`);
-
     if (action === 'themes') {
       // 테마 목록 반환
       const themes = await getThemes();

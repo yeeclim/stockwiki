@@ -5,8 +5,8 @@
 function getEnv(key) {
   const K = key.toUpperCase();
   // 하드코딩된 키 (최후의 수단)
-  if (K === 'DEEPSEEK_API_KEY') return process.env.DEEPSEEK_API_KEY || process.env.deepseek_api_key || 'sk-4218c82760e24b4db9f20e83e26767fc';
-  if (K === 'GEMINI_API_KEY') return process.env.GEMINI_API_KEY || process.env.gemini_api_key || 'AIzaSyDFhrvjyJh2CPn1rl8R7S0Pd-WnDRunTqk';
+  if (K === 'DEEPSEEK_API_KEY') return process.env.DEEPSEEK_API_KEY || process.env.deepseek_api_key || '';
+  if (K === 'GEMINI_API_KEY') return process.env.GEMINI_API_KEY || process.env.gemini_api_key || '';
 
   return process.env[K] || process.env[key.toLowerCase()] || process.env[key] || '';
 }
@@ -38,8 +38,6 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('🎯 AI 검증위원회 질문:', symbol, question.substring(0, 100) + '...');
-
     // 항상 5개의 작업을 실행하도록 변경 (UI에서 자리를 차지하게 하기 위함)
     const tasks = [];
     tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
@@ -64,7 +62,6 @@ export default async function handler(req, res) {
       if (result.status === 'fulfilled' && result.value) {
         const rawResponse = result.value;
         const recommendation = parseRecommendation(rawResponse);
-        console.log(`🤖 ${taskName} 응답 완료:`, recommendation);
         models.push({
           modelName: taskName,
           recommendation: recommendation,
@@ -99,13 +96,6 @@ export default async function handler(req, res) {
       price,
       changePercent,
       isKorean: isKorean || false,
-    });
-
-    console.log('✅ AI 검증위원회 결과:', {
-      models: models.length,
-      verificationScore: verification.score,
-      agreement: verification.agreement,
-      finalRecommendation,
     });
 
     return res.status(200).json({

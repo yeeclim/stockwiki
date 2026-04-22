@@ -1,21 +1,21 @@
 import Parser from 'rss-parser';
+import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './shared.js';
 
 const parser = new Parser();
 
 export default async function handler(req, res) {
   const fetch = globalThis.fetch || (await import('node-fetch')).default;
-  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/json');
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+
+  if (!checkRateLimit(getClientIp(req), 60, 60_000)) {
+    return fail(res, 429, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
   }
 
-  // query 또는 body에서 source 확인
   const { source } = req.query;
   const bodySource = req.body?.source;
   const activeSource = source || bodySource || 'naver';
@@ -64,13 +64,15 @@ async function handleMkRss(req, res) {
 }
 
 async function handleDaumNews(req, res) {
-  const { keyword, max_results = 10 } = req.method === 'POST' ? req.body : req.query;
+  const raw = req.method === 'POST' ? req.body : req.query;
+  const keyword = validateString(raw.keyword, { minLen: 1, maxLen: 100 });
+  const max_results = validateInt(raw.max_results, { min: 1, max: 30 }) ?? 10;
 
-  if (!keyword || keyword.trim() === '') {
-    return res.status(400).json({ success: false, error: '키워드가 필요합니다' });
+  if (!keyword) {
+    return fail(res, 400, '유효한 키워드가 필요합니다 (1~100자)');
   }
 
-  const encodedKeyword = encodeURIComponent(keyword.trim());
+  const encodedKeyword = encodeURIComponent(keyword);
   const searchUrl = `https://search.daum.net/search?w=news&q=${encodedKeyword}&sort=recency`;
 
   const response = await fetch(searchUrl, {
@@ -127,13 +129,15 @@ async function handleDaumNews(req, res) {
 }
 
 async function handleNaverNews(req, res) {
-  const { keyword, max_results = 20 } = req.method === 'POST' ? req.body : req.query;
+  const raw = req.method === 'POST' ? req.body : req.query;
+  const keyword = validateString(raw.keyword, { minLen: 1, maxLen: 100 });
+  const max_results = validateInt(raw.max_results, { min: 1, max: 50 }) ?? 20;
 
-  if (!keyword || keyword.trim() === '') {
-    return res.status(400).json({ success: false, error: '키워드가 필요합니다' });
+  if (!keyword) {
+    return fail(res, 400, '유효한 키워드가 필요합니다 (1~100자)');
   }
 
-  const encodedKeyword = encodeURIComponent(keyword.trim());
+  const encodedKeyword = encodeURIComponent(keyword);
   const rssUrl = `https://news.naver.com/main/rss/section.naver?sid=101&query=${encodedKeyword}`;
 
   const response = await fetch(rssUrl, {
