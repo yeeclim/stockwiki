@@ -91356,7 +91356,7 @@ q=A.bG(j,A.bu(B.HS,B.bJ,j,16),B.q,j,new A.bt(q,j,j,j,j,j,B.c1),j,j,B.d2,j)
 p=i.ok
 o=p.x
 n=t.p
-o=A.b([A.bd(A.b([q,B.as,A.U("Fear & Greed (Stock)",j,j,j,j,o==null?j:o.aX(h.k3,B.o),j,j)],n),B.p,B.m,B.j,0)],n)
+o=A.b([A.bd(A.b([q,B.as,A.U("Fear & Greed",j,j,j,j,o==null?j:o.aX(h.k3,B.o),j,j)],n),B.p,B.m,B.j,0)],n)
 if(k.f)o.push(A.bW(A.db(A.ip(j,B.bJ,j,j,j,j,j,2,j,j),20,20),j,j))
 else{q=k.r
 if(q!=null){p=p.Q

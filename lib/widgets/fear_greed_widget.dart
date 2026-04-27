@@ -145,7 +145,7 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Fear & Greed (Stock)',
+                  'Fear & Greed',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,
