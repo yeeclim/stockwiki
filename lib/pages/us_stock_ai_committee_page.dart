@@ -54,32 +54,23 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
     try {
       List<Stock> stocks = [];
-      
-      // 미국 주식인지 국내 주식인지 판단 
-      // 한글이 포함되어 있거나 숫자만으로 6자리 등을 입력한 경우 국내 주식으로 간주
-      final isUSStock = !(RegExp(r'[가-힣]').hasMatch(query) || RegExp(r'^\d+$').hasMatch(query));      
-      debugPrint('🔍 주식 검색 시작: $query (${isUSStock ? "미국" : "국내"} 주식)');
-      
-      if (isUSStock) {
-        // 미국 주식 검색
-        debugPrint('🇺🇸 미국 주식 검색 중...');
-        stocks = await FMPService.fetchStocks(query);
-        debugPrint('✅ 미국 주식 검색 결과: ${stocks.length}개');
-        if (stocks.isNotEmpty) {
-          debugPrint('📊 첫 번째 결과: ${stocks[0].name} (${stocks[0].symbol}), 가격: ${stocks[0].price}, 변동률: ${stocks[0].changePercent}');
-        }
-      } else {
+
+      // 한글 포함 또는 순수 숫자(종목코드)이면 국내 주식으로 바로 판단
+      final isDefinitelyKorean = RegExp(r'[가-힣]').hasMatch(query) || RegExp(r'^\d+$').hasMatch(query);
+
+      if (isDefinitelyKorean) {
         // 국내 주식 검색
-        debugPrint('🇰🇷 국내 주식 검색 중...');
         stocks = await _searchKoreanStock(query);
-        debugPrint('✅ 국내 주식 검색 결과: ${stocks.length}개');
-        if (stocks.isNotEmpty) {
-          debugPrint('📊 첫 번째 결과: ${stocks[0].name} (${stocks[0].symbol}), 가격: ${stocks[0].price}, 변동률: ${stocks[0].changePercent}');
+      } else {
+        // 영문/혼합 쿼리: 미국 주식 먼저 시도, 없으면 국내 주식(영문명) 검색
+        stocks = await FMPService.fetchStocks(query);
+        if (stocks.isEmpty) {
+          // LS ELECTRIC처럼 영문명 국내 주식일 수 있으므로 KRX도 검색
+          stocks = await _searchKoreanStock(query);
         }
       }
 
       if (stocks.isEmpty) {
-        debugPrint('⚠️ 검색 결과가 없습니다.');
         setState(() {
           _error = '검색 결과가 없습니다. 다른 키워드로 검색해주세요.';
           _isLoading = false;
@@ -395,7 +386,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                         color: theme.colorScheme.onSurface,
                       ),
                       decoration: InputDecoration(
-                        hintText: '주식 검색 (예: AAPL, 삼성전자, 005930)',
+                        hintText: '주식 검색 (예: AAPL, 삼성전자, LS ELECTRIC, 005930)',
                         hintStyle: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -455,7 +446,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               ),
               const SizedBox(height: 8),
               Text(
-                '💡 미국주식(예: AAPL) 또는 국내주식(예: 삼성전자, 005930)을 검색하세요',
+                '💡 미국주식(예: AAPL) 또는 국내주식(예: 삼성전자, LS ELECTRIC, 005930)을 검색하세요',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
