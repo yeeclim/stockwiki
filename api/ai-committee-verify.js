@@ -34,27 +34,27 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...cached.data, cached: true });
     }
 
-    // 각 슬롯마다 주 모델 실패 시 백업 자동 시도
+    // 각 슬롯: 주 모델 실패 시 완전히 다른 회사 백업으로 자동 시도
     const tasks = [
       {
         name: 'Gemini',
         fn: () => askWithFallback(
-          () => askGemini(question),
-          () => askOpenRouter(question, 'google/gemma-4-31b-it:free', 'Gemini')
+          () => askGemini(question),                                                          // Google (직접)
+          () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Gemini')  // NVIDIA (다른 회사)
         ),
       },
       {
         name: 'Llama 3.3',
         fn: () => askWithFallback(
-          () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3'),
-          () => askOpenRouter(question, 'nousresearch/hermes-3-llama-3.1-405b:free', 'Llama 3.3')
+          () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3'),       // Meta
+          () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Llama 3.3')         // Alibaba (다른 회사)
         ),
       },
       {
         name: 'Qwen3',
         fn: () => askWithFallback(
-          () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3'),
-          () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Qwen3')
+          () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3'),            // Alibaba
+          () => askOpenRouter(question, 'nvidia/nemotron-nano-9b-v2:free', 'Qwen3')                   // NVIDIA (다른 회사)
         ),
       },
     ];
