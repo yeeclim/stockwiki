@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     const MODEL_POOL = [
       { name: 'Gemini',    fn: () => askGemini(question) },
       { name: 'Qwen3',     fn: () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3') },
-      { name: 'Nemotron',  fn: () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron') },
+      { name: 'Phi-4',     fn: () => askOpenRouter(question, 'microsoft/phi-4:free', 'Phi-4') },
       { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
       { name: 'Gemma 4',   fn: () => askOpenRouter(question, 'google/gemma-4-31b-it:free', 'Gemma 4') },
     ];
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       throw new Error('모든 AI 모델 응답에 실패했습니다.');
     }
 
-    const verification = calculateVerification(models);
+    const verification = calculateVerification(models, MODEL_POOL.length);
     const finalRecommendation = determineFinalRecommendation(models);
     const summary = generateSummary(models, finalRecommendation, verification, {
       symbol, price, changePercent, isKorean: isKorean || false,
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       success: true,
       models,
       verificationCount: MODEL_POOL.length,
-      activeCount: models.length,
+      activeCount: successes.length,
       verificationScore: verification.score,
       agreement: verification.agreement,
       finalRecommendation,
@@ -133,6 +133,15 @@ async function askWithFallback(primary, fallback) {
   }
 }
 
+// 응답 마지막 300자 안에 "결론: X" 패턴이 없으면 에러 처리 (체인오브소트 모델 필터링)
+function validateConclusion(content, displayName) {
+  const tail = content.slice(-300).toLowerCase();
+  if (!tail.match(/결론\s*[:：]\s*(buy|hold|watch|sell|매수|매도|보유|관망)/)) {
+    throw new Error(`${displayName} 결론 누락 (응답 불완전)`);
+  }
+  return content;
+}
+
 // Gemini API (Google AI Studio 무료)
 async function askGemini(question) {
   const apiKey = getEnv('GEMINI_API_KEY');
@@ -152,7 +161,7 @@ async function askGemini(question) {
     throw new Error(`Gemini HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
   const data = await response.json();
-  return data.candidates[0].content.parts[0].text;
+  return validateConclusion(data.candidates[0].content.parts[0].text, 'Gemini');
 }
 
 // OpenRouter API (무료 모델 공용 함수)
@@ -182,7 +191,7 @@ async function askOpenRouter(question, model, displayName) {
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
-  return content;
+  return validateConclusion(content, displayName);
 }
 
 // AI 응답에서 추천 파싱
@@ -207,16 +216,18 @@ function parseRecommendation(response) {
   return 'Watch';
 }
 
-function calculateVerification(models) {
+function calculateVerification(models, totalTried) {
   const validModels = models.filter(m => m.recommendation !== 'Error');
   if (validModels.length === 0) return { score: 0, agreement: '오류' };
 
+  const successRate = validModels.length / (totalTried || validModels.length);
   const counts = {};
   validModels.forEach(m => counts[m.recommendation] = (counts[m.recommendation] || 0) + 1);
   const maxCount = Math.max(...Object.values(counts));
-  const rate = (maxCount / validModels.length) * 100;
-  const agreement = rate >= 80 ? '일치' : rate >= 60 ? '높음' : rate >= 40 ? '보통' : '낮음';
-  return { score: Math.round(rate), agreement };
+  const agreementRate = maxCount / validModels.length;
+  const score = Math.round(agreementRate * successRate * 100);
+  const agreement = agreementRate >= 0.8 ? '일치' : agreementRate >= 0.6 ? '높음' : agreementRate >= 0.4 ? '보통' : '낮음';
+  return { score, agreement };
 }
 
 function determineFinalRecommendation(models) {
