@@ -890,7 +890,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     if (lowerName.contains('gemini')) {
       displayName = 'Gemini';
     } else if (lowerName.contains('llama')) {
-      displayName = 'Llama 3';
+      displayName = 'Llama 3.3';
+    } else if (lowerName.contains('gemma')) {
+      displayName = 'Gemma 3';
     } else if (lowerName.contains('mistral')) {
       displayName = 'Mistral';
     } else if (lowerName.contains('gpt') || lowerName.contains('openai')) {

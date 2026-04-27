@@ -23,9 +23,9 @@ export default async function handler(req, res) {
     }
 
     const tasks = [
-      { name: 'Gemini',  fn: () => askGemini(question) },
-      { name: 'Llama 3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.1-8b-instruct:free', 'Llama 3') },
-      { name: 'Mistral', fn: () => askOpenRouter(question, 'mistralai/mistral-7b-instruct:free', 'Mistral') },
+      { name: 'Gemini',   fn: () => askGemini(question) },
+      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
+      { name: 'Gemma 3',  fn: () => askOpenRouter(question, 'google/gemma-3-27b-it:free', 'Gemma 3') },
     ];
 
     const results = await Promise.allSettled(tasks.map(t => t.fn()));
