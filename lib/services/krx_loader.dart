@@ -79,7 +79,10 @@ class KrxLoader {
               'sector': s['sector'] ?? theme,
               'marketCap': s['marketCap'] ?? 0,
               'description': s['description'] ?? '',
-              'reason': s['recommendation'] ?? '관련 테마 수혜주',
+              'reason': (s['reasons'] as List<dynamic>?)?.first?.toString()
+                  ?? s['recommendation']?.toString()
+                  ?? '관련 테마 수혜주',
+              'score': s['totalScore'] ?? 0,
               'price': s['price'],
               'changePercent': s['changePercent'],
               'news': (s['news'] as List<dynamic>? ?? []).map((n) => {
