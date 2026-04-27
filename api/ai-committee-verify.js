@@ -1,10 +1,14 @@
 // AI 검증위원회 API
-// Gemini (Google AI Studio 무료) + Llama 3 + Mistral (OpenRouter 무료)
+// Gemini (Google AI Studio 무료) + Llama 3.3 + Gemma 3 (OpenRouter 무료)
 
 function getEnv(key) {
   const K = key.toUpperCase();
   return process.env[K] || process.env[key.toLowerCase()] || process.env[key] || '';
 }
+
+// 종목별 결과 캐시 (30분)
+const cache = new Map();
+const CACHE_TTL = 30 * 60 * 1000;
 
 export default async function handler(req, res) {
   const fetch = globalThis.fetch || (await import('node-fetch')).default;
@@ -20,6 +24,14 @@ export default async function handler(req, res) {
 
     if (!question) {
       return res.status(400).json({ success: false, error: '질문이 필요합니다' });
+    }
+
+    // 캐시 확인 (symbol 기준 30분)
+    const cacheKey = symbol || question.substring(0, 50);
+    const cached = cache.get(cacheKey);
+    if (cached && (Date.now() - cached.time) < CACHE_TTL) {
+      console.log(`✅ 캐시 응답: ${cacheKey}`);
+      return res.status(200).json({ ...cached.data, cached: true });
     }
 
     const tasks = [
@@ -63,7 +75,7 @@ export default async function handler(req, res) {
       symbol, price, changePercent, isKorean: isKorean || false,
     });
 
-    return res.status(200).json({
+    const responseData = {
       success: true,
       models,
       verificationCount: tasks.length,
@@ -73,7 +85,14 @@ export default async function handler(req, res) {
       finalRecommendation,
       summary,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    // 성공한 모델이 1개 이상이면 캐시 저장
+    if (models.some(m => m.recommendation !== 'Error')) {
+      cache.set(cacheKey, { data: responseData, time: Date.now() });
+    }
+
+    return res.status(200).json(responseData);
 
   } catch (error) {
     console.error('❌ AI 검증위원회 오류:', error);
