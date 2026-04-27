@@ -34,10 +34,29 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...cached.data, cached: true });
     }
 
+    // 각 슬롯마다 주 모델 실패 시 백업 자동 시도
     const tasks = [
-      { name: 'Gemini',   fn: () => askGemini(question) },
-      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
-      { name: 'Qwen3',    fn: () => askOpenRouter(question, 'qwen/qwen3-235b-a22b:free', 'Qwen3') },
+      {
+        name: 'Gemini',
+        fn: () => askWithFallback(
+          () => askGemini(question),
+          () => askOpenRouter(question, 'google/gemma-4-31b-it:free', 'Gemini')
+        ),
+      },
+      {
+        name: 'Llama 3.3',
+        fn: () => askWithFallback(
+          () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3'),
+          () => askOpenRouter(question, 'nousresearch/hermes-3-llama-3.1-405b:free', 'Llama 3.3')
+        ),
+      },
+      {
+        name: 'Qwen3',
+        fn: () => askWithFallback(
+          () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3'),
+          () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Qwen3')
+        ),
+      },
     ];
 
     const results = await Promise.allSettled(tasks.map(t => t.fn()));
@@ -107,6 +126,16 @@ const PROMPT_SUFFIX = `
 
 분석 후 마지막 줄에 반드시 다음 형식으로만 결론을 작성하세요:
 결론: Buy  (또는 Hold, Watch, Sell 중 하나)`;
+
+// 주 모델 실패 시 백업 모델 자동 시도
+async function askWithFallback(primary, fallback) {
+  try {
+    return await primary();
+  } catch (e) {
+    console.warn('⚠️ 주 모델 실패, 백업 시도:', e.message);
+    return await fallback();
+  }
+}
 
 // Gemini API (Google AI Studio 무료)
 async function askGemini(question) {
