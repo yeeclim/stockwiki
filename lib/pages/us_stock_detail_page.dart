@@ -4,14 +4,17 @@ import '../models/stock.dart';
 import '../models/news.dart';
 import '../services/fmp_service.dart';
 import '../services/us_stock_news_service.dart';
+import '../services/bookmark_service.dart';
 import '../widgets/us_stock_chart_widget.dart';
 
 class UsStockDetailPage extends StatefulWidget {
   final Stock stock;
+  final bool isKorean;
 
   const UsStockDetailPage({
     super.key,
     required this.stock,
+    this.isKorean = false,
   });
 
   @override
@@ -23,6 +26,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   List<News> _newsList = [];
   bool _isLoadingDetail = false;
   bool _isLoadingNews = false;
+  bool _isBookmarked = false;
   String? _error;
 
   @override
@@ -30,6 +34,30 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     super.initState();
     _loadStockDetail();
     _loadStockNews();
+    _checkBookmark();
+  }
+
+  Future<void> _checkBookmark() async {
+    final result = await BookmarkService.isBookmarked(widget.stock.symbol);
+    if (mounted) setState(() => _isBookmarked = result);
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarked) {
+      await BookmarkService.removeBookmark(widget.stock.symbol);
+    } else {
+      await BookmarkService.addStock(
+        widget.stock,
+        type: widget.isKorean ? 'kr' : 'us',
+      );
+    }
+    await _checkBookmark();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_isBookmarked ? '관심종목에 추가되었습니다' : '관심종목에서 제거되었습니다'),
+        duration: const Duration(seconds: 1),
+      ));
+    }
   }
 
   Future<void> _loadStockDetail() async {
@@ -93,6 +121,14 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         backgroundColor: theme.appBarTheme.backgroundColor,
         iconTheme: theme.appBarTheme.iconTheme,
         actions: [
+          IconButton(
+            icon: Icon(
+              _isBookmarked ? Icons.star : Icons.star_border,
+              color: _isBookmarked ? Colors.amber : theme.colorScheme.onSurface,
+            ),
+            onPressed: _toggleBookmark,
+            tooltip: _isBookmarked ? '관심종목 제거' : '관심종목 추가',
+          ),
           IconButton(
             icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
             onPressed: () {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/bookmark_service.dart';
+import '../models/stock.dart';
+import 'us_stock_detail_page.dart';
 
 class BookmarkListPage extends StatefulWidget {
   const BookmarkListPage({super.key});
@@ -19,10 +21,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
   }
 
   Future<void> _loadBookmarks() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final bookmarks = await BookmarkService.getAllBookmarkDetails();
       setState(() {
@@ -30,17 +29,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('북마크 로드 오류: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      setState(() => _isLoading = false);
     }
   }
 
@@ -48,13 +37,10 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('북마크 제거'),
-        content: Text('$stockName을(를) 북마크에서 제거하시겠습니까?'),
+        title: const Text('관심종목 제거'),
+        content: Text('$stockName을(를) 관심종목에서 제거하시겠습니까?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('제거', style: TextStyle(color: Colors.red)),
@@ -64,46 +50,30 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
     );
 
     if (confirmed == true) {
-      final success = await BookmarkService.removeBookmark(stockCode);
-      if (success) {
-        await _loadBookmarks();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$stockName 북마크에서 제거되었습니다.'),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
+      await BookmarkService.removeBookmark(stockCode);
+      await _loadBookmarks();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$stockName이(가) 관심종목에서 제거되었습니다.'), duration: const Duration(seconds: 1)),
+        );
       }
     }
   }
 
-  String _formatPrice(int price) {
-    final priceStr = price.toString();
-    final buffer = StringBuffer('₩');
-    for (int i = 0; i < priceStr.length; i++) {
-      if (i > 0 && (priceStr.length - i) % 3 == 0) {
-        buffer.write(',');
-      }
-      buffer.write(priceStr[i]);
-    }
-    return buffer.toString();
-  }
+  void _navigateToDetail(Map<String, dynamic> bookmark) {
+    final type = bookmark['type'] as String? ?? 'us';
+    final stock = Stock(
+      symbol: bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '',
+      name: bookmark['stockName'] as String? ?? '',
+      price: (bookmark['price'] as num?)?.toDouble(),
+      changePercent: (bookmark['changePercent'] as num?)?.toDouble(),
+      change: (bookmark['change'] as num?)?.toDouble(),
+    );
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return '';
-    try {
-      final date = DateTime.parse(dateStr);
-      final year = date.year.toString();
-      final month = date.month.toString().padLeft(2, '0');
-      final day = date.day.toString().padLeft(2, '0');
-      final hour = date.hour.toString().padLeft(2, '0');
-      final minute = date.minute.toString().padLeft(2, '0');
-      return '$year-$month-$day $hour:$minute';
-    } catch (e) {
-      return dateStr;
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UsStockDetailPage(stock: stock, isKorean: type == 'kr')),
+    );
   }
 
   @override
@@ -112,7 +82,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('📑 북마크 목록'),
+        title: const Text('⭐ 관심종목'),
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        iconTheme: theme.appBarTheme.iconTheme,
       ),
       body: _buildBody(),
     );
@@ -120,10 +92,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
   Widget _buildBody() {
     final theme = Theme.of(context);
+
     if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: theme.colorScheme.primary),
-      );
+      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
     }
 
     if (_bookmarks.isEmpty) {
@@ -131,24 +102,13 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.bookmark_border,
-              size: 64,
-              color: theme.colorScheme.outline,
-            ),
+            Icon(Icons.star_border, size: 72, color: theme.colorScheme.outline),
             const SizedBox(height: 16),
-            Text(
-              '북마크된 종목이 없습니다',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+            Text('관심종목이 없습니다', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 8),
             Text(
-              'AI 종목 추천에서 관심 종목을 북마크하세요',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              '종목 상세 페이지에서 ★ 버튼으로 추가하세요',
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -161,195 +121,119 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _bookmarks.length,
-        itemBuilder: (context, index) {
-          final bookmark = _bookmarks[index];
-          return _buildBookmarkCard(bookmark);
-        },
+        itemBuilder: (context, index) => _buildCard(_bookmarks[index]),
       ),
     );
   }
 
-  Widget _buildBookmarkCard(Map<String, dynamic> bookmark) {
+  Widget _buildCard(Map<String, dynamic> bookmark) {
     final theme = Theme.of(context);
     final stockName = bookmark['stockName'] as String? ?? 'N/A';
-    final stockCode = bookmark['stockCode'] as String? ?? 'N/A';
-    final currentPrice = bookmark['currentPrice'] as int? ?? 0;
-    final targetPrice = bookmark['targetPrice'] as int? ?? 0;
-    final recommendation = bookmark['recommendation'] as String? ?? '매수';
-    final reason = bookmark['reason'] as String? ?? '';
-    final bookmarkedAt = bookmark['bookmarkedAt'] as String?;
-
-    final priceDiff = targetPrice - currentPrice;
-    final priceDiffPercent = currentPrice > 0
-        ? (priceDiff / currentPrice * 100)
-        : 0.0;
+    final stockCode = bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
+    final type = bookmark['type'] as String? ?? 'us';
+    final isKorean = type == 'kr';
+    final price = (bookmark['price'] as num?)?.toDouble();
+    final changePercent = (bookmark['changePercent'] as num?)?.toDouble();
+    final isPositive = (changePercent ?? 0) >= 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: theme.cardTheme.elevation,
       color: theme.cardTheme.color,
       shape: theme.cardTheme.shape,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        stockName,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        stockCode,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.bookmark, color: theme.colorScheme.primary),
-                  onPressed: () => _removeBookmark(stockCode, stockName),
-                  tooltip: '북마크 제거',
-                ),
-              ],
-            ),
-            Divider(color: theme.dividerColor),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: InkWell(
+        onTap: () => _navigateToDetail(bookmark),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              // 국기 + 종목 정보
+              Expanded(
+                child: Row(
                   children: [
-                    Text(
-                      '현재가',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    Text(isKorean ? '🇰🇷' : '🇺🇸', style: const TextStyle(fontSize: 24)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            stockName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            stockCode,
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+              // 가격 + 등락률
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (price != null)
                     Text(
-                      _formatPrice(currentPrice),
+                      isKorean ? '₩${price.toInt().toLocaleString()}' : '\$${price.toStringAsFixed(2)}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,
                       ),
                     ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '목표가',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                  if (changePercent != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      _formatPrice(targetPrice),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: priceDiffPercent > 0
-                            ? Colors.green
-                            : Colors.red,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${isPositive ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+                        style: TextStyle(
+                          color: isPositive ? Colors.green : Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: recommendation == '매수'
-                        ? Colors.green.withOpacity(0.2)
-                        : recommendation == '매도'
-                            ? Colors.red.withOpacity(0.2)
-                            : Colors.grey.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    recommendation,
-                    style: TextStyle(
-                      color: recommendation == '매수'
-                          ? Colors.green
-                          : recommendation == '매도'
-                              ? Colors.red
-                              : Colors.grey,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                if (priceDiffPercent != 0)
-                  Text(
-                    '${priceDiffPercent > 0 ? '+' : ''}${priceDiffPercent.toStringAsFixed(1)}%',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: priceDiffPercent > 0
-                          ? Colors.green
-                          : Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-              ],
-            ),
-            if (reason.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Divider(color: theme.dividerColor),
-              const SizedBox(height: 8),
-              Text(
-                '추천 근거',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                reason,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 8),
+              // 제거 버튼
+              IconButton(
+                icon: Icon(Icons.star, color: Colors.amber.shade600, size: 22),
+                onPressed: () => _removeBookmark(stockCode, stockName),
+                tooltip: '관심종목 제거',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
-            if (bookmarkedAt != null) ...[
-              const SizedBox(height: 12),
-              Divider(color: theme.dividerColor),
-              const SizedBox(height: 8),
-              Text(
-                '북마크한 시간: ${_formatDate(bookmarkedAt)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
+extension on int {
+  String toLocaleString() {
+    final s = toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+}
