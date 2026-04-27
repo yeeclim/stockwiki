@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     const MODEL_POOL = [
       { name: 'Gemini',    fn: () => askGemini(question) },
       { name: 'Qwen3',     fn: () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3') },
-      { name: 'Phi-4',     fn: () => askOpenRouter(question, 'microsoft/phi-4:free', 'Phi-4') },
+      { name: 'Mistral',   fn: () => askOpenRouter(question, 'mistralai/mistral-7b-instruct:free', 'Mistral') },
       { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
       { name: 'Gemma 4',   fn: () => askOpenRouter(question, 'google/gemma-4-31b-it:free', 'Gemma 4') },
     ];
