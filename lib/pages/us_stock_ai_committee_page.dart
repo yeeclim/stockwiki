@@ -920,8 +920,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       displayName = 'Llama 3.3';
     } else if (lowerName.contains('qwen')) {
       displayName = 'Qwen3';
+    } else if (lowerName.contains('nemotron')) {
+      displayName = 'Nemotron';
     } else if (lowerName.contains('gemma')) {
-      displayName = 'Gemma 3';
+      displayName = 'Gemma 4';
     } else if (lowerName.contains('mistral')) {
       displayName = 'Mistral';
     } else if (lowerName.contains('gpt') || lowerName.contains('openai')) {
