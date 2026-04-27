@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import '../models/stock.dart';
 
 /// 북마크 서비스
 /// SharedPreferences를 사용하여 북마크된 종목을 영구 저장
@@ -96,6 +97,18 @@ class BookmarkService {
       debugPrint('북마크 상세 정보 로드 오류: $e');
     }
     return null;
+  }
+
+  /// Stock 객체로 관심종목 추가 (미국/국내 공통)
+  static Future<bool> addStock(Stock stock, {String type = 'us'}) async {
+    return addBookmark(stock.symbol, {
+      'stockName': stock.name,
+      'symbol': stock.symbol,
+      'type': type,
+      'price': stock.price,
+      'changePercent': stock.changePercent,
+      'change': stock.change,
+    });
   }
 
   /// 모든 북마크 상세 정보 가져오기

@@ -6,6 +6,7 @@ import '../pages/us_stock_ai_recommend_page.dart';
 import '../pages/us_stock_theme_recommend_page.dart';
 import '../pages/us_stock_ai_committee_page.dart';
 import '../pages/theme_recommendations_page.dart';
+import '../pages/bookmark_list_page.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -107,11 +108,26 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
                 ListTile(
+                  leading: Icon(Icons.star, color: Colors.amber.shade600),
+                  title: Text("관심종목", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
+                  subtitle: Text(
+                    '국내·미국 즐겨찾기',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ??
+                           TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BookmarkListPage()),
+                    );
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.groups, color: Colors.green),
                   title: Text("AI 검증위원회", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
                   subtitle: Text(
                     '다중 AI 검증',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ?? 
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ??
                            TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
                   ),
                   onTap: () {
