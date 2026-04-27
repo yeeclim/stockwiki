@@ -265,6 +265,11 @@ async function scrapeNaverThemeStocks(themeId, themeName) {
       const percentText = numberCells[2].textContent.replace(/,/g, '').replace(/%/g, '').trim();
       const changePercent = parseFloat(percentText) || 0;
 
+      // 거래량 (4번째 컬럼)
+      const volume = numberCells.length >= 4
+        ? parseInt(numberCells[3].textContent.replace(/,/g, '').trim()) || 0
+        : 0;
+
       if (symbol && name) {
         stocks.push({
           symbol,
@@ -272,7 +277,8 @@ async function scrapeNaverThemeStocks(themeId, themeName) {
           price,
           change,
           changePercent,
-          sector: themeName, // fallback용
+          volume,
+          sector: themeName,
           description: `네이버 금융 ${themeName} 종목`
         });
       }
@@ -332,32 +338,93 @@ async function getThemeStocks(themeName) {
   return stocks;
 }
 
-// 종합 투자 분석 
-// (실시간 크롤링된 데이터가 넘어올 것이므로 가짜 지표 생성 삭제)
+// ── 점수 산정 (100점 만점, ai-recommend-list와 동일 기준) ───────
+// · 모멘텀  60점: 등락률 기반 (테마 스크랩은 volume 불확실해서 비중 올림)
+// · 거래량  25점: volume이 있을 경우만 반영
+// · 안정성  15점: 과도한 급등락 없이 건전한 상승
+function calcThemeScore(stock) {
+  const cp = stock.changePercent ?? 0;
+  const vol = stock.volume ?? 0;
+
+  // 하락 중 종목은 0점 (추천 제외)
+  if (cp < -1) return 0;
+
+  // ① 모멘텀
+  let momentumScore;
+  if (cp >= 5)       momentumScore = 60;
+  else if (cp >= 3)  momentumScore = 55;
+  else if (cp >= 2)  momentumScore = 46;
+  else if (cp >= 1)  momentumScore = 35;
+  else if (cp >= 0)  momentumScore = 20;
+  else               momentumScore = 8;
+
+  // ② 거래량
+  let volScore;
+  if (vol >= 1_000_000)      volScore = 25;
+  else if (vol >= 300_000)   volScore = 20;
+  else if (vol >= 100_000)   volScore = 14;
+  else if (vol >= 30_000)    volScore = 8;
+  else if (vol > 0)          volScore = 4;
+  else                       volScore = 10; // 거래량 미수집 시 중립값
+
+  // ③ 안정성
+  const abs = Math.abs(cp);
+  let stabilityScore;
+  if (abs >= 1 && abs <= 5)  stabilityScore = 15;
+  else if (abs < 1)          stabilityScore = 9;
+  else if (abs <= 8)         stabilityScore = 7;
+  else                       stabilityScore = 3;
+
+  return momentumScore + volScore + stabilityScore;
+}
+
+function scoreToRecommendation(score, cp) {
+  if (score >= 75) return '강력 매수';
+  if (score >= 55) return '매수';
+  if (score >= 35) return '관망';
+  return '보유';
+}
+
+function buildThemeReasons(stock, score) {
+  const cp = stock.changePercent ?? 0;
+  const vol = stock.volume ?? 0;
+  const reasons = [];
+
+  if (cp >= 3) {
+    reasons.push(`오늘 +${cp.toFixed(2)}% 강한 상승 — 테마 수혜 모멘텀 확인`);
+  } else if (cp >= 1) {
+    reasons.push(`오늘 +${cp.toFixed(2)}% 안정적 상승 — 테마 수요 유입 중`);
+  } else if (cp >= 0) {
+    reasons.push(`오늘 ${cp.toFixed(2)}% 보합 — 추가 모멘텀 확인 권장`);
+  } else {
+    reasons.push(`오늘 ${cp.toFixed(2)}% 소폭 조정 — 단기 관망 유효`);
+  }
+
+  if (vol >= 300_000) {
+    reasons.push(`거래량 ${vol.toLocaleString()}주 — 활발한 매수세`);
+  } else if (vol > 0) {
+    reasons.push(`거래량 ${vol.toLocaleString()}주`);
+  }
+
+  reasons.push(`${stock.sector} 테마 — 스크리닝 점수 ${score}점 / 100점`);
+  return reasons;
+}
+
 function getComprehensiveAnalysis(stockData) {
+  const totalScore = calcThemeScore(stockData);
+  const recommendation = scoreToRecommendation(totalScore, stockData.changePercent ?? 0);
   return {
     symbol: stockData.symbol,
     name: stockData.name,
     price: stockData.price,
     change: stockData.change,
     changePercent: stockData.changePercent,
-    ma5: 0,
-    ma20: 0,
-    ma60: 0,
-    trend: '실시간 파싱 대기',
-    volume: 0,
-    tradingValue: 0,
-    marketCap: 0, // 상세 파싱 전까지 대기
-    capital: 0,
-    quarterlyRevenue: 0,
-    quarterlyProfit: 0,
-    profitMargin: 0,
-    volumeTrend: '대기',
-    technicalScore: 0,
+    volume: stockData.volume ?? 0,
+    totalScore,
+    technicalScore: totalScore,   // 호환성 유지
     fundamentalScore: 0,
-    totalScore: 0,
-    recommendation: '관망',
-    confidence: 0,
+    recommendation,
+    reasons: buildThemeReasons(stockData, totalScore),
     lastUpdate: new Date().toISOString(),
   };
 }
