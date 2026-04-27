@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     const responseData = {
       success: true,
       models,
-      verificationCount: tasks.length,
+      verificationCount: MODEL_POOL.length,
       activeCount: models.length,
       verificationScore: verification.score,
       agreement: verification.agreement,
