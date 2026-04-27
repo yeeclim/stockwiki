@@ -807,6 +807,37 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   children: rec.models.map((model) => _buildVotingPlate(model)).toList(),
                 ),
 
+                // 전체 모델 오류 시 안내 배너
+                if (rec.models.isNotEmpty && rec.models.every((m) => m.recommendation == 'Error'))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'AI 모델 API 키가 설정되지 않았습니다.\nVercel 환경변수에 OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY를 등록해주세요.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.orange.shade800,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 24),
                 Divider(color: theme.dividerColor),
                 const SizedBox(height: 16),
@@ -868,6 +899,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       displayName = 'Ollama';
     }
 
+    final isError = model.recommendation == 'Error';
+    final isMissing = model.reasoning.contains('미설정');
+    final errorLabel = isMissing ? '키 미설정' : '분석 실패';
+
     return Tooltip(
       message: model.reasoning,
       padding: const EdgeInsets.all(12),
@@ -901,7 +936,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             ),
           ),
           Text(
-            model.recommendation,
+            isError ? errorLabel : model.recommendation,
             style: theme.textTheme.labelSmall?.copyWith(
               color: color,
               fontWeight: FontWeight.bold,
