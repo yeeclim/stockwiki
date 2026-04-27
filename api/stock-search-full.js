@@ -148,35 +148,38 @@ async function loadKRXData() {
 
 // KRX 데이터에서 검색
 function searchInKRXData(allStocks, keyword, limit) {
-  // 한글 검색을 위해 toLowerCase() 제거 (한글은 대소문자가 없음)
   const searchKeyword = keyword.trim();
-
+  // 영문 검색은 대소문자 무시
+  const searchKeywordLower = searchKeyword.toLowerCase();
 
   const matchingStocks = allStocks.filter(stock => {
     const name = stock['한글 종목명'] || '';
     const shortName = stock['한글 종목약명'] || '';
+    const engName = (stock['영문 종목명'] || '').toLowerCase();
     const code = stock['단축코드'] || '';
 
-    // 정확한 매칭 우선, 부분 매칭도 허용
-    const nameMatch = name.includes(searchKeyword) || name === searchKeyword;
-    const shortNameMatch = shortName.includes(searchKeyword) || shortName === searchKeyword;
-    const codeMatch = code.includes(searchKeyword) || code === searchKeyword;
+    const nameMatch = name.includes(searchKeyword);
+    const shortNameMatch = shortName.includes(searchKeyword);
+    const engNameMatch = engName.includes(searchKeywordLower);
+    const codeMatch = code === searchKeyword || code.startsWith(searchKeyword);
 
-    return nameMatch || shortNameMatch || codeMatch;
+    return nameMatch || shortNameMatch || engNameMatch || codeMatch;
   });
 
   // 검색 우선순위 정렬 루틴
   const sortedStocks = matchingStocks.sort((a, b) => {
     const aName = a['한글 종목명'] || '';
     const aShortName = a['한글 종목약명'] || '';
+    const aEngName = (a['영문 종목명'] || '').toLowerCase();
     const bName = b['한글 종목명'] || '';
     const bShortName = b['한글 종목약명'] || '';
+    const bEngName = (b['영문 종목명'] || '').toLowerCase();
     const aCode = a['단축코드'] || '';
     const bCode = b['단축코드'] || '';
 
     // 1위: 검색어와 완전히 일치하는 종목 최우선
-    const aExact = aName === searchKeyword || aShortName === searchKeyword || aCode === searchKeyword;
-    const bExact = bName === searchKeyword || bShortName === searchKeyword || bCode === searchKeyword;
+    const aExact = aName === searchKeyword || aShortName === searchKeyword || aCode === searchKeyword || aEngName === searchKeywordLower;
+    const bExact = bName === searchKeyword || bShortName === searchKeyword || bCode === searchKeyword || bEngName === searchKeywordLower;
 
     if (aExact && !bExact) return -1;
     if (!aExact && bExact) return 1;
