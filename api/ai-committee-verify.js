@@ -119,148 +119,147 @@ export default async function handler(req, res) {
   }
 }
 
+const PROMPT_SUFFIX = `
+
+분석 후 마지막 줄에 반드시 다음 형식으로만 결론을 작성하세요:
+결론: Buy  (또는 Hold, Watch, Sell 중 하나)`;
+
 // ChatGPT API 호출
 async function askChatGPT(question) {
-  try {
-    const apiKey = getEnv('OPENAI_API_KEY');
-    if (!apiKey) throw new Error('OPENAI_API_KEY 미설정');
+  const apiKey = getEnv('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OPENAI_API_KEY 미설정');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // 업그레이드
-        messages: [{
-          role: 'user',
-          content: question + '\n\n결론을 Buy, Hold, Watch, Sell 중 하나로만 답변해주세요.'
-        }],
-        max_tokens: 200,
-      }),
-    });
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
+      max_tokens: 400,
+    }),
+  });
 
-    if (!response.ok) return 'Watch';
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    return 'Watch';
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`ChatGPT HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
+  const data = await response.json();
+  return data.choices[0].message.content;
 }
 
 // Gemini API 호출
 async function askGemini(question) {
-  try {
-    const apiKey = getEnv('GEMINI_API_KEY');
-    if (!apiKey) throw new Error('GEMINI_API_KEY 미설정');
+  const apiKey = getEnv('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY 미설정');
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: question + '\n\n결론을 Buy, Hold, Watch, Sell 중 하나로만 답변해주세요.'
-            }]
-          }],
-        }),
-      }
-    );
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: question + PROMPT_SUFFIX }] }] }),
+    }
+  );
 
-    if (!response.ok) return 'Watch';
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
-  } catch (error) {
-    return 'Watch';
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Gemini HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
+  const data = await response.json();
+  return data.candidates[0].content.parts[0].text;
 }
 
 // Claude API 호출
 async function askClaude(question) {
-  try {
-    const apiKey = getEnv('ANTHROPIC_API_KEY');
-    if (!apiKey) return 'Watch';
+  const apiKey = getEnv('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY 미설정');
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: question + '\n\n결론을 Buy, Hold, Watch, Sell 중 하나로만 답변해주세요.' }],
-      }),
-    });
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-sonnet-20240620',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
+    }),
+  });
 
-    if (!response.ok) return 'Watch';
-    const data = await response.json();
-    return data.content[0].text;
-  } catch (error) {
-    return 'Watch';
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Claude HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
+  const data = await response.json();
+  return data.content[0].text;
 }
 
-// DeepSeek API 호출 (OpenAI SDK 호환)
+// DeepSeek API 호출
 async function askDeepSeek(question) {
-  try {
-    const apiKey = getEnv('DEEPSEEK_API_KEY');
-    if (!apiKey) return 'Watch';
+  const apiKey = getEnv('DEEPSEEK_API_KEY');
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY 미설정');
 
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [{ role: 'user', content: question + '\n\n결론을 Buy, Hold, Watch, Sell 중 하나로만 답변해주세요.' }],
-        max_tokens: 200,
-      }),
-    });
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
+      max_tokens: 400,
+    }),
+  });
 
-    if (!response.ok) return 'Watch';
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    return 'Watch';
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`DeepSeek HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
+  const data = await response.json();
+  return data.choices[0].message.content;
 }
 
-// Ollama API 호출
+// Ollama API 호출 (로컬 전용 — Vercel 환경에서는 미설정으로 처리)
 async function askOllama(question) {
-  try {
-    const ollamaUrl = getEnv('OLLAMA_URL') || 'http://localhost:11434/api/generate';
-    const response = await fetch(ollamaUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: getEnv('OLLAMA_MODEL') || 'llama3',
-        prompt: question + '\n\n결론을 Buy, Hold, Watch, Sell 중 하나로만 답변해주세요.',
-        stream: false,
-      }),
-    });
+  const ollamaUrl = getEnv('OLLAMA_URL');
+  if (!ollamaUrl) throw new Error('OLLAMA_URL 미설정 (로컬 전용 모델)');
 
-    if (!response.ok) return 'Watch';
-    const data = await response.json();
-    return data.response || data.choices?.[0]?.message?.content || 'Watch';
-  } catch (error) {
-    return 'Watch';
-  }
+  const response = await fetch(ollamaUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: getEnv('OLLAMA_MODEL') || 'llama3',
+      prompt: question + PROMPT_SUFFIX,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+  const data = await response.json();
+  return data.response || data.choices?.[0]?.message?.content;
 }
 
 // AI 응답에서 추천 파싱
+// "결론: Buy" 형식 우선 → 키워드 포함 여부 순
 function parseRecommendation(response) {
   const text = response.toLowerCase();
+
+  // 1순위: "결론: Buy" 패턴 명시적 매칭
+  const conclusionMatch = text.match(/결론\s*[:：]\s*(buy|hold|watch|sell|매수|매도|보유|관망)/);
+  if (conclusionMatch) {
+    const v = conclusionMatch[1];
+    if (v === 'buy' || v === '매수') return 'Buy';
+    if (v === 'hold' || v === '보유') return 'Hold';
+    if (v === 'sell' || v === '매도') return 'Sell';
+    if (v === 'watch' || v === '관망') return 'Watch';
+  }
+
+  // 2순위: 텍스트 내 키워드 포함 여부 (sell > buy > hold > watch 순으로 강도 판단)
+  if (text.includes('strong sell') || text.includes('강력 매도')) return 'Sell';
+  if (text.includes('strong buy') || text.includes('강력 매수')) return 'Buy';
+  if (text.includes('sell') || text.includes('매도')) return 'Sell';
   if (text.includes('buy') || text.includes('매수')) return 'Buy';
   if (text.includes('hold') || text.includes('보유')) return 'Hold';
-  if (text.includes('sell') || text.includes('매도')) return 'Sell';
   if (text.includes('watch') || text.includes('관망')) return 'Watch';
   return 'Watch';
 }
