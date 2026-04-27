@@ -38,13 +38,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // 항상 5개의 작업을 실행하도록 변경 (UI에서 자리를 차지하게 하기 위함)
+    // 무료/저비용 모델 3개만 운영 (Claude·Ollama 제외)
     const tasks = [];
     tasks.push({ name: 'ChatGPT', fn: () => askChatGPT(question) });
     tasks.push({ name: 'Gemini', fn: () => askGemini(question) });
-    tasks.push({ name: 'Claude', fn: () => askClaude(question) });
     tasks.push({ name: 'DeepSeek', fn: () => askDeepSeek(question) });
-    tasks.push({ name: 'Ollama', fn: () => askOllama(question) });
 
     if (tasks.length === 0) {
       // 기본적으로 서비스가 가능하도록 최소 1개(OpenAI 또는 Gemini)는 환경변수 설정을 권고하지만
