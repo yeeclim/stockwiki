@@ -59,13 +59,11 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       final isDefinitelyKorean = RegExp(r'[가-힣]').hasMatch(query) || RegExp(r'^\d+$').hasMatch(query);
 
       if (isDefinitelyKorean) {
-        // 국내 주식 검색
         stocks = await _searchKoreanStock(query);
       } else {
-        // 영문/혼합 쿼리: 미국 주식 먼저 시도, 없으면 국내 주식(영문명) 검색
-        stocks = await FMPService.fetchStocks(query);
+        // 영문/혼합: 서버사이드 미국 주식 검색 → 없으면 국내 영문명 검색
+        stocks = await _searchUsStock(query);
         if (stocks.isEmpty) {
-          // LS ELECTRIC처럼 영문명 국내 주식일 수 있으므로 KRX도 검색
           stocks = await _searchKoreanStock(query);
         }
       }
@@ -100,6 +98,35 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         _isSearching = false;
       });
     }
+  }
+
+  // 미국 주식 검색 (서버사이드 Yahoo Finance)
+  Future<List<Stock>> _searchUsStock(String keyword) async {
+    final baseUrl = Uri.base.origin;
+    final isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+    final apiBaseUrl = isLocalDev ? 'http://localhost:3000' : baseUrl;
+    final url = '$apiBaseUrl/api/us-stock-search?keyword=${Uri.encodeComponent(keyword)}';
+
+    try {
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] is List) {
+          return (data['data'] as List).map((item) => Stock(
+            symbol: item['symbol'] ?? '',
+            name: item['name'] ?? '',
+            price: (item['price'] as num?)?.toDouble(),
+            change: (item['change'] as num?)?.toDouble(),
+            changePercent: (item['changePercent'] as num?)?.toDouble(),
+            volume: (item['volume'] as num?)?.toInt(),
+            marketCap: (item['marketCap'] as num?)?.toInt(),
+          )).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('미국 주식 검색 오류: $e');
+    }
+    return [];
   }
 
   // 국내 주식 검색
@@ -891,6 +918,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       displayName = 'Gemini';
     } else if (lowerName.contains('llama')) {
       displayName = 'Llama 3.3';
+    } else if (lowerName.contains('qwen')) {
+      displayName = 'Qwen3';
     } else if (lowerName.contains('gemma')) {
       displayName = 'Gemma 3';
     } else if (lowerName.contains('mistral')) {
