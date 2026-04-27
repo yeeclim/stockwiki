@@ -1,6 +1,9 @@
 {
   "outputDirectory": "build/web",
   "framework": null,
+  "functions": {
+    "api/ai-committee-verify.js": { "maxDuration": 60 }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
