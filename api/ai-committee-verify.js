@@ -34,55 +34,51 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...cached.data, cached: true });
     }
 
-    // 각 슬롯: 주 모델 실패 시 완전히 다른 회사 백업으로 자동 시도
-    const tasks = [
-      {
-        name: 'Gemini',
-        fn: () => askWithFallback(
-          () => askGemini(question),                                                          // Google (직접)
-          () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Gemini')  // NVIDIA (다른 회사)
-        ),
-      },
-      {
-        name: 'Llama 3.3',
-        fn: () => askWithFallback(
-          () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3'),       // Meta
-          () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Llama 3.3')         // Alibaba (다른 회사)
-        ),
-      },
-      {
-        name: 'Qwen3',
-        fn: () => askWithFallback(
-          () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3'),            // Alibaba
-          () => askOpenRouter(question, 'nvidia/nemotron-nano-9b-v2:free', 'Qwen3')                   // NVIDIA (다른 회사)
-        ),
-      },
+    // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
+    const MODEL_POOL = [
+      { name: 'Gemini',    fn: () => askGemini(question) },
+      { name: 'Qwen3',     fn: () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3') },
+      { name: 'Nemotron',  fn: () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron') },
+      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
+      { name: 'Gemma 4',   fn: () => askOpenRouter(question, 'google/gemma-4-31b-it:free', 'Gemma 4') },
     ];
 
-    const results = await Promise.allSettled(tasks.map(t => t.fn()));
+    const allResults = await Promise.allSettled(MODEL_POOL.map(m => m.fn()));
 
-    const models = [];
-    results.forEach((result, index) => {
-      const taskName = tasks[index].name;
+    const successes = [];
+    const failures = [];
+    allResults.forEach((result, i) => {
+      const name = MODEL_POOL[i].name;
       if (result.status === 'fulfilled' && result.value) {
-        const rawResponse = result.value;
-        models.push({
-          modelName: taskName,
-          recommendation: parseRecommendation(rawResponse),
-          reasoning: rawResponse.substring(0, 200),
-          fullResponse: rawResponse,
-        });
+        successes.push({ name, response: result.value });
       } else {
-        const errorMessage = result.reason?.message || '응답 실패';
-        console.error(`❌ ${taskName} 실패:`, errorMessage);
-        models.push({
-          modelName: taskName,
-          recommendation: 'Error',
-          reasoning: errorMessage,
-          fullResponse: errorMessage,
-        });
+        const msg = result.reason?.message || '응답 실패';
+        console.error(`❌ ${name} 실패:`, msg);
+        failures.push({ name, error: msg });
       }
     });
+
+    // 성공 최대 3개 + 부족하면 실패로 채움
+    const selected = [
+      ...successes.slice(0, 3),
+      ...failures.slice(0, Math.max(0, 3 - successes.length)),
+    ];
+
+    const models = selected.map(item =>
+      item.response
+        ? {
+            modelName: item.name,
+            recommendation: parseRecommendation(item.response),
+            reasoning: item.response.substring(0, 200),
+            fullResponse: item.response,
+          }
+        : {
+            modelName: item.name,
+            recommendation: 'Error',
+            reasoning: item.error,
+            fullResponse: item.error,
+          }
+    );
 
     if (models.length === 0) {
       throw new Error('모든 AI 모델 응답에 실패했습니다.');
