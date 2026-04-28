@@ -37,10 +37,10 @@ export default async function handler(req, res) {
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
       { name: 'Gemini',    fn: () => askGemini(question) },
-      { name: 'GPT OSS',   fn: () => askOpenRouter(question, 'openai/gpt-oss-20b:free', 'GPT OSS') },
-      { name: 'Llama 3.2', fn: () => askOpenRouter(question, 'meta-llama/llama-3.2-3b-instruct:free', 'Llama 3.2') },
-      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
       { name: 'MiniMax',   fn: () => askOpenRouter(question, 'minimax/minimax-m2.5:free', 'MiniMax') },
+      { name: 'Ling',      fn: () => askOpenRouter(question, 'inclusionai/ling-2.6-flash:free', 'Ling') },
+      { name: 'GLM',       fn: () => askOpenRouter(question, 'z-ai/glm-4.5-air:free', 'GLM') },
+      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
     ];
 
     const withTimeout = (fn, ms = 20000) => Promise.race([
@@ -107,10 +107,10 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString(),
     };
 
-    // 성공한 모델이 1개 이상이면 캐시 저장
-    if (models.some(m => m.recommendation !== 'Error')) {
-      cache.set(cacheKey, { data: responseData, time: Date.now() });
-    }
+    // 성공 → 30분 캐시 / 전체 실패 → 5분 캐시 (rate limit 반복 방지)
+    const hasSuccess = models.some(m => m.recommendation !== 'Error');
+    const cacheTime = hasSuccess ? Date.now() : Date.now() - (CACHE_TTL - 5 * 60 * 1000);
+    cache.set(cacheKey, { data: responseData, time: cacheTime });
 
     return res.status(200).json(responseData);
 
