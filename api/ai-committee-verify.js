@@ -1,5 +1,5 @@
 // AI 검증위원회 API
-// Gemini (Google AI Studio 무료) + Llama 3.3 + Gemma 3 (OpenRouter 무료)
+// Gemini (Google AI Studio 무료) + Llama 3.3 / Llama 3.1 / Gemma 2 / Mixtral (Groq 무료)
 
 function getEnv(key) {
   const K = key.toUpperCase();
@@ -37,10 +37,10 @@ export default async function handler(req, res) {
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
       { name: 'Gemini',    fn: () => askGemini(question) },
-      { name: 'MiniMax',   fn: () => askOpenRouter(question, 'minimax/minimax-m2.5:free', 'MiniMax') },
-      { name: 'Ling',      fn: () => askOpenRouter(question, 'inclusionai/ling-2.6-flash:free', 'Ling') },
-      { name: 'GLM',       fn: () => askOpenRouter(question, 'z-ai/glm-4.5-air:free', 'GLM') },
-      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
+      { name: 'Llama 3.3', fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
+      { name: 'Llama 3.1', fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
+      { name: 'Gemma 2',   fn: () => askGroq(question, 'gemma2-9b-it', 'Gemma 2') },
+      { name: 'Mixtral',   fn: () => askGroq(question, 'mixtral-8x7b-32768', 'Mixtral') },
     ];
 
     const withTimeout = (fn, ms = 20000) => Promise.race([
@@ -167,6 +167,34 @@ async function askGemini(question) {
   }
   const data = await response.json();
   return validateConclusion(data.candidates[0].content.parts[0].text, 'Gemini');
+}
+
+// Groq API (빠른 무료 추론)
+async function askGroq(question, model, displayName) {
+  const apiKey = getEnv('GROQ_API_KEY');
+  if (!apiKey) throw new Error('GROQ_API_KEY 미설정');
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
+      max_tokens: 500,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
+  }
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
+  return validateConclusion(content, displayName);
 }
 
 // OpenRouter API (무료 모델 공용 함수)
