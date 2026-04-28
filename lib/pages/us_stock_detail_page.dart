@@ -68,20 +68,13 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
 
     try {
       final detail = await FMPService.fetchStockDetail(widget.stock.symbol);
-      if (detail != null) {
-        setState(() {
-          _stockDetail = Stock.fromJson(detail);
-          _isLoadingDetail = false;
-        });
-      } else {
-        setState(() {
-          _error = '주식 상세 정보를 불러올 수 없습니다';
-          _isLoadingDetail = false;
-        });
-      }
+      setState(() {
+        _stockDetail = detail != null ? Stock.fromJson(detail) : widget.stock;
+        _isLoadingDetail = false;
+      });
     } catch (e) {
       setState(() {
-        _error = '오류 발생: $e';
+        _stockDetail = widget.stock;
         _isLoadingDetail = false;
       });
     }
@@ -93,7 +86,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     });
 
     try {
-      final news = await UsStockNewsService.fetchStockNews(widget.stock.symbol);
+      final news = await UsStockNewsService.fetchStockNews(widget.stock.symbol, stockName: widget.stock.name);
       setState(() {
         _newsList = news;
         _isLoadingNews = false;

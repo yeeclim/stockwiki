@@ -12,91 +12,10 @@ class UsStockNewsService {
   static const String _finnhubApiKey = String.fromEnvironment('FINNHUB_API_KEY');
   static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
 
-  /// 미국 주식 관련 뉴스 조회 (Finnhub API 사용 - 무료, CORS 지원)
-  static Future<List<News>> fetchStockNews(String symbol, {int limit = 10}) async {
-    try {
-      debugPrint('📰 [News] 뉴스 조회 시작 (Finnhub): $symbol');
-      
-      // Finnhub company news API (최근 30일)
-      final fromDate = DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T')[0];
-      final toDate = DateTime.now().toIso8601String().split('T')[0];
-      
-      final newsUrl = Uri.parse(
-        '$_finnhubBaseUrl/company-news?symbol=$symbol&from=$fromDate&to=$toDate&token=$_finnhubApiKey'
-      );
-      
-      debugPrint('🌐 [News] 뉴스 URL: $newsUrl');
-      
-      final response = await http.get(newsUrl);
-      debugPrint('📊 [News] 뉴스 응답 상태: ${response.statusCode}');
-      
-      if (response.statusCode != 200) {
-        debugPrint('❌ [News] 뉴스 조회 실패 - 상태 코드: ${response.statusCode}');
-        return [];
-      }
-
-      final data = json.decode(response.body);
-      debugPrint('📋 [News] 뉴스 데이터 파싱 완료: ${data.runtimeType}');
-      
-      // Finnhub는 배열로 직접 반환
-      if (data is List) {
-        if (data.isEmpty) {
-          debugPrint('⚠️ [News] 뉴스 리스트가 비어있음');
-          return [];
-        }
-        
-        debugPrint('📰 [News] 첫 번째 뉴스 샘플: ${data[0]}');
-        
-        try {
-          final newsList = data
-              .take(limit)
-              .map((item) {
-                try {
-                  final datetime = item['datetime'];
-                  String publishedAt = '';
-                  
-                  if (datetime != null) {
-                    try {
-                      publishedAt = DateTime.fromMillisecondsSinceEpoch(
-                        datetime * 1000,
-                      ).toIso8601String();
-                    } catch (e) {
-                      debugPrint('⚠️ [News] datetime 파싱 오류: $e');
-                    }
-                  }
-                  
-                  final title = item['headline']?.toString() ?? '';
-                  final description = item['summary']?.toString() ?? '';
-                  
-                  return News(
-                    title: title,
-                    description: description,
-                    link: item['url']?.toString() ?? '',
-                    source: item['source']?.toString() ?? '',
-                    publishedAt: publishedAt,
-                    sentiment: _analyzeSentiment('$title $description'),
-                  );
-                } catch (e) {
-                  debugPrint('⚠️ [News] 개별 뉴스 파싱 오류: $e, item: $item');
-                  rethrow;
-                }
-              })
-              .toList();
-          debugPrint('✅ [News] 뉴스 ${newsList.length}개 로드 완료');
-          return newsList;
-        } catch (e) {
-          debugPrint('💥 [News] 뉴스 파싱 오류: $e');
-          debugPrint('📄 [News] 오류 스택: ${StackTrace.current}');
-          return [];
-        }
-      }
-      
-      debugPrint('⚠️ [News] 뉴스 데이터가 리스트가 아님: $data');
-      return [];
-    } catch (e) {
-      debugPrint('💥 [News] 뉴스 조회 오류: $e');
-      return [];
-    }
+  /// 주식 관련 뉴스 조회 (서버사이드 news-search API 사용, API 키 불필요)
+  static Future<List<News>> fetchStockNews(String symbol, {String? stockName, int limit = 10}) async {
+    final keyword = stockName ?? symbol;
+    return await searchNewsByKeyword(keyword, limit: limit);
   }
 
   /// 여러 주식 관련 뉴스 조회
