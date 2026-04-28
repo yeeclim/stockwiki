@@ -36,11 +36,11 @@ export default async function handler(req, res) {
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
-      { name: 'Gemini',      fn: () => askGemini(question) },
-      { name: 'Nemotron',    fn: () => askOpenRouter(question, 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron') },
-      { name: 'MiniMax',     fn: () => askOpenRouter(question, 'minimax/minimax-m2.5:free', 'MiniMax') },
-      { name: 'Ling',        fn: () => askOpenRouter(question, 'inclusionai/ling-2.6-1t:free', 'Ling') },
-      { name: 'Tencent Hy3', fn: () => askOpenRouter(question, 'tencent/hy3-preview:free', 'Tencent Hy3') },
+      { name: 'Gemini',    fn: () => askGemini(question) },
+      { name: 'Hermes 3',  fn: () => askOpenRouter(question, 'nousresearch/hermes-3-llama-3.1-405b:free', 'Hermes 3') },
+      { name: 'GPT OSS',   fn: () => askOpenRouter(question, 'openai/gpt-oss-120b:free', 'GPT OSS') },
+      { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
+      { name: 'MiniMax',   fn: () => askOpenRouter(question, 'minimax/minimax-m2.5:free', 'MiniMax') },
     ];
 
     const allResults = await Promise.allSettled(MODEL_POOL.map(m => m.fn()));
