@@ -15,7 +15,7 @@ class NewsService {
   static const Duration _cacheExpiry = Duration(minutes: 5);
 
   /// 종목명으로 관련 뉴스를 검색합니다 (국내/해외 구분)
-  static Future<List<News>> searchStockNews(String stockName, {bool isKoreanStock = true}) async {
+  static Future<List<News>> searchStockNews(String stockName, {bool isKoreanStock = true, String? symbol}) async {
     if (stockName.isEmpty) return [];
 
     // 캐시 확인
@@ -67,13 +67,28 @@ class NewsService {
         final String baseUrl = Uri.base.origin;
 
         if (isKoreanStock) {
-          // 국내주식: 국내 뉴스 API만 사용
+          // 국내주식: MK RSS → Yahoo Finance 순으로 보완
           try {
             final mkRssNews = await _fetchFromMkRss(baseUrl, stockName);
-            if (mkRssNews.isNotEmpty) {
-              allNews.addAll(mkRssNews);
-            }
+            if (mkRssNews.isNotEmpty) allNews.addAll(mkRssNews);
           } catch (_) {}
+          // 여전히 부족하면 Yahoo Finance 폴백 (종목명 + KRX 심볼)
+          if (allNews.length < _maxResults) {
+            try {
+              // KRX 심볼이 있으면 Yahoo Finance 형식으로 변환 (010120 → 010120.KS)
+              final yahooKeyword = (symbol != null && RegExp(r'^\d+$').hasMatch(symbol))
+                  ? '$symbol.KS'
+                  : stockName;
+              final yahooNews = await _fetchFromNewsProxy(baseUrl, yahooKeyword, lang: 'ko,en');
+              if (yahooNews.isEmpty && symbol != null) {
+                // 심볼로 안 나오면 종목명으로 재시도
+                final nameNews = await _fetchFromNewsProxy(baseUrl, stockName, lang: 'ko,en');
+                allNews.addAll(nameNews);
+              } else {
+                allNews.addAll(yahooNews);
+              }
+            } catch (_) {}
+          }
         } else {
           // 미국주식: 백엔드 프록시를 통해 외부 뉴스 조회
           try {
@@ -107,10 +122,10 @@ class NewsService {
     }
   }
 
-  static Future<List<News>> _fetchFromNewsProxy(String baseUrl, String keyword) async {
+  static Future<List<News>> _fetchFromNewsProxy(String baseUrl, String keyword, {String lang = 'ko,en'}) async {
     try {
       final encoded = Uri.encodeQueryComponent(keyword);
-      final uri = Uri.parse('$baseUrl/api/news-search?keyword=$encoded&lang=ko,en');
+      final uri = Uri.parse('$baseUrl/api/news-search?keyword=$encoded&lang=$lang');
       final response = await http.get(uri).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
