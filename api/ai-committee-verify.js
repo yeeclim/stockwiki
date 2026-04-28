@@ -36,11 +36,11 @@ export default async function handler(req, res) {
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
-      { name: 'Gemini',    fn: () => askGemini(question) },
-      { name: 'Qwen3',     fn: () => askOpenRouter(question, 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3') },
-      { name: 'Mistral',   fn: () => askOpenRouter(question, 'mistralai/mistral-7b-instruct:free', 'Mistral') },
       { name: 'Llama 3.3', fn: () => askOpenRouter(question, 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3') },
-      { name: 'Gemma 4',   fn: () => askOpenRouter(question, 'google/gemma-4-31b-it:free', 'Gemma 4') },
+      { name: 'DeepSeek',  fn: () => askOpenRouter(question, 'deepseek/deepseek-chat:free', 'DeepSeek') },
+      { name: 'Gemma 3',   fn: () => askOpenRouter(question, 'google/gemma-3-27b-it:free', 'Gemma 3') },
+      { name: 'Gemini',    fn: () => askGemini(question) },
+      { name: 'Qwen3',     fn: () => askOpenRouter(question, 'qwen/qwen3-14b:free', 'Qwen3') },
     ];
 
     const allResults = await Promise.allSettled(MODEL_POOL.map(m => m.fn()));
