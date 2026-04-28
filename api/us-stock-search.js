@@ -1,4 +1,5 @@
 // 미국 주식 검색 API (Yahoo Finance, API 키 불필요)
+// v2: forced redeploy
 import { checkRateLimit, getClientIp, fail } from './shared.js';
 
 export default async function handler(req, res) {
