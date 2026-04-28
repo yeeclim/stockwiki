@@ -140,8 +140,9 @@ async function askWithFallback(primary, fallback) {
 
 // 응답 마지막 300자 안에 "결론: X" 패턴이 없으면 에러 처리 (체인오브소트 모델 필터링)
 function validateConclusion(content, displayName) {
-  const tail = content.slice(-300).toLowerCase();
-  if (!tail.match(/결론\s*[:：]\s*(buy|hold|watch|sell|매수|매도|보유|관망)/)) {
+  const tail = content.slice(-400).toLowerCase();
+  if (!tail.match(/결론\s*[:：]\s*(buy|hold|watch|sell|매수|매도|보유|관망)/) &&
+      !tail.match(/conclusion\s*[:：]\s*(buy|hold|watch|sell)/)) {
     throw new Error(`${displayName} 결론 누락 (응답 불완전)`);
   }
   return content;
@@ -183,7 +184,7 @@ async function askGroq(question, model, displayName) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
-      max_tokens: 500,
+      max_tokens: 1000,
     }),
   });
 
@@ -213,7 +214,7 @@ async function askOpenRouter(question, model, displayName) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
-      max_tokens: 500,
+      max_tokens: 1000,
     }),
   });
 
@@ -231,7 +232,7 @@ async function askOpenRouter(question, model, displayName) {
 function parseRecommendation(response) {
   const text = response.toLowerCase();
 
-  const conclusionMatch = text.match(/결론\s*[:：]\s*(buy|hold|watch|sell|매수|매도|보유|관망)/);
+  const conclusionMatch = text.match(/(?:결론|conclusion)\s*[:：]\s*(buy|hold|watch|sell|매수|매도|보유|관망)/);
   if (conclusionMatch) {
     const v = conclusionMatch[1];
     if (v === 'buy'   || v === '매수') return 'Buy';
