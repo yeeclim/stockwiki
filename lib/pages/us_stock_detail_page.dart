@@ -97,7 +97,11 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     try {
       final List<News> news;
       if (_isKoreanStock) {
-        news = await NewsService.searchStockNews(widget.stock.name, isKoreanStock: true);
+        news = await NewsService.searchStockNews(
+          widget.stock.name,
+          isKoreanStock: true,
+          symbol: widget.stock.symbol,
+        );
       } else {
         news = await UsStockNewsService.fetchStockNews(widget.stock.symbol, stockName: widget.stock.name);
       }
