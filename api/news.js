@@ -137,52 +137,56 @@ async function handleNaverNews(req, res) {
     return fail(res, 400, '유효한 키워드가 필요합니다 (1~100자)');
   }
 
+  // Google News RSS (한국) — 무료, API 키 불필요, 키워드 검색 실제 동작
   const encodedKeyword = encodeURIComponent(keyword);
-  const rssUrl = `https://news.naver.com/main/rss/section.naver?sid=101&query=${encodedKeyword}`;
+  const rssUrl = `https://news.google.com/rss/search?q=${encodedKeyword}&hl=ko&gl=KR&ceid=KR:ko`;
 
-  const response = await fetch(rssUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    timeout: 10000
-  });
+  try {
+    const response = await fetch(rssUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
+      signal: AbortSignal.timeout(8000),
+    });
 
-  if (!response.ok) return res.status(200).json({ success: true, count: 0, results: [] });
+    if (!response.ok) return res.status(200).json({ success: true, count: 0, results: [] });
 
-  const xmlText = await response.text();
-  const newsList = [];
-  const itemPattern = /<item[^>]*>(.*?)<\/item>/gs;
-  const items = xmlText.match(itemPattern) || [];
+    const xmlText = await response.text();
+    const newsList = [];
+    const itemPattern = /<item>([\s\S]*?)<\/item>/g;
+    let match;
 
-  for (let i = 0; i < Math.min(items.length, max_results); i++) {
-    const itemXml = items[i];
-    const titleMatch = itemXml.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>/) || itemXml.match(/<title[^>]*>(.*?)<\/title>/);
-    const title = titleMatch ? cleanText(titleMatch[1]) : '';
-    const linkMatch = itemXml.match(/<link[^>]*><!\[CDATA\[(.*?)\]\]><\/link>/) || itemXml.match(/<link[^>]*>(.*?)<\/link>/);
-    const link = linkMatch ? linkMatch[1] : '';
-    const descMatch = itemXml.match(/<description[^>]*><!\[CDATA\[(.*?)\]\]><\/description>/) || itemXml.match(/<description[^>]*>(.*?)<\/description>/);
-    const description = descMatch ? cleanText(descMatch[1]) : '';
-    const pubDateMatch = itemXml.match(/<pubDate[^>]*>(.*?)<\/pubDate>/);
+    while ((match = itemPattern.exec(xmlText)) !== null && newsList.length < max_results) {
+      const itemXml = match[1];
+      const titleMatch = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemXml.match(/<title>([\s\S]*?)<\/title>/);
+      const title = titleMatch ? cleanText(titleMatch[1]) : '';
+      const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
+      const link = linkMatch ? linkMatch[1].trim() : '';
+      const descMatch = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemXml.match(/<description>([\s\S]*?)<\/description>/);
+      const description = descMatch ? cleanText(descMatch[1]) : '';
+      const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+      const sourceMatch = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/);
 
-    if (title && link) {
-      newsList.push({
-        title: title,
-        description: description,
-        link: link,
-        source: title.match(/\[(.*?)\]/)?.[1] || '네이버뉴스',
-        published_at: pubDateMatch ? pubDateMatch[1] : '',
-        crawled_at: new Date().toISOString()
-      });
+      if (title && link) {
+        newsList.push({
+          title,
+          description,
+          link,
+          source: sourceMatch ? cleanText(sourceMatch[1]) : '구글뉴스',
+          published_at: pubDateMatch ? pubDateMatch[1].trim() : '',
+          crawled_at: new Date().toISOString(),
+        });
+      }
     }
-  }
 
-  res.status(200).json({
-    success: true,
-    keyword: keyword.trim(),
-    count: newsList.length,
-    results: newsList,
-    crawled_at: new Date().toISOString()
-  });
+    return res.status(200).json({
+      success: true,
+      keyword: keyword.trim(),
+      count: newsList.length,
+      results: newsList,
+      crawled_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    return res.status(200).json({ success: true, count: 0, results: [] });
+  }
 }
 
 function cleanText(text) {
