@@ -4,6 +4,7 @@ import '../models/stock.dart';
 import '../models/news.dart';
 import '../services/fmp_service.dart';
 import '../services/us_stock_news_service.dart';
+import '../services/news_service.dart';
 import '../services/bookmark_service.dart';
 import '../widgets/us_stock_chart_widget.dart';
 
@@ -80,13 +81,26 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     }
   }
 
+  bool get _isKoreanStock {
+    return widget.isKorean ||
+        RegExp(r'^\d+$').hasMatch(widget.stock.symbol) ||
+        widget.stock.symbol.endsWith('.KS') ||
+        widget.stock.symbol.endsWith('.KQ') ||
+        RegExp(r'[가-힣]').hasMatch(widget.stock.name);
+  }
+
   Future<void> _loadStockNews() async {
     setState(() {
       _isLoadingNews = true;
     });
 
     try {
-      final news = await UsStockNewsService.fetchStockNews(widget.stock.symbol, stockName: widget.stock.name);
+      final List<News> news;
+      if (_isKoreanStock) {
+        news = await NewsService.searchStockNews(widget.stock.name, isKoreanStock: true);
+      } else {
+        news = await UsStockNewsService.fetchStockNews(widget.stock.symbol, stockName: widget.stock.name);
+      }
       setState(() {
         _newsList = news;
         _isLoadingNews = false;
