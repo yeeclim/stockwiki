@@ -1,6 +1,4 @@
-// 외부 뉴스 API 프록시 (NewsData.io, GNews, MediaStack)
-// API 키는 서버 환경변수에서만 읽음 — 클라이언트에 노출되지 않음
-
+// 외부 뉴스 API 프록시 — Yahoo Finance(무료) + 유료 API 키 있으면 병행 사용
 import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './shared.js';
 
 export default async function handler(req, res) {
@@ -16,24 +14,24 @@ export default async function handler(req, res) {
   }
 
   const keyword = validateString(req.query.keyword, { minLen: 1, maxLen: 100 });
-  if (!keyword) {
-    return fail(res, 400, '유효한 검색어가 필요합니다 (1~100자)');
-  }
-  const lang = req.query.lang || 'ko,en';
+  if (!keyword) return fail(res, 400, '유효한 검색어가 필요합니다 (1~100자)');
+
+  const lang = req.query.lang || 'en';
   const maxResults = validateInt(req.query.limit, { min: 1, max: 30 }) ?? 10;
   const sanitized = encodeURIComponent(keyword);
 
-  const results = await Promise.allSettled([
+  const sources = [
+    fetchYahooNews(keyword, maxResults),
     fetchNewsData(sanitized, lang, maxResults),
     fetchGNews(sanitized, lang, maxResults),
-    fetchMediaStack(sanitized, lang, maxResults),
-  ]);
+  ];
+
+  const results = await Promise.allSettled(sources);
 
   const allNews = results
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
 
-  // 제목 기준 중복 제거
   const seen = new Set();
   const unique = allNews.filter(item => {
     if (!item.title || seen.has(item.title)) return false;
@@ -45,6 +43,32 @@ export default async function handler(req, res) {
     success: true,
     results: unique.slice(0, maxResults),
   });
+}
+
+// Yahoo Finance 뉴스 검색 (API 키 불필요)
+async function fetchYahooNews(keyword, limit) {
+  try {
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'application/json',
+    };
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(keyword)}&quotesCount=0&newsCount=${limit}&enableFuzzyQuery=false`;
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const news = data.news || [];
+    return news.map(item => ({
+      title: item.title || '',
+      description: item.summary || '',
+      link: item.link || '',
+      source: item.publisher || 'Yahoo Finance',
+      publishedAt: item.providerPublishTime
+        ? new Date(item.providerPublishTime * 1000).toISOString()
+        : '',
+    }));
+  } catch {
+    return [];
+  }
 }
 
 async function fetchNewsData(keyword, lang, limit) {
@@ -81,26 +105,6 @@ async function fetchGNews(keyword, lang, limit) {
       link: item.url || '',
       source: item.source?.name || 'GNews',
       publishedAt: item.publishedAt || '',
-    }));
-  } catch {
-    return [];
-  }
-}
-
-async function fetchMediaStack(keyword, lang, limit) {
-  const apiKey = process.env.MEDIASTACK_API_KEY || '';
-  if (!apiKey) return [];
-  try {
-    const url = `http://api.mediastack.com/v1/news?access_key=${apiKey}&keywords=${keyword}&languages=${lang}&limit=${limit}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.data || []).map(item => ({
-      title: item.title || '',
-      description: item.description || '',
-      link: item.url || '',
-      source: item.source || 'MediaStack',
-      publishedAt: item.published_at || '',
     }));
   } catch {
     return [];
