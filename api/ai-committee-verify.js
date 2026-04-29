@@ -123,12 +123,13 @@ export default async function handler(req, res) {
   }
 }
 
-const PROMPT_SUFFIX = `
+const SYSTEM_INSTRUCTION = `당신은 한국 주식 시장 전문 애널리스트입니다.
+반드시 한국어로만 답변하세요.
+한자(漢字), 중국어, 일본어, 베트남어 등 다른 언어 문자는 절대 사용하지 마세요.
+영어는 종목코드(AAPL, NVDA, TSLA), 금융 약어(PER, PBR, ROE, EPS, EBITDA, RSI, MACD, MA, ETF, AI, ESG)처럼 한국어로 대체할 수 없는 경우에만 허용됩니다.
+모든 분석과 의견은 자연스러운 한국어 문장으로 작성하세요.`;
 
-[언어 규칙 - 반드시 준수]
-- 반드시 한국어로만 답변하세요. 한자, 베트남어, 일본어 등 다른 언어는 절대 사용하지 마세요.
-- 영어는 종목코드(AAPL, NVDA 등), 고유명사(AI, ESG, PER, PBR, ROE 등 금융 약어)처럼 한국어 대체가 불가능한 경우에만 허용합니다.
-- 모든 분석 내용, 설명, 의견은 자연스러운 한국어 문장으로 작성하세요.
+const PROMPT_SUFFIX = `
 
 분석 후 마지막 줄에 반드시 다음 형식으로만 결론을 작성하세요:
 결론: Buy  (또는 Hold, Watch, Sell 중 하나)`;
@@ -163,7 +164,10 @@ async function askGemini(question) {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: question + PROMPT_SUFFIX }] }] }),
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        contents: [{ parts: [{ text: question + PROMPT_SUFFIX }] }],
+      }),
     }
   );
 
@@ -188,7 +192,10 @@ async function askGroq(question, model, displayName) {
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
+      messages: [
+        { role: 'system', content: SYSTEM_INSTRUCTION },
+        { role: 'user', content: question + PROMPT_SUFFIX },
+      ],
       max_tokens: 1000,
     }),
   });
