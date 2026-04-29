@@ -167,18 +167,18 @@ const CJK_TO_KOREAN = {
   '實績': '실적', '展望': '전망', '危険': '위험', '安定': '안정',
 };
 
-// CJK 문자가 섞인 경우 치환 후 여전히 남아 있으면 에러 처리
+// CJK 문자가 섞인 경우 치환 후 남은 것은 제거 (거부 대신 정제)
 function sanitizeAndValidateLanguage(content, displayName) {
   let result = content;
   for (const [cjk, korean] of Object.entries(CJK_TO_KOREAN)) {
     result = result.replaceAll(cjk, korean);
   }
-  // 치환 후에도 CJK 통합한자 (U+4E00-U+9FFF) 또는 일본어(U+3040-U+30FF)가 남아 있으면 거부
+  // 치환 후에도 CJK 통합한자 (U+4E00-U+9FFF) 또는 일본어(U+3040-U+30FF)가 남아 있으면 제거
   if (/[一-鿿㐀-䶿぀-ヿ]/.test(result)) {
     const sample = [...result.matchAll(/[一-鿿㐀-䶿぀-ヿ]/g)]
       .slice(0, 5).map(m => m[0]).join('');
-    console.warn(`⚠️ ${displayName} 한자/일본어 미처리 문자 포함: ${sample}`);
-    throw new Error(`${displayName} 응답에 한자/일본어 포함됨 (언어 위반)`);
+    console.warn(`⚠️ ${displayName} CJK 문자 자동 제거: ${sample}`);
+    result = result.replace(/[一-鿿㐀-䶿぀-ヿ]+/g, '').replace(/  +/g, ' ').trim();
   }
   return result;
 }
