@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
+import '../models/news.dart';
 import '../services/fmp_service.dart';
+import '../services/news_service.dart';
+import '../services/us_stock_news_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'us_stock_detail_page.dart';
@@ -23,6 +27,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   String? _error;
   DateTime? _lastUpdated;
   String _searchQuery = '';
+  List<News> _stockNews = [];
+  bool _isLoadingNews = false;
 
   @override
   void initState() {
@@ -34,6 +40,26 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadNewsForStock(Stock stock) async {
+    if (!mounted) return;
+    setState(() => _isLoadingNews = true);
+    try {
+      final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) ||
+          stock.symbol.endsWith('.KS') ||
+          stock.symbol.endsWith('.KQ') ||
+          RegExp(r'[가-힣]').hasMatch(stock.name);
+      final List<News> news;
+      if (isKorean) {
+        news = await NewsService.searchStockNews(stock.name, isKoreanStock: true, symbol: stock.symbol);
+      } else {
+        news = await UsStockNewsService.fetchStockNews(stock.symbol, stockName: stock.name);
+      }
+      if (mounted) setState(() { _stockNews = news; _isLoadingNews = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingNews = false);
+    }
   }
 
   Future<void> _searchStock(String query) async {
@@ -88,7 +114,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         _lastUpdated = DateTime.now();
         _isLoading = false;
         _isSearching = false;
+        _stockNews = [];
       });
+      _loadNewsForStock(stock);
     } catch (e) {
       debugPrint('💥 검색 중 오류 발생: $e');
       debugPrint('📚 오류 타입: ${e.runtimeType}');
@@ -898,9 +926,86 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     ),
                   ),
                 ),
+
+                const SizedBox(height: 24),
+                Divider(color: theme.dividerColor),
+                const SizedBox(height: 16),
+
+                // 4. 관련 뉴스
+                Row(
+                  children: [
+                    Icon(Icons.newspaper, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '관련 뉴스',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    if (_isLoadingNews) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 12, height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_isLoadingNews)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text('뉴스를 불러오는 중...', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  )
+                else if (_stockNews.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text('관련 뉴스가 없습니다', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  )
+                else
+                  ..._stockNews.take(5).map((news) => _buildNewsItem(news)),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewsItem(News news) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () async {
+        final uri = Uri.tryParse(news.link);
+        if (uri != null && await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(news.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (news.source.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(news.source, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.onSurfaceVariant),
+          ],
         ),
       ),
     );
