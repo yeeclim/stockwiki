@@ -123,11 +123,23 @@ export default async function handler(req, res) {
   }
 }
 
-const SYSTEM_INSTRUCTION = `당신은 한국 주식 시장 전문 애널리스트입니다.
-반드시 한국어로만 답변하세요.
-한자(漢字), 중국어, 일본어, 베트남어 등 다른 언어 문자는 절대 사용하지 마세요.
-영어는 종목코드(AAPL, NVDA, TSLA), 금융 약어(PER, PBR, ROE, EPS, EBITDA, RSI, MACD, MA, ETF, AI, ESG)처럼 한국어로 대체할 수 없는 경우에만 허용됩니다.
-모든 분석과 의견은 자연스러운 한국어 문장으로 작성하세요.`;
+const SYSTEM_INSTRUCTION = `You are a Korean stock market analyst. You MUST write your entire response in Korean (한국어) only.
+
+STRICTLY FORBIDDEN - never use these characters or languages:
+- Chinese characters (漢字/한자): 公司, 信號, 財務, 增加, 趨勢, 市場, 維持, 大きい, 稍微 etc.
+- Japanese (hiragana/katakana): あいう, アイウ etc.
+- Vietnamese or any other non-Korean script.
+
+If you want to write "company" write 회사 (NOT 公司).
+If you want to write "signal" write 신호 (NOT 信號).
+If you want to write "financial" write 재무 (NOT 財務).
+If you want to write "increase" write 증가 (NOT 增加).
+If you want to write "trend" write 추세 (NOT 趨勢).
+If you want to write "market" write 시장 (NOT 市場).
+
+ALLOWED: Korean (한글), and ONLY these English abbreviations when no Korean equivalent exists: ticker symbols (AAPL, NVDA, TSLA), financial terms (PER, PBR, ROE, EPS, EBITDA, RSI, MACD, MA, ETF, AI, ESG, GDP, CPI).
+
+Write all analysis in natural Korean sentences.`;
 
 const PROMPT_SUFFIX = `
 
@@ -142,6 +154,33 @@ async function askWithFallback(primary, fallback) {
     console.warn('⚠️ 주 모델 실패, 백업 시도:', e.message);
     return await fallback();
   }
+}
+
+// 한자/일본어 → 한국어 치환 테이블
+const CJK_TO_KOREAN = {
+  '公司': '회사', '信號': '신호', '財務': '재무', '增加': '증가',
+  '趨勢': '추세', '市場': '시장', '維持': '유지', '减少': '감소',
+  '分析': '분석', '投資': '투자', '收益': '수익', '利益': '이익',
+  '매출液': '매출액', '負債': '부채', '資産': '자산', '株價': '주가',
+  '上昇': '상승', '下落': '하락', '比率': '비율', '成長': '성장',
+  '企業': '기업', '産業': '산업', '競争': '경쟁', '技術': '기술',
+  '實績': '실적', '展望': '전망', '危険': '위험', '安定': '안정',
+};
+
+// CJK 문자가 섞인 경우 치환 후 여전히 남아 있으면 에러 처리
+function sanitizeAndValidateLanguage(content, displayName) {
+  let result = content;
+  for (const [cjk, korean] of Object.entries(CJK_TO_KOREAN)) {
+    result = result.replaceAll(cjk, korean);
+  }
+  // 치환 후에도 CJK 통합한자 (U+4E00-U+9FFF) 또는 일본어(U+3040-U+30FF)가 남아 있으면 거부
+  if (/[一-鿿㐀-䶿぀-ヿ]/.test(result)) {
+    const sample = [...result.matchAll(/[一-鿿㐀-䶿぀-ヿ]/g)]
+      .slice(0, 5).map(m => m[0]).join('');
+    console.warn(`⚠️ ${displayName} 한자/일본어 미처리 문자 포함: ${sample}`);
+    throw new Error(`${displayName} 응답에 한자/일본어 포함됨 (언어 위반)`);
+  }
+  return result;
 }
 
 // 응답 마지막 300자 안에 "결론: X" 패턴이 없으면 에러 처리 (체인오브소트 모델 필터링)
@@ -176,7 +215,8 @@ async function askGemini(question) {
     throw new Error(`Gemini HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
   const data = await response.json();
-  return validateConclusion(data.candidates[0].content.parts[0].text, 'Gemini');
+  const text = data.candidates[0].content.parts[0].text;
+  return validateConclusion(sanitizeAndValidateLanguage(text, 'Gemini'), 'Gemini');
 }
 
 // Groq API (빠른 무료 추론)
@@ -207,7 +247,7 @@ async function askGroq(question, model, displayName) {
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
-  return validateConclusion(content, displayName);
+  return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
 
 // OpenRouter API (무료 모델 공용 함수)
