@@ -1011,78 +1011,190 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     );
   }
 
+  String _resolveDisplayName(String modelName) {
+    final lowerName = modelName.toLowerCase();
+    if (lowerName.contains('gemini')) return 'Gemini';
+    if (lowerName.contains('llama 3.3') || lowerName.contains('llama-3.3')) return 'Llama 3.3';
+    if (lowerName.contains('llama 3.1') || lowerName.contains('llama-3.1') || lowerName.contains('llama-3.1-8b')) return 'Llama 3.1';
+    if (lowerName.contains('llama')) return 'Llama';
+    if (lowerName.contains('qwen')) return 'Qwen';
+    if (lowerName.contains('nemotron')) return 'Nemotron';
+    if (lowerName.contains('gemma')) return 'Gemma 2';
+    if (lowerName.contains('mixtral')) return 'Mixtral';
+    if (lowerName.contains('mistral')) return 'Mistral';
+    if (lowerName.contains('gpt') || lowerName.contains('openai')) return 'ChatGPT';
+    if (lowerName.contains('claude') || lowerName.contains('anthropic')) return 'Claude';
+    if (lowerName.contains('deepseek')) return 'DeepSeek';
+    return modelName;
+  }
+
+  // reasoning 첫 문장 또는 최대 45자 요약
+  String _abbreviateReasoning(String reasoning) {
+    if (reasoning.isEmpty) return '';
+    final newlineIdx = reasoning.indexOf('\n');
+    final end = newlineIdx > 0 && newlineIdx <= 50 ? newlineIdx : reasoning.length;
+    final first = reasoning.substring(0, end.clamp(0, 50));
+    return reasoning.length > 50 ? '$first…' : first;
+  }
+
+  void _showReasoningSheet(AiModelResponse model, String displayName) {
+    final color = _getRecommendationColor(model.recommendation);
+    final isError = model.recommendation == 'Error';
+    final fullText = model.fullResponse.isNotEmpty ? model.fullResponse : model.reasoning;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, scrollController) => Column(
+            children: [
+              // 핸들
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: theme.dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: color, width: 2),
+                      ),
+                      child: Icon(_getRecommendationIcon(model.recommendation), color: color, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(displayName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            isError ? '분석 실패' : model.recommendation,
+                            style: theme.textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // 전체 내용
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    fullText.isEmpty ? '분석 내용이 없습니다.' : fullText,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.7),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildVotingPlate(AiModelResponse model) {
     final theme = Theme.of(context);
     final color = _getRecommendationColor(model.recommendation);
-    
-    // 모델명 매핑 및 정규화
-    String displayName = model.modelName;
-    
-    final lowerName = model.modelName.toLowerCase();
-    if (lowerName.contains('gemini')) {
-      displayName = 'Gemini';
-    } else if (lowerName.contains('llama')) {
-      displayName = 'Llama 3.3';
-    } else if (lowerName.contains('qwen')) {
-      displayName = 'Qwen3';
-    } else if (lowerName.contains('nemotron')) {
-      displayName = 'Nemotron';
-    } else if (lowerName.contains('gemma')) {
-      displayName = 'Gemma 4';
-    } else if (lowerName.contains('mistral')) {
-      displayName = 'Mistral';
-    } else if (lowerName.contains('gpt') || lowerName.contains('openai')) {
-      displayName = 'ChatGPT';
-    } else if (lowerName.contains('claude') || lowerName.contains('anthropic')) {
-      displayName = 'Claude';
-    } else if (lowerName.contains('deepseek')) {
-      displayName = 'DeepSeek';
-    }
-
+    final displayName = _resolveDisplayName(model.modelName);
     final isError = model.recommendation == 'Error';
     final isMissing = model.reasoning.contains('미설정');
-    final errorLabel = isMissing ? '키 미설정' : '분석 실패';
+    final shortReason = _abbreviateReasoning(model.reasoning);
 
-    return Tooltip(
-      message: model.reasoning,
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      triggerMode: TooltipTriggerMode.tap,
-      showDuration: const Duration(seconds: 5),
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: color, width: 2),
+    return GestureDetector(
+      onTap: () => _showReasoningSheet(model, displayName),
+      child: SizedBox(
+        width: 90,
+        child: Column(
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: color, width: 2),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      _getRecommendationIcon(model.recommendation),
+                      color: color,
+                      size: 30,
+                    ),
+                  ),
+                ),
+                // 탭 힌트 아이콘
+                Container(
+                  width: 18, height: 18,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: theme.dividerColor),
+                  ),
+                  child: Icon(Icons.info_outline, size: 12, color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
             ),
-            child: Center(
-              child: Icon(
-                _getRecommendationIcon(model.recommendation),
+            const SizedBox(height: 6),
+            Text(
+              displayName,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              isError ? (isMissing ? '키 미설정' : '분석 실패') : model.recommendation,
+              style: theme.textTheme.labelSmall?.copyWith(
                 color: color,
-                size: 30,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            displayName,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
+            const SizedBox(height: 4),
+            Text(
+              shortReason,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 9,
+                height: 1.3,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          Text(
-            isError ? errorLabel : model.recommendation,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

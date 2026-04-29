@@ -22,11 +22,13 @@ class AiModelResponse {
   final String modelName;
   final String recommendation;
   final String reasoning;
+  final String fullResponse;
 
   AiModelResponse({
     required this.modelName,
     required this.recommendation,
     required this.reasoning,
+    this.fullResponse = '',
   });
 
   factory AiModelResponse.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class AiModelResponse {
       modelName: json['modelName'] ?? 'Unknown',
       recommendation: json['recommendation'] ?? 'Hold',
       reasoning: json['reasoning'] ?? '',
+      fullResponse: json['fullResponse'] ?? json['reasoning'] ?? '',
     );
   }
 }
