@@ -133,60 +133,86 @@ async function handleNaverNews(req, res) {
   const keyword = validateString(raw.keyword, { minLen: 1, maxLen: 100 });
   const max_results = validateInt(raw.max_results, { min: 1, max: 50 }) ?? 20;
 
-  if (!keyword) {
-    return fail(res, 400, '유효한 키워드가 필요합니다 (1~100자)');
-  }
+  if (!keyword) return fail(res, 400, '유효한 키워드가 필요합니다 (1~100자)');
 
-  // Google News RSS (한국) — 무료, API 키 불필요, 키워드 검색 실제 동작
+  // 네이버 뉴스 검색 스크래핑 — <mark> 태그가 붙은 항목이 키워드 매칭 기사
   const encodedKeyword = encodeURIComponent(keyword);
-  const rssUrl = `https://news.google.com/rss/search?q=${encodedKeyword}&hl=ko&gl=KR&ceid=KR:ko`;
+  const searchUrl = `https://search.naver.com/search.naver?where=news&query=${encodedKeyword}&sort=1&nso=so:dd,p:all`;
 
   try {
-    const response = await fetch(rssUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'ko-KR,ko;q=0.9',
+      },
       signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) return res.status(200).json({ success: true, count: 0, results: [] });
 
-    const xmlText = await response.text();
-    const newsList = [];
-    const itemPattern = /<item>([\s\S]*?)<\/item>/g;
-    let match;
+    const html = await response.text();
 
-    while ((match = itemPattern.exec(xmlText)) !== null && newsList.length < max_results) {
-      const itemXml = match[1];
-      const titleMatch = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemXml.match(/<title>([\s\S]*?)<\/title>/);
-      const title = titleMatch ? cleanText(titleMatch[1]) : '';
-      const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
-      const link = linkMatch ? linkMatch[1].trim() : '';
-      const descMatch = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemXml.match(/<description>([\s\S]*?)<\/description>/);
-      const description = descMatch ? cleanText(descMatch[1]) : '';
-      const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
-      const sourceMatch = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/);
+    // 1. 키워드 매칭 기사 타이틀 (<mark> 포함된 것만 추출)
+    const allTitleMatches = [...html.matchAll(/"title":"([^"]{3,})"/g)];
+    const markedTitles = allTitleMatches
+      .map(m => m[1])
+      .filter(t => t.includes('<mark>') || t.includes('<strong>'));
 
-      if (title && link) {
-        newsList.push({
-          title,
-          description,
-          link,
-          source: sourceMatch ? cleanText(sourceMatch[1]) : '구글뉴스',
-          published_at: pubDateMatch ? pubDateMatch[1].trim() : '',
-          crawled_at: new Date().toISOString(),
-        });
-      }
+    // 2. 네이버 뉴스 기사 링크 (중복 제거)
+    const rawLinks = html.match(/https?:\/\/n\.news\.naver\.com\/mnews\/article\/[^\\"&]+/g) || [];
+    const uniqueLinks = [...new Set(rawLinks)];
+
+    // 3. 소스명: <mark> 타이틀 바로 앞의 짧은 타이틀
+    const results = [];
+    let linkIdx = 0;
+
+    for (let i = 0; i < allTitleMatches.length && results.length < max_results; i++) {
+      const raw = allTitleMatches[i][1];
+      if (!raw.includes('<mark>') && !raw.includes('<strong>')) continue;
+
+      const title = cleanNaverText(raw);
+      if (!title || title.length < 5) continue;
+
+      const prevRaw = i > 0 ? allTitleMatches[i - 1][1] : '';
+      const source = (prevRaw.length < 25 && !prevRaw.includes('<mark>'))
+        ? cleanNaverText(prevRaw)
+        : '네이버뉴스';
+
+      const link = uniqueLinks[linkIdx]
+        ? (uniqueLinks[linkIdx].startsWith('http') ? uniqueLinks[linkIdx] : 'https://' + uniqueLinks[linkIdx])
+        : `https://search.naver.com/search.naver?where=news&query=${encodedKeyword}`;
+      linkIdx++;
+
+      results.push({
+        title,
+        description: '',
+        link,
+        source,
+        published_at: new Date().toISOString(),
+        crawled_at: new Date().toISOString(),
+      });
     }
 
     return res.status(200).json({
       success: true,
       keyword: keyword.trim(),
-      count: newsList.length,
-      results: newsList,
+      count: results.length,
+      results,
       crawled_at: new Date().toISOString(),
     });
   } catch (e) {
+    console.error('handleNaverNews error:', e.message);
     return res.status(200).json({ success: true, count: 0, results: [] });
   }
+}
+
+function cleanNaverText(raw) {
+  return raw
+    .replace(/<\/?mark>/g, '').replace(/<\/?strong>/g, '')
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
 function cleanText(text) {
