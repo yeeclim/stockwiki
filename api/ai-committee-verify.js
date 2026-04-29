@@ -38,9 +38,9 @@ export default async function handler(req, res) {
     const MODEL_POOL = [
       { name: 'Gemini',    fn: () => askGemini(question) },
       { name: 'Llama 3.3', fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
-      { name: 'Llama 3.1', fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
       { name: 'Gemma 2',   fn: () => askGroq(question, 'gemma2-9b-it', 'Gemma 2') },
       { name: 'Mixtral',   fn: () => askGroq(question, 'mixtral-8x7b-32768', 'Mixtral') },
+      { name: 'Llama 3.1', fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
     ];
 
     const withTimeout = (fn, ms = 20000) => Promise.race([
