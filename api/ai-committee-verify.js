@@ -80,7 +80,7 @@ export default async function handler(req, res) {
         : {
             modelName: item.name,
             recommendation: 'Error',
-            reasoning: item.error,
+            reasoning: cuteErrorMessage(item.error),
             fullResponse: item.error,
           }
     );
@@ -145,6 +145,36 @@ const PROMPT_SUFFIX = `
 
 분석 후 마지막 줄에 반드시 다음 형식으로만 결론을 작성하세요:
 결론: Buy  (또는 Hold, Watch, Sell 중 하나)`;
+
+// 에러 메시지를 귀여운 문구로 변환
+function cuteErrorMessage(error) {
+  const msg = (error || '').toLowerCase();
+  if (msg.includes('429') || msg.includes('quota') || msg.includes('exceeded') || msg.includes('rate limit')) {
+    const msgs = [
+      '무료 끝났당 ㅠ_ㅠ 내일 다시 만나요!',
+      '오늘 할당량 다 썼어요~ 😢 내일 봐요!',
+      '열심히 일했더니 쿼터가 동났어요 ㅠㅠ',
+      '무료 티켓 소진! 🎟️ 내일 충전돼요~',
+    ];
+    return msgs[Math.floor(Math.random() * msgs.length)];
+  }
+  if (msg.includes('미설정') || msg.includes('api_key') || msg.includes('api key')) {
+    return '열쇠를 못 찾겠어요 🔑 API 키가 없나봐요';
+  }
+  if (msg.includes('시간 초과') || msg.includes('timeout')) {
+    return '생각하다 잠들었어요 💤 다시 깨워볼까요?';
+  }
+  if (msg.includes('결론 누락') || msg.includes('불완전')) {
+    return '말이 너무 길어져서 결론을 깜빡했대요 🤔';
+  }
+  if (msg.includes('한자') || msg.includes('cjk') || msg.includes('언어 위반')) {
+    return '한자가 너무 좋아서 혼났어요 😅 다시 시도해 보세요!';
+  }
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('connect')) {
+    return '길을 잃었어요 🗺️ 네트워크가 불안정한가봐요';
+  }
+  return '앗, 제가 삐끗했어요! 🙈 잠시 후 다시 시도해 보세요';
+}
 
 // 주 모델 실패 시 백업 모델 자동 시도
 async function askWithFallback(primary, fallback) {
