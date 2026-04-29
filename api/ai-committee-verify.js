@@ -125,6 +125,11 @@ export default async function handler(req, res) {
 
 const PROMPT_SUFFIX = `
 
+[언어 규칙 - 반드시 준수]
+- 반드시 한국어로만 답변하세요. 한자, 베트남어, 일본어 등 다른 언어는 절대 사용하지 마세요.
+- 영어는 종목코드(AAPL, NVDA 등), 고유명사(AI, ESG, PER, PBR, ROE 등 금융 약어)처럼 한국어 대체가 불가능한 경우에만 허용합니다.
+- 모든 분석 내용, 설명, 의견은 자연스러운 한국어 문장으로 작성하세요.
+
 분석 후 마지막 줄에 반드시 다음 형식으로만 결론을 작성하세요:
 결론: Buy  (또는 Hold, Watch, Sell 중 하나)`;
 
