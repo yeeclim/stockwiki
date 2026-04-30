@@ -580,14 +580,16 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                flex: positiveCount,
-                child: Container(height: 4, color: Colors.green),
-              ),
-              Expanded(
-                flex: negativeCount,
-                child: Container(height: 4, color: Colors.red),
-              ),
+              if (positiveCount > 0)
+                Expanded(
+                  flex: positiveCount,
+                  child: Container(height: 4, color: Colors.green),
+                ),
+              if (negativeCount > 0)
+                Expanded(
+                  flex: negativeCount,
+                  child: Container(height: 4, color: Colors.red),
+                ),
               if (positiveCount == 0 && negativeCount == 0)
                 Expanded(child: Container(height: 4, color: Colors.grey)),
             ],

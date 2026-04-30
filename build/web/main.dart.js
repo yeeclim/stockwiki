@@ -93028,7 +93028,9 @@ i.toString
 i=A.L(i).ok.x
 h=t.p
 i=A.b6(A.b([j,B.fN,A.c4(A.S("\ub274\uc2a4 \uac10\uc815 \ubd84\uc11d \ub3d9\ud5a5",g,g,g,g,i==null?g:i.uT(B.n),g,g),1),A.S(n,g,g,g,g,A.bW(g,g,m,g,g,g,g,g,g,g,g,14,g,g,B.n,g,g,!0,g,g,g,g,g,g,g,g),g,g)],h),B.p,B.l,B.j,0)
-j=A.b([A.c4(A.by(g,g,B.q,B.ab,g,4,g,g,g),q),A.c4(A.by(g,g,B.q,B.aj,g,4,g,g,g),p)],h)
+j=A.b([],h)
+if(q>0)j.push(A.c4(A.by(g,g,B.q,B.ab,g,4,g,g,g),q))
+if(p>0)j.push(A.c4(A.by(g,g,B.q,B.aj,g,4,g,g,g),p))
 if(q===0&&p===0)j.push(A.c4(A.by(g,g,B.q,B.dn,g,4,g,g,g),1))
 return A.by(g,A.aP(A.b([i,B.aW,A.b6(j,B.p,B.l,B.j,0),B.b3,A.b6(A.b([A.S("\ud638\uc7ac\uc131 "+q+"\uac74",g,g,g,g,B.XO,g,g),A.S("\uc545\uc7ac\uc131 "+p+"\uac74",g,g,g,g,B.Z9,g,g)],h),B.p,B.aD,B.j,0)],h),B.p,B.l,B.j),B.q,g,new A.bk(s,g,k,o,g,g,B.L),g,g,B.ae,g)},
 Qc(a){if(a>=1e9)return B.d.Z(a/1e9,1)+"B"
