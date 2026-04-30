@@ -953,6 +953,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                if (!_isLoadingNews)
+                  _buildSentimentSummary(),
+                const SizedBox(height: 8),
                 if (_isLoadingNews)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -969,6 +972,91 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSentimentSummary() {
+    final theme = Theme.of(context);
+    int score = 0;
+    int positiveCount = 0;
+    int negativeCount = 0;
+
+    for (final news in _stockNews) {
+      if (news.sentiment == 'Positive') { score++; positiveCount++; }
+      else if (news.sentiment == 'Negative') { score--; negativeCount++; }
+    }
+
+    if (_stockNews.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.analytics_outlined, color: Colors.grey.shade400, size: 18),
+            const SizedBox(width: 8),
+            Text('뉴스 감정 분석', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text('데이터 없음', style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
+          ],
+        ),
+      );
+    }
+
+    Color signalColor;
+    String signal;
+    IconData signalIcon;
+
+    if (score >= 3) { signal = '긍정적 흐름'; signalColor = Colors.green[700]!; signalIcon = Icons.trending_up; }
+    else if (score >= 1) { signal = '다소 긍정적'; signalColor = Colors.green; signalIcon = Icons.sentiment_satisfied; }
+    else if (score <= -3) { signal = '부정적 흐름'; signalColor = Colors.red[700]!; signalIcon = Icons.trending_down; }
+    else if (score <= -1) { signal = '다소 부정적'; signalColor = Colors.red; signalIcon = Icons.sentiment_dissatisfied; }
+    else { signal = '중립'; signalColor = Colors.grey; signalIcon = Icons.remove_circle_outline; }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: signalColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: signalColor.withOpacity(0.4)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(signalIcon, color: signalColor, size: 18),
+              const SizedBox(width: 8),
+              Text('뉴스 감정 분석',
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Text(signal,
+                  style: TextStyle(color: signalColor, fontWeight: FontWeight.bold, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (positiveCount > 0)
+                Expanded(flex: positiveCount, child: Container(height: 3, color: Colors.green)),
+              if (negativeCount > 0)
+                Expanded(flex: negativeCount, child: Container(height: 3, color: Colors.red)),
+              if (positiveCount == 0 && negativeCount == 0)
+                Expanded(child: Container(height: 3, color: Colors.grey.withOpacity(0.3))),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('호재 $positiveCount건', style: const TextStyle(fontSize: 11, color: Colors.green)),
+              Text('악재 $negativeCount건', style: const TextStyle(fontSize: 11, color: Colors.red)),
+            ],
+          ),
+        ],
       ),
     );
   }
