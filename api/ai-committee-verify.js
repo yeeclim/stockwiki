@@ -285,11 +285,20 @@ function sanitizeAndValidateLanguage(content, displayName) {
     console.warn(`⚠️ ${displayName} CJK 문자 자동 제거: ${sample}`);
     result = result.replace(/[一-鿿㐀-䶿぀-ヿ]+/g, '').replace(/  +/g, ' ').trim();
   }
-    // 일반 영어 단어 → 한국어 치환 (허용 약어 제외)
+  // 일반 영어 단어 → 한국어 치환 (허용 약어 제외)
   result = sanitizeEnglishWords(result);
   // 기타 외국어 단어 제거 (터키어, 베트남어 등)
   result = removeForeignWords(result);
-  return result;
+
+  // 화이트리스트 최종 정제:
+  // 허용: 한글(가-힣·자모), ASCII 출력 문자(영문·숫자·구두점), CJK 구두점, 일반 구두점, 줄바꿈
+  // 제거: 아랍어·키릴·히브리·태국어·데바나가리 등 비허용 유니코드 블록
+  const beforeLen = result.length;
+  result = result.replace(/[^가-힤ᄀ-ᇿ㄰-㆏ -~　-〿‐-⁞\n\r]/g, '');
+  if (result.length < beforeLen) {
+    console.warn(`⚠️ ${displayName} 비허용 문자(아랍어 등) ${beforeLen - result.length}자 제거됨`);
+  }
+  return result.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
 // 응답 마지막 300자 안에 "결론: X" 패턴이 없으면 에러 처리 (체인오브소트 모델 필터링)
