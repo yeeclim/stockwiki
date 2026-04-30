@@ -197,6 +197,52 @@ const CJK_TO_KOREAN = {
   '實績': '실적', '展望': '전망', '危険': '위험', '安定': '안정',
 };
 
+// 허용된 영어 약어 목록 (대소문자 무관)
+const ALLOWED_ENGLISH = new Set([
+  'per', 'pbr', 'roe', 'eps', 'ebitda', 'rsi', 'macd', 'ma', 'etf', 'ai',
+  'esg', 'gdp', 'cpi', 'ipo', 'm&a', 'ev', 'fcf', 'ocf', 'capex', 'wacc',
+]);
+
+// 일반 영어 단어 → 한국어 치환 테이블
+const ENGLISH_TO_KOREAN = {
+  // 기업/시장
+  'company': '기업', 'companies': '기업들', 'market': '시장', 'sector': '섹터',
+  'industry': '산업', 'stock': '주식', 'stocks': '주식', 'share': '주식', 'shares': '주식',
+  // 재무
+  'revenue': '매출', 'profit': '이익', 'profits': '이익', 'earnings': '실적',
+  'growth': '성장', 'financial': '재무', 'operating': '영업', 'net': '순',
+  'gross': '총', 'margin': '마진', 'valuation': '밸류에이션',
+  'dividend': '배당', 'buyback': '자사주 매입', 'forecast': '전망',
+  'guidance': '가이던스', 'outlook': '전망', 'report': '보고서',
+  'quarter': '분기', 'annual': '연간', 'fiscal': '회계',
+  // 분석
+  'analysis': '분석', 'trend': '추세', 'momentum': '모멘텀',
+  'support': '지지', 'resistance': '저항', 'breakout': '돌파',
+  'bullish': '강세', 'bearish': '약세', 'volatile': '변동성이 높은',
+  'performance': '실적', 'investment': '투자', 'investor': '투자자',
+  'investors': '투자자들', 'risk': '리스크', 'risks': '리스크',
+  // 동사/형용사
+  'increase': '증가', 'decrease': '감소', 'decline': '하락', 'rise': '상승',
+  'improve': '개선', 'strong': '강한', 'weak': '약한', 'stable': '안정적인',
+  'positive': '긍정적', 'negative': '부정적', 'neutral': '중립적',
+  'significant': '상당한', 'potential': '잠재적', 'expected': '예상되는',
+  'based on': '기반으로', 'compared to': '대비', 'year-over-year': '전년 대비',
+};
+
+// 일반 영어 단어를 한국어로 치환 (허용 약어는 유지)
+function sanitizeEnglishWords(content) {
+  let result = content;
+  for (const [en, ko] of Object.entries(ENGLISH_TO_KOREAN)) {
+    // 단어 경계 기준, 대소문자 무관 치환
+    result = result.replace(new RegExp(`\\b${en}\\b`, 'gi'), (match) => {
+      // 전부 대문자인 경우 허용 약어일 수 있으니 확인
+      if (ALLOWED_ENGLISH.has(match.toLowerCase())) return match;
+      return ko;
+    });
+  }
+  return result;
+}
+
 // CJK 문자가 섞인 경우 치환 후 남은 것은 제거 (거부 대신 정제)
 function sanitizeAndValidateLanguage(content, displayName) {
   let result = content;
@@ -210,6 +256,8 @@ function sanitizeAndValidateLanguage(content, displayName) {
     console.warn(`⚠️ ${displayName} CJK 문자 자동 제거: ${sample}`);
     result = result.replace(/[一-鿿㐀-䶿぀-ヿ]+/g, '').replace(/  +/g, ' ').trim();
   }
+  // 일반 영어 단어 → 한국어 치환 (허용 약어 제외)
+  result = sanitizeEnglishWords(result);
   return result;
 }
 
