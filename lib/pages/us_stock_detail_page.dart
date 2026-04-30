@@ -390,8 +390,11 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             const SizedBox(height: 12),
 
             // 뉴스 감정 분석 요약 — 로딩 완료 후 항상 표시
-            if (!_isLoadingNews)
-              _buildSentimentSummary(),
+            Builder(builder: (ctx) {
+              debugPrint('🧩 감정블럭 조건: isLoading=$_isLoadingNews newsCount=${_newsList.length}');
+              if (!_isLoadingNews) return _buildSentimentSummary();
+              return const SizedBox.shrink();
+            }),
 
             const SizedBox(height: 12),
 
@@ -513,6 +516,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   }
 
   Widget _buildSentimentSummary() {
+    debugPrint('🔍 _buildSentimentSummary 호출됨: 뉴스 ${_newsList.length}개, isLoading=$_isLoadingNews');
     int score = 0;
     int positiveCount = 0;
     int negativeCount = 0;
