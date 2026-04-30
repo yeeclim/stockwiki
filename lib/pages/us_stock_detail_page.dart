@@ -388,14 +388,21 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
               ],
             ),
             const SizedBox(height: 12),
-            
-            // 뉴스 감정 분석 요약 (매매 신호)
-            if (!_isLoadingNews && _newsList.isNotEmpty)
+
+            // 뉴스 감정 분석 요약 — 로딩 완료 후 항상 표시
+            if (!_isLoadingNews)
               _buildSentimentSummary(),
 
             const SizedBox(height: 12),
-            
-            if (_newsList.isEmpty && !_isLoadingNews)
+
+            if (_isLoadingNews)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_newsList.isEmpty)
               Container(
                 padding: const EdgeInsets.all(20),
                 child: Center(
@@ -518,6 +525,29 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         score--;
         negativeCount++;
       }
+    }
+
+    if (_newsList.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.analytics_outlined, color: Colors.grey.shade400, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              '뉴스 감정 분석 동향',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            Text('데이터 없음', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+          ],
+        ),
+      );
     }
 
     String signal;
