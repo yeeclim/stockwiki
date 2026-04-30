@@ -229,6 +229,35 @@ const ENGLISH_TO_KOREAN = {
   'based on': '기반으로', 'compared to': '대비', 'year-over-year': '전년 대비',
 };
 
+// 알려진 외국어(터키어·베트남어 등) 단어 → 한국어 치환, 나머지는 제거
+const FOREIGN_WORDS = {
+  // 터키어 (Turkish)
+  'uzun': '장기', 'kisa': '단기', 'yuksek': '높은', 'dusuk': '낮은',
+  'buyume': '성장', 'artis': '증가', 'azalis': '감소', 'kar': '이익',
+  'zarar': '손실', 'piyasa': '시장', 'sirket': '기업', 'hisse': '주식',
+  'yatirim': '투자', 'analiz': '분석', 'rapor': '보고서', 'hedef': '목표',
+  // 베트남어 (Vietnamese)
+  'tang': '증가', 'giam': '감소', 'lon': '큰', 'nho': '작은',
+  'thi truong': '시장', 'cong ty': '기업', 'dau tu': '투자',
+  // 인도네시아어 / 말레이어
+  'pertumbuhan': '성장', 'pendapatan': '매출', 'keuntungan': '이익',
+  'pasar': '시장', 'perusahaan': '기업', 'saham': '주식',
+};
+
+function removeForeignWords(content) {
+  let result = content;
+
+  // 알려진 외국어 단어 → 한국어로 치환
+  for (const [foreign, korean] of Object.entries(FOREIGN_WORDS)) {
+    result = result.replace(new RegExp(`\\b${foreign}\\b`, 'gi'), korean);
+  }
+
+  // 비ASCII 라틴 문자 포함 단어 제거 (ü ı ğ ş ö ç â ê 등 — 영어·한국어 아님)
+  result = result.replace(/\b[a-zA-ZÀ-ÖØ-öø-ÿ]*[À-ÖØ-öø-ÿ]+[a-zA-ZÀ-ÖØ-öø-ÿ]*\b/g, '');
+
+  return result.replace(/  +/g, ' ').trim();
+}
+
 // 일반 영어 단어를 한국어로 치환 (허용 약어는 유지)
 function sanitizeEnglishWords(content) {
   let result = content;
@@ -256,8 +285,10 @@ function sanitizeAndValidateLanguage(content, displayName) {
     console.warn(`⚠️ ${displayName} CJK 문자 자동 제거: ${sample}`);
     result = result.replace(/[一-鿿㐀-䶿぀-ヿ]+/g, '').replace(/  +/g, ' ').trim();
   }
-  // 일반 영어 단어 → 한국어 치환 (허용 약어 제외)
+    // 일반 영어 단어 → 한국어 치환 (허용 약어 제외)
   result = sanitizeEnglishWords(result);
+  // 기타 외국어 단어 제거 (터키어, 베트남어 등)
+  result = removeForeignWords(result);
   return result;
 }
 
