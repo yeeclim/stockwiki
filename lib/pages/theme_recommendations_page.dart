@@ -212,8 +212,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     final sector = stock['sector'] as String;
     final description = stock['description'] as String;
     final reason = stock['reason'] as String? ?? '관련 테마의 대표적인 수혜주로 분석됨';
-    
-    // 뉴스 데이터 타입 변경 대응 (List<Map<String, String>>)
+    final ma20 = stock['ma20'] as num?;
+    final ma60 = stock['ma60'] as num?;
+    final high52w = stock['high52w'] as num?;
+    final price = (stock['price'] as num?)?.toDouble();
+
     final newsList = (stock['news'] as List<dynamic>? ?? []).cast<Map<String, String>>();
 
     return Card(
@@ -275,15 +278,45 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               ),
               
               const SizedBox(height: 12),
-              
+
+              // MA / 52주 고가 뱃지
+              if (ma20 != null || high52w != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (ma20 != null)
+                        _techBadge(
+                          themeData,
+                          'MA20  ${_fmtPrice(ma20)}',
+                          Colors.blue,
+                        ),
+                      if (ma60 != null)
+                        _techBadge(
+                          themeData,
+                          'MA60  ${_fmtPrice(ma60)}',
+                          Colors.indigo,
+                        ),
+                      if (high52w != null && price != null)
+                        _techBadge(
+                          themeData,
+                          '52주 고가 대비 ${(price / high52w.toDouble() * 100).toStringAsFixed(1)}%',
+                          Colors.teal,
+                        ),
+                    ],
+                  ),
+                ),
+
               // 추천 사유 박스
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: themeData.colorScheme.primaryContainer.withOpacity(0.3),
+                  color: themeData.colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeData.colorScheme.primary.withOpacity(0.2)),
+                  border: Border.all(color: themeData.colorScheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,6 +418,31 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _techBadge(ThemeData themeData, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: themeData.textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  String _fmtPrice(num value) {
+    return value.toInt().toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]},',
     );
   }
 }
