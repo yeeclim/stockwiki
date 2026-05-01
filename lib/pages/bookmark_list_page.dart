@@ -82,7 +82,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('⭐ 관심종목'),
+        title: const Text('관심종목'),
         backgroundColor: theme.appBarTheme.backgroundColor,
         iconTheme: theme.appBarTheme.iconTheme,
       ),
