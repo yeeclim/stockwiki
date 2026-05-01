@@ -181,6 +181,35 @@ class _StockSearchPageState extends State<StockSearchPage> {
                 const BtcWidget(),
                 const SizedBox(height: 40),
               ],
+
+              // 푸터
+              const Divider(),
+              const SizedBox(height: 12),
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      'Made by Bermont',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '본 서비스의 모든 투자 판단 및 그 결과에 대한\n책임은 전적으로 이용자 본인에게 있습니다.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
