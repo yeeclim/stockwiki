@@ -6,11 +6,14 @@ import { JSDOM } from 'jsdom';
 
 let cachedThemes = null;
 let themesLastUpdate = 0;
-const THEME_CACHE_TTL = 30 * 60 * 1000; // 30분 캐시 (테마 목록은 자주 안변함)
+const THEME_CACHE_TTL = 30 * 60 * 1000;
 
-// 테마 데이터 캐시
 const themeStocksCache = {};
-const STOCKS_CACHE_TTL = 5 * 60 * 1000; // 5분 캐시 (종목 데이터는 자주 변할 수 있음)
+const STOCKS_CACHE_TTL = 5 * 60 * 1000;
+
+// 기술적 지표 캐시 (1시간)
+const technicalCache = {};
+const TECHNICAL_CACHE_TTL = 60 * 60 * 1000;
 
 // 테마별 추천 종목 API
 export default async function handler(req, res) {
@@ -338,6 +341,100 @@ async function getThemeStocks(themeName) {
   return stocks;
 }
 
+// ── 기술적 지표 (MA20, MA60, 52주 고가) ──────────────────────────
+
+async function fetchTechnicalData(symbol) {
+  const now = Date.now();
+  const cached = technicalCache[symbol];
+  if (cached && (now - cached.lastUpdate < TECHNICAL_CACHE_TTL)) {
+    return cached.data;
+  }
+
+  try {
+    const url = `https://fchart.stock.naver.com/sise.nhn?symbol=${symbol}&timeframe=day&count=260&requestType=0`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://finance.naver.com/',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+
+    const xml = await res.text();
+    const closes = [];
+    const re = /<item data="([^"]+)"/g;
+    let m;
+    while ((m = re.exec(xml)) !== null) {
+      const parts = m[1].split('|');
+      if (parts.length >= 5) {
+        const c = parseInt(parts[4]);
+        if (c > 0) closes.push(c);
+      }
+    }
+
+    if (closes.length < 20) return null;
+
+    const calcMA = (n) => {
+      if (closes.length < n) return null;
+      const slice = closes.slice(-n);
+      return slice.reduce((a, b) => a + b, 0) / n;
+    };
+
+    const data = {
+      ma20: calcMA(20),
+      ma60: calcMA(60),
+      high52w: Math.max(...closes.slice(-252)),
+    };
+
+    technicalCache[symbol] = { data, lastUpdate: now };
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// 기술적 필터
+// - pass=false → 추천 목록에서 제외
+// - warning → 카드에 뱃지로 경고 표시 (제외하지 않음)
+function applyTechnicalFilter(price, tech) {
+  if (!tech || !price) return { pass: true, warning: null };
+
+  const { ma20, ma60, high52w } = tech;
+
+  // ① MA 데드크로스 (MA20 < MA60) — 중기 하락 추세 → 제외
+  if (ma20 && ma60 && ma20 < ma60) {
+    return { pass: false, warning: null };
+  }
+
+  // ② 가격이 MA20 아래 — 단기 하락 추세 → 제외
+  if (ma20 && price < ma20) {
+    return { pass: false, warning: null };
+  }
+
+  // ③ 52주 신고가 경신 중 (고가 초과) → 제외
+  if (high52w && price > high52w) {
+    return { pass: false, warning: null };
+  }
+
+  // ④ MA20 대비 20% 초과 과열 → 제외
+  if (ma20 && price > ma20 * 1.20) {
+    return { pass: false, warning: null };
+  }
+
+  // ⑤ 52주 고가 95% 이상 근접 → 경고 뱃지 (제외 안함)
+  const near52wHigh = high52w && price >= high52w * 0.95;
+
+  // ⑥ MA20 대비 10~20% 구간 → 주의 뱃지
+  const nearMA20Top = ma20 && price > ma20 * 1.10;
+
+  let warning = null;
+  if (near52wHigh) warning = '52주 고가 근접';
+  else if (nearMA20Top) warning = 'MA20 대비 고점';
+
+  return { pass: true, warning };
+}
+
 // ── 점수 산정 (100점 만점, ai-recommend-list와 동일 기준) ───────
 // · 모멘텀  60점: 등락률 기반 (테마 스크랩은 volume 불확실해서 비중 올림)
 // · 거래량  25점: volume이 있을 경우만 반영
@@ -569,33 +666,60 @@ async function getTopRecommendations(limit = 10, sortBy = 'totalScore') {
   return analyses.slice(0, limit);
 }
 
-// 특정 테마의 추천 종목 랭킹
+// 특정 테마의 추천 종목 랭킹 (기술적 필터 적용)
 async function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') {
   const stocks = await getThemeStocks(theme);
-  if (stocks.length === 0) {
-    return [];
+  if (stocks.length === 0) return [];
+
+  // 기술적 데이터 병렬 fetch
+  const techResults = await Promise.all(
+    stocks.map(s => fetchTechnicalData(s.symbol).catch(() => null))
+  );
+
+  const analyses = [];
+  for (let i = 0; i < stocks.length; i++) {
+    const stock = stocks[i];
+    const tech = techResults[i];
+    const filterResult = applyTechnicalFilter(stock.price, tech);
+
+    if (!filterResult.pass) {
+      console.log(`[기술필터 제외] ${stock.name}(${stock.symbol})`);
+      continue;
+    }
+
+    const analysis = getComprehensiveAnalysis(stock);
+
+    // MA 정보 reasons에 추가
+    if (tech?.ma20) {
+      const ma20Diff = ((stock.price - tech.ma20) / tech.ma20 * 100).toFixed(1);
+      analysis.reasons = analysis.reasons ?? [];
+      analysis.reasons.push(`MA20 대비 +${ma20Diff}% — 상승 추세 유지`);
+      if (tech.ma60) {
+        analysis.reasons.push(`MA20(${Math.round(tech.ma20).toLocaleString()}) > MA60(${Math.round(tech.ma60).toLocaleString()}) — 골든크로스 배열`);
+      }
+      if (tech.high52w) {
+        const ratio52w = (stock.price / tech.high52w * 100).toFixed(1);
+        analysis.reasons.push(`52주 고가 대비 ${ratio52w}%`);
+      }
+    }
+    if (filterResult.warning) {
+      analysis.reasons = analysis.reasons ?? [];
+      analysis.reasons.push(`⚠ ${filterResult.warning} — 신규 진입 시 주의`);
+    }
+
+    analyses.push({
+      ...stock,
+      ...analysis,
+      ma20: tech?.ma20 ? Math.round(tech.ma20) : null,
+      ma60: tech?.ma60 ? Math.round(tech.ma60) : null,
+      high52w: tech?.high52w ?? null,
+    });
   }
 
-  const analyses = stocks.map(stock => ({
-    ...stock,
-    ...getComprehensiveAnalysis(stock)
-  }));
-
-  // 정렬
   analyses.sort((a, b) => {
-    if (sortBy === 'totalScore') {
-      return b.totalScore - a.totalScore;
-    } else if (sortBy === 'technicalScore') {
-      return b.technicalScore - a.technicalScore;
-    } else if (sortBy === 'fundamentalScore') {
-      return b.fundamentalScore - a.fundamentalScore;
-    } else if (sortBy === 'marketCap') {
-      return b.marketCap - a.marketCap;
-    } else if (sortBy === 'volume') {
-      return b.volume - a.volume;
-    } else if (sortBy === 'tradingValue') {
-      return b.tradingValue - a.tradingValue;
-    }
+    if (sortBy === 'totalScore') return b.totalScore - a.totalScore;
+    if (sortBy === 'technicalScore') return b.technicalScore - a.technicalScore;
+    if (sortBy === 'volume') return b.volume - a.volume;
     return b.totalScore - a.totalScore;
   });
 

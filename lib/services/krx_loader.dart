@@ -85,6 +85,9 @@ class KrxLoader {
               'score': s['totalScore'] ?? 0,
               'price': s['price'],
               'changePercent': s['changePercent'],
+              'ma20': s['ma20'],
+              'ma60': s['ma60'],
+              'high52w': s['high52w'],
               'news': (s['news'] as List<dynamic>? ?? []).map((n) => {
                 'title': n['title'].toString(),
                 'url': n['url'].toString(),
