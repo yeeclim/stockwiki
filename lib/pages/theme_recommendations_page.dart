@@ -117,7 +117,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     // 테마가 아직 로드되지 않았을 때의 처리
     if (_themes.isEmpty && _isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('📈 테마별 추천 종목')),
+        appBar: AppBar(title: const Text('테마별 추천 종목')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
