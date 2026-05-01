@@ -61,18 +61,29 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
 
   Future<void> _loadData() async {
     if (_themes.isEmpty) return;
-    
+
     setState(() => _isLoading = true);
 
     try {
-      // 현재 선택된 탭의 데이터 우선 로드 또는 모든 탭 로드
-      // 성능을 위해 현재는 모든 탭 순차 로드 (기존 로직 유지)
-      for (String theme in _themes) {
+      for (final theme in List<String>.from(_themes)) {
         final stocks = await KrxLoader.getThemeStocks(theme);
         if (mounted) {
           setState(() {
             _themeStocks[theme] = stocks;
           });
+        }
+      }
+
+      // 종목이 0개인 테마 숨기기
+      if (mounted) {
+        final visible = _themes.where((t) => (_themeStocks[t] ?? []).isNotEmpty).toList();
+        if (visible.length != _themes.length) {
+          final old = _tabController;
+          setState(() {
+            _themes = visible;
+            _tabController = TabController(length: _themes.length, vsync: this);
+          });
+          old.dispose();
         }
       }
     } catch (e) {
@@ -83,25 +94,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   }
 
   void _navigateToStockDetail(String symbol) {
-    // Yahoo Finance 한국 주식 페이지로 이동
-    // 0/1/2/3/4/5 로 시작하는 종목은 유가증권(KS), 나머지는 코스닥(KQ) 확률이 높지만
-    // 네이버에서 가져올 때 마켓 정보를 주면 더 정확함. 현재는 기존 하드코딩 + 휴리스틱 유지
-    String yahooUrl;
-     
-     // 간단한 마켓 구분 (6자리 숫자인 경우)
-     if (symbol.length == 6) {
-       // 코스닥 종목 예외 처리 (기존 리스트 유지 및 신규 추가 대응)
-       final kosdaqStocks = ['247540', '095610', '240810', '035720', '068270', '086520', '196170', '357780']; 
-       if (kosdaqStocks.contains(symbol)) {
-         yahooUrl = 'https://finance.yahoo.com/quote/$symbol.KQ';
-       } else {
-         yahooUrl = 'https://finance.yahoo.com/quote/$symbol.KS';
-       }
-     } else {
-       yahooUrl = 'https://finance.yahoo.com/quote/$symbol';
-     }
-
-    _launchURL(yahooUrl);
+    _launchURL('https://finance.naver.com/item/main.naver?code=$symbol');
   }
 
   void _launchURL(String url) async {
@@ -400,7 +393,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    'Yahoo Finance 실시간 확인',
+                    '네이버 증권 바로가기',
                     style: themeData.textTheme.labelSmall?.copyWith(
                       color: themeData.colorScheme.primary,
                       fontWeight: FontWeight.bold,
