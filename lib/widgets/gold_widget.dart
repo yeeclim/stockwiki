@@ -158,10 +158,13 @@ class _GoldWidgetState extends State<GoldWidget> {
                     color: Colors.amber.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.monetization_on_outlined,
-                    color: Colors.amber,
-                    size: 16,
+                  child: const Text(
+                    'Au',
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

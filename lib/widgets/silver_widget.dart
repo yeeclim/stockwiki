@@ -216,10 +216,13 @@ class _SilverWidgetState extends State<SilverWidget> {
                     color: accentColor.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.trending_neutral, // Or another icon
-                    color: accentColor,
-                    size: 16,
+                  child: Text(
+                    'Ag',
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
