@@ -39,6 +39,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           _themes = themes;
           if (_themes.isNotEmpty) {
             _tabController = TabController(length: _themes.length, vsync: this);
+            _tabController.addListener(() { if (mounted) setState(() {}); });
           }
         });
         if (_themes.isNotEmpty) {
@@ -93,6 +94,86 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     }
   }
 
+  void _showThemePickerSheet() {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '테마 선택',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _themes.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+                    ),
+                    itemBuilder: (_, index) {
+                      final isSelected = _tabController.index == index;
+                      return ListTile(
+                        dense: true,
+                        leading: Text(
+                          '${index + 1}',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        title: Text(
+                          _themes[index],
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                            : null,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _tabController.animateTo(index);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _navigateToStockDetail(String symbol) {
     _launchURL('https://finance.naver.com/item/main.naver?code=$symbol');
   }
@@ -125,20 +206,37 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          '📈 테마별 추천 종목',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
+        title: GestureDetector(
+          onTap: _themes.isNotEmpty ? _showThemePickerSheet : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  _themes.isNotEmpty
+                      ? _themes[_tabController.index]
+                      : '📈 테마별 추천 종목',
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              if (_themes.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface, size: 20),
+              ],
+            ],
           ),
         ),
         backgroundColor: theme.appBarTheme.backgroundColor,
         foregroundColor: theme.appBarTheme.foregroundColor,
-        toolbarHeight: 48, 
+        toolbarHeight: 48,
         iconTheme: theme.iconTheme,
         elevation: 0,
-        bottom: _themes.isEmpty 
-          ? null 
+        bottom: _themes.isEmpty
+          ? null
           : TabBar(
               controller: _tabController,
               isScrollable: true,
@@ -203,7 +301,6 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     final symbol = stock['symbol'] as String;
     final name = stock['name'] as String;
     final sector = stock['sector'] as String;
-    final description = stock['description'] as String;
     final reason = stock['reason'] as String? ?? '관련 테마의 대표적인 수혜주로 분석됨';
     final ma20 = stock['ma20'] as num?;
     final ma60 = stock['ma60'] as num?;
@@ -262,16 +359,6 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               ),
               const SizedBox(height: 12),
               
-              // 기업 개요
-              Text(
-                description,
-                style: themeData.textTheme.bodyMedium?.copyWith(
-                  color: themeData.colorScheme.onSurface,
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-
               // MA / 52주 고가 뱃지
               if (ma20 != null || high52w != null)
                 Padding(
@@ -388,7 +475,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               
               const SizedBox(height: 12),
               
-              // Yahoo Finance 링크
+              // 네이버 증권 링크
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -401,8 +488,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   ),
                   const SizedBox(width: 4),
                   Icon(
-                    Icons.open_in_new, 
-                    size: 12, 
+                    Icons.open_in_new,
+                    size: 12,
                     color: themeData.colorScheme.primary
                   ),
                 ],
