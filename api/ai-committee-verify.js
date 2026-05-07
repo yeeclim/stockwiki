@@ -50,13 +50,14 @@ export default async function handler(req, res) {
 
     const allResults = await Promise.allSettled(MODEL_POOL.map(m => withTimeout(m.fn)));
 
-    // Gemini는 항상 첫 번째 슬롯에 표시 (성공·실패 무관)
-    const geminiResult = allResults[0];
-    const geminiEntry = (geminiResult.status === 'fulfilled' && geminiResult.value)
-      ? { name: 'Gemini', response: geminiResult.value }
-      : { name: 'Gemini', error: geminiResult.reason?.message || '응답 실패' };
+    // 첫 번째 슬롯은 항상 표시 (성공·실패 무관)
+    const firstModel = MODEL_POOL[0];
+    const firstResult = allResults[0];
+    const firstEntry = (firstResult.status === 'fulfilled' && firstResult.value)
+      ? { name: firstModel.name, response: firstResult.value }
+      : { name: firstModel.name, error: firstResult.reason?.message || '응답 실패' };
 
-    if (geminiEntry.error) console.error('❌ Gemini 실패:', geminiEntry.error);
+    if (firstEntry.error) console.error(`❌ ${firstModel.name} 실패:`, firstEntry.error);
 
     // 나머지 Groq 모델 중 성공한 것 2개 채움
     const groqSuccesses = [];
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
     });
 
     const selected = [
-      geminiEntry,
+      firstEntry,
       ...groqSuccesses.slice(0, 2),
       ...groqFailures.slice(0, Math.max(0, 2 - groqSuccesses.length)),
     ];
