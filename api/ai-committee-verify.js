@@ -50,24 +50,36 @@ export default async function handler(req, res) {
 
     const allResults = await Promise.allSettled(MODEL_POOL.map(m => withTimeout(m.fn)));
 
-    const successes = [];
-    const failures = [];
-    allResults.forEach((result, i) => {
-      const name = MODEL_POOL[i].name;
+    // Gemini는 항상 첫 번째 슬롯에 표시 (성공·실패 무관)
+    const geminiResult = allResults[0];
+    const geminiEntry = (geminiResult.status === 'fulfilled' && geminiResult.value)
+      ? { name: 'Gemini', response: geminiResult.value }
+      : { name: 'Gemini', error: geminiResult.reason?.message || '응답 실패' };
+
+    if (geminiEntry.error) console.error('❌ Gemini 실패:', geminiEntry.error);
+
+    // 나머지 Groq 모델 중 성공한 것 2개 채움
+    const groqSuccesses = [];
+    const groqFailures = [];
+    allResults.slice(1).forEach((result, i) => {
+      const name = MODEL_POOL[i + 1].name;
       if (result.status === 'fulfilled' && result.value) {
-        successes.push({ name, response: result.value });
+        groqSuccesses.push({ name, response: result.value });
       } else {
         const msg = result.reason?.message || '응답 실패';
         console.error(`❌ ${name} 실패:`, msg);
-        failures.push({ name, error: msg });
+        groqFailures.push({ name, error: msg });
       }
     });
 
-    // 성공 최대 3개 + 부족하면 실패로 채움
     const selected = [
-      ...successes.slice(0, 3),
-      ...failures.slice(0, Math.max(0, 3 - successes.length)),
+      geminiEntry,
+      ...groqSuccesses.slice(0, 2),
+      ...groqFailures.slice(0, Math.max(0, 2 - groqSuccesses.length)),
     ];
+
+    const successes = selected.filter(s => s.response);
+    const failures = selected.filter(s => s.error);
 
     const models = selected.map(item =>
       item.response
