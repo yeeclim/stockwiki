@@ -30,6 +30,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     super.initState();
     _sectors = UsSectorLoader.getSectors();
     _tabController = TabController(length: _sectors.length, vsync: this);
+    _tabController.addListener(() { if (mounted) setState(() {}); });
     _loadAllSectors();
   }
 
@@ -72,10 +73,75 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     }
   }
 
+  void _showSectorPickerSheet() {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          expand: false,
+          builder: (_, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text('섹터 선택', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _sectors.length,
+                    separatorBuilder: (_, __) => Divider(height: 1, color: theme.colorScheme.outlineVariant.withOpacity(0.4)),
+                    itemBuilder: (_, index) {
+                      final isSelected = _tabController.index == index;
+                      return ListTile(
+                        dense: true,
+                        leading: Text(_getSectorIcon(_sectors[index]),
+                          style: const TextStyle(fontSize: 18)),
+                        title: Text(
+                          _sectors[index],
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                            : null,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _tabController.animateTo(index);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _navigateToStockDetail(String symbol) {
-    // Yahoo Finance 미국 주식 페이지로 이동
-    final yahooUrl = 'https://finance.yahoo.com/quote/$symbol';
-    _launchURL(yahooUrl);
+    _launchURL('https://finance.yahoo.com/quote/$symbol');
   }
 
   void _launchURL(String url) async {
@@ -98,11 +164,21 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: theme.appBarTheme.backgroundColor,
-        title: Text(
-          '📊 Sector별 추천 종목',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
+        title: GestureDetector(
+          onTap: _showSectorPickerSheet,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _sectors.isNotEmpty ? '${_getSectorIcon(_sectors[_tabController.index])} ${_sectors[_tabController.index]}' : '📊 Sector별 추천 종목',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface, size: 20),
+            ],
           ),
         ),
         leading: IconButton(
@@ -170,7 +246,6 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     final themeData = Theme.of(context);
     final symbol = stock['symbol'] as String;
     final name = stock['name'] as String;
-    final description = stock['description'] as String;
     final reason = stock['reason'] as String? ?? 'Key sector leader with strong fundamentals.';
     
     // 뉴스 데이터 타입 변경 대응 (List<Map<String, String>>)
@@ -225,17 +300,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 ],
               ),
               const SizedBox(height: 12),
-              
-              // 기업 개요
-              Text(
-                description,
-                style: themeData.textTheme.bodyMedium?.copyWith(
-                  color: themeData.colorScheme.onSurface,
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
+
               // 추천 사유 박스
               Container(
                 width: double.infinity,
@@ -327,18 +392,14 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    '실시간 시세 (Yahoo Finance)',
+                    'Yahoo Finance 바로가기',
                     style: themeData.textTheme.labelSmall?.copyWith(
                       color: themeData.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(
-                    Icons.open_in_new, 
-                    size: 12, 
-                    color: themeData.colorScheme.primary
-                  ),
+                  Icon(Icons.open_in_new, size: 12, color: themeData.colorScheme.primary),
                 ],
               ),
             ],

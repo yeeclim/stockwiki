@@ -12,6 +12,10 @@ class Stock {
   final int? marketCap;
   final String? lastUpdate;
   final List<News>? news;
+  final double? ma50;
+  final double? ma200;
+  final double? yearHigh;
+  final double? yearLow;
 
   Stock({
     required this.symbol,
@@ -23,6 +27,10 @@ class Stock {
     this.marketCap,
     this.lastUpdate,
     this.news,
+    this.ma50,
+    this.ma200,
+    this.yearHigh,
+    this.yearLow,
   });
 
   factory Stock.fromJson(Map<String, dynamic> json) {
@@ -31,7 +39,7 @@ class Stock {
       final newsData = json['news'] as List<dynamic>;
       newsList = newsData.map((item) => News.fromJson(item)).toList();
     }
-    
+
     return Stock(
       symbol: json['symbol'] ?? '',
       name: json['name'] ?? '',
@@ -42,6 +50,10 @@ class Stock {
       marketCap: json['marketCap']?.toInt(),
       lastUpdate: json['lastUpdate'],
       news: newsList,
+      ma50: (json['priceAvg50'] ?? json['ma50'])?.toDouble(),
+      ma200: (json['priceAvg200'] ?? json['ma200'])?.toDouble(),
+      yearHigh: json['yearHigh']?.toDouble(),
+      yearLow: json['yearLow']?.toDouble(),
     );
   }
 

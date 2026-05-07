@@ -6,6 +6,40 @@ let cache = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5분
 
+// ── MA 캐시 ──────────────────────────────────────────────────────
+const maCache = {};
+const MA_CACHE_TTL = 30 * 60 * 1000; // 30분
+
+async function fetchMaData(code) {
+  const now = Date.now();
+  if (maCache[code] && now - maCache[code].time < MA_CACHE_TTL) {
+    return maCache[code].data;
+  }
+  try {
+    const url = `https://fchart.stock.naver.com/sise.nhn?symbol=${code}&timeframe=day&count=200&requestType=0`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://finance.naver.com/',
+      }
+    });
+    if (!res.ok) return { ma20: 0, ma60: 0 };
+    const text = await res.text();
+    const matches = [...text.matchAll(/data="[^|"]+\|[^|"]+\|[^|"]+\|[^|"]+\|([^|"]+)\|/g)];
+    const closes = matches.map(m => parseFloat(m[1])).filter(v => !isNaN(v) && v > 0);
+    if (closes.length < 20) return { ma20: 0, ma60: 0 };
+    const ma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const ma60 = closes.length >= 60
+      ? closes.slice(-60).reduce((a, b) => a + b, 0) / 60
+      : 0;
+    const result = { ma20, ma60 };
+    maCache[code] = { data: result, time: now };
+    return result;
+  } catch {
+    return { ma20: 0, ma60: 0 };
+  }
+}
+
 // ── 스크리닝 대상 종목 (섹터별 분산 50선) ───────────────────────
 const UNIVERSE = [
   // 반도체·IT
@@ -122,12 +156,14 @@ export default async function handler(req, res) {
 
 // ── 스크리닝 & 랭킹 ──────────────────────────────────────────────
 async function screenAndRank() {
-  // 전 종목 병렬 조회 (실패한 종목은 제외)
   const results = await Promise.allSettled(
     UNIVERSE.map(async stock => {
-      const data = await fetchStockDataDirect(stock.code);
+      const [data, maData] = await Promise.all([
+        fetchStockDataDirect(stock.code),
+        fetchMaData(stock.code),
+      ]);
       if (!data || !data.price) return null;
-      return { stock, data };
+      return { stock, data, maData };
     })
   );
 
@@ -137,10 +173,11 @@ async function screenAndRank() {
 
   // 각 종목 점수 계산
   const scored = fetched
-    .map(({ stock, data }) => ({
+    .map(({ stock, data, maData }) => ({
       stock,
       data,
-      score: calcScore(data),
+      maData,
+      score: calcScore(data, maData),
     }))
     .filter(item => item.score > 0);
 
@@ -148,61 +185,78 @@ async function screenAndRank() {
   scored.sort((a, b) => b.score - a.score);
   const top = scored.slice(0, 10);
 
-  return top.map(({ stock, data, score }) => buildItem(stock, data, score));
+  return top.map(({ stock, data, maData, score }) => buildItem(stock, data, maData, score));
 }
 
 // ── 점수 산정 (100점 만점) ───────────────────────────────────────
-// · 모멘텀  50점: 오늘 등락률 기반 (상승 폭이 클수록 고점수)
-// · 거래량  30점: 거래량이 많을수록 매수세 신뢰도 증가
-// · 안정성  20점: 과도한 급등락 없이 건전한 상승
-function calcScore(data) {
+// · 이평선  25점: MA20/MA60 골든크로스 및 이평선 위치
+// · 모멘텀  40점: 오늘 등락률 기반
+// · 거래량  20점: 매수세 신뢰도
+// · 안정성  15점: 적정 상승 폭
+function calcScore(data, maData) {
   const cp = data.changePercent ?? 0;
   const vol = data.volume ?? 0;
+  const price = data.price ?? 0;
+  const ma20 = maData?.ma20 ?? 0;
+  const ma60 = maData?.ma60 ?? 0;
 
-  // ① 모멘텀 점수 (상승일 때만 추천 가치 있음)
-  let momentumScore;
-  if (cp >= 5)       momentumScore = 50;   // 급등 (다소 오버슈팅 위험 있지만 모멘텀 최고)
-  else if (cp >= 3)  momentumScore = 47;   // 강한 상승 (가장 이상적)
-  else if (cp >= 2)  momentumScore = 40;
-  else if (cp >= 1)  momentumScore = 30;
-  else if (cp >= 0)  momentumScore = 18;   // 보합
-  else if (cp >= -1) momentumScore = 8;    // 소폭 하락
-  else               momentumScore = 0;    // 하락 중 → 추천 제외
+  // MA20 아래 → 단기 하락 추세, 추천 제외
+  if (ma20 > 0 && price < ma20) return 0;
 
-  // 하락 중인 종목은 점수 자체를 0으로 (필터링용)
+  // 하락 중인 종목도 제외
   if (cp < -1) return 0;
 
-  // ② 거래량 점수
-  let volScore;
-  if (vol >= 3_000_000)      volScore = 30;
-  else if (vol >= 1_000_000) volScore = 25;
-  else if (vol >= 300_000)   volScore = 18;
-  else if (vol >= 100_000)   volScore = 12;
-  else if (vol >= 30_000)    volScore = 6;
-  else                       volScore = 2;
+  // ① 이평선 신호 (최대 25점)
+  let maScore = 0;
+  if (ma20 > 0 && ma60 > 0) {
+    if (price > ma20 && price > ma60 && ma20 > ma60) maScore = 25; // 골든크로스
+    else if (price > ma20 && price > ma60)           maScore = 18;
+    else if (price > ma20)                           maScore = 10;
+  } else if (ma20 > 0 && price > ma20) {
+    maScore = 10;
+  }
 
-  // ③ 안정성 점수 (1~5% 상승이 가장 이상적, 급등·보합은 감점)
+  // ② 모멘텀 점수 (최대 40점)
+  let momentumScore;
+  if (cp >= 5)       momentumScore = 40;
+  else if (cp >= 3)  momentumScore = 37;
+  else if (cp >= 2)  momentumScore = 30;
+  else if (cp >= 1)  momentumScore = 22;
+  else if (cp >= 0)  momentumScore = 12;
+  else if (cp >= -1) momentumScore = 5;
+  else               momentumScore = 0;
+
+  // ③ 거래량 점수 (최대 20점)
+  let volScore;
+  if (vol >= 3000000)      volScore = 20;
+  else if (vol >= 1000000) volScore = 16;
+  else if (vol >= 300000)  volScore = 11;
+  else if (vol >= 100000)  volScore = 7;
+  else if (vol >= 30000)   volScore = 3;
+  else                     volScore = 1;
+
+  // ④ 안정성 점수 (최대 15점)
   let stabilityScore;
   const abscp = Math.abs(cp);
-  if (abscp >= 1 && abscp <= 5)  stabilityScore = 20;
-  else if (abscp < 1)            stabilityScore = 12;  // 너무 평탄
-  else if (abscp <= 8)           stabilityScore = 10;  // 다소 급등
-  else                           stabilityScore = 4;   // 과급등
+  if (abscp >= 1 && abscp <= 5)  stabilityScore = 15;
+  else if (abscp < 1)            stabilityScore = 9;
+  else if (abscp <= 8)           stabilityScore = 7;
+  else                           stabilityScore = 3;
 
-  return momentumScore + volScore + stabilityScore;
+  return Math.min(100, maScore + momentumScore + volScore + stabilityScore);
 }
 
 // ── 추천 아이템 생성 ─────────────────────────────────────────────
-function buildItem(stock, data, score) {
+function buildItem(stock, data, maData, score) {
   const cp = data.changePercent ?? 0;
   const vol = data.volume ?? 0;
   const price = data.price;
 
   const action = scoreToAction(score, cp);
-  const reasons = buildReasons(stock, data, score);
+  const reasons = buildReasons(stock, data, maData, score);
 
   return {
-    stockName: data.name || stock.name,
+    stockName: stock.name || (data.name || '').replace(/\s*:\s*Npay\s*증권\s*/gi, '').trim(),
     stockCode: stock.code,
     currentPrice: price,
     changePercent: cp,
@@ -238,10 +292,24 @@ function targetMultiplier(action) {
 }
 
 // ── 이유 생성 (데이터 기반) ──────────────────────────────────────
-function buildReasons(stock, data, score) {
+function buildReasons(stock, data, maData, score) {
   const cp = data.changePercent ?? 0;
   const vol = data.volume ?? 0;
+  const price = data.price ?? 0;
+  const ma20 = maData?.ma20 ?? 0;
+  const ma60 = maData?.ma60 ?? 0;
   const reasons = [];
+
+  // 이평선 신호
+  if (ma20 > 0 && ma60 > 0) {
+    if (price > ma20 && price > ma60 && ma20 > ma60) {
+      reasons.push(`골든크로스 + 현재가 MA20(${ma20.toFixed(0)})·MA60(${ma60.toFixed(0)}) 상회 — 강한 상승 추세`);
+    } else if (price > ma20 && price > ma60) {
+      reasons.push(`현재가 MA20(${ma20.toFixed(0)})·MA60(${ma60.toFixed(0)}) 상회 — 중단기 상승 구간`);
+    } else if (price > ma20) {
+      reasons.push(`현재가 MA20(${ma20.toFixed(0)}) 상회 — 단기 상승 모멘텀`);
+    }
+  }
 
   // 모멘텀 근거
   if (cp >= 3) {
@@ -253,9 +321,9 @@ function buildReasons(stock, data, score) {
   }
 
   // 거래량 근거
-  if (vol >= 1_000_000) {
+  if (vol >= 1000000) {
     reasons.push(`거래량 ${vol.toLocaleString()}주 — 시장 관심 집중, 수급 긍정적`);
-  } else if (vol >= 300_000) {
+  } else if (vol >= 300000) {
     reasons.push(`거래량 ${vol.toLocaleString()}주 — 평균 이상 거래 활발`);
   } else {
     reasons.push(`거래량 ${vol.toLocaleString()}주 — 거래 비교적 한산, 변동성 주의`);

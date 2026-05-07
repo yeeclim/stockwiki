@@ -114,7 +114,7 @@ async function fetchStockData(symbol) {
 
               const stockData = {
                 symbol: symbol,
-                name: name || symbol,
+                name: (name || symbol).replace(/\s*:\s*Npay\s*증권\s*/gi, '').trim(),
                 price: price,
                 change: change || 0,
                 changePercent: changePercent || 0,

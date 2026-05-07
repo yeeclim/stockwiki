@@ -15,6 +15,43 @@ const STOCKS_CACHE_TTL = 5 * 60 * 1000;
 const technicalCache = {};
 const TECHNICAL_CACHE_TTL = 60 * 60 * 1000;
 
+// 시총 필터 기준: 5,000억원 이상
+const MIN_MARKET_CAP_EOK = 5_000; // 억원 단위
+
+// 한국 기업이 세계 시장에 영향을 주는 글로벌 테마 키워드 화이트리스트
+// 이 키워드 중 하나라도 포함된 테마만 노출
+const GLOBAL_THEME_KEYWORDS = [
+  // 반도체·소재·부품
+  '반도체', '메모리', '파운드리', '시스템반도체', 'HBM', 'DRAM', 'NAND',
+  // 배터리·전기차·에너지저장
+  '2차전지', '배터리', '전기차', 'EV', '전고체', '양극재', '음극재', '분리막', '전해질',
+  // 디스플레이
+  '디스플레이', 'OLED', 'LCD', 'QLED', '마이크로LED',
+  // 자동차·모빌리티
+  '자동차', '모빌리티', '자율주행', '전장',
+  // 조선·해양
+  '조선', '해양플랜트', 'LNG',
+  // 방산·우주
+  '방산', '방위', '우주', '항공', '드론',
+  // AI·로봇·자동화
+  'AI', '인공지능', '로봇', '자동화', '머신러닝', '데이터센터', '클라우드', 'GPU',
+  // 에너지·수소·원자력
+  '수소', '신재생', '태양광', '풍력', '원자력', '핵융합', '소형모듈원자로', 'SMR',
+  '전력', '전력기기', '변압기', '송전',
+  // 소재·철강·화학
+  '철강', '소재', '희토류', '구리', '알루미늄', '석유화학', '정유', '화학',
+  // 바이오·헬스케어
+  '바이오', '제약', '신약', '의료기기', '헬스케어', 'mRNA', '항암',
+  // 통신·네트워크
+  '5G', '6G', '네트워크', '위성',
+  // 소부장 (소재·부품·장비)
+  '소부장', '장비',
+  // K-뷰티·글로벌 소비재
+  'K-뷰티', '화장품', 'K뷰티',
+  // 게임·엔터 (글로벌 IP)
+  '게임', '엔터테인먼트', '콘텐츠', 'K-콘텐츠',
+];
+
 // 테마별 추천 종목 API
 export default async function handler(req, res) {
   // CORS 헤더 설정
@@ -274,24 +311,46 @@ async function scrapeNaverThemeStocks(themeId, themeName) {
         : 0;
 
       if (symbol && name) {
-        stocks.push({
-          symbol,
-          name,
-          price,
-          change,
-          changePercent,
-          volume,
-          sector: themeName,
-          description: `네이버 금융 ${themeName} 종목`
-        });
+        stocks.push({ symbol, name, price, change, changePercent, volume, sector: themeName,
+          description: `네이버 금융 ${themeName} 종목` });
       }
     });
 
-    // 테마별 상위 5~10개만 리턴
-    return stocks.slice(0, 10);
+    // 종목별 실제 시총 조회 후 필터링
+    const withCap = await Promise.all(
+      stocks.map(async s => {
+        const cap = await fetchMarketCapEok(s.symbol);
+        return { ...s, marketCapEok: cap, marketCap: cap * 100_000_000 };
+      })
+    );
+
+    const filtered = withCap.filter(s => s.marketCapEok >= MIN_MARKET_CAP_EOK);
+
+    // 테마별 상위 10개만 리턴
+    return filtered.slice(0, 10);
   } catch (error) {
     console.error(`테마 ${themeId} 스크래핑 실패:`, error);
     return [];
+  }
+}
+
+// 네이버 itemSummary API로 시가총액(억원) 조회
+const marketCapCache = {};
+async function fetchMarketCapEok(symbol) {
+  if (marketCapCache[symbol] !== undefined) return marketCapCache[symbol];
+  try {
+    const res = await fetch(
+      `https://api.finance.naver.com/service/itemSummary.nhn?itemcode=${symbol}`,
+      { headers: { 'Referer': 'https://finance.naver.com/' } }
+    );
+    if (!res.ok) return 0;
+    const data = await res.json();
+    // marketSum은 백만원 단위 → 100으로 나누면 억원
+    const cap = Math.floor((parseInt(data.marketSum) || 0) / 100);
+    marketCapCache[symbol] = cap;
+    return cap;
+  } catch {
+    return 0;
   }
 }
 
@@ -304,8 +363,11 @@ async function getThemes() {
 
   const themes = await scrapeNaverThemeList();
   if (themes && themes.length > 0) {
-    // 서버 부하/타이머 방지를 위해 상위 50개 정도만 사용
-    cachedThemes = themes.slice(0, 50);
+    // 글로벌 영향력 있는 테마만 필터링
+    const globalThemes = themes.filter(t =>
+      GLOBAL_THEME_KEYWORDS.some(kw => t.name.includes(kw))
+    );
+    cachedThemes = globalThemes.slice(0, 50);
     themesLastUpdate = now;
     return cachedThemes;
   }

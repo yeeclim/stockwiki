@@ -205,203 +205,152 @@ class FMPService {
 
   /// AI 추천 주식 목록 가져오기 (상승률, 거래량, 시가총액 기준)
   static Future<List<StockRecommendation>> fetchRecommendedStocks({int limit = 20}) async {
-    // 주요 미국 주식 심볼 목록 (S&P 500 상위 종목)
-    final majorStocks = [
-      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B',
-      'UNH', 'JNJ', 'PFE', 'XOM', 'JPM', 'WMT', 'PG', 'MA', 'CVX', 'LLY',
-      'AVGO', 'PEP', 'COST', 'ABBV', 'MRK', 'AMD', 'MCD', 'TMO', 'NFLX'
-    ];
-
     try {
-      debugPrint('🤖 [FMP] AI 추천 주식 조회 시작 (limit: $limit)');
-      
-      // 1. 캐시 확인
-      final cacheKey = 'fmp_recommendations';
-      final cachedData = await CacheService.get(cacheKey);
-      
-      if (cachedData != null) {
-        final List<dynamic> quoteData = cachedData;
-        
-        List<StockRecommendation> recommendations = quoteData
-             .where((item) => item['price'] != null && item['changePercent'] != null)
-             .map<StockRecommendation>((item) {
-               final stock = Stock.fromJson(item);
-               final score = _calculateAIScore(stock);
-               final reasons = _generateReasons(stock);
-               final action = _determineAction(stock, score);
-               
-               return StockRecommendation(
-                 stock: stock,
-                 score: score,
-                 reasons: reasons,
-                 action: action,
-               );
-             })
-             .where((rec) => rec.action == 'Buy') 
-             .toList();
+      debugPrint('🤖 [US-RECOMMEND] AI 추천 주식 조회 시작');
+
+      const apiUrl = 'https://stockwiki.vercel.app/api/us-recommend';
+      final res = await getWithRetry(Uri.parse(apiUrl));
+
+      if (res.statusCode == 200) {
+        final body = json.decode(res.body);
+        final List<dynamic> items = body['data'] ?? [];
+
+        final recommendations = items.map<StockRecommendation>((item) {
+          final stock = Stock.fromJson(item);
+          return StockRecommendation(
+            stock: stock,
+            score: (item['score'] as num?)?.toDouble() ?? 0,
+            reasons: List<String>.from(item['reasons'] ?? []),
+            action: item['action'] ?? 'Hold',
+          );
+        }).toList();
 
         recommendations.sort((a, b) => b.score.compareTo(a.score));
         return recommendations.take(limit).toList();
       }
       
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      
-      // 실시간 시세 조회
-      final symbols = majorStocks.join(',');
-      final quoteUrl = Uri.parse('$_baseUrl/quote/$symbols?apikey=$_apiKey&t=$timestamp');
-      
-      final quoteRes = await getWithRetry(quoteUrl);
-      
-      if (quoteRes.statusCode == 200) {
-        final quoteData = json.decode(quoteRes.body);
-        if (quoteData is List && quoteData.isNotEmpty) {
-           // 2. 캐시 저장 (1시간) - 추천 정보는 자주 안 변해도 됨
-           await CacheService.set(cacheKey, quoteData, expiration: const Duration(hours: 1));
-           
-           List<StockRecommendation> recommendations = quoteData
-              .where((item) => item['price'] != null && item['changePercent'] != null)
-              .map<StockRecommendation>((item) {
-                final stock = Stock.fromJson(item);
-                final score = _calculateAIScore(stock);
-                final reasons = _generateReasons(stock);
-                final action = _determineAction(stock, score);
-                
-                  return StockRecommendation(
-                  stock: stock,
-                  score: score,
-                  reasons: reasons,
-                  action: action,
-                );
-              })
-              .where((rec) => rec.action == 'Buy') // Hold, Watch 제거
-              .toList();
-
-          recommendations.sort((a, b) => b.score.compareTo(a.score));
-          return recommendations.take(limit).toList();
-        }
-      }
-
-      // Fallback: Finnhub (상위 5개만 조회하여 추천)
-      debugPrint('⚠️ [FMP] 추천 조회 실패, Finnhub Fallback 시도');
-      List<StockRecommendation> recommendations = [];
-      for (var symbol in majorStocks.take(5)) {
-        final detail = await _fetchStockDetailFinnhub(symbol);
-        if (detail != null) {
-          final stock = Stock.fromJson(detail);
-          final score = _calculateAIScore(stock); // 거래량 누락으로 점수는 낮을 수 있음
-          recommendations.add(StockRecommendation(
-            stock: stock,
-            score: score,
-            reasons: ['시장 주도 대형주 (데이터 대체)'], 
-            action: 'Hold',
-          ));
-        }
-      }
-      return recommendations;
+      debugPrint('⚠️ [US-RECOMMEND] API 응답 실패');
+      return [];
 
     } catch (e) {
-      debugPrint('💥 [FMP] AI 추천 주식 조회 오류: $e');
+      debugPrint('💥 [US-RECOMMEND] 오류: $e');
       return [];
     }
   }
 
-  /// AI 점수 계산 (0-100점)
+  // 시총 최소 기준: $100억 (USD) 이상 대형주만
+  static const double _minMarketCapUsd = 10000000000;
+
+  /// AI 점수 계산 (0-100점) — 이평선 중심
   static double _calculateAIScore(Stock stock) {
-    double score = 50.0; // 기본 점수
-    
-    // 상승률 점수 (0-30점)
+    final price = stock.price ?? 0;
+    final ma50 = stock.ma50 ?? 0;
+    final ma200 = stock.ma200 ?? 0;
     final changePercent = stock.changePercent ?? 0;
-    if (changePercent > 0) {
-      score += (changePercent * 2).clamp(0, 30); // 상승률 1%당 2점 (최대 30점)
-    } else {
-      score += (changePercent * 1.5).clamp(-30, 0); // 하락률 페널티
-    }
-    
-    // 거래량 점수 (0-20점)
     final volume = stock.volume ?? 0;
-    if (volume > 10000000) {
-      score += 20; // 거래량 1천만 이상
-    } else if (volume > 5000000) {
-      score += 15; // 거래량 5백만 이상
-    } else if (volume > 1000000) {
-      score += 10; // 거래량 1백만 이상
-    } else if (volume > 500000) {
-      score += 5; // 거래량 50만 이상
+
+    double score = 30.0; // 기본 점수
+
+    // ① 이평선 신호 (최대 50점)
+    if (ma50 > 0 && ma200 > 0) {
+      if (price > ma50 && price > ma200 && ma50 > ma200) {
+        score += 50; // 골든크로스 + 가격 이평선 위 — 강세
+      } else if (price > ma50 && price > ma200) {
+        score += 38;
+      } else if (price > ma50 && ma50 > ma200) {
+        score += 30;
+      } else if (price > ma50) {
+        score += 20;
+      } else if (price < ma50 && price < ma200) {
+        score -= 15; // 데드크로스 구간 — 약세
+      }
+    } else if (ma50 > 0) {
+      score += (price > ma50) ? 20 : -10;
     }
-    
-    // 시가총액 점수 (0-20점)
-    final marketCap = stock.marketCap ?? 0;
-    if (marketCap > 1000000000000) {
-      score += 20; // 시가총액 1조 이상
-    } else if (marketCap > 500000000000) {
-      score += 15; // 시가총액 5천억 이상
-    } else if (marketCap > 100000000000) {
-      score += 10; // 시가총액 1천억 이상
+
+    // ② 모멘텀 (최대 20점)
+    if (changePercent >= 3)       score += 20;
+    else if (changePercent >= 1)  score += 12;
+    else if (changePercent >= 0)  score += 5;
+    else if (changePercent >= -2) score -= 5;
+    else                          score -= 15;
+
+    // ③ 거래량 (최대 15점)
+    if (volume > 10000000)      score += 15;
+    else if (volume > 5000000)  score += 10;
+    else if (volume > 1000000)  score += 5;
+
+    // ④ 52주 고가 근접 여부 (최대 10점)
+    final yearHigh = stock.yearHigh ?? 0;
+    if (yearHigh > 0 && price > 0) {
+      final ratio = price / yearHigh;
+      if (ratio >= 0.95) score += 10; // 52주 고가 95% 이상
+      else if (ratio >= 0.85) score += 5;
     }
-    
-    // 변동성 점수 (0-10점) - 상승률의 절댓값이 적당한 경우
-    if (changePercent.abs() > 2 && changePercent.abs() < 10 && changePercent > 0) {
-      score += 10; // 적당한 상승 변동성
-    }
-    
+
     return score.clamp(0, 100);
   }
 
   /// 추천 이유 생성
   static List<String> _generateReasons(Stock stock) {
-    List<String> reasons = [];
-    
+    final price = stock.price ?? 0;
+    final ma50 = stock.ma50 ?? 0;
+    final ma200 = stock.ma200 ?? 0;
     final changePercent = stock.changePercent ?? 0;
     final volume = stock.volume ?? 0;
-    final marketCap = stock.marketCap ?? 0;
-    
-    if (changePercent > 3) {
-      reasons.add('강한 상승 모멘텀 (${changePercent.toStringAsFixed(2)}%)');
-    } else if (changePercent > 1) {
-      reasons.add('안정적 상승 추세 (${changePercent.toStringAsFixed(2)}%)');
+    final yearHigh = stock.yearHigh ?? 0;
+    final reasons = <String>[];
+
+    // 이평선 신호
+    if (ma50 > 0 && ma200 > 0) {
+      if (price > ma50 && price > ma200 && ma50 > ma200) {
+        reasons.add('골든크로스 + 현재가 MA50·MA200 상회 — 강한 상승 추세');
+      } else if (price > ma50 && price > ma200) {
+        reasons.add('현재가 MA50·MA200 상회 — 중장기 상승 구간');
+      } else if (price > ma50) {
+        reasons.add('현재가 MA50 상회 — 단기 상승 모멘텀');
+      }
     }
-    
+
+    // 모멘텀
+    if (changePercent >= 3) {
+      reasons.add('오늘 +${changePercent.toStringAsFixed(2)}% 강한 상승 모멘텀');
+    } else if (changePercent >= 1) {
+      reasons.add('오늘 +${changePercent.toStringAsFixed(2)}% 안정적 상승');
+    }
+
+    // 거래량
     if (volume > 10000000) {
-      reasons.add('높은 거래량으로 유동성 우수');
+      reasons.add('거래량 ${(volume / 1000000).toStringAsFixed(0)}M — 유동성 우수');
     } else if (volume > 5000000) {
-      reasons.add('활발한 거래량');
+      reasons.add('거래량 ${(volume / 1000000).toStringAsFixed(0)}M — 활발한 매수세');
     }
-    
-    if (marketCap > 1000000000000) {
-      reasons.add('대형주로 안정성 높음');
-    } else if (marketCap > 500000000000) {
-      reasons.add('중대형주로 성장성 우수');
+
+    // 52주 고가 근접
+    if (yearHigh > 0 && price / yearHigh >= 0.95) {
+      reasons.add('52주 고가(${yearHigh.toStringAsFixed(0)}) 근접 — 강한 상승 흐름');
     }
-    
-    // Sector별 이유
-    if (stock.symbol.contains('AAPL') || stock.symbol.contains('MSFT') || 
-        stock.symbol.contains('GOOGL') || stock.symbol.contains('NVDA')) {
-      reasons.add('기술주 선두주자로 성장 잠재력');
-    }
-    
-    if (reasons.isEmpty) {
-      reasons.add('시장 관심도 높은 종목');
-    }
-    
+
+    if (reasons.isEmpty) reasons.add('시장 주도 대형주 — 이평선 기준 관심 종목');
     return reasons;
   }
 
-  /// 액션 결정 (Buy, Hold, Watch)
+  /// 액션 결정: 이평선 기반
   static String _determineAction(Stock stock, double score) {
-    final changePercent = stock.changePercent ?? 0;
-    
-    // 점수가 높으면(60점 이상) 상승률이 낮아도 매수 추천
-    if (score >= 60) {
-      return 'Buy';
-    } 
-    // 점수가 준수(50점 이상)하고 상승세가 뚜렷하면 매수 추천
-    else if (score >= 50 && changePercent > 1.0) {
-      return 'Buy';
-    }
-    // 그 외에는 관망 (API에서 필터링됨)
-    else {
-      return 'Hold';
-    }
+    final price = stock.price ?? 0;
+    final ma50 = stock.ma50 ?? 0;
+    final ma200 = stock.ma200 ?? 0;
+    final marketCap = (stock.marketCap ?? 0).toDouble();
+
+    // 시총 $100억 미만 제외
+    if (marketCap < _minMarketCapUsd) return 'Hold';
+
+    // 이평선 데이터 있을 때: 가격이 MA50 위에 있어야 최소 조건
+    if (ma50 > 0 && price < ma50) return 'Hold';
+
+    if (score >= 65) return 'Buy';
+    if (score >= 50) return 'Buy';
+    return 'Hold';
   }
 
   /// Sector별 추천 주식 가져오기
