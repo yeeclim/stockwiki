@@ -66,23 +66,24 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     setState(() => _isLoading = true);
 
     try {
-      for (final theme in List<String>.from(_themes)) {
-        final stocks = await KrxLoader.getThemeStocks(theme);
-        if (mounted) {
-          setState(() {
-            _themeStocks[theme] = stocks;
-          });
-        }
-      }
+      // 병렬 로딩 (순차 → 동시)
+      await Future.wait(
+        List<String>.from(_themes).map((theme) async {
+          final stocks = await KrxLoader.getThemeStocks(theme);
+          if (mounted) setState(() { _themeStocks[theme] = stocks; });
+        }),
+      );
 
       // 종목이 0개인 테마 숨기기
       if (mounted) {
         final visible = _themes.where((t) => (_themeStocks[t] ?? []).isNotEmpty).toList();
         if (visible.length != _themes.length) {
           final old = _tabController;
+          final newCtrl = TabController(length: visible.length, vsync: this);
+          newCtrl.addListener(() { if (mounted) setState(() {}); });
           setState(() {
             _themes = visible;
-            _tabController = TabController(length: _themes.length, vsync: this);
+            _tabController = newCtrl;
           });
           old.dispose();
         }

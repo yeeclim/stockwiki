@@ -52,7 +52,7 @@ class UsSectorLoader {
         'description': 'Semiconductors',
         'reason': '데이터 센터 CPU/GPU 시장에서 시장 리더의 강력한 대안으로 경쟁력 확보.',
         'news': [
-          {'title': 'AMD instict MI300 series challenges NVIDIA dominance', 'url': 'https://www.google.com/search?q=AMD+MI300+news&tbm=nws'},
+          {'title': 'AMD Instinct MI300 series challenges NVIDIA dominance', 'url': 'https://www.google.com/search?q=AMD+MI300+news&tbm=nws'},
           {'title': 'Server market share gains continue against Intel', 'url': 'https://www.google.com/search?q=AMD+server+market+share+news&tbm=nws'}
         ]
       },
@@ -88,7 +88,7 @@ class UsSectorLoader {
         'reason': 'Optum을 통한 사업 다각화로 안정적인 현금 흐름과 의료 서비스 시장 지배력 보유.',
         'news': [
           {'title': 'UnitedHealth reports solid earnings despite cyberattack impact', 'url': 'https://www.google.com/search?q=UnitedHealth+earnings+news&tbm=nws'},
-          {'title': 'Optum Health expends care delivery capabilities', 'url': 'https://www.google.com/search?q=UnitedHealth+Optum+expansion+news&tbm=nws'}
+          {'title': 'Optum Health expands care delivery capabilities', 'url': 'https://www.google.com/search?q=UnitedHealth+Optum+expansion+news&tbm=nws'}
         ]
       },
       {
@@ -98,7 +98,7 @@ class UsSectorLoader {
         'description': 'Pharmaceuticals & MedTech',
         'reason': '소비자 건강 부문 분사 후 고성장 제약 및 의료기기(MedTech) 분야에 집중.',
         'news': [
-          {'title': 'MedTech aquisition expands cardiovascular portfolio', 'url': 'https://www.google.com/search?q=JNJ+MedTech+acquisition+news&tbm=nws'},
+          {'title': 'MedTech acquisition expands cardiovascular portfolio', 'url': 'https://www.google.com/search?q=JNJ+MedTech+acquisition+news&tbm=nws'},
           {'title': 'Strong immunology drug sales drive growth', 'url': 'https://www.google.com/search?q=JNJ+immunology+sales+news&tbm=nws'}
         ]
       },
@@ -167,7 +167,7 @@ class UsSectorLoader {
         'reason': 'ETF(iShares) 자금 유입 1위 및 인프라 투자 확대로 자산 운용 시장 지배.',
         'news': [
           {'title': 'Bitcoin ETF inflows shatter records', 'url': 'https://www.google.com/search?q=BlackRock+Bitcoin+ETF+news&tbm=nws'},
-          {'title': 'Aquisition of GIP to boost infrastructure business', 'url': 'https://www.google.com/search?q=BlackRock+GIP+acquisition+news&tbm=nws'}
+          {'title': 'Acquisition of GIP to boost infrastructure business', 'url': 'https://www.google.com/search?q=BlackRock+GIP+acquisition+news&tbm=nws'}
         ]
       },
     ],

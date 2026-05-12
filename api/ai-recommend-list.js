@@ -279,7 +279,6 @@ function buildItem(stock, data, maData, score) {
 }
 
 function scoreToAction(score, cp) {
-  if (score >= 75) return 'Buy';
   if (score >= 55) return 'Buy';
   if (score >= 35) return 'Watch';
   return 'Hold';
