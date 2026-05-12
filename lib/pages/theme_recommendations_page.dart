@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/krx_loader.dart';
+import '../utils/tradingview_helper.dart';
 import 'us_stock_search_page.dart';
 import 'ai_stock_recommend_page.dart';
 import 'us_stock_ai_recommend_page.dart';
@@ -175,8 +176,13 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     );
   }
 
-  void _navigateToStockDetail(String symbol) {
-    _launchURL('https://finance.naver.com/item/main.naver?code=$symbol');
+  void _navigateToStockDetail(String symbol, String name) {
+    showChart(
+      context,
+      tvSymbol: krxSymbol(symbol),
+      stockName: name,
+      naverCode: symbol,
+    );
   }
 
   void _launchURL(String url) async {
@@ -319,7 +325,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         side: BorderSide(color: themeData.colorScheme.outlineVariant),
       ),
       child: InkWell(
-        onTap: () => _navigateToStockDetail(symbol),
+        onTap: () => _navigateToStockDetail(symbol, name),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -476,22 +482,18 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               
               const SizedBox(height: 12),
               
-              // 네이버 증권 링크
+              // 차트 보기 힌트
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  Icon(Icons.bar_chart, size: 13, color: themeData.colorScheme.primary),
+                  const SizedBox(width: 4),
                   Text(
-                    '네이버 증권 바로가기',
+                    '차트 보기',
                     style: themeData.textTheme.labelSmall?.copyWith(
                       color: themeData.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.open_in_new,
-                    size: 12,
-                    color: themeData.colorScheme.primary
                   ),
                 ],
               ),
