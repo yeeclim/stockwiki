@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/stock.dart';
 import '../services/fmp_service.dart';
 import '../widgets/stock_card.dart';
+import '../utils/tradingview_helper.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockAiRecommendPage extends StatefulWidget {
@@ -176,14 +177,12 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
               color: theme.cardTheme.color,
               shape: theme.cardTheme.shape,
               child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => UsStockDetailPage(stock: stock),
-                    ),
-                  );
-                },
+                onTap: () => showChart(
+                  context,
+                  tvSymbol: usSymbol(stock.symbol),
+                  stockName: stock.name,
+                  yahooTicker: stock.symbol,
+                ),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -335,6 +334,21 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                           ),
                         )),
                       ],
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Icon(Icons.bar_chart, size: 13, color: theme.colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            '차트 보기',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

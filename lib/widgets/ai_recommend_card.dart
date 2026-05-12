@@ -8,8 +8,9 @@ import '../pages/ai_stock_recommend_page.dart';
 /// been moved here so the main page can stay thin.
 class AiRecommendCard extends StatelessWidget {
   final StockRecommendation rec;
+  final VoidCallback? onChartTap;
 
-  const AiRecommendCard({super.key, required this.rec});
+  const AiRecommendCard({super.key, required this.rec, this.onChartTap});
 
   // ─── Formatters ──────────────────────────────────────────────────────────
 
@@ -552,6 +553,26 @@ class AiRecommendCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   _buildTradingStrategies(context, rec.currentPrice),
                 ],
+                const SizedBox(height: 12),
+                Divider(height: 1, color: theme.dividerColor),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: onChartTap,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(Icons.bar_chart, size: 13, color: theme.colorScheme.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        '차트 보기',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

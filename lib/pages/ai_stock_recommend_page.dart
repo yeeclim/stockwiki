@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import '../services/bookmark_service.dart';
+import '../utils/tradingview_helper.dart';
 import '../widgets/ai_recommend_header.dart';
 import '../widgets/ai_recommend_card.dart';
 import '../widgets/ai_recommend_empty_state.dart';
@@ -315,7 +316,16 @@ StockWiki AI 추천
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _recommendations.length,
         itemBuilder: (context, index) {
-          return AiRecommendCard(rec: _recommendations[index]);
+          final rec = _recommendations[index];
+          return AiRecommendCard(
+            rec: rec,
+            onChartTap: () => showChart(
+              context,
+              tvSymbol: krxSymbol(rec.stockCode),
+              stockName: rec.stockName,
+              naverCode: rec.stockCode,
+            ),
+          );
         },
       ),
     );
