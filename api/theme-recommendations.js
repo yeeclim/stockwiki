@@ -474,24 +474,23 @@ function applyTechnicalFilter(price, tech) {
     return { pass: false, warning: null };
   }
 
-  // ③ 52주 신고가 경신 중 (고가 초과) → 제외
-  if (high52w && price > high52w) {
-    return { pass: false, warning: null };
-  }
+  // ③ 52주 신고가 돌파 → 강세 신호이므로 제외하지 않고 경고 뱃지만 표시
 
   // ④ MA20 대비 20% 초과 과열 → 제외
   if (ma20 && price > ma20 * 1.20) {
     return { pass: false, warning: null };
   }
 
-  // ⑤ 52주 고가 95% 이상 근접 → 경고 뱃지 (제외 안함)
-  const near52wHigh = high52w && price >= high52w * 0.95;
+  // ⑤ 52주 고가 돌파/근접 → 경고 뱃지 (제외 안함)
+  const above52wHigh = high52w && price > high52w;
+  const near52wHigh  = high52w && price >= high52w * 0.95;
 
   // ⑥ MA20 대비 10~20% 구간 → 주의 뱃지
   const nearMA20Top = ma20 && price > ma20 * 1.10;
 
   let warning = null;
-  if (near52wHigh) warning = '52주 고가 근접';
+  if (above52wHigh)  warning = '52주 신고가 돌파';
+  else if (near52wHigh)  warning = '52주 고가 근접';
   else if (nearMA20Top) warning = 'MA20 대비 고점';
 
   return { pass: true, warning };
