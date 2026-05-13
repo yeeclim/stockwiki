@@ -285,14 +285,19 @@ async function naverMobileQuery(q, type, seen) {
   }
 }
 
-// ── Naver fchart 가격 ─────────────────────────────────────────────────────────
+// ── Naver fchart 가격 + 한글 종목명 ───────────────────────────────────────────
 async function fetchPrice(item) {
-  const { code, name, isEtf, market } = item;
+  const { code, isEtf, market } = item;
+  let name = item.name;
   let price = null, changePercent = null;
   try {
     const url = `https://fchart.stock.naver.com/sise.nhn?symbol=${code}&timeframe=day&count=2&requestType=0`;
     const text = await fetchText(url, 5000);
     if (text) {
+      // fchart XML에 name 속성으로 한글 종목명이 포함됨
+      const nameMatch = /<chartData[^>]+name="([^"]+)"/.exec(text);
+      if (nameMatch?.[1]) name = nameMatch[1];
+
       const matches = [...text.matchAll(/data="[^|"]+\|[^|"]+\|[^|"]+\|[^|"]+\|([^|"]+)\|/g)];
       const closes = matches.map(m => parseFloat(m[1])).filter(v => !isNaN(v) && v > 0);
       if (closes.length >= 1) price = closes[closes.length - 1];
