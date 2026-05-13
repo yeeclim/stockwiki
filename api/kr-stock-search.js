@@ -94,7 +94,11 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
   const filterWord = filterQuery.match(/^[A-Za-z]{2,}/)?.[0]?.toLowerCase() ?? '';
 
   try {
-    const url = `https://symbol-search.tradingview.com/symbol_search/?text=${encodeURIComponent(q)}&hl=0&exchange=KRX&lang=ko&type=&domain=production&limit=30`;
+    // 번역된 영어 쿼리(filterQuery에 한글 없는 경우)는 exchange 필터 없이 글로벌 검색
+    // KRX가 일부 ETF를 exchange=KRX 인덱스에 미등록하는 케이스 보완
+    const isTranslated = !/[가-힣]/.test(q) && q !== filterQuery && /[가-힣]/.test(filterQuery);
+    const exchangeParam = isTranslated ? '' : '&exchange=KRX';
+    const url = `https://symbol-search.tradingview.com/symbol_search/?text=${encodeURIComponent(q)}&hl=0${exchangeParam}&lang=ko&type=&domain=production&limit=50`;
     const text = await fetchText(url, 8000, {
       'Referer': 'https://www.tradingview.com/',
       'Accept': 'application/json',
@@ -104,7 +108,7 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
     let data; try { data = JSON.parse(text); } catch { console.log('[tv] parse err, raw:', text?.substring(0, 100)); return; }
 
     const list = Array.isArray(data) ? data : (data?.symbols ?? []);
-    console.log(`[tv] "${q}" raw ${list.length} items`);
+    console.log(`[tv] "${q}"(${isTranslated ? 'global' : 'KRX'}) raw ${list.length} items`);
     for (const item of list) {
       // TradingView: symbol = "466930" (6자리) or "KRX:466930"
       const raw = item.symbol ?? '';
