@@ -49,43 +49,53 @@ export default async function handler(req, res) {
 // 한국 종목은 symbol이 "466930.KS" (KOSPI) 또는 "466930.KQ" (KOSDAQ) 형식
 async function yahooSearch(q, type) {
   try {
-    const encoded = encodeURIComponent(q);
-    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encoded}&quotesCount=15&newsCount=0&enableFuzzyQuery=false`;
-    const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
-    if (!text) return [];
+    const seen = new Map(); // code → item
 
-    let data;
-    try { data = JSON.parse(text); } catch { return []; }
+    // 1차: 전체 쿼리로 검색
+    await yahooSearchQuery(q, type, seen);
 
-    const quotes = data?.quotes || [];
-    const results = [];
-
-    for (const quote of quotes) {
-      const symbol = quote.symbol || '';
-      // .KS = KOSPI, .KQ = KOSDAQ
-      const isKorean = /\.(KS|KQ)$/.test(symbol);
-      if (!isKorean) continue;
-
-      const code = symbol.replace(/\.(KS|KQ)$/, '');
-      if (!/^\d{6}$/.test(code)) continue;
-
-      const name = quote.shortname || quote.longname || '';
-      if (!name) continue;
-
-      const isEtf = quote.quoteType === 'ETF'
-                 || quote.quoteType === 'ETF-ETN'
-                 || code.startsWith('5');
-      const market = symbol.endsWith('.KQ') ? 'KOSDAQ' : 'KOSPI';
-
-      if (type === 'stock' && isEtf) continue;
-      if (type === 'etf' && !isEtf) continue;
-
-      results.push({ code, name, isEtf, market });
+    // 2차: 한글이 포함된 긴 쿼리면 영문/숫자 prefix로 추가 검색
+    // 예) "SOL 200타겟위클리커버드콜" → "SOL 200"으로도 검색
+    const asciiPrefix = q.match(/^[A-Za-z0-9\s\-\.]+/)?.[0]?.trim() ?? '';
+    if (asciiPrefix && asciiPrefix.length >= 2 && asciiPrefix !== q) {
+      await yahooSearchQuery(asciiPrefix, type, seen);
     }
-    return results;
+
+    return [...seen.values()];
   } catch (e) {
     console.error('[yahooSearch]:', e.message);
     return [];
+  }
+}
+
+async function yahooSearchQuery(q, type, seen) {
+  const encoded = encodeURIComponent(q);
+  const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encoded}&quotesCount=20&newsCount=0&enableFuzzyQuery=false`;
+  const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
+  if (!text) return;
+
+  let data;
+  try { data = JSON.parse(text); } catch { return; }
+
+  for (const quote of (data?.quotes || [])) {
+    const symbol = quote.symbol || '';
+    if (!/\.(KS|KQ)$/.test(symbol)) continue;
+
+    const code = symbol.replace(/\.(KS|KQ)$/, '');
+    if (!/^\d{6}$/.test(code) || seen.has(code)) continue;
+
+    const name = quote.shortname || quote.longname || '';
+    if (!name) continue;
+
+    const isEtf = quote.quoteType === 'ETF'
+               || quote.quoteType === 'ETF-ETN'
+               || code.startsWith('5');
+    const market = symbol.endsWith('.KQ') ? 'KOSDAQ' : 'KOSPI';
+
+    if (type === 'stock' && isEtf) continue;
+    if (type === 'etf' && !isEtf) continue;
+
+    seen.set(code, { code, name, isEtf, market });
   }
 }
 
