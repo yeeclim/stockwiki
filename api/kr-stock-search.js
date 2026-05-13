@@ -24,9 +24,9 @@ export default async function handler(req, res) {
       queries.push(asciiPrefix);
     }
 
-    // 1차: KRX 공식 종목 검색 (ETF·ETN·주식 전체, 가장 정확)
-    await Promise.all(queries.map(qry => krxQuery(qry, type, seen)));
-    console.log(`[krx] ${seen.size} results for "${q}"`);
+    // 1차: TradingView 심볼 검색 (글로벌 서버, KRX 전 종목 포함)
+    await Promise.all(queries.map(qry => tradingviewQuery(qry, type, seen)));
+    console.log(`[tv] ${seen.size} results for "${q}"`);
 
     // 2차: Yahoo Finance (추가 보완)
     if (seen.size < 10) {
@@ -34,13 +34,19 @@ export default async function handler(req, res) {
       console.log(`[yahoo] ${seen.size} results`);
     }
 
-    // 3차: Daum Finance (카카오)
+    // 3차: KRX 공식 API (POST)
+    if (seen.size < 5) {
+      await Promise.all(queries.map(qry => krxQuery(qry, type, seen)));
+      console.log(`[krx] ${seen.size} results`);
+    }
+
+    // 4차: Daum Finance (카카오)
     if (seen.size < 5) {
       await Promise.all(queries.map(qry => daumQuery(qry, type, seen)));
       console.log(`[daum] ${seen.size} results`);
     }
 
-    // 4차: Naver 모바일 (fallback)
+    // 5차: Naver 모바일 (fallback)
     if (seen.size < 3) {
       for (const qry of queries) {
         await naverMobileQuery(qry, type, seen);
@@ -63,6 +69,36 @@ export default async function handler(req, res) {
     console.error('kr-stock-search error:', e.message);
     res.status(500).json({ success: false, error: '검색 중 오류: ' + e.message });
   }
+}
+
+// ── TradingView 심볼 검색 ─────────────────────────────────────────────────────
+async function tradingviewQuery(q, type, seen) {
+  try {
+    const url = `https://symbol-search.tradingview.com/symbol_search/?text=${encodeURIComponent(q)}&hl=1&exchange=KRX&lang=ko&type=&domain=production`;
+    const text = await fetchText(url, 8000, {
+      'Referer': 'https://www.tradingview.com/',
+      'Accept': 'application/json',
+      'Origin': 'https://www.tradingview.com',
+    });
+    if (!text) return;
+    let data; try { data = JSON.parse(text); } catch { console.log('[tv] parse err, raw:', text?.substring(0, 100)); return; }
+
+    const list = Array.isArray(data) ? data : (data?.symbols ?? []);
+    for (const item of list) {
+      // TradingView: symbol = "466930" (6자리) or "KRX:466930"
+      const raw = item.symbol ?? '';
+      const code = raw.replace(/^.*:/, '').replace(/\D/g, '').slice(0, 6);
+      if (!code || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+      const name = item.description || '';
+      if (!name) continue;
+      const itemType = (item.type ?? '').toLowerCase();
+      const isEtf = itemType === 'fund' || itemType === 'etf' || code.startsWith('5');
+      const market = item.exchange || 'KRX';
+      if (type === 'stock' && isEtf) continue;
+      if (type === 'etf' && !isEtf) continue;
+      seen.set(code, { code, name, isEtf, market });
+    }
+  } catch (e) { console.error('[tv]', e.message); }
 }
 
 // ── KRX 공식 종목 검색 ────────────────────────────────────────────────────────
