@@ -39,30 +39,26 @@ export default async function handler(req, res) {
       }
     }
 
-    // 1차: TradingView 심볼 검색 (글로벌 서버, KRX 전 종목 포함)
-    // filterQuery=q (원본)로 넘겨야 번역 쿼리의 isTranslated 조건이 올바르게 동작
-    await Promise.all(queries.map(qry => tradingviewQuery(qry, type, seen, q)));
-    console.log(`[tv] ${seen.size} results for "${q}"`);
+    // 1차: TradingView + KRX 병렬 (sin1 리전에서 KRX 접근 시도)
+    await Promise.all([
+      ...queries.map(qry => tradingviewQuery(qry, type, seen, q)),
+      ...queries.map(qry => krxQuery(qry, type, seen)),
+    ]);
+    console.log(`[primary] ${seen.size} results for "${q}"`);
 
     // 2차: Yahoo Finance (추가 보완)
-    if (seen.size < 10) {
+    if (seen.size < 12) {
       await Promise.all(queries.map(qry => yahooQuery(qry, type, seen)));
       console.log(`[yahoo] ${seen.size} results`);
     }
 
-    // 3차: KRX 공식 API (POST)
-    if (seen.size < 5) {
-      await Promise.all(queries.map(qry => krxQuery(qry, type, seen)));
-      console.log(`[krx] ${seen.size} results`);
-    }
-
-    // 4차: Daum Finance (카카오)
+    // 3차: Daum Finance (카카오)
     if (seen.size < 5) {
       await Promise.all(queries.map(qry => daumQuery(qry, type, seen)));
       console.log(`[daum] ${seen.size} results`);
     }
 
-    // 5차: Naver 모바일 (fallback)
+    // 4차: Naver 모바일 (fallback)
     if (seen.size < 3) {
       for (const qry of queries) {
         await naverMobileQuery(qry, type, seen);
@@ -90,9 +86,12 @@ export default async function handler(req, res) {
 // ── TradingView 심볼 검색 ─────────────────────────────────────────────────────
 // filterQuery: 결과 관련성 판단에 쓸 원본 쿼리 (예: "SOL 200")
 async function tradingviewQuery(q, type, seen, filterQuery = q) {
-  // 필터 단어: filterQuery에서 앞의 ASCII 알파벳 단어만 추출 (예: "SOL")
-  // KODEX, SOL 등 펀드 패밀리가 있으면 해당 단어가 결과명에 있어야 함
-  const filterWord = filterQuery.match(/^[A-Za-z]{2,}/)?.[0]?.toLowerCase() ?? '';
+  // 필터 조건: filterQuery에서 ASCII 단어(2자+) + 3자리 이상 숫자 모두 추출
+  // "SOL 200" → ["sol","200"], 결과명에 모두 포함돼야 함 (SOL SP500 같은 오탐 제거)
+  const filterTerms = [
+    ...(filterQuery.match(/\b[A-Za-z]{2,}\b/g) ?? []).map(w => w.toLowerCase()),
+    ...(filterQuery.match(/\b\d{3,}\b/g) ?? []),
+  ];
 
   try {
     // 번역된 영어 쿼리(filterQuery에 한글 없는 경우)는 exchange 필터 없이 글로벌 검색
@@ -118,8 +117,11 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
       // hl=0이어도 혹시 모를 HTML 태그 제거
       const name = (item.description || '').replace(/<[^>]+>/g, '').trim();
       if (!name) continue;
-      // 펀드 패밀리 필터: "SOL" 단어 경계 매칭 → "Solar" 같은 오탐 방지
-      if (filterWord && !new RegExp(`\\b${filterWord}\\b`, 'i').test(name)) continue;
+      // 필터: 쿼리의 모든 핵심 단어/숫자가 결과명에 있어야 함
+      if (filterTerms.length > 0) {
+        const nl = name.toLowerCase();
+        if (!filterTerms.every(t => nl.includes(t))) continue;
+      }
       const itemType = (item.type ?? '').toLowerCase();
       const isEtf = itemType === 'fund' || itemType === 'etf' || code.startsWith('5');
       const market = item.exchange || 'KRX';
