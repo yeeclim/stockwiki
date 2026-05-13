@@ -116,8 +116,9 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
       const raw = item.symbol ?? '';
       const code = raw.replace(/^.*:/, '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
       if (!code || !KRX_CODE.test(code) || seen.has(code)) continue;
-      // local_description(한글) 우선, 없으면 영문 description
-      const name = (item.local_description || item.description || '').replace(/<[^>]+>/g, '').trim();
+      // local_description(한글) 우선, 없으면 영문 → 한글 변환
+      const raw = (item.local_description || item.description || '').replace(/<[^>]+>/g, '').trim();
+      const name = korenizeName(raw);
       if (!name) continue;
       // 필터: 쿼리의 모든 핵심 단어/숫자가 결과명에 있어야 함
       if (filterTerms.length > 0) {
@@ -329,6 +330,57 @@ const KO_EN = [
   ['회사채', 'corporate bond'],
   ['채권', 'bond'],
 ];
+
+// TradingView 영문 ETF명 → 한글 변환
+// "Shinhan SOL 200 Target Weekly Covered Call ETF Units" → "SOL 200타겟위클리커버드콜"
+function korenizeName(name) {
+  if (!name || /[가-힣]/.test(name)) return name; // 이미 한글 포함이면 그대로
+
+  let n = name;
+
+  // 운용사 prefix 제거 (브랜드명은 유지)
+  for (const c of [
+    'Shinhan ', 'Samsung ', 'Mirae Asset ', 'KB ', 'Hanwha ',
+    'NH-Amundi ', 'NH ', 'Kiwoom ', 'Korea Investment ', 'Hyundai ',
+    'IBK ', 'DB ', 'Eugene ', 'Bookook ', 'Timefolio ', 'Woori ',
+    'Kyobo ', 'Hana ', 'Shinyoung ', 'Daishin ',
+  ]) {
+    if (n.startsWith(c)) { n = n.slice(c.length); break; }
+  }
+
+  // 뒤쪽 ETF/Units 등 제거
+  n = n.replace(/\s+(ETF Units|ETF|Units|Fund)\s*$/i, '').trim();
+
+  // 영어 ETF 용어 → 한글 (긴 표현 먼저)
+  for (const [en, ko] of [
+    ['Target Weekly Covered Call', '타겟위클리커버드콜'],
+    ['Weekly Covered Call', '위클리커버드콜'],
+    ['Covered Call', '커버드콜'],
+    ['Inverse 2[xX]', '인버스2X'],
+    ['Leverage', '레버리지'],
+    ['Inverse', '인버스'],
+    ['Dividend Growth', '배당성장'],
+    ['Dividend', '배당'],
+    ['Momentum', '모멘텀'],
+    ['Healthcare', '헬스케어'],
+    ['Semiconductor', '반도체'],
+    ['Government Bond', '국채'],
+    ['Corporate Bond', '회사채'],
+    ['Bond', '채권'],
+    ['REITs', '리츠'],
+    ['Futures', '선물'],
+    ['Total Return', 'TR'],
+    ['Weekly', '위클리'],
+    ['Top 10', 'TOP10'],
+  ]) {
+    n = n.replace(new RegExp(en, 'gi'), ko);
+  }
+
+  // 한글 앞 공백 제거: "SOL 200 타겟위클리" → "SOL 200타겟위클리"
+  n = n.replace(/\s+(?=[가-힣])/g, '');
+
+  return n.trim() || name;
+}
 
 function translateForTv(q) {
   let result = q;
