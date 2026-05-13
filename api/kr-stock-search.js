@@ -15,17 +15,24 @@ export default async function handler(req, res) {
   if (!q) return res.json({ success: true, data: [] });
 
   try {
-    // finance.naver.com 검색 결과 HTML 파싱 (Vercel에서 접근 가능한 도메인)
-    let items = await naverFinanceSearch(q, type);
+    // 1차: Yahoo Finance (한국 주식 .KS/.KQ 지원, 서버에서 접근 가능)
+    let items = await yahooSearch(q, type);
 
-    if (items.length === 0) {
-      return res.json({ success: true, data: [] });
+    // 2차: Naver 모바일 검색 API
+    if (items.length < 3) {
+      const naverItems = await naverMobileSearch(q, type);
+      const seen = new Set(items.map(i => i.code));
+      for (const item of naverItems) {
+        if (!seen.has(item.code)) { seen.add(item.code); items.push(item); }
+      }
     }
+
+    if (items.length === 0) return res.json({ success: true, data: [] });
 
     items = items.slice(0, 15);
 
-    // 가격 병렬 조회
-    const settled = await Promise.allSettled(items.map(item => fetchPrice(item)));
+    // 가격 병렬 조회 (Naver fchart)
+    const settled = await Promise.allSettled(items.map(fetchPrice));
     const data = settled
       .filter(r => r.status === 'fulfilled' && r.value)
       .map(r => r.value);
@@ -38,65 +45,99 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Naver Finance 검색 (HTML 파싱) ─────────────────────────────────────────────
-async function naverFinanceSearch(q, type) {
-  const encoded = encodeURIComponent(q);
-  const url = `https://finance.naver.com/search/searchList.naver?query=${encoded}`;
+// ── Yahoo Finance 검색 ─────────────────────────────────────────────────────────
+// 한국 종목은 symbol이 "466930.KS" (KOSPI) 또는 "466930.KQ" (KOSDAQ) 형식
+async function yahooSearch(q, type) {
+  try {
+    const encoded = encodeURIComponent(q);
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encoded}&quotesCount=15&newsCount=0&enableFuzzyQuery=false`;
+    const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
+    if (!text) return [];
 
-  const html = await fetchText(url, 10000, {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'ko-KR,ko;q=0.9',
-  });
+    let data;
+    try { data = JSON.parse(text); } catch { return []; }
 
-  if (!html) {
-    console.error('[naverFinanceSearch] empty response');
-    return [];
-  }
+    const quotes = data?.quotes || [];
+    const results = [];
 
-  const results = [];
-  const seen = new Set();
+    for (const quote of quotes) {
+      const symbol = quote.symbol || '';
+      // .KS = KOSPI, .KQ = KOSDAQ
+      const isKorean = /\.(KS|KQ)$/.test(symbol);
+      if (!isKorean) continue;
 
-  // href="/item/main.naver?code=XXXXXX" 패턴으로 종목 코드·이름 추출
-  // 종목 이름은 <a> 태그 텍스트 또는 내부 <em>/<strong> 텍스트
-  const linkRe = /href="\/item\/(?:main|sise)\.naver\?code=(\d{6})"[^>]*>([\s\S]*?)<\/a>/gi;
-  let m;
-  while ((m = linkRe.exec(html)) !== null) {
-    const code = m[1];
-    // 내부 태그 제거하여 순수 텍스트 추출
-    const rawName = m[2].replace(/<[^>]+>/g, '').trim();
-    if (!rawName || seen.has(code)) continue;
-    seen.add(code);
+      const code = symbol.replace(/\.(KS|KQ)$/, '');
+      if (!/^\d{6}$/.test(code)) continue;
 
-    const isEtf = code.startsWith('5') // ETN 코드 대역
-               || /ETF|ETN|레버리지|인버스|선물|채권|리츠|커버드콜|인컴|위클리|월지급/i.test(rawName);
-    const market = ''; // HTML에서 시장 구분은 별도 파싱 필요 시 추가
+      const name = quote.shortname || quote.longname || '';
+      if (!name) continue;
 
-    if (type === 'stock' && isEtf) continue;
-    if (type === 'etf' && !isEtf) continue;
+      const isEtf = quote.quoteType === 'ETF'
+                 || quote.quoteType === 'ETF-ETN'
+                 || code.startsWith('5');
+      const market = symbol.endsWith('.KQ') ? 'KOSDAQ' : 'KOSPI';
 
-    results.push({ code, name: rawName, isEtf, market });
-  }
-
-  // 결과가 없으면 더 넓은 패턴으로 재시도 (code= 포함 링크만)
-  if (results.length === 0) {
-    const codeRe = /[?&]code=(\d{6})[^"]*"[^>]*>([^<]{2,40})</gi;
-    while ((m = codeRe.exec(html)) !== null) {
-      const code = m[1];
-      const name = m[2].trim();
-      if (!name || name.length < 2 || seen.has(code)) continue;
-      seen.add(code);
-      const isEtf = code.startsWith('5')
-                 || /ETF|ETN|레버리지|인버스|선물|채권|리츠|커버드콜|인컴|위클리|월지급/i.test(name);
       if (type === 'stock' && isEtf) continue;
       if (type === 'etf' && !isEtf) continue;
-      results.push({ code, name, isEtf, market: '' });
-    }
-  }
 
-  return results;
+      results.push({ code, name, isEtf, market });
+    }
+    return results;
+  } catch (e) {
+    console.error('[yahooSearch]:', e.message);
+    return [];
+  }
 }
 
-// ── 가격 조회 (Naver fchart) ───────────────────────────────────────────────────
+// ── Naver 모바일 검색 API ─────────────────────────────────────────────────────
+async function naverMobileSearch(q, type) {
+  // 여러 endpoint 시도
+  const endpoints = [
+    `https://m.stock.naver.com/api/search/searchWord?searchWord=${encodeURIComponent(q)}&pageSize=20`,
+    `https://m.stock.naver.com/api/stocks/search?keyword=${encodeURIComponent(q)}&page=1&pageSize=20`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const text = await fetchText(url, 8000, { 'Referer': 'https://m.stock.naver.com/' });
+      if (!text) continue;
+
+      let data;
+      try { data = JSON.parse(text); } catch { continue; }
+
+      // 가능한 필드명들
+      const list = data?.stockList || data?.stocks || data?.items
+                || data?.result?.stockList || data?.data?.stockList || [];
+      if (!Array.isArray(list) || list.length === 0) continue;
+
+      const results = [];
+      for (const item of list) {
+        const code = item.itemCode || item.stockCode || item.code || '';
+        const name = item.itemName || item.stockName || item.name || '';
+        if (!code || !name || !/^\d{6}$/.test(code)) continue;
+
+        const isEtf = item.quoteType === 'ETF'
+                   || !!(item.etfType)
+                   || code.startsWith('5');
+        const market = item.stockExchangeType?.name
+                    || item.stockExchangeType?.code
+                    || item.market || '';
+
+        if (type === 'stock' && isEtf) continue;
+        if (type === 'etf' && !isEtf) continue;
+
+        results.push({ code, name, isEtf, market });
+      }
+
+      if (results.length > 0) return results;
+    } catch (e) {
+      console.error('[naverMobileSearch]', url, e.message);
+    }
+  }
+  return [];
+}
+
+// ── Naver fchart 가격 조회 ────────────────────────────────────────────────────
 async function fetchPrice(item) {
   const { code, name, isEtf, market } = item;
   let price = null, changePercent = null;
@@ -105,7 +146,7 @@ async function fetchPrice(item) {
     const text = await fetchText(url, 5000);
     if (text) {
       const matches = [...text.matchAll(/data="[^|"]+\|[^|"]+\|[^|"]+\|[^|"]+\|([^|"]+)\|/g)];
-      const closes = matches.map(m2 => parseFloat(m2[1])).filter(v => !isNaN(v) && v > 0);
+      const closes = matches.map(m => parseFloat(m[1])).filter(v => !isNaN(v) && v > 0);
       if (closes.length >= 1) price = closes[closes.length - 1];
       if (closes.length >= 2) {
         const prev = closes[closes.length - 2];
@@ -116,14 +157,14 @@ async function fetchPrice(item) {
   return { code, name, isEtf, market, price, changePercent };
 }
 
-// ── 공통 fetch 유틸 ────────────────────────────────────────────────────────────
+// ── 공통 fetch 유틸 ───────────────────────────────────────────────────────────
 async function fetchText(url, timeoutMs = 8000, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://finance.naver.com/',
         ...extraHeaders,
       },
