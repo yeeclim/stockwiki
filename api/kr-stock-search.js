@@ -83,6 +83,9 @@ export default async function handler(req, res) {
   }
 }
 
+// KRX 종목코드: 숫자 6자리 또는 숫자로 시작하는 6자리 알파뉴메릭 (예: 0167B0)
+const KRX_CODE = /^\d[A-Z0-9]{5}$/i;
+
 // ── TradingView 심볼 검색 ─────────────────────────────────────────────────────
 // filterQuery: 결과 관련성 판단에 쓸 원본 쿼리 (예: "SOL 200")
 async function tradingviewQuery(q, type, seen, filterQuery = q) {
@@ -109,10 +112,10 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
 
     const list = Array.isArray(data) ? data : (data?.symbols ?? []);
     for (const item of list) {
-      // TradingView: symbol = "466930" (6자리) or "KRX:466930"
+      // TradingView: symbol = "466930" or "KRX:0167B0" (알파뉴메릭 포함)
       const raw = item.symbol ?? '';
-      const code = raw.replace(/^.*:/, '').replace(/\D/g, '').slice(0, 6);
-      if (!code || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+      const code = raw.replace(/^.*:/, '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
+      if (!code || !KRX_CODE.test(code) || seen.has(code)) continue;
       // hl=0이어도 혹시 모를 HTML 태그 제거
       const name = (item.description || '').replace(/<[^>]+>/g, '').trim();
       if (!name) continue;
@@ -152,9 +155,9 @@ async function krxQuery(q, type, seen) {
         const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
         if (list.length === 0) return; // KRX 응답 파싱 실패
         for (const item of list) {
-          const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
+          const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
           const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
-          if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+          if (!code || !name || !KRX_CODE.test(code) || seen.has(code)) continue;
           const isEtf = true;
           const market = item.MKT_NM || item.mktNm || 'KRX';
           seen.set(code, { code, name, isEtf, market });
@@ -180,9 +183,9 @@ async function krxQuery(q, type, seen) {
         const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
         if (list.length === 0) return; // KRX 응답 파싱 실패
         for (const item of list) {
-          const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
+          const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
           const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
-          if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+          if (!code || !name || !KRX_CODE.test(code) || seen.has(code)) continue;
           const isEtf = false;
           const market = item.MKT_NM || item.mktNm || '';
           seen.set(code, { code, name, isEtf, market });
@@ -209,8 +212,8 @@ async function yahooQueryHost(host, q, type, seen) {
     for (const quote of (data?.quotes ?? [])) {
       const symbol = quote.symbol ?? '';
       if (!/\.(KS|KQ)$/.test(symbol)) continue;
-      const code = symbol.replace(/\.(KS|KQ)$/, '');
-      if (!/^\d{6}$/.test(code) || seen.has(code)) continue;
+      const code = symbol.replace(/\.(KS|KQ)$/, '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
+      if (!KRX_CODE.test(code) || seen.has(code)) continue;
       const name = quote.shortname || quote.longname || '';
       if (!name) continue;
       const isEtf = /^ETF/.test(quote.quoteType ?? '') || code.startsWith('5');
@@ -238,8 +241,8 @@ async function daumQuery(q, type, seen) {
     const list = data?.data ?? data?.result ?? [];
     for (const item of list) {
       const rawCode = item.shortCode || item.code || item.symbolCode?.replace(/^[A-Z]/, '') || '';
-      const code = rawCode.replace(/\D/g, '').slice(0, 6);
-      if (!code || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+      const code = rawCode.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
+      if (!code || !KRX_CODE.test(code) || seen.has(code)) continue;
       const name = item.name || item.stockName || '';
       if (!name) continue;
       const isEtf = (item.type ?? '').toUpperCase().includes('ETF')
@@ -267,9 +270,9 @@ async function naverMobileQuery(q, type, seen) {
       const list = data?.stockList || data?.stocks || data?.items || data?.result?.stockList || [];
       if (!Array.isArray(list) || list.length === 0) continue;
       for (const item of list) {
-        const code = item.itemCode || item.stockCode || item.code || '';
+        const code = (item.itemCode || item.stockCode || item.code || '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
         const name = item.itemName || item.stockName || item.name || '';
-        if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+        if (!code || !name || !KRX_CODE.test(code) || seen.has(code)) continue;
         const isEtf = !!(item.etfType) || code.startsWith('5');
         const market = item.stockExchangeType?.name || item.market || '';
         if (type === 'stock' && isEtf) continue;
