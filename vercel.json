@@ -2,7 +2,8 @@
   "outputDirectory": "build/web",
   "framework": null,
   "functions": {
-    "api/ai-committee-verify.js": { "maxDuration": 60 }
+    "api/ai-committee-verify.js": { "maxDuration": 60 },
+    "api/kr-stock-search.js": { "regions": ["sin1"] }
   },
   "routes": [
     {
