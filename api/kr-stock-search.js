@@ -23,11 +23,10 @@ export default async function handler(req, res) {
     if (asciiPrefix && asciiPrefix.length >= 2 && asciiPrefix !== q) {
       queries.push(asciiPrefix);
     }
-    // 한국어 포함 + ASCII prefix가 다단어면 펀드 패밀리(첫 단어)로 추가 검색
-    // 예: "SOL 200타겟위클리커버드콜" → "SOL"로도 검색해 커버드콜 등 포함
-    const hasKorean = /[가-힣]/.test(q);
+    // ASCII prefix가 다단어(예: "SOL 200")이면 펀드 패밀리(첫 단어 "SOL")로도 추가 검색
+    // → "SOL 200" 검색 시 커버드콜처럼 TradingView 매칭이 약한 ETF도 포함
     const asciiParts = asciiPrefix.split(/\s+/).filter(Boolean);
-    if (hasKorean && asciiParts.length >= 2) {
+    if (asciiParts.length >= 2) {
       const fundFamily = asciiParts[0];
       if (fundFamily.length >= 2 && !queries.includes(fundFamily)) {
         queries.push(fundFamily);
@@ -99,6 +98,7 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
     let data; try { data = JSON.parse(text); } catch { console.log('[tv] parse err, raw:', text?.substring(0, 100)); return; }
 
     const list = Array.isArray(data) ? data : (data?.symbols ?? []);
+    console.log(`[tv] "${q}" raw ${list.length} items`);
     for (const item of list) {
       // TradingView: symbol = "466930" (6자리) or "KRX:466930"
       const raw = item.symbol ?? '';
