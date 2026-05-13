@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/tradingview_chart.dart';
 
-// 순수 6자리 숫자 KRX 코드만 TradingView 차트 지원
+// KRX 심볼 중 알파뉴메릭 코드(신규상장 등)만 차트 미지원
+// 미국주식(NASDAQ:AAPL 등) 및 일반 KRX 6자리는 차트 지원
 bool _hasTvChart(String tvSymbol) {
-  final code = tvSymbol.replaceFirst(RegExp(r'^[A-Za-z]+:'), '');
+  if (!tvSymbol.startsWith('KRX:')) return true;
+  final code = tvSymbol.substring(4);
   return RegExp(r'^\d{6}$').hasMatch(code);
 }
 
