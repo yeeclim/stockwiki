@@ -74,7 +74,7 @@ export default async function handler(req, res) {
 // ── TradingView 심볼 검색 ─────────────────────────────────────────────────────
 async function tradingviewQuery(q, type, seen) {
   try {
-    const url = `https://symbol-search.tradingview.com/symbol_search/?text=${encodeURIComponent(q)}&hl=1&exchange=KRX&lang=ko&type=&domain=production`;
+    const url = `https://symbol-search.tradingview.com/symbol_search/?text=${encodeURIComponent(q)}&hl=0&exchange=KRX&lang=ko&type=&domain=production&limit=30`;
     const text = await fetchText(url, 8000, {
       'Referer': 'https://www.tradingview.com/',
       'Accept': 'application/json',
@@ -89,7 +89,8 @@ async function tradingviewQuery(q, type, seen) {
       const raw = item.symbol ?? '';
       const code = raw.replace(/^.*:/, '').replace(/\D/g, '').slice(0, 6);
       if (!code || !/^\d{6}$/.test(code) || seen.has(code)) continue;
-      const name = item.description || '';
+      // hl=0이어도 혹시 모를 HTML 태그 제거
+      const name = (item.description || '').replace(/<[^>]+>/g, '').trim();
       if (!name) continue;
       const itemType = (item.type ?? '').toLowerCase();
       const isEtf = itemType === 'fund' || itemType === 'etf' || code.startsWith('5');
