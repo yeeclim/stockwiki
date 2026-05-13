@@ -107,8 +107,8 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
       // hl=0이어도 혹시 모를 HTML 태그 제거
       const name = (item.description || '').replace(/<[^>]+>/g, '').trim();
       if (!name) continue;
-      // 펀드 패밀리 필터: "SOL 200..." 검색 시 SOL 없는 KODEX 결과 제외
-      if (filterWord && !name.toLowerCase().includes(filterWord)) continue;
+      // 펀드 패밀리 필터: "SOL" 단어 경계 매칭 → "Solar" 같은 오탐 방지
+      if (filterWord && !new RegExp(`\\b${filterWord}\\b`, 'i').test(name)) continue;
       const itemType = (item.type ?? '').toLowerCase();
       const isEtf = itemType === 'fund' || itemType === 'etf' || code.startsWith('5');
       const market = item.exchange || 'KRX';
