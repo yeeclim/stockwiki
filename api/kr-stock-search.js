@@ -83,13 +83,15 @@ async function krxQuery(q, type, seen) {
       );
       if (etfText) {
         let d; try { d = JSON.parse(etfText); } catch { d = null; }
-        const list = d?.result ?? d?.OutBlock_1 ?? d?.block1 ?? [];
+        const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
+        if (list.length > 0) console.log('[krx-etf] sample:', JSON.stringify(list[0]));
+        else console.log('[krx-etf] raw keys:', d ? Object.keys(d) : 'null');
         for (const item of list) {
-          const code = (item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
-          const name = item.isuAbbrNm || item.isuNm || '';
+          const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
+          const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
           if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
           const isEtf = true;
-          const market = item.mktNm || 'KRX';
+          const market = item.MKT_NM || item.mktNm || 'KRX';
           seen.set(code, { code, name, isEtf, market });
         }
       }
@@ -110,13 +112,15 @@ async function krxQuery(q, type, seen) {
       );
       if (stkText) {
         let d; try { d = JSON.parse(stkText); } catch { d = null; }
-        const list = d?.result ?? d?.OutBlock_1 ?? d?.block1 ?? [];
+        const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
+        if (list.length > 0) console.log('[krx-stk] sample:', JSON.stringify(list[0]));
+        else console.log('[krx-stk] raw keys:', d ? Object.keys(d) : 'null');
         for (const item of list) {
-          const code = (item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
-          const name = item.isuAbbrNm || item.isuNm || '';
+          const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
+          const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
           if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
           const isEtf = false;
-          const market = item.mktNm || '';
+          const market = item.MKT_NM || item.mktNm || '';
           seen.set(code, { code, name, isEtf, market });
         }
       }
