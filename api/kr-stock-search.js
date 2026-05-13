@@ -15,27 +15,17 @@ export default async function handler(req, res) {
   if (!q) return res.json({ success: true, data: [] });
 
   try {
-    // 1차: Naver 자동완성 (짧은 키워드에 강함)
-    let rawItems = await naverAcSearch(q, type);
+    // finance.naver.com 검색 결과 HTML 파싱 (Vercel에서 접근 가능한 도메인)
+    let items = await naverFinanceSearch(q, type);
 
-    // 2차: Naver 모바일 검색 API (긴 ETF 이름에 강함) — fallback
-    if (rawItems.length < 3) {
-      const mobileItems = await naverMobileSearch(q, type);
-      // 자동완성 결과에 없는 것만 추가
-      const acCodes = new Set(rawItems.map(r => r.code));
-      for (const item of mobileItems) {
-        if (!acCodes.has(item.code)) rawItems.push(item);
-      }
-    }
-
-    rawItems = rawItems.slice(0, 15);
-
-    if (rawItems.length === 0) {
+    if (items.length === 0) {
       return res.json({ success: true, data: [] });
     }
 
+    items = items.slice(0, 15);
+
     // 가격 병렬 조회
-    const settled = await Promise.allSettled(rawItems.map(item => fetchPrice(item)));
+    const settled = await Promise.allSettled(items.map(item => fetchPrice(item)));
     const data = settled
       .filter(r => r.status === 'fulfilled' && r.value)
       .map(r => r.value);
@@ -48,98 +38,74 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Naver 자동완성 API ────────────────────────────────────────────────────────
-async function naverAcSearch(q, type) {
-  const targets = type === 'stock' ? ['stock']
-                : type === 'etf'   ? ['etf']
-                : ['stock', 'etf'];
+// ── Naver Finance 검색 (HTML 파싱) ─────────────────────────────────────────────
+async function naverFinanceSearch(q, type) {
+  const encoded = encodeURIComponent(q);
+  const url = `https://finance.naver.com/search/searchList.naver?query=${encoded}`;
 
-  const allItems = [];
-  const seen = new Set();
+  const html = await fetchText(url, 10000, {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'ko-KR,ko;q=0.9',
+  });
 
-  for (const target of targets) {
-    try {
-      const encoded = encodeURIComponent(q);
-      const url = `https://ac.finance.naver.com/ac?q=${encoded}&q_enc=UTF-8&target=${encodeURIComponent(target)}&st=111&frm=thstock`;
-      const text = await fetchText(url, 6000);
-      if (!text) continue;
-
-      const data = parseJson(text);
-      if (!data) continue;
-
-      for (const item of (data.r || data.items || [])) {
-        const code = Array.isArray(item) ? item[0] : item.code;
-        if (!code || seen.has(code)) continue;
-        seen.add(code);
-        allItems.push(normalizeAcItem(item));
-      }
-    } catch (e) {
-      console.error(`[naverAcSearch] target=${target}:`, e.message);
-    }
-  }
-  return allItems;
-}
-
-// ── Naver 모바일 검색 API (긴 이름 검색에 적합) ───────────────────────────────
-async function naverMobileSearch(q, type) {
-  try {
-    const encoded = encodeURIComponent(q);
-    const url = `https://m.stock.naver.com/api/search/all?query=${encoded}&target=stock,etf`;
-    const text = await fetchText(url, 8000, {
-      'Referer': 'https://m.stock.naver.com/',
-    });
-    if (!text) return [];
-
-    const data = parseJson(text);
-    if (!data) return [];
-
-    const results = [];
-    const seen = new Set();
-
-    // 가능한 필드명 목록 처리
-    const sections = [
-      ...(data.stocks || data.stockItems || []),
-      ...(data.etfs || data.etfItems || []),
-      ...(data.funds || []),
-    ];
-
-    for (const item of sections) {
-      const code = item.itemCode || item.stockCode || item.code || '';
-      const name = item.itemName || item.stockName || item.name || '';
-      const isEtf = !!(item.etfTabCode || item.etfType || item.isEtf
-                     || (code.length === 6 && code.startsWith('5')));
-      const market = item.stockExchangeType?.name
-                  || item.market
-                  || (item.stockExchangeType?.code === 'KOSDAQ' ? 'KOSDAQ' : 'KOSPI');
-
-      if (!code || !name || seen.has(code)) continue;
-
-      // type 필터 적용
-      if (type === 'stock' && isEtf) continue;
-      if (type === 'etf' && !isEtf) continue;
-
-      seen.add(code);
-      results.push({ code, name, isEtf, market });
-    }
-    return results;
-  } catch (e) {
-    console.error('[naverMobileSearch]:', e.message);
+  if (!html) {
+    console.error('[naverFinanceSearch] empty response');
     return [];
   }
+
+  const results = [];
+  const seen = new Set();
+
+  // href="/item/main.naver?code=XXXXXX" 패턴으로 종목 코드·이름 추출
+  // 종목 이름은 <a> 태그 텍스트 또는 내부 <em>/<strong> 텍스트
+  const linkRe = /href="\/item\/(?:main|sise)\.naver\?code=(\d{6})"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = linkRe.exec(html)) !== null) {
+    const code = m[1];
+    // 내부 태그 제거하여 순수 텍스트 추출
+    const rawName = m[2].replace(/<[^>]+>/g, '').trim();
+    if (!rawName || seen.has(code)) continue;
+    seen.add(code);
+
+    const isEtf = code.startsWith('5') // ETN 코드 대역
+               || /ETF|ETN|레버리지|인버스|선물|채권|리츠|커버드콜|인컴|위클리|월지급/i.test(rawName);
+    const market = ''; // HTML에서 시장 구분은 별도 파싱 필요 시 추가
+
+    if (type === 'stock' && isEtf) continue;
+    if (type === 'etf' && !isEtf) continue;
+
+    results.push({ code, name: rawName, isEtf, market });
+  }
+
+  // 결과가 없으면 더 넓은 패턴으로 재시도 (code= 포함 링크만)
+  if (results.length === 0) {
+    const codeRe = /[?&]code=(\d{6})[^"]*"[^>]*>([^<]{2,40})</gi;
+    while ((m = codeRe.exec(html)) !== null) {
+      const code = m[1];
+      const name = m[2].trim();
+      if (!name || name.length < 2 || seen.has(code)) continue;
+      seen.add(code);
+      const isEtf = code.startsWith('5')
+                 || /ETF|ETN|레버리지|인버스|선물|채권|리츠|커버드콜|인컴|위클리|월지급/i.test(name);
+      if (type === 'stock' && isEtf) continue;
+      if (type === 'etf' && !isEtf) continue;
+      results.push({ code, name, isEtf, market: '' });
+    }
+  }
+
+  return results;
 }
 
-// ── 가격 조회 ─────────────────────────────────────────────────────────────────
+// ── 가격 조회 (Naver fchart) ───────────────────────────────────────────────────
 async function fetchPrice(item) {
   const { code, name, isEtf, market } = item;
-  if (!code || !name) return null;
-
   let price = null, changePercent = null;
   try {
     const url = `https://fchart.stock.naver.com/sise.nhn?symbol=${code}&timeframe=day&count=2&requestType=0`;
     const text = await fetchText(url, 5000);
     if (text) {
       const matches = [...text.matchAll(/data="[^|"]+\|[^|"]+\|[^|"]+\|[^|"]+\|([^|"]+)\|/g)];
-      const closes = matches.map(m => parseFloat(m[1])).filter(v => !isNaN(v) && v > 0);
+      const closes = matches.map(m2 => parseFloat(m2[1])).filter(v => !isNaN(v) && v > 0);
       if (closes.length >= 1) price = closes[closes.length - 1];
       if (closes.length >= 2) {
         const prev = closes[closes.length - 2];
@@ -147,48 +113,31 @@ async function fetchPrice(item) {
       }
     }
   } catch (_) {}
-
   return { code, name, isEtf, market, price, changePercent };
 }
 
-// ── 공통 유틸 ─────────────────────────────────────────────────────────────────
+// ── 공통 fetch 유틸 ────────────────────────────────────────────────────────────
 async function fetchText(url, timeoutMs = 8000, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://finance.naver.com/',
-        'Accept': '*/*',
         ...extraHeaders,
       },
       signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error('[fetchText] HTTP', res.status, url);
+      return null;
+    }
     return await res.text();
   } catch (e) {
-    if (e.name !== 'AbortError') console.error('[fetchText]', url, e.message);
+    if (e.name !== 'AbortError') console.error('[fetchText]', e.message, url);
     return null;
   } finally {
     clearTimeout(timer);
   }
-}
-
-function parseJson(text) {
-  try { return JSON.parse(text); } catch (_) {}
-  // JSONP 래퍼 제거
-  const m = text.match(/\(([\s\S]+)\)\s*;?\s*$/);
-  if (m) { try { return JSON.parse(m[1]); } catch (_) {} }
-  return null;
-}
-
-function normalizeAcItem(item) {
-  const code      = Array.isArray(item) ? item[0] : item.code;
-  const name      = Array.isArray(item) ? item[1] : item.name;
-  const typeCode  = Array.isArray(item) ? (item[2] ?? '') : '';
-  const marketCode = Array.isArray(item) ? (item[4] ?? '') : '';
-  const isEtf = typeCode === '4' || (code?.length === 6 && code.startsWith('5'));
-  const market = marketCode === 'KQ11' ? 'KOSDAQ' : marketCode === 'KS11' ? 'KOSPI' : '';
-  return { code, name, isEtf, market };
 }
