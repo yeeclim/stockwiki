@@ -24,34 +24,28 @@ export default async function handler(req, res) {
       queries.push(asciiPrefix);
     }
 
-    // 1차: Yahoo Finance (KR locale — 한국 ETF 결과 개선)
-    for (const qry of queries) {
-      await yahooQuery(qry, type, seen);
-    }
-    console.log(`[yahoo] ${seen.size} results for "${q}"`);
+    // 1차: KRX 공식 종목 검색 (ETF·ETN·주식 전체, 가장 정확)
+    await Promise.all(queries.map(qry => krxQuery(qry, type, seen)));
+    console.log(`[krx] ${seen.size} results for "${q}"`);
 
-    // 2차: Naver Finance HTML 검색 (finance.naver.com 본체는 Vercel에서 접근 가능)
-    if (seen.size < 8) {
-      for (const qry of queries) {
-        await naverFinanceHtmlQuery(qry, type, seen);
-      }
-      console.log(`[naver-html] total ${seen.size} results`);
+    // 2차: Yahoo Finance (추가 보완)
+    if (seen.size < 10) {
+      await Promise.all(queries.map(qry => yahooQuery(qry, type, seen)));
+      console.log(`[yahoo] ${seen.size} results`);
     }
 
-    // 3차: Daum Finance (카카오 금융, 한국 ETF 커버 보완)
+    // 3차: Daum Finance (카카오)
     if (seen.size < 5) {
-      for (const qry of queries) {
-        await daumQuery(qry, type, seen);
-      }
-      console.log(`[daum] total ${seen.size} results`);
+      await Promise.all(queries.map(qry => daumQuery(qry, type, seen)));
+      console.log(`[daum] ${seen.size} results`);
     }
 
-    // 4차: Naver 모바일 검색 (fallback)
+    // 4차: Naver 모바일 (fallback)
     if (seen.size < 3) {
       for (const qry of queries) {
         await naverMobileQuery(qry, type, seen);
       }
-      console.log(`[naver-mobile] total ${seen.size} results`);
+      console.log(`[naver] ${seen.size} results`);
     }
 
     const items = [...seen.values()].slice(0, 15);
@@ -71,7 +65,66 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Yahoo Finance (KR locale) ──────────────────────────────────────────────────
+// ── KRX 공식 종목 검색 ────────────────────────────────────────────────────────
+async function krxQuery(q, type, seen) {
+  try {
+    // ETF·ETN 검색
+    if (type !== 'stock') {
+      const etfBody = new URLSearchParams({
+        bld: 'dbms/comm/finder/finderStkEtfFind',
+        searchText: q,
+        pageNo: '1',
+        pageSize: '30',
+      });
+      const etfText = await fetchPostText(
+        'https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd',
+        etfBody.toString(),
+        { 'Referer': 'https://data.krx.co.kr/', 'Origin': 'https://data.krx.co.kr' }
+      );
+      if (etfText) {
+        let d; try { d = JSON.parse(etfText); } catch { d = null; }
+        const list = d?.result ?? d?.OutBlock_1 ?? d?.block1 ?? [];
+        for (const item of list) {
+          const code = (item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
+          const name = item.isuAbbrNm || item.isuNm || '';
+          if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+          const isEtf = true;
+          const market = item.mktNm || 'KRX';
+          seen.set(code, { code, name, isEtf, market });
+        }
+      }
+    }
+
+    // 일반 주식 검색
+    if (type !== 'etf') {
+      const stkBody = new URLSearchParams({
+        bld: 'dbms/comm/finder/finderStkFind',
+        searchText: q,
+        pageNo: '1',
+        pageSize: '30',
+      });
+      const stkText = await fetchPostText(
+        'https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd',
+        stkBody.toString(),
+        { 'Referer': 'https://data.krx.co.kr/', 'Origin': 'https://data.krx.co.kr' }
+      );
+      if (stkText) {
+        let d; try { d = JSON.parse(stkText); } catch { d = null; }
+        const list = d?.result ?? d?.OutBlock_1 ?? d?.block1 ?? [];
+        for (const item of list) {
+          const code = (item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
+          const name = item.isuAbbrNm || item.isuNm || '';
+          if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+          const isEtf = false;
+          const market = item.mktNm || '';
+          seen.set(code, { code, name, isEtf, market });
+        }
+      }
+    }
+  } catch (e) { console.error('[krx]', e.message); }
+}
+
+// ── Yahoo Finance ──────────────────────────────────────────────────────────────
 async function yahooQuery(q, type, seen) {
   try {
     const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=40&newsCount=0&enableFuzzyQuery=true&lang=ko-KR&region=KR`;
@@ -93,37 +146,6 @@ async function yahooQuery(q, type, seen) {
       seen.set(code, { code, name, isEtf, market });
     }
   } catch (e) { console.error('[yahoo]', e.message); }
-}
-
-// ── Naver Finance HTML 검색 ────────────────────────────────────────────────────
-async function naverFinanceHtmlQuery(q, type, seen) {
-  try {
-    const url = `https://finance.naver.com/search/searchList.nhn?query=${encodeURIComponent(q)}&searchType=quant`;
-    const text = await fetchText(url, 8000, {
-      'Referer': 'https://finance.naver.com/',
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'ko-KR,ko;q=0.9',
-    });
-    if (!text) return;
-
-    // href="/item/main.naver?code=466930" 또는 main.nhn?code= 두 패턴 모두 캡처
-    const codeRe = /href="\/item\/main\.n(?:aver|hn)\?code=(\d{6})"/g;
-    const nameRe = /<td class="tit">\s*<a[^>]+>([^<]+)<\/a>/g;
-
-    const codes = [...text.matchAll(codeRe)].map(m => m[1]);
-    const names = [...text.matchAll(nameRe)].map(m => m[1].trim());
-
-    for (let i = 0; i < codes.length; i++) {
-      const code = codes[i];
-      const name = names[i] ?? '';
-      if (!code || !name || seen.has(code)) continue;
-      const isEtf = name.includes('ETF') || name.includes('ETN') || code.startsWith('5');
-      const market = '';
-      if (type === 'stock' && isEtf) continue;
-      if (type === 'etf' && !isEtf) continue;
-      seen.set(code, { code, name, isEtf, market });
-    }
-  } catch (e) { console.error('[naver-html]', e.message); }
 }
 
 // ── Daum Finance (카카오) ─────────────────────────────────────────────────────
@@ -181,7 +203,7 @@ async function naverMobileQuery(q, type, seen) {
         seen.set(code, { code, name, isEtf, market });
       }
       if (seen.size > 0) break;
-    } catch (e) { console.error('[naver-mobile]', url, e.message); }
+    } catch (e) { console.error('[naver]', url, e.message); }
   }
 }
 
@@ -205,7 +227,7 @@ async function fetchPrice(item) {
   return { code, name, isEtf, market, price, changePercent };
 }
 
-// ── 공통 fetch ────────────────────────────────────────────────────────────────
+// ── 공통 GET fetch ────────────────────────────────────────────────────────────
 async function fetchText(url, timeoutMs = 8000, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -222,6 +244,32 @@ async function fetchText(url, timeoutMs = 8000, extraHeaders = {}) {
     return await res.text();
   } catch (e) {
     if (e.name !== 'AbortError') console.error('[fetchText]', e.message, url);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── 공통 POST fetch ────────────────────────────────────────────────────────────
+async function fetchPostText(url, body, extraHeaders = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*',
+        ...extraHeaders,
+      },
+      body,
+      signal: controller.signal,
+    });
+    if (!res.ok) { console.error('[fetchPost] HTTP', res.status, url); return null; }
+    return await res.text();
+  } catch (e) {
+    if (e.name !== 'AbortError') console.error('[fetchPost]', e.message, url);
     return null;
   } finally {
     clearTimeout(timer);
