@@ -116,8 +116,8 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
       const raw = item.symbol ?? '';
       const code = raw.replace(/^.*:/, '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
       if (!code || !KRX_CODE.test(code) || seen.has(code)) continue;
-      // hl=0이어도 혹시 모를 HTML 태그 제거
-      const name = (item.description || '').replace(/<[^>]+>/g, '').trim();
+      // local_description(한글) 우선, 없으면 영문 description
+      const name = (item.local_description || item.description || '').replace(/<[^>]+>/g, '').trim();
       if (!name) continue;
       // 필터: 쿼리의 모든 핵심 단어/숫자가 결과명에 있어야 함
       if (filterTerms.length > 0) {
