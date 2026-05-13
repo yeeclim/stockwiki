@@ -24,13 +24,21 @@ export default async function handler(req, res) {
       queries.push(asciiPrefix);
     }
 
-    // 1차: Yahoo Finance (quotesCount 넉넉하게)
+    // 1차: Yahoo Finance (KR locale — 한국 ETF 결과 개선)
     for (const qry of queries) {
       await yahooQuery(qry, type, seen);
     }
     console.log(`[yahoo] ${seen.size} results for "${q}"`);
 
-    // 2차: Daum Finance (카카오 금융, 한국 ETF 커버 보완)
+    // 2차: Naver Finance HTML 검색 (finance.naver.com 본체는 Vercel에서 접근 가능)
+    if (seen.size < 8) {
+      for (const qry of queries) {
+        await naverFinanceHtmlQuery(qry, type, seen);
+      }
+      console.log(`[naver-html] total ${seen.size} results`);
+    }
+
+    // 3차: Daum Finance (카카오 금융, 한국 ETF 커버 보완)
     if (seen.size < 5) {
       for (const qry of queries) {
         await daumQuery(qry, type, seen);
@@ -38,12 +46,12 @@ export default async function handler(req, res) {
       console.log(`[daum] total ${seen.size} results`);
     }
 
-    // 3차: Naver 모바일 검색
+    // 4차: Naver 모바일 검색 (fallback)
     if (seen.size < 3) {
       for (const qry of queries) {
         await naverMobileQuery(qry, type, seen);
       }
-      console.log(`[naver] total ${seen.size} results`);
+      console.log(`[naver-mobile] total ${seen.size} results`);
     }
 
     const items = [...seen.values()].slice(0, 15);
@@ -63,10 +71,10 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Yahoo Finance ──────────────────────────────────────────────────────────────
+// ── Yahoo Finance (KR locale) ──────────────────────────────────────────────────
 async function yahooQuery(q, type, seen) {
   try {
-    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=40&newsCount=0&enableFuzzyQuery=true`;
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=40&newsCount=0&enableFuzzyQuery=true&lang=ko-KR&region=KR`;
     const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
     if (!text) return;
     let data; try { data = JSON.parse(text); } catch { return; }
@@ -87,20 +95,52 @@ async function yahooQuery(q, type, seen) {
   } catch (e) { console.error('[yahoo]', e.message); }
 }
 
+// ── Naver Finance HTML 검색 ────────────────────────────────────────────────────
+async function naverFinanceHtmlQuery(q, type, seen) {
+  try {
+    const url = `https://finance.naver.com/search/searchList.nhn?query=${encodeURIComponent(q)}&searchType=quant`;
+    const text = await fetchText(url, 8000, {
+      'Referer': 'https://finance.naver.com/',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'ko-KR,ko;q=0.9',
+    });
+    if (!text) return;
+
+    // href="/item/main.naver?code=466930" 또는 main.nhn?code= 두 패턴 모두 캡처
+    const codeRe = /href="\/item\/main\.n(?:aver|hn)\?code=(\d{6})"/g;
+    const nameRe = /<td class="tit">\s*<a[^>]+>([^<]+)<\/a>/g;
+
+    const codes = [...text.matchAll(codeRe)].map(m => m[1]);
+    const names = [...text.matchAll(nameRe)].map(m => m[1].trim());
+
+    for (let i = 0; i < codes.length; i++) {
+      const code = codes[i];
+      const name = names[i] ?? '';
+      if (!code || !name || seen.has(code)) continue;
+      const isEtf = name.includes('ETF') || name.includes('ETN') || code.startsWith('5');
+      const market = '';
+      if (type === 'stock' && isEtf) continue;
+      if (type === 'etf' && !isEtf) continue;
+      seen.set(code, { code, name, isEtf, market });
+    }
+  } catch (e) { console.error('[naver-html]', e.message); }
+}
+
 // ── Daum Finance (카카오) ─────────────────────────────────────────────────────
 async function daumQuery(q, type, seen) {
   try {
     const url = `https://finance.daum.net/api/search/stocks?q=${encodeURIComponent(q)}&includeEtf=true&includeFund=false&limit=20`;
     const text = await fetchText(url, 8000, {
       'Referer': 'https://finance.daum.net/',
+      'Origin': 'https://finance.daum.net',
       'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'ko-KR,ko;q=0.9',
     });
     if (!text) return;
     let data; try { data = JSON.parse(text); } catch { return; }
 
     const list = data?.data ?? data?.result ?? [];
     for (const item of list) {
-      // symbolCode: "A466930" (A prefix), shortCode: "466930"
       const rawCode = item.shortCode || item.code || item.symbolCode?.replace(/^[A-Z]/, '') || '';
       const code = rawCode.replace(/\D/g, '').slice(0, 6);
       if (!code || !/^\d{6}$/.test(code) || seen.has(code)) continue;
@@ -141,7 +181,7 @@ async function naverMobileQuery(q, type, seen) {
         seen.set(code, { code, name, isEtf, market });
       }
       if (seen.size > 0) break;
-    } catch (e) { console.error('[naver]', url, e.message); }
+    } catch (e) { console.error('[naver-mobile]', url, e.message); }
   }
 }
 
