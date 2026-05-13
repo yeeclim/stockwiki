@@ -23,8 +23,14 @@ export default async function handler(req, res) {
     if (asciiPrefix && asciiPrefix.length >= 2 && asciiPrefix !== q) {
       queries.push(asciiPrefix);
     }
+    // 한국어 ETF 용어 → 영어 번역 쿼리 추가 (TradingView는 영어 description 검색)
+    // 예: "SOL 200타겟위클리커버드콜" → "SOL 200 target weekly covered call"
+    const translated = translateForTv(q);
+    if (translated && translated !== q && translated !== asciiPrefix && !queries.includes(translated)) {
+      queries.push(translated);
+    }
+
     // ASCII prefix가 다단어(예: "SOL 200")이면 펀드 패밀리(첫 단어 "SOL")로도 추가 검색
-    // → "SOL 200" 검색 시 커버드콜처럼 TradingView 매칭이 약한 ETF도 포함
     const asciiParts = asciiPrefix.split(/\s+/).filter(Boolean);
     if (asciiParts.length >= 2) {
       const fundFamily = asciiParts[0];
@@ -283,6 +289,41 @@ async function fetchPrice(item) {
     }
   } catch (_) {}
   return { code, name, isEtf, market, price, changePercent };
+}
+
+// ── 한국어 ETF 용어 → 영어 번역 (TradingView 검색 최적화) ──────────────────────
+const KO_EN = [
+  ['타겟위클리커버드콜', 'target weekly covered call'],
+  ['위클리커버드콜', 'weekly covered call'],
+  ['커버드콜', 'covered call'],
+  ['위클리', 'weekly'],
+  ['타겟', 'target'],
+  ['인버스2x', 'inverse 2x'],
+  ['인버스', 'inverse'],
+  ['레버리지', 'leverage'],
+  ['배당성장', 'dividend growth'],
+  ['배당', 'dividend'],
+  ['성장', 'growth'],
+  ['가치', 'value'],
+  ['모멘텀', 'momentum'],
+  ['헬스케어', 'healthcare'],
+  ['반도체', 'semiconductor'],
+  ['금융', 'financial'],
+  ['리츠', 'reits'],
+  ['선물', 'futures'],
+  ['단기채', 'short term bond'],
+  ['국채', 'government bond'],
+  ['회사채', 'corporate bond'],
+  ['채권', 'bond'],
+];
+
+function translateForTv(q) {
+  let result = q;
+  for (const [ko, en] of KO_EN) {
+    result = result.replace(new RegExp(ko, 'g'), ' ' + en);
+  }
+  // 숫자+한글 사이 공백 정리, 연속 공백 제거, 앞뒤 정리
+  return result.replace(/\s+/g, ' ').trim();
 }
 
 // ── 공통 GET fetch ────────────────────────────────────────────────────────────
