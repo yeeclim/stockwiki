@@ -108,7 +108,6 @@ async function tradingviewQuery(q, type, seen, filterQuery = q) {
     let data; try { data = JSON.parse(text); } catch { console.log('[tv] parse err, raw:', text?.substring(0, 100)); return; }
 
     const list = Array.isArray(data) ? data : (data?.symbols ?? []);
-    console.log(`[tv] "${q}"(${isTranslated ? 'global' : 'KRX'}) raw ${list.length} items`);
     for (const item of list) {
       // TradingView: symbol = "466930" (6자리) or "KRX:466930"
       const raw = item.symbol ?? '';
@@ -151,8 +150,7 @@ async function krxQuery(q, type, seen) {
       if (etfText) {
         let d; try { d = JSON.parse(etfText); } catch { d = null; }
         const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
-        if (list.length > 0) console.log('[krx-etf] sample:', JSON.stringify(list[0]));
-        else console.log('[krx-etf] raw keys:', d ? Object.keys(d) : 'null');
+        if (list.length === 0) return; // KRX 응답 파싱 실패
         for (const item of list) {
           const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
           const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
@@ -180,8 +178,7 @@ async function krxQuery(q, type, seen) {
       if (stkText) {
         let d; try { d = JSON.parse(stkText); } catch { d = null; }
         const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
-        if (list.length > 0) console.log('[krx-stk] sample:', JSON.stringify(list[0]));
-        else console.log('[krx-stk] raw keys:', d ? Object.keys(d) : 'null');
+        if (list.length === 0) return; // KRX 응답 파싱 실패
         for (const item of list) {
           const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/\D/g, '').slice(0, 6);
           const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
