@@ -16,33 +16,46 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
   List<Stock> _results = [];
   bool _isLoading = false;
   String _error = '';
+  String _type = 'stock'; // 'stock' | 'etf' | 'all'
 
   Future<void> _search() async {
     final keyword = _controller.text.trim();
     if (keyword.isEmpty) return;
 
-    debugPrint('🚀 [US Stock Search] 검색 시작: $keyword');
-    
-    setState(() {
-      _isLoading = true;
-      _error = '';
-    });
+    setState(() { _isLoading = true; _error = ''; });
 
     try {
-      debugPrint('📞 [US Stock Search] FMPService.fetchStocks 호출');
-      // 미국 주식 검색
-      final results = await FMPService.fetchStocks(keyword);
-      debugPrint('📊 [US Stock Search] 검색 결과: ${results.length}개');
-      
+      final List<Stock> results;
+      if (_type == 'stock') {
+        results = await FMPService.fetchStocks(keyword);
+      } else {
+        results = await FMPService.fetchAll(keyword);
+      }
       setState(() => _results = results);
-      debugPrint('✅ [US Stock Search] UI 업데이트 완료');
     } catch (e) {
-      debugPrint('❌ [US Stock Search] 오류 발생: $e');
       setState(() => _error = '검색 중 오류 발생: $e');
     } finally {
       setState(() => _isLoading = false);
-      debugPrint('🏁 [US Stock Search] 검색 완료');
     }
+  }
+
+  Widget _filterChip(String label, String value, ThemeData theme) {
+    final selected = _type == value;
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() => _type = value);
+        if (_controller.text.isNotEmpty) _search();
+      },
+      selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+      checkmarkColor: theme.colorScheme.primary,
+      labelStyle: theme.textTheme.labelMedium?.copyWith(
+          color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal),
+      side: BorderSide(
+          color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
+    );
   }
 
   @override
@@ -95,7 +108,11 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                       color: theme.colorScheme.onSurface,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Search keyword (예: Apple, AAPL)',
+                      hintText: _type == 'stock'
+                          ? 'Search keyword (예: Apple, AAPL)'
+                          : _type == 'etf'
+                              ? 'ETF 검색 (예: SPY, QQQ, TQQQ)'
+                              : 'Search keyword (예: AAPL, SPY)',
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -124,7 +141,21 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            // 종류 필터 칩
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _filterChip('주식', 'stock', theme),
+                  const SizedBox(width: 8),
+                  _filterChip('ETF·레버리지', 'etf', theme),
+                  const SizedBox(width: 8),
+                  _filterChip('전체', 'all', theme),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             if (_isLoading)
               Center(
                 child: CircularProgressIndicator(
