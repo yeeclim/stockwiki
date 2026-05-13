@@ -7,6 +7,7 @@ import '../pages/us_stock_theme_recommend_page.dart';
 import '../pages/us_stock_ai_committee_page.dart';
 import '../pages/theme_recommendations_page.dart';
 import '../pages/bookmark_list_page.dart';
+import '../pages/portfolio_page.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -119,6 +120,21 @@ class AppDrawer extends StatelessWidget {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const BookmarkListPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet, color: Colors.deepPurple),
+                  title: Text("내 포트폴리오", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
+                  subtitle: Text(
+                    '보유 종목 · 수익률 추적',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ??
+                           TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PortfolioPage()),
                     );
                   },
                 ),
