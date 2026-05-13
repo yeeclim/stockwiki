@@ -23,9 +23,19 @@ export default async function handler(req, res) {
     if (asciiPrefix && asciiPrefix.length >= 2 && asciiPrefix !== q) {
       queries.push(asciiPrefix);
     }
+    // 한국어 포함 + ASCII prefix가 다단어면 펀드 패밀리(첫 단어)로 추가 검색
+    // 예: "SOL 200타겟위클리커버드콜" → "SOL"로도 검색해 커버드콜 등 포함
+    const hasKorean = /[가-힣]/.test(q);
+    const asciiParts = asciiPrefix.split(/\s+/).filter(Boolean);
+    if (hasKorean && asciiParts.length >= 2) {
+      const fundFamily = asciiParts[0];
+      if (fundFamily.length >= 2 && !queries.includes(fundFamily)) {
+        queries.push(fundFamily);
+      }
+    }
 
     // 1차: TradingView 심볼 검색 (글로벌 서버, KRX 전 종목 포함)
-    await Promise.all(queries.map(qry => tradingviewQuery(qry, type, seen)));
+    await Promise.all(queries.map(qry => tradingviewQuery(qry, type, seen, asciiPrefix || q)));
     console.log(`[tv] ${seen.size} results for "${q}"`);
 
     // 2차: Yahoo Finance (추가 보완)
@@ -72,7 +82,12 @@ export default async function handler(req, res) {
 }
 
 // ── TradingView 심볼 검색 ─────────────────────────────────────────────────────
-async function tradingviewQuery(q, type, seen) {
+// filterQuery: 결과 관련성 판단에 쓸 원본 쿼리 (예: "SOL 200")
+async function tradingviewQuery(q, type, seen, filterQuery = q) {
+  // 필터 단어: filterQuery에서 앞의 ASCII 알파벳 단어만 추출 (예: "SOL")
+  // KODEX, SOL 등 펀드 패밀리가 있으면 해당 단어가 결과명에 있어야 함
+  const filterWord = filterQuery.match(/^[A-Za-z]{2,}/)?.[0]?.toLowerCase() ?? '';
+
   try {
     const url = `https://symbol-search.tradingview.com/symbol_search/?text=${encodeURIComponent(q)}&hl=0&exchange=KRX&lang=ko&type=&domain=production&limit=30`;
     const text = await fetchText(url, 8000, {
@@ -92,6 +107,8 @@ async function tradingviewQuery(q, type, seen) {
       // hl=0이어도 혹시 모를 HTML 태그 제거
       const name = (item.description || '').replace(/<[^>]+>/g, '').trim();
       if (!name) continue;
+      // 펀드 패밀리 필터: "SOL 200..." 검색 시 SOL 없는 KODEX 결과 제외
+      if (filterWord && !name.toLowerCase().includes(filterWord)) continue;
       const itemType = (item.type ?? '').toLowerCase();
       const isEtf = itemType === 'fund' || itemType === 'etf' || code.startsWith('5');
       const market = item.exchange || 'KRX';
