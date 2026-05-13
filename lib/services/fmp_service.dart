@@ -18,10 +18,24 @@ class FMPService {
   static const String _finnhubApiKey = String.fromEnvironment('FINNHUB_API_KEY');
   static const String _finnhubBaseUrl = 'https://finnhub.io/api/v1';
 
-  /// 키워드 기반 검색 후 실시간 가격 정보 추가
-  static Future<List<Stock>> fetchStocks(String keyword) async {
-    // 1. 캐시 확인
-    final cacheKey = 'fmp_search_$keyword';
+  // ETF 포함 여부에 따른 exchange 목록
+  static const _stockExchanges = {'NASDAQ', 'NYSE', 'AMEX'};
+  static const _etfExchanges = {'NASDAQ', 'NYSE', 'AMEX', 'ETF', 'BATS', 'ARCA'};
+
+  /// 키워드 기반 검색 (주식 전용, NASDAQ/NYSE/AMEX 필터)
+  static Future<List<Stock>> fetchStocks(String keyword) =>
+      _fmpSearch(keyword, _stockExchanges, includeEtf: false);
+
+  /// 키워드 기반 검색 (ETF/레버리지 포함, 거래소 필터 확대)
+  static Future<List<Stock>> fetchAll(String keyword) =>
+      _fmpSearch(keyword, _etfExchanges, includeEtf: true);
+
+  static Future<List<Stock>> _fmpSearch(
+    String keyword,
+    Set<String> allowedExchanges, {
+    required bool includeEtf,
+  }) async {
+    final cacheKey = 'fmp_search_${includeEtf ? 'all' : 'stock'}_$keyword';
     final cachedData = await CacheService.get(cacheKey);
     if (cachedData != null) {
       final List<dynamic> list = cachedData;
@@ -29,34 +43,29 @@ class FMPService {
     }
 
     try {
-      debugPrint('🔍 [FMP] 검색 시작: $keyword');
+      debugPrint('🔍 [FMP] 검색 시작: $keyword (ETF포함=$includeEtf)');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      
-      // 1. FMP 검색 시도
-      final searchUrl = Uri.parse('$_baseUrl/search?query=$keyword&limit=10&apikey=$_apiKey&t=$timestamp');
+      final limit = includeEtf ? 20 : 10;
+      final searchUrl = Uri.parse('$_baseUrl/search?query=$keyword&limit=$limit&apikey=$_apiKey&t=$timestamp');
       final searchRes = await getWithRetry(searchUrl);
 
       if (searchRes.statusCode == 200) {
         final searchData = json.decode(searchRes.body);
-        
         if (searchData is List && searchData.isNotEmpty) {
-           // 미국 주식만 필터링
           List<String> symbols = searchData
-              .where((e) => e['exchangeShortName'] == 'NASDAQ' || 
-                          e['exchangeShortName'] == 'NYSE' ||
-                          e['exchangeShortName'] == 'AMEX')
+              .where((e) {
+                final ex = e['exchangeShortName'] as String? ?? '';
+                return allowedExchanges.contains(ex);
+              })
               .map<String>((e) => e['symbol'] as String)
               .toList();
-          
+
           if (symbols.isNotEmpty) {
-            // 심볼 기반으로 실시간 정보 조회
             final quoteUrl = Uri.parse('$_baseUrl/quote/${symbols.join(',')}?apikey=$_apiKey&t=$timestamp');
             final quoteRes = await getWithRetry(quoteUrl);
-
             if (quoteRes.statusCode == 200) {
               final quoteData = json.decode(quoteRes.body);
               if (quoteData is List) {
-                // 2. 캐시 저장 (30분)
                 await CacheService.set(cacheKey, quoteData, expiration: const Duration(minutes: 30));
                 return quoteData.map<Stock>((item) => Stock.fromJson(item)).toList();
               }
@@ -64,33 +73,35 @@ class FMPService {
           }
         }
       }
-      
-      debugPrint('⚠️ [FMP] 검색 실패 또는 결과 없음, Finnhub Fallback 시도');
-      return await _fetchStocksFinnhub(keyword);
-      
+
+      debugPrint('⚠️ [FMP] 검색 실패, Finnhub Fallback 시도');
+      return await _fetchStocksFinnhub(keyword, includeEtf: includeEtf);
     } catch (e) {
-      debugPrint('💥 [FMP] 검색 오류: $e, Finnhub Fallback 시도');
-      return await _fetchStocksFinnhub(keyword);
+      debugPrint('💥 [FMP] 검색 오류: $e');
+      return await _fetchStocksFinnhub(keyword, includeEtf: includeEtf);
     }
   }
 
   /// Finnhub 검색 Fallback
-  static Future<List<Stock>> _fetchStocksFinnhub(String keyword) async {
+  static Future<List<Stock>> _fetchStocksFinnhub(String keyword, {bool includeEtf = false}) async {
     try {
       final searchUrl = Uri.parse('$_finnhubBaseUrl/search?q=$keyword&token=$_finnhubApiKey');
       final response = await getWithRetry(searchUrl);
-      
+
       if (response.statusCode != 200) return [];
-      
+
       final data = json.decode(response.body);
       final results = data['result'] as List<dynamic>?;
-      
+
       if (results == null || results.isEmpty) return [];
-      
-      // 상위 5개만 상세 조회 (Rate Limit 고려)
+
+      // ETF 포함 여부에 따라 type 필터 조정
+      final allowedTypes = includeEtf
+          ? {'Common Stock', 'ETF', 'ETP'}
+          : {'Common Stock'};
       final symbols = results
           .take(5)
-          .where((item) => item['type'] == 'Common Stock' && !item['symbol'].contains('.'))
+          .where((item) => allowedTypes.contains(item['type']) && !item['symbol'].contains('.'))
           .map((item) => item['symbol'] as String)
           .toList();
           

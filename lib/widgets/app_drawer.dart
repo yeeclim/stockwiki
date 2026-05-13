@@ -8,6 +8,7 @@ import '../pages/us_stock_ai_committee_page.dart';
 import '../pages/theme_recommendations_page.dart';
 import '../pages/bookmark_list_page.dart';
 import '../pages/portfolio_page.dart';
+import '../pages/kr_stock_search_page.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -173,6 +174,21 @@ class AppDrawer extends StatelessWidget {
                       letterSpacing: 1.2,
                     ),
                   ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.search, color: Colors.blue),
+                  title: Text("주식·ETF 검색", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
+                  subtitle: Text(
+                    '국내 주식·ETF·ETN',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ??
+                           TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const KrStockSearchPage()),
+                    );
+                  },
                 ),
                 ListTile(
                   leading: const Icon(Icons.auto_graph, color: Colors.blue),
