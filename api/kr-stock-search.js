@@ -333,22 +333,25 @@ const KO_EN = [
 
 // TradingView 영문 ETF명 → 한글 변환
 // "Shinhan SOL 200 Target Weekly Covered Call ETF Units" → "SOL 200타겟위클리커버드콜"
+const ETF_BRANDS = [
+  'KODEX', 'TIGER', 'RISE', 'KBSTAR', 'ARIRANG', 'HANARO', 'ACE',
+  'KOSEF', 'SOL', 'FOCUS', 'MASTER', 'PLUS', 'TRUE', 'TIMEFOLIO',
+  'TREX', 'BNK', 'WOORI',
+];
+
 function korenizeName(name) {
-  if (!name || /[가-힣]/.test(name)) return name; // 이미 한글 포함이면 그대로
+  if (!name || /[가-힣]/.test(name)) return name; // 이미 한글이면 그대로
 
   let n = name;
 
-  // 운용사 prefix 제거 (브랜드명은 유지)
-  for (const c of [
-    'Shinhan ', 'Samsung ', 'Mirae Asset ', 'KB ', 'Hanwha ',
-    'NH-Amundi ', 'NH ', 'Kiwoom ', 'Korea Investment ', 'Hyundai ',
-    'IBK ', 'DB ', 'Eugene ', 'Bookook ', 'Timefolio ', 'Woori ',
-    'Kyobo ', 'Hana ', 'Shinyoung ', 'Daishin ',
-  ]) {
-    if (n.startsWith(c)) { n = n.slice(c.length); break; }
+  // ETF 브랜드명 앞에 붙은 운용사 이름 통째로 제거
+  // "Shinhan SOL ..." → "SOL ...", "Mirae Asset TIGER ..." → "TIGER ..."
+  for (const brand of ETF_BRANDS) {
+    const idx = n.search(new RegExp(`\\b${brand}\\b`, 'i'));
+    if (idx > 0) { n = n.slice(idx); break; }
   }
 
-  // 뒤쪽 ETF/Units 등 제거
+  // 뒤쪽 "ETF Units / ETF / Units / Fund" 제거
   n = n.replace(/\s+(ETF Units|ETF|Units|Fund)\s*$/i, '').trim();
 
   // 영어 ETF 용어 → 한글 (긴 표현 먼저)
