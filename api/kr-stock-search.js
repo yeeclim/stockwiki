@@ -195,8 +195,14 @@ async function krxQuery(q, type, seen) {
 
 // ── Yahoo Finance ──────────────────────────────────────────────────────────────
 async function yahooQuery(q, type, seen) {
+  // query1과 query2 병렬 시도 - 서버마다 결과가 다를 수 있음
+  const hosts = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
+  await Promise.all(hosts.map(host => yahooQueryHost(host, q, type, seen)));
+}
+
+async function yahooQueryHost(host, q, type, seen) {
   try {
-    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=40&newsCount=0&enableFuzzyQuery=true&lang=ko-KR&region=KR`;
+    const url = `https://${host}/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=50&newsCount=0&enableFuzzyQuery=true&lang=ko-KR&region=KR`;
     const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
     if (!text) return;
     let data; try { data = JSON.parse(text); } catch { return; }
