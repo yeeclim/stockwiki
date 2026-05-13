@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chcp 65001)",
+      "Bash(flutter clean *)",
+      "PowerShell([Console]::OutputEncoding = [System.Text.Encoding]::UTF8; flutter clean 2>&1)",
+      "Bash(grep -n \"eval\\\\|innerHTML\\\\|dangerouslySetInnerHTML\\\\|innerHTML\\\\|\\\\\\\\$\\\\{.*\\\\\\\\}\\\\|template\" /e/stockwiki/api/*.js)",
+      "Bash(xargs wc *)",
+      "PowerShell([Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Set-Location e:\\\\stockwiki; flutter pub upgrade 2>&1 | Select-Object -First 40)",
+      "PowerShell([Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Set-Location e:\\\\stockwiki; flutter build web --release 2>&1)",
+      "PowerShell([Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Set-Location e:\\\\stockwiki; flutter pub get 2>&1 | Select-Object -Last 5)",
+      "Bash(vercel --version)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(vercel --prod)",
+      "Bash(vercel login *)",
+      "Bash(node -e ' *)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\) if sys.stdin.read\\(1\\)=='[' else json.loads\\('['+sys.stdin.read\\(\\)\\); print\\(list\\(data[0].keys\\(\\)\\) if isinstance\\(data,list\\) else list\\(data.keys\\(\\)\\)\\)\")",
+      "Bash(python3 -c \" import json with open\\('e:/stockwiki/assets/krx_basic_info.json', encoding='utf-8'\\) as f: data = json.load\\(f\\) first = data[0] if isinstance\\(data, list\\) else list\\(data.values\\(\\)\\)[0] print\\('Keys:', list\\(first.keys\\(\\)\\)\\) print\\('Sample:', {k: first[k] for k in list\\(first.keys\\(\\)\\)[:10]}\\) \")",
+      "Bash(powershell -Command ' *)",
+      "Bash(flutter build *)"
+    ]
+  }
+}
