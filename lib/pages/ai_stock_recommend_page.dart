@@ -9,6 +9,7 @@ import '../utils/tradingview_helper.dart';
 import '../widgets/ai_recommend_header.dart';
 import '../widgets/ai_recommend_card.dart';
 import '../widgets/ai_recommend_empty_state.dart';
+import '../widgets/portfolio_add_sheet.dart';
 
 class AiStockRecommendPage extends StatefulWidget {
   const AiStockRecommendPage({super.key});
@@ -324,6 +325,13 @@ StockWiki AI 추천
               tvSymbol: krxSymbol(rec.stockCode),
               stockName: rec.stockName,
               naverCode: rec.stockCode,
+            ),
+            onPortfolioTap: () => showPortfolioAddSheet(
+              context,
+              stockCode: rec.stockCode,
+              stockName: rec.stockName,
+              market: 'kr',
+              currentPrice: rec.currentPrice > 0 ? rec.currentPrice.toDouble() : null,
             ),
           );
         },
