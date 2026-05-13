@@ -62,7 +62,7 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
       appBar: AppBar(
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        title: Text('🇰🇷 국내 주식·ETF 검색',
+        title: Text('🇰🇷 국내 검색',
             style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         leading: IconButton(

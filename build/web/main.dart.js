@@ -95784,7 +95784,7 @@ J(a0){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,c=null,b=A.H(a0),a=b.p3
 a=a.gb1(a)
 s=b.ok
 r=s.r
-r=A.J("\ud83c\uddf0\ud83c\uddf7 \uad6d\ub0b4 \uc8fc\uc2dd\xb7ETF \uac80\uc0c9",c,c,c,c,r==null?c:r.aN(b.ax.k3,B.l),c,c)
+r=A.J("\ud83c\uddf0\ud83c\uddf7 \uad6d\ub0b4 \uac80\uc0c9",c,c,c,c,r==null?c:r.aN(b.ax.k3,B.l),c,c)
 q=b.ax
 p=q.k3
 o=A.dt(c,c,A.aO(B.cX,p,c,c),c,c,new A.asT(a0),c,c,c)
@@ -98803,7 +98803,7 @@ c=A.bD(a0,a0,c==null?s:c,a0,a0,a0,a0,a0,a0,a0,a0,11,a0,a0,a0,a0,a0,!0,a0,a0,a0,a
 c=A.jm(q,1)
 b=n?a0:o.B2(a3.b,B.l,1.2)
 b=A.J("\ud55c\uad6d \uc8fc\uc2dd",a0,a0,a0,a0,b==null?A.bD(a0,a0,a3.b,a0,a0,a0,a0,a0,a0,a0,a0,12,a0,a0,B.l,a0,a0,!0,a0,1.2,a0,a0,a0,a0,a0,a0):b,a0,a0)
-a=A.J("\uc8fc\uc2dd\xb7ETF \uac80\uc0c9",a0,a0,a0,a0,g?A.bD(a0,a0,s,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,!0,a0,a0,a0,a0,a0,a0,a0,a0):h,a0,a0)
+a=A.J("\uad6d\ub0b4 \uac80\uc0c9",a0,a0,a0,a0,g?A.bD(a0,a0,s,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,!0,a0,a0,a0,a0,a0,a0,a0,a0):h,a0,a0)
 if(e)a4=a0
 else{e=a3.rx
 a4=a4.aw(e==null?s:e)}if(a4==null){a4=a3.rx

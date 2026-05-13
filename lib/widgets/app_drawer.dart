@@ -177,7 +177,7 @@ class AppDrawer extends StatelessWidget {
                 ),
                 ListTile(
                   leading: const Icon(Icons.search, color: Colors.blue),
-                  title: Text("주식·ETF 검색", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
+                  title: Text("국내 검색", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
                   subtitle: Text(
                     '국내 주식·ETF·ETN',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ??
