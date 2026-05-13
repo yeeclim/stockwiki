@@ -15,23 +15,41 @@ export default async function handler(req, res) {
   if (!q) return res.json({ success: true, data: [] });
 
   try {
-    // 1차: Yahoo Finance (한국 주식 .KS/.KQ 지원, 서버에서 접근 가능)
-    let items = await yahooSearch(q, type);
+    const seen = new Map(); // code → item
 
-    // 2차: Naver 모바일 검색 API
-    if (items.length < 3) {
-      const naverItems = await naverMobileSearch(q, type);
-      const seen = new Set(items.map(i => i.code));
-      for (const item of naverItems) {
-        if (!seen.has(item.code)) { seen.add(item.code); items.push(item); }
-      }
+    // 검색어 준비: 전체 + ASCII prefix
+    const queries = [q];
+    const asciiPrefix = q.match(/^[A-Za-z0-9\s\-\.]+/)?.[0]?.trim() ?? '';
+    if (asciiPrefix && asciiPrefix.length >= 2 && asciiPrefix !== q) {
+      queries.push(asciiPrefix);
     }
 
+    // 1차: Yahoo Finance (quotesCount 넉넉하게)
+    for (const qry of queries) {
+      await yahooQuery(qry, type, seen);
+    }
+    console.log(`[yahoo] ${seen.size} results for "${q}"`);
+
+    // 2차: Daum Finance (카카오 금융, 한국 ETF 커버 보완)
+    if (seen.size < 5) {
+      for (const qry of queries) {
+        await daumQuery(qry, type, seen);
+      }
+      console.log(`[daum] total ${seen.size} results`);
+    }
+
+    // 3차: Naver 모바일 검색
+    if (seen.size < 3) {
+      for (const qry of queries) {
+        await naverMobileQuery(qry, type, seen);
+      }
+      console.log(`[naver] total ${seen.size} results`);
+    }
+
+    const items = [...seen.values()].slice(0, 15);
     if (items.length === 0) return res.json({ success: true, data: [] });
 
-    items = items.slice(0, 15);
-
-    // 가격 병렬 조회 (Naver fchart)
+    // 가격 병렬 조회
     const settled = await Promise.allSettled(items.map(fetchPrice));
     const data = settled
       .filter(r => r.status === 'fulfilled' && r.value)
@@ -45,109 +63,89 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Yahoo Finance 검색 ─────────────────────────────────────────────────────────
-// 한국 종목은 symbol이 "466930.KS" (KOSPI) 또는 "466930.KQ" (KOSDAQ) 형식
-async function yahooSearch(q, type) {
+// ── Yahoo Finance ──────────────────────────────────────────────────────────────
+async function yahooQuery(q, type, seen) {
   try {
-    const seen = new Map(); // code → item
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=40&newsCount=0&enableFuzzyQuery=true`;
+    const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
+    if (!text) return;
+    let data; try { data = JSON.parse(text); } catch { return; }
 
-    // 1차: 전체 쿼리로 검색
-    await yahooSearchQuery(q, type, seen);
-
-    // 2차: 한글이 포함된 긴 쿼리면 영문/숫자 prefix로 추가 검색
-    // 예) "SOL 200타겟위클리커버드콜" → "SOL 200"으로도 검색
-    const asciiPrefix = q.match(/^[A-Za-z0-9\s\-\.]+/)?.[0]?.trim() ?? '';
-    if (asciiPrefix && asciiPrefix.length >= 2 && asciiPrefix !== q) {
-      await yahooSearchQuery(asciiPrefix, type, seen);
+    for (const quote of (data?.quotes ?? [])) {
+      const symbol = quote.symbol ?? '';
+      if (!/\.(KS|KQ)$/.test(symbol)) continue;
+      const code = symbol.replace(/\.(KS|KQ)$/, '');
+      if (!/^\d{6}$/.test(code) || seen.has(code)) continue;
+      const name = quote.shortname || quote.longname || '';
+      if (!name) continue;
+      const isEtf = /^ETF/.test(quote.quoteType ?? '') || code.startsWith('5');
+      const market = symbol.endsWith('.KQ') ? 'KOSDAQ' : 'KOSPI';
+      if (type === 'stock' && isEtf) continue;
+      if (type === 'etf' && !isEtf) continue;
+      seen.set(code, { code, name, isEtf, market });
     }
-
-    return [...seen.values()];
-  } catch (e) {
-    console.error('[yahooSearch]:', e.message);
-    return [];
-  }
+  } catch (e) { console.error('[yahoo]', e.message); }
 }
 
-async function yahooSearchQuery(q, type, seen) {
-  const encoded = encodeURIComponent(q);
-  const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encoded}&quotesCount=20&newsCount=0&enableFuzzyQuery=false`;
-  const text = await fetchText(url, 8000, { 'Accept': 'application/json' });
-  if (!text) return;
+// ── Daum Finance (카카오) ─────────────────────────────────────────────────────
+async function daumQuery(q, type, seen) {
+  try {
+    const url = `https://finance.daum.net/api/search/stocks?q=${encodeURIComponent(q)}&includeEtf=true&includeFund=false&limit=20`;
+    const text = await fetchText(url, 8000, {
+      'Referer': 'https://finance.daum.net/',
+      'Accept': 'application/json, text/plain, */*',
+    });
+    if (!text) return;
+    let data; try { data = JSON.parse(text); } catch { return; }
 
-  let data;
-  try { data = JSON.parse(text); } catch { return; }
-
-  for (const quote of (data?.quotes || [])) {
-    const symbol = quote.symbol || '';
-    if (!/\.(KS|KQ)$/.test(symbol)) continue;
-
-    const code = symbol.replace(/\.(KS|KQ)$/, '');
-    if (!/^\d{6}$/.test(code) || seen.has(code)) continue;
-
-    const name = quote.shortname || quote.longname || '';
-    if (!name) continue;
-
-    const isEtf = quote.quoteType === 'ETF'
-               || quote.quoteType === 'ETF-ETN'
-               || code.startsWith('5');
-    const market = symbol.endsWith('.KQ') ? 'KOSDAQ' : 'KOSPI';
-
-    if (type === 'stock' && isEtf) continue;
-    if (type === 'etf' && !isEtf) continue;
-
-    seen.set(code, { code, name, isEtf, market });
-  }
+    const list = data?.data ?? data?.result ?? [];
+    for (const item of list) {
+      // symbolCode: "A466930" (A prefix), shortCode: "466930"
+      const rawCode = item.shortCode || item.code || item.symbolCode?.replace(/^[A-Z]/, '') || '';
+      const code = rawCode.replace(/\D/g, '').slice(0, 6);
+      if (!code || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+      const name = item.name || item.stockName || '';
+      if (!name) continue;
+      const isEtf = (item.type ?? '').toUpperCase().includes('ETF')
+                 || (item.securityType ?? '').toUpperCase().includes('ETF')
+                 || code.startsWith('5');
+      const market = item.market?.name || item.marketName || '';
+      if (type === 'stock' && isEtf) continue;
+      if (type === 'etf' && !isEtf) continue;
+      seen.set(code, { code, name, isEtf, market });
+    }
+  } catch (e) { console.error('[daum]', e.message); }
 }
 
-// ── Naver 모바일 검색 API ─────────────────────────────────────────────────────
-async function naverMobileSearch(q, type) {
-  // 여러 endpoint 시도
+// ── Naver 모바일 ───────────────────────────────────────────────────────────────
+async function naverMobileQuery(q, type, seen) {
   const endpoints = [
     `https://m.stock.naver.com/api/search/searchWord?searchWord=${encodeURIComponent(q)}&pageSize=20`,
     `https://m.stock.naver.com/api/stocks/search?keyword=${encodeURIComponent(q)}&page=1&pageSize=20`,
   ];
-
   for (const url of endpoints) {
     try {
       const text = await fetchText(url, 8000, { 'Referer': 'https://m.stock.naver.com/' });
       if (!text) continue;
-
-      let data;
-      try { data = JSON.parse(text); } catch { continue; }
-
-      // 가능한 필드명들
-      const list = data?.stockList || data?.stocks || data?.items
-                || data?.result?.stockList || data?.data?.stockList || [];
+      let data; try { data = JSON.parse(text); } catch { continue; }
+      const list = data?.stockList || data?.stocks || data?.items || data?.result?.stockList || [];
       if (!Array.isArray(list) || list.length === 0) continue;
-
-      const results = [];
       for (const item of list) {
         const code = item.itemCode || item.stockCode || item.code || '';
         const name = item.itemName || item.stockName || item.name || '';
-        if (!code || !name || !/^\d{6}$/.test(code)) continue;
-
-        const isEtf = item.quoteType === 'ETF'
-                   || !!(item.etfType)
-                   || code.startsWith('5');
-        const market = item.stockExchangeType?.name
-                    || item.stockExchangeType?.code
-                    || item.market || '';
-
+        if (!code || !name || !/^\d{6}$/.test(code) || seen.has(code)) continue;
+        const isEtf = !!(item.etfType) || code.startsWith('5');
+        const market = item.stockExchangeType?.name || item.market || '';
         if (type === 'stock' && isEtf) continue;
         if (type === 'etf' && !isEtf) continue;
-
-        results.push({ code, name, isEtf, market });
+        seen.set(code, { code, name, isEtf, market });
       }
-
-      if (results.length > 0) return results;
-    } catch (e) {
-      console.error('[naverMobileSearch]', url, e.message);
-    }
+      if (seen.size > 0) break;
+    } catch (e) { console.error('[naver]', url, e.message); }
   }
-  return [];
 }
 
-// ── Naver fchart 가격 조회 ────────────────────────────────────────────────────
+// ── Naver fchart 가격 ─────────────────────────────────────────────────────────
 async function fetchPrice(item) {
   const { code, name, isEtf, market } = item;
   let price = null, changePercent = null;
@@ -167,7 +165,7 @@ async function fetchPrice(item) {
   return { code, name, isEtf, market, price, changePercent };
 }
 
-// ── 공통 fetch 유틸 ───────────────────────────────────────────────────────────
+// ── 공통 fetch ────────────────────────────────────────────────────────────────
 async function fetchText(url, timeoutMs = 8000, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -180,10 +178,7 @@ async function fetchText(url, timeoutMs = 8000, extraHeaders = {}) {
       },
       signal: controller.signal,
     });
-    if (!res.ok) {
-      console.error('[fetchText] HTTP', res.status, url);
-      return null;
-    }
+    if (!res.ok) { console.error('[fetchText] HTTP', res.status, url); return null; }
     return await res.text();
   } catch (e) {
     if (e.name !== 'AbortError') console.error('[fetchText]', e.message, url);
