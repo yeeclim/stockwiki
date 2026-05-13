@@ -40,7 +40,8 @@ export default async function handler(req, res) {
     }
 
     // 1차: TradingView 심볼 검색 (글로벌 서버, KRX 전 종목 포함)
-    await Promise.all(queries.map(qry => tradingviewQuery(qry, type, seen, asciiPrefix || q)));
+    // filterQuery=q (원본)로 넘겨야 번역 쿼리의 isTranslated 조건이 올바르게 동작
+    await Promise.all(queries.map(qry => tradingviewQuery(qry, type, seen, q)));
     console.log(`[tv] ${seen.size} results for "${q}"`);
 
     // 2차: Yahoo Finance (추가 보완)
