@@ -36,11 +36,11 @@ export default async function handler(req, res) {
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
-      { name: 'Qwen QwQ',     fn: () => askGroqThink(question, 'qwen-qwq-32b', 'Qwen QwQ') },
-      { name: 'Llama 3.3',   fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
-      { name: 'Gemma 2',     fn: () => askGroq(question, 'gemma2-9b-it', 'Gemma 2') },
-      { name: 'Mixtral',     fn: () => askGroq(question, 'mixtral-8x7b-32768', 'Mixtral') },
-      { name: 'Llama 3.1',   fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
+      { name: 'Qwen3 32B',    fn: () => askGroqThink(question, 'qwen/qwen3-32b', 'Qwen3 32B') },
+      { name: 'Llama 3.3',    fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
+      { name: 'Llama 4 Scout',fn: () => askGroq(question, 'meta-llama/llama-4-scout-17b-16e-instruct', 'Llama 4 Scout') },
+      { name: 'GPT-OSS 20B',  fn: () => askGroq(question, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
+      { name: 'Llama 3.1',    fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
     ];
 
     const withTimeout = (fn, ms = 20000) => Promise.race([
