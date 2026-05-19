@@ -31,12 +31,26 @@ async function handleChartProxy(req, res) {
     const { symbol, period = 'd', isKorean = 'false' } = req.query;
     let targetUrl = '';
 
+    const naverHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://finance.naver.com/',
+    };
+
     if (isKorean === 'true') {
-        let periodStr = 'day';
-        if (period === 'w') periodStr = 'week';
-        else if (period === 'm') periodStr = 'month';
+        const periods = period === 'm' ? ['month', 'week'] // 월 없으면 주로 fallback
+                      : period === 'w' ? ['week']
+                      : ['day'];
         const cleanSymbol = symbol.replace('.KS', '').replace('.KQ', '');
-        targetUrl = `https://ssl.pstatic.net/imgfinance/chart/item/area/${periodStr}/${cleanSymbol}.png`;
+        for (const periodStr of periods) {
+            targetUrl = `https://ssl.pstatic.net/imgfinance/chart/item/area/${periodStr}/${cleanSymbol}.png`;
+            const response = await fetch(targetUrl, { headers: naverHeaders });
+            if (response.ok) {
+                res.setHeader('Content-Type', 'image/png');
+                res.setHeader('Cache-Control', 'public, max-age=60');
+                return res.status(200).send(Buffer.from(await response.arrayBuffer()));
+            }
+        }
+        return res.status(404).end();
     } else {
         targetUrl = `https://charts.finviz.com/chart.ashx?t=${symbol}&ty=c&ta=0&p=${period}&cb=${Date.now()}`;
     }
@@ -44,11 +58,11 @@ async function handleChartProxy(req, res) {
     const response = await fetch(targetUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': isKorean === 'true' ? 'https://finance.naver.com/' : 'https://finviz.com/'
+            'Referer': 'https://finviz.com/',
         }
     });
 
-    if (!response.ok) return res.status(response.status).json({ error: 'Failed to fetch image' });
+    if (!response.ok) return res.status(response.status).end();
 
     res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=60');
