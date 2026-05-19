@@ -71,9 +71,9 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.clear, color: theme.colorScheme.onSurface),
-            onPressed: () { _controller.clear(); setState(() { _results = []; _error = ''; }); },
-            tooltip: '초기화',
+            icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
+            onPressed: () => Navigator.of(context).pop(),
+            tooltip: '닫기',
           ),
         ],
       ),
