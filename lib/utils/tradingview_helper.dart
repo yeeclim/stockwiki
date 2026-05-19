@@ -133,11 +133,14 @@ class _NaverChartWidget extends StatefulWidget {
 
 class _NaverChartWidgetState extends State<_NaverChartWidget> {
   String _period = 'd';
+  bool _hasError = false;
 
   String get _url {
     final origin = kIsWeb ? Uri.base.origin : 'https://stockwiki.vercel.app';
     return '$origin/api/utils?type=chart&symbol=${widget.code}&isKorean=true&period=$_period';
   }
+
+  void _changePeriod(String p) => setState(() { _period = p; _hasError = false; });
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +159,7 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
                   child: ChoiceChip(
                     label: Text(pair.$1),
                     selected: _period == pair.$2,
-                    onSelected: (_) => setState(() => _period = pair.$2),
+                    onSelected: (_) => _changePeriod(pair.$2),
                   ),
                 ),
             ],
@@ -164,27 +167,51 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
         ),
         // 차트 이미지
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Image.network(
-              _url,
-              key: ValueKey(_url),
-              fit: BoxFit.contain,
-              loadingBuilder: (_, child, progress) => progress == null
-                  ? child
-                  : Center(child: CircularProgressIndicator(
-                      color: th.colorScheme.primary,
-                      value: progress.expectedTotalBytes != null
-                          ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                          : null,
-                    )),
-              errorBuilder: (_, __, ___) => Center(
-                child: Text('차트를 불러올 수 없습니다.',
-                    style: th.textTheme.bodyMedium?.copyWith(
-                        color: th.colorScheme.onSurfaceVariant)),
-              ),
-            ),
-          ),
+          child: _hasError
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.image_not_supported_outlined,
+                          size: 40, color: th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                      const SizedBox(height: 12),
+                      Text('차트를 불러올 수 없습니다.',
+                          style: th.textTheme.bodyMedium?.copyWith(
+                              color: th.colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => launchUrl(
+                          Uri.parse('https://finance.naver.com/item/main.naver?code=${widget.code}'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        icon: const Icon(Icons.open_in_new, size: 16),
+                        label: const Text('네이버에서 보기'),
+                      ),
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  child: Image.network(
+                    _url,
+                    key: ValueKey(_url),
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : Center(child: CircularProgressIndicator(
+                            color: th.colorScheme.primary,
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                : null,
+                          )),
+                    errorBuilder: (_, __, ___) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) setState(() => _hasError = true);
+                      });
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
         ),
       ],
     );
