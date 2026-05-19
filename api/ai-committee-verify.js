@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
-      { name: 'DeepSeek R1', fn: () => askGroqR1(question, 'deepseek-r1-distill-llama-70b', 'DeepSeek R1') },
+      { name: 'DeepSeek V3', fn: () => askDeepSeek(question, 'deepseek-chat', 'DeepSeek V3') },
       { name: 'Llama 3.3',   fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
       { name: 'Gemma 2',     fn: () => askGroq(question, 'gemma2-9b-it', 'Gemma 2') },
       { name: 'Mixtral',     fn: () => askGroq(question, 'mixtral-8x7b-32768', 'Mixtral') },
@@ -324,12 +324,12 @@ function validateConclusion(content, displayName) {
   return content;
 }
 
-// DeepSeek R1 (Groq 경유, 추론 모델 — <think> 블록 제거 후 사용)
-async function askGroqR1(question, model, displayName) {
-  const apiKey = getEnv('GROQ_API_KEY');
-  if (!apiKey) throw new Error('GROQ_API_KEY 미설정');
+// DeepSeek 공식 API (deepseek-chat = V3, deepseek-reasoner = R1)
+async function askDeepSeek(question, model, displayName) {
+  const apiKey = getEnv('DEEPSEEK_API_KEY');
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY 미설정');
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -341,7 +341,7 @@ async function askGroqR1(question, model, displayName) {
         { role: 'system', content: SYSTEM_INSTRUCTION },
         { role: 'user', content: question + PROMPT_SUFFIX },
       ],
-      max_tokens: 2000,
+      max_tokens: 1500,
     }),
   });
 
@@ -350,11 +350,8 @@ async function askGroqR1(question, model, displayName) {
     throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
   const data = await response.json();
-  let content = data.choices?.[0]?.message?.content;
+  const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
-
-  // R1 추론 블록 제거 (<think>...</think>)
-  content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
