@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
-      { name: 'DeepSeek V3', fn: () => askOpenRouter(question, 'deepseek/deepseek-chat-v3-0324:free', 'DeepSeek V3') },
+      { name: 'DeepSeek V3', fn: () => askOpenRouter(question, 'deepseek/deepseek-chat:free', 'DeepSeek V3') },
       { name: 'Llama 3.3',   fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
       { name: 'Gemma 2',     fn: () => askGroq(question, 'gemma2-9b-it', 'Gemma 2') },
       { name: 'Mixtral',     fn: () => askGroq(question, 'mixtral-8x7b-32768', 'Mixtral') },
