@@ -28,17 +28,38 @@ class _TradingViewChartState extends State<TradingViewChart> {
     try {
       ui_web.platformViewRegistry.registerViewFactory(_viewType, (int id) {
         final theme = widget.isDark ? 'dark' : 'light';
-        final encoded = Uri.encodeComponent(widget.tvSymbol);
+        // XSS 방지: 심볼에서 따옴표 제거
+        final symbol = widget.tvSymbol.replaceAll('"', '').replaceAll("'", '');
+        final srcdoc = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000}
+</style>
+</head>
+<body>
+<div id="tv" style="width:100%;height:100%"></div>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+new TradingView.widget({
+  autosize:true,
+  symbol:"$symbol",
+  interval:"D",
+  timezone:"Asia/Seoul",
+  theme:"$theme",
+  style:"1",
+  locale:"kr",
+  enable_publishing:false,
+  allow_symbol_change:false,
+  container_id:"tv"
+});
+</script>
+</body>
+</html>''';
         return html.IFrameElement()
-          ..src = 'https://www.tradingview.com/widgetembed/'
-              '?symbol=$encoded'
-              '&interval=D'
-              '&theme=$theme'
-              '&locale=kr'
-              '&style=1'
-              '&hide_top_toolbar=0'
-              '&save_image=0'
-              '&allow_symbol_change=0'
+          ..srcdoc = srcdoc
           ..style.width = '100%'
           ..style.height = '100%'
           ..style.border = 'none'
