@@ -84,18 +84,13 @@ async function handleCommodityPrice(req, res) {
 async function handleFearGreed(req, res) {
     const fetch = globalThis.fetch || (await import('node-fetch')).default;
     try {
-        const response = await fetch('https://alternative.me/crypto/fear-and-greed-index/', {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+        const response = await fetch('https://api.alternative.me/fng/?limit=1', {
+            headers: { 'Accept': 'application/json' }
         });
-        const html = await response.text();
-        const valueMatch = html.match(/class="fng-value">\s*(\d+)/);
-        const labelMatch = html.match(/class="fng-text">\s*([^<]+)/);
-
-        const value = valueMatch ? parseInt(valueMatch[1]) : 50;
-        const label = labelMatch ? labelMatch[1].trim() : 'Neutral';
-
+        const json = await response.json();
+        const item = json?.data?.[0];
+        const value = item ? parseInt(item.value) : 50;
+        const label = item?.value_classification ?? 'Neutral';
         return res.status(200).json({ value, label });
     } catch (e) {
         console.error('Fear & Greed Error:', e);
