@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
     const MODEL_POOL = [
-      { name: 'DeepSeek V4', fn: () => askOpenRouter(question, 'deepseek/deepseek-v4-flash:free', 'DeepSeek V4') },
+      { name: 'Gemini Flash', fn: () => askGemini(question, 'gemini-2.0-flash', 'Gemini Flash') },
       { name: 'Llama 3.3',   fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
       { name: 'Gemma 2',     fn: () => askGroq(question, 'gemma2-9b-it', 'Gemma 2') },
       { name: 'Mixtral',     fn: () => askGroq(question, 'mixtral-8x7b-32768', 'Mixtral') },
@@ -353,6 +353,40 @@ async function askDeepSeek(question, model, displayName) {
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
 
+  return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
+}
+
+// Google Gemini API (Google AI Studio 무료)
+async function askGemini(question, model, displayName) {
+  const apiKey = getEnv('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY 미설정');
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: SYSTEM_INSTRUCTION },
+          { role: 'user', content: question + PROMPT_SUFFIX },
+        ],
+        max_tokens: 1500,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
+  }
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
 
