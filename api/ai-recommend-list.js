@@ -1,5 +1,5 @@
 import { fetchStockDataDirect } from './naver-stock.js';
-import { checkRateLimit, getClientIp, fail } from './shared.js';
+import { checkRateLimit, getClientIp, fail } from './_shared.js';
 
 // ── 캐시 ────────────────────────────────────────────────────────
 let cache = null;

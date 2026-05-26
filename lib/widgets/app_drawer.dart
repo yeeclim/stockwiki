@@ -9,6 +9,7 @@ import '../pages/theme_recommendations_page.dart';
 import '../pages/bookmark_list_page.dart';
 import '../pages/portfolio_page.dart';
 import '../pages/kr_stock_search_page.dart';
+import '../pages/board_page.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -154,7 +155,22 @@ class AppDrawer extends StatelessWidget {
                     );
                   },
                 ),
-                
+                ListTile(
+                  leading: const Icon(Icons.forum_outlined, color: Colors.orange),
+                  title: Text("자유게시판", style: theme.textTheme.bodyLarge ?? TextStyle(color: theme.colorScheme.onSurface)),
+                  subtitle: Text(
+                    '익명 자유 토론',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant) ??
+                           TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BoardPage()),
+                    );
+                  },
+                ),
+
                 // 구분선
                 Divider(color: theme.dividerColor, height: 1),
                 

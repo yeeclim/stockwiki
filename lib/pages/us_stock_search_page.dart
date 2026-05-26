@@ -1,7 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/stock.dart';
-import '../services/fmp_service.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockSearchPage extends StatefulWidget {
@@ -22,18 +22,30 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
     final keyword = _controller.text.trim();
     if (keyword.isEmpty) return;
 
-    setState(() { _isLoading = true; _error = ''; });
+    setState(() { _isLoading = true; _error = ''; _results = []; });
 
     try {
-      final List<Stock> results;
-      if (_type == 'stock') {
-        results = await FMPService.fetchStocks(keyword);
+      final origin = Uri.base.origin;
+      final url = '$origin/api/us-stock-search?keyword=${Uri.encodeComponent(keyword)}';
+      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final data = json.decode(res.body);
+
+      if (data['success'] == true) {
+        final raw = List<Map<String, dynamic>>.from(data['data'] ?? []);
+        final filtered = _type == 'stock'
+            ? raw.where((s) => !(s['exchange'] as String? ?? '').contains('ETF')).toList()
+            : raw;
+        setState(() => _results = filtered.map((s) => Stock(
+          symbol: s['symbol'] as String? ?? '',
+          name: s['name'] as String? ?? '',
+          price: (s['price'] as num?)?.toDouble(),
+          changePercent: (s['changePercent'] as num?)?.toDouble(),
+        )).toList());
       } else {
-        results = await FMPService.fetchAll(keyword);
+        setState(() => _error = data['error'] ?? '검색 결과가 없습니다');
       }
-      setState(() => _results = results);
     } catch (e) {
-      setState(() => _error = '검색 중 오류 발생: $e');
+      setState(() => _error = '검색 중 오류: $e');
     } finally {
       setState(() => _isLoading = false);
     }

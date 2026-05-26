@@ -1,6 +1,6 @@
 import { readFile, access } from 'fs/promises';
 import path from 'path';
-import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './shared.js';
+import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './_shared.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

@@ -1,0 +1,11 @@
+*.zip
+.venv/
+.dart_tool/
+.pub-cache/
+android/
+ios/
+linux/
+macos/
+windows/
+test/
+assets/fonts/*.zip
