@@ -1,5 +1,5 @@
 import Parser from 'rss-parser';
-import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './shared.js';
+import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './_shared.js';
 
 const parser = new Parser();
 

@@ -1,4 +1,8 @@
 # Vercel에서 무시할 파일들
+*.zip
+.venv/
+.dart_tool/
+trading/
 android/
 ios/
 linux/

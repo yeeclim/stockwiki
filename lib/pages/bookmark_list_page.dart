@@ -62,6 +62,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
   void _navigateToDetail(Map<String, dynamic> bookmark) {
     final type = bookmark['type'] as String? ?? 'us';
+    final code = bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
+    final isKr = type == 'kr' || RegExp(r'^\d{6}$').hasMatch(code);
     final stock = Stock(
       symbol: bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '',
       name: bookmark['stockName'] as String? ?? '',
@@ -72,7 +74,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => UsStockDetailPage(stock: stock, isKorean: type == 'kr')),
+      MaterialPageRoute(builder: (_) => UsStockDetailPage(stock: stock, isKorean: isKr)),
     );
   }
 
@@ -131,7 +133,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
     final stockName = bookmark['stockName'] as String? ?? 'N/A';
     final stockCode = bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
     final type = bookmark['type'] as String? ?? 'us';
-    final isKorean = type == 'kr';
+    // 종목코드가 6자리 숫자면 한국 주식으로 간주 (type 저장 오류 fallback)
+    final isKorean = type == 'kr' || RegExp(r'^\d{6}$').hasMatch(stockCode);
     final price = (bookmark['price'] as num?)?.toDouble();
     final changePercent = (bookmark['changePercent'] as num?)?.toDouble();
     final isPositive = (changePercent ?? 0) >= 0;

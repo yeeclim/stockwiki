@@ -1,5 +1,5 @@
 // 외부 뉴스 API 프록시 — Yahoo Finance(무료) + 유료 API 키 있으면 병행 사용
-import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './shared.js';
+import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './_shared.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

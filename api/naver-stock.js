@@ -1,4 +1,4 @@
-import { checkRateLimit, getClientIp, validateSymbol, fail } from './shared.js';
+import { checkRateLimit, getClientIp, validateSymbol, fail } from './_shared.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
