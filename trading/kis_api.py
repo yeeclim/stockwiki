@@ -133,6 +133,111 @@ class KISApi:
                 }
         return {'shares': 0, 'avg_price': 0.0}
 
+    def get_fundamentals(self, code: str) -> dict:
+        """현재가 + PER + PBR + 거래량 (FHKST01010100 재활용)"""
+        r = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
+            headers=self._h("FHKST01010100"),
+            params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+        )
+        r.raise_for_status()
+        d = r.json()
+        if d['rt_cd'] != '0':
+            raise RuntimeError(f"시세 오류: {d['msg1']}")
+        out = d['output']
+
+        def _f(v):
+            try: return float(v) if v and str(v).strip() not in ('', '-') else 0.0
+            except: return 0.0
+        def _i(v):
+            try: return int(v) if v else 0
+            except: return 0
+
+        return {
+            'price':  _i(out.get('stck_prpr')),
+            'per':    _f(out.get('per')),
+            'pbr':    _f(out.get('pbr')),
+            'volume': _i(out.get('acml_vol')),
+        }
+
+    def get_ma_data(self, code: str) -> dict:
+        """MA5 / MA20 / MA60 / MA120 + 골든크로스 여부"""
+        end   = datetime.now().strftime('%Y%m%d')
+        start = (datetime.now() - timedelta(days=250)).strftime('%Y%m%d')
+        r = requests.get(
+            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            headers=self._h("FHKST03010100"),
+            params={
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_INPUT_ISCD":         code,
+                "FID_INPUT_DATE_1":       start,
+                "FID_INPUT_DATE_2":       end,
+                "FID_PERIOD_DIV_CODE":    "D",
+                "FID_ORG_ADJ_PRC":        "0",
+            },
+        )
+        r.raise_for_status()
+        d = r.json()
+        if d['rt_cd'] != '0':
+            raise RuntimeError(f"차트 오류: {d['msg1']}")
+
+        prices = [int(x['stck_clpr']) for x in d.get('output2', [])
+                  if x.get('stck_clpr', '0') not in ('0', '', None)]
+
+        def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
+        def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
+
+        ma5, ma20, ma60, ma120 = ma(5), ma(20), ma(60), ma(120)
+        p5, p20 = ma_prev(5), ma_prev(20)
+
+        return {
+            'ma5':   ma5,  'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
+            'golden_cross': bool(ma5 and ma20 and p5 and p20
+                                 and ma5 > ma20 and p5 <= p20),
+            'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
+        }
+
+    def get_financial_ratios(self, code: str) -> dict | None:
+        """부채비율, 유동비율, 현금비율 — FnGuide 스크래핑 (실패 시 None)"""
+        try:
+            from bs4 import BeautifulSoup
+            r = requests.get(
+                "https://comp.fnguide.com/SVO2/ASP/SVD_Finance.asp",
+                params={"gicode": f"A{code}", "rptType": "1",
+                        "fin_typ": "0", "MenuYn": "N"},
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                timeout=10,
+            )
+            r.raise_for_status()
+            soup = BeautifulSoup(r.content, 'lxml')
+
+            TARGETS = {
+                '부채비율': 'debt_ratio',
+                '유동비율': 'current_ratio',
+                '현금비율': 'cash_ratio',
+            }
+            result = {}
+            for row in soup.select('tr'):
+                th = row.find('th')
+                if not th:
+                    continue
+                label = th.get_text(strip=True)
+                for keyword, key in TARGETS.items():
+                    if keyword in label:
+                        for td in reversed(row.find_all('td')):
+                            txt = td.get_text(strip=True).replace(',', '').replace('%', '')
+                            try:
+                                result[key] = float(txt)
+                                break
+                            except ValueError:
+                                continue
+                        break
+
+            return result if result else None
+        except Exception as e:
+            print(f"⚠️  재무비율 조회 실패 ({code}): {e}")
+            return None
+
     # ── 주문 ──────────────────────────────────────────────────────────────────
     def buy(self, code, amount: int) -> dict | None:
         """시장가 매수 (금액 → 수량 계산)"""
