@@ -7,21 +7,25 @@ import os
 import json
 import requests
 
-_REST_KEY      = os.environ.get('KAKAO_REST_API_KEY', '').strip()
-_REFRESH_TOKEN = os.environ.get('KAKAO_REFRESH_TOKEN', '').strip()
+_REST_KEY       = os.environ.get('KAKAO_REST_API_KEY', '').strip()
+_REFRESH_TOKEN  = os.environ.get('KAKAO_REFRESH_TOKEN', '').strip()
+_CLIENT_SECRET  = os.environ.get('KAKAO_CLIENT_SECRET', '').strip()
 
 
 def _get_access_token() -> str | None:
     """리프레시 토큰 → 액세스 토큰 발급"""
     if not _REST_KEY or not _REFRESH_TOKEN:
         return None
+    data = {
+        'grant_type':    'refresh_token',
+        'client_id':     _REST_KEY,
+        'refresh_token': _REFRESH_TOKEN,
+    }
+    if _CLIENT_SECRET:
+        data['client_secret'] = _CLIENT_SECRET
     r = requests.post(
         'https://kauth.kakao.com/oauth/token',
-        data={
-            'grant_type':    'refresh_token',
-            'client_id':     _REST_KEY,
-            'refresh_token': _REFRESH_TOKEN,
-        },
+        data=data,
         timeout=10,
     )
     if r.status_code == 200:
