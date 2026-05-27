@@ -5,10 +5,12 @@ GitHub Actions에서 장중 5분마다 호출됨
 import sys
 import traceback
 from datetime import datetime
+from io import StringIO
 import pytz
 
 from kis_api import KISApi
 import strategy
+import kakao_notify
 
 # ── 감시 종목 리스트 ─────────────────────────────────────────────────────────
 WATCHLIST = [
@@ -30,12 +32,19 @@ def is_market_open() -> bool:
 def main():
     kst = pytz.timezone('Asia/Seoul')
     now_str = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S KST')
+
+    # ── stdout 캡처 시작 (카카오톡 전송용) ──────────────────────────────────
+    _buf = StringIO()
+    _tee = _TeeWriter(sys.stdout, _buf)
+    sys.stdout = _tee
+
     print(f"\n{'='*60}")
     print(f"  StockWiki 자동매매  |  {now_str}")
     print(f"{'='*60}")
 
     if not is_market_open():
         print("⏸  장외 시간 → 종료")
+        sys.stdout = sys.__stdout__
         sys.exit(0)
 
     # KIS API 인증
@@ -58,9 +67,30 @@ def main():
         print(f"⚠️  오류 {len(errors)}건 발생:")
         for e in errors:
             print(f"   - {e}")
+
+    # ── stdout 복원 + 카카오톡 전송 ─────────────────────────────────────────
+    sys.stdout = sys.__stdout__
+    kakao_notify.send(_buf.getvalue())
+
+    if errors:
         sys.exit(1)
     else:
         print("✅ 완료")
+
+
+class _TeeWriter:
+    """sys.stdout 을 원본 + 버퍼 양쪽에 동시 기록"""
+    def __init__(self, original, buffer):
+        self._orig = original
+        self._buf  = buffer
+
+    def write(self, data):
+        self._orig.write(data)
+        self._buf.write(data)
+
+    def flush(self):
+        self._orig.flush()
+        self._buf.flush()
 
 
 if __name__ == '__main__':
