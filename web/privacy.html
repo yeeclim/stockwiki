@@ -11,6 +11,7 @@
     p, li { font-size: 15px; }
     a { color: #6c63ff; }
     .updated { color: #888; font-size: 13px; margin-bottom: 32px; }
+    .highlight { background: #f0eeff; border-left: 4px solid #6c63ff; padding: 12px 16px; border-radius: 4px; margin: 12px 0; }
   </style>
 </head>
 <body>
@@ -33,23 +34,38 @@
     <li>서비스 개선 및 통계 분석</li>
   </ul>
 
-  <h2>3. 개인정보 보유 및 이용 기간</h2>
+  <h2>3. 개인정보 보관 및 보안</h2>
+  <div class="highlight">
+    <p>서비스의 모든 개인정보 및 인증 데이터는 <strong>Supabase Inc.</strong>의 인프라를 통해 저장·관리됩니다.<br>
+    Supabase는 다음과 같은 보안 조치를 적용합니다:</p>
+    <ul>
+      <li>전송 구간 <strong>TLS/SSL 암호화</strong></li>
+      <li>저장 데이터 <strong>AES-256 암호화</strong></li>
+      <li>비밀번호 <strong>bcrypt 단방향 해싱</strong> (원문 복원 불가)</li>
+      <li>SOC 2 Type II 보안 인증 획득</li>
+      <li>행 수준 보안(RLS)으로 데이터 접근 제어</li>
+    </ul>
+    <p>서비스 운영자는 이용자의 비밀번호 원문에 접근할 수 없습니다.</p>
+  </div>
+
+  <h2>4. 개인정보 보유 및 이용 기간</h2>
   <p>회원 탈퇴 시 즉시 삭제합니다. 단, 관계 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다.</p>
 
-  <h2>4. 개인정보의 제3자 제공</h2>
-  <p>서비스는 이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 다만, 법령에 의한 경우는 예외로 합니다.</p>
+  <h2>5. 개인정보의 제3자 제공</h2>
+  <p>서비스는 이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 단, 법령에 의한 경우는 예외로 합니다.</p>
 
-  <h2>5. 개인정보 처리 위탁</h2>
+  <h2>6. 개인정보 처리 위탁</h2>
   <ul>
-    <li>Supabase Inc. — 인증 및 데이터 저장</li>
-    <li>Google LLC — Google 소셜 로그인</li>
-    <li>Kakao Corp. — 카카오 소셜 로그인</li>
+    <li><strong>Supabase Inc.</strong> — 인증, 데이터베이스 저장 및 보안 관리 (미국)</li>
+    <li><strong>Google LLC</strong> — Google 소셜 로그인 처리</li>
+    <li><strong>Kakao Corp.</strong> — 카카오 소셜 로그인 처리</li>
+    <li><strong>Vercel Inc.</strong> — 웹 서비스 호스팅</li>
   </ul>
 
-  <h2>6. 이용자의 권리</h2>
+  <h2>7. 이용자의 권리</h2>
   <p>이용자는 언제든지 마이페이지에서 개인정보 확인, 수정, 삭제(회원 탈퇴)를 요청할 수 있습니다.</p>
 
-  <h2>7. 문의</h2>
+  <h2>8. 문의</h2>
   <p>개인정보 관련 문의: <a href="mailto:eklim4254@gmail.com">eklim4254@gmail.com</a></p>
 
   <br>
