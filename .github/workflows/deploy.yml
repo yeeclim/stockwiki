@@ -22,11 +22,7 @@ jobs:
       run: flutter pub get
     
     - name: Build web
-      env:
-        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      run: >
-        flutter build web --release
-        --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+      run: flutter build web --release --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
     
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v25
