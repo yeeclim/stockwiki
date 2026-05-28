@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:stockwiki/providers/auth_provider.dart';
 import 'package:stockwiki/providers/bookmark_provider.dart';
 import 'package:stockwiki/theme/app_theme.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
@@ -8,24 +10,33 @@ import 'package:stockwiki/widgets/gold_widget.dart';
 import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
-import 'package:stockwiki/pages/us_stock_search_page.dart';
-import 'package:stockwiki/pages/ai_stock_recommend_page.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
-import 'package:stockwiki/pages/ai_algorithm_explain_page.dart';
-import 'package:stockwiki/pages/bookmark_list_page.dart';
-import 'package:stockwiki/pages/us_stock_ai_recommend_page.dart';
-import 'package:stockwiki/pages/us_stock_theme_recommend_page.dart';
-import 'package:stockwiki/pages/us_stock_ai_committee_page.dart';
 import 'package:stockwiki/widgets/app_drawer.dart';
 
 // Global Theme Notifier
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
-void main() {
+// Supabase 설정 (--dart-define 으로 주입)
+const _supabaseUrl =
+    String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://xpiqctjidvrlmazslzyg.supabase.co');
+const _supabaseAnonKey =
+    String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Supabase 초기화
+  await Supabase.initialize(
+    url: _supabaseUrl,
+    anonKey: _supabaseAnonKey,
+  );
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => BookmarkProvider()..load(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => BookmarkProvider()..load()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -71,7 +82,6 @@ class _StockSearchPageState extends State<StockSearchPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
