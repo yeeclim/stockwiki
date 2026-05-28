@@ -15,6 +15,7 @@ import '../pages/kr_stock_search_page.dart';
 import '../pages/board_page.dart';
 import '../pages/login_page.dart';
 import '../pages/ai_trading_page.dart';
+import '../pages/my_page.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -61,11 +62,47 @@ class AppDrawer extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                // ── 로그인 / 유저 정보 섹션 ────────────────────────────────
-                if (isLoggedIn)
-                  _UserTile(authProvider: authProvider, theme: theme)
-                else
-                  _LoginTile(theme: theme),
+                // ── 마이페이지 ────────────────────────────────────────────
+                ListTile(
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.12),
+                    backgroundImage: isLoggedIn && authProvider.avatarUrl != null
+                        ? NetworkImage(authProvider.avatarUrl!)
+                        : null,
+                    child: !isLoggedIn || authProvider.avatarUrl == null
+                        ? Icon(Icons.person,
+                            size: 18, color: theme.colorScheme.primary)
+                        : null,
+                  ),
+                  title: Text(
+                    '마이페이지',
+                    style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.bold) ??
+                        TextStyle(color: theme.colorScheme.onSurface),
+                  ),
+                  subtitle: Text(
+                    isLoggedIn
+                        ? authProvider.displayName
+                        : '로그인 / 회원가입',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing:
+                      Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    if (isLoggedIn) {
+                      Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const MyPage()));
+                    } else {
+                      Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const LoginPage()));
+                    }
+                  },
+                ),
 
                 Divider(color: theme.dividerColor, height: 1),
 
@@ -304,7 +341,8 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
-// ── 로그인 타일 (비로그인 상태) ────────────────────────────────────────────────
+// (더 이상 사용하지 않는 타일 — 마이페이지 ListTile로 대체됨)
+// ignore: unused_element
 class _LoginTile extends StatelessWidget {
   final ThemeData theme;
   const _LoginTile({required this.theme});
@@ -349,7 +387,7 @@ class _LoginTile extends StatelessWidget {
   }
 }
 
-// ── 유저 정보 타일 (로그인 상태) ──────────────────────────────────────────────
+// ignore: unused_element
 class _UserTile extends StatelessWidget {
   final AuthProvider authProvider;
   final ThemeData theme;
