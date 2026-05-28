@@ -4,9 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AuthService {
   static final _supabase = Supabase.instance.client;
 
-  // OAuth 리디렉션 URL — 웹은 현재 origin, 모바일은 딥링크 스킴
-  static String? get _redirectTo =>
-      kIsWeb ? null : 'io.supabase.stockwiki://login-callback/';
+  // OAuth 리디렉션 URL — 웹은 현재 브라우저 origin, 모바일은 딥링크 스킴
+  static String? get _redirectTo {
+    if (!kIsWeb) return 'io.supabase.stockwiki://login-callback/';
+    // Uri.base.origin = 현재 브라우저 주소의 origin (배포 시 stockwiki.vercel.app)
+    return Uri.base.origin;
+  }
 
   // ── 소셜 로그인 ──────────────────────────────────────────────────────────────
   static Future<void> signInWithGoogle() async {
