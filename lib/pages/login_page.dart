@@ -42,7 +42,6 @@ class _LoginPageState extends State<LoginPage> {
         final res = await AuthService.signUp(email, pw);
         if (!mounted) return;
         if (res.user != null) {
-          _showSnack('가입 완료! 이메일을 확인해 인증해 주세요.', isError: false);
           Navigator.of(context).pop();
         }
       } else {
