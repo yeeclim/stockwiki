@@ -8,38 +8,34 @@ from kis_api import KISApi
 import kakao_notify
 from strategy import _score_entry
 
-# ── 스크리닝 후보 종목 (StockWiki 테마별 추천 전 종목) ────────────────────────
+# ── 스크리닝 후보 종목 ────────────────────────────────────────────────────────
 CANDIDATES = [
-    # 피지컬 AI / 휴머노이드 로봇
-    {'code': '108490', 'name': '로보티즈',       'sector': 'AI로봇'},
-    {'code': '056080', 'name': '유진로봇',        'sector': 'AI로봇'},
-    {'code': '466100', 'name': '클로봇',          'sector': 'AI로봇'},
-    {'code': '022100', 'name': '포스코DX',        'sector': 'AI로봇'},
-    {'code': '011070', 'name': 'LG이노텍',        'sector': 'AI로봇'},
-    {'code': '307950', 'name': '현대오토에버',    'sector': 'AI로봇'},
-    {'code': '066570', 'name': 'LG전자',          'sector': 'AI로봇'},
-    # 전력설비
-    {'code': '010120', 'name': 'LS ELECTRIC',    'sector': '전력설비'},
-    {'code': '000500', 'name': '가온전선',        'sector': '전력설비'},
-    {'code': '001440', 'name': '대한전선',        'sector': '전력설비'},
-    {'code': '006260', 'name': 'LS',              'sector': '전력설비'},
-    {'code': '034020', 'name': '두산에너빌리티',  'sector': '전력설비'},
-    {'code': '103590', 'name': '일진전기',        'sector': '전력설비'},
-    {'code': '229640', 'name': 'LS에코에너지',    'sector': '전력설비'},
-    {'code': '060370', 'name': 'LS마린솔루션',    'sector': '전력설비'},
-    # 반도체
-    {'code': '005930', 'name': '삼성전자',        'sector': '반도체'},
-    {'code': '000660', 'name': 'SK하이닉스',      'sector': '반도체'},
-    {'code': '000990', 'name': 'DB하이텍',        'sector': '반도체'},
-    # AI 챗봇
-    {'code': '018260', 'name': '삼성에스디에스',  'sector': 'AI챗봇'},
-    {'code': '035420', 'name': 'NAVER',           'sector': 'AI챗봇'},
-    {'code': '007660', 'name': '이수페타시스',    'sector': 'AI챗봇'},
-    {'code': '035720', 'name': '카카오',          'sector': 'AI챗봇'},
-    # 조선
-    {'code': '097230', 'name': 'HJ중공업',        'sector': '조선'},
-    {'code': '010140', 'name': '삼성중공업',      'sector': '조선'},
-    {'code': '042660', 'name': '한화오션',        'sector': '조선'},
+    # 양자컴퓨팅
+    {'code': '030200', 'name': 'KT',             'sector': '양자'},
+    {'code': '017670', 'name': 'SK텔레콤',        'sector': '양자'},
+    {'code': '032640', 'name': 'LG유플러스',      'sector': '양자'},
+    {'code': '203650', 'name': '드림시큐리티',    'sector': '양자'},
+    {'code': '155360', 'name': '우리로',          'sector': '양자'},
+    # 수소
+    {'code': '336260', 'name': '두산퓨얼셀',      'sector': '수소'},
+    {'code': '288620', 'name': '에스퓨얼셀',      'sector': '수소'},
+    {'code': '271940', 'name': '일진하이솔루스',  'sector': '수소'},
+    {'code': '382900', 'name': '범한퓨얼셀',      'sector': '수소'},
+    {'code': '150220', 'name': '미코파워',        'sector': '수소'},
+    {'code': '034020', 'name': '두산에너빌리티',  'sector': '수소'},
+    # 로봇
+    {'code': '277810', 'name': '레인보우로보틱스','sector': '로봇'},
+    {'code': '090360', 'name': '로보스타',        'sector': '로봇'},
+    {'code': '348370', 'name': '뉴로메카',        'sector': '로봇'},
+    {'code': '108490', 'name': '로보티즈',        'sector': '로봇'},
+    {'code': '056080', 'name': '유진로봇',        'sector': '로봇'},
+    {'code': '117730', 'name': '티로보틱스',      'sector': '로봇'},
+    # 유리기판
+    {'code': '011790', 'name': 'SKC',             'sector': '유리기판'},
+    {'code': '272290', 'name': '이녹스첨단소재',  'sector': '유리기판'},
+    {'code': '009150', 'name': '삼성전기',        'sector': '유리기판'},
+    {'code': '011070', 'name': 'LG이노텍',        'sector': '유리기판'},
+    {'code': '040910', 'name': '아이씨디',        'sector': '유리기판'},
 ]
 
 BUY_THRESHOLD = 6
