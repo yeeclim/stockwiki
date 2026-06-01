@@ -146,7 +146,14 @@ def run(api, stock_code: str, stock_name: str):
     cash      = api.get_cash()
 
     # 기본 정보 출력
+    prdy_ctrt  = fund.get('prdy_ctrt', 0.0)   # 전일 대비율
+    open_price = fund.get('open', 0)            # 당일 시가
+    prdy_clpr  = fund.get('prdy_clpr', 0)       # 전일 종가
+    gap_pct    = (open_price - prdy_clpr) / prdy_clpr * 100 if prdy_clpr else 0.0
+
     print(f"현재가     : {price:>10,}원")
+    print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
+    print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
     if ma60:
         print(f"60일 MA    : {ma60:>10,.0f}원")
     ma5, ma20 = ma_data.get('ma5'), ma_data.get('ma20')
@@ -188,8 +195,17 @@ def run(api, stock_code: str, stock_name: str):
     # ── 포지션 있음 → 수익률 기준 분할매도 / 추가매수 ───────────────────────
     chg = (price - avg_price) / avg_price * 100
     print(f"수익률     : {chg:>+10.2f}%")
-    print()
 
+    # ── 당일 급락 안전장치 ────────────────────────────────────────────────────
+    # 전일 대비 -5% 이상 하락 중이면 추가매수 금지 (악재·갭하락 대응)
+    DAILY_DROP_LIMIT = -5.0
+    daily_drop = prdy_ctrt  # 이미 계산된 전일 대비율
+    if daily_drop <= DAILY_DROP_LIMIT:
+        print(f"\n⛔ 당일 급락 {daily_drop:.2f}% (기준 {DAILY_DROP_LIMIT}%) → 추가매수 전면 금지")
+        print("⏸  악재 가능성 — 매수 보류")
+        return
+
+    print()
     acted = False
 
     if chg >= 10 and not state.get('sell_10_done'):
