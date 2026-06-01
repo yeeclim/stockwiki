@@ -59,7 +59,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         score += 1
         log.append(f"  🔶 [+1] MA5({ma5:,.0f}) > MA20({ma20:,.0f}) 유지 중")
     else:
-        log.append(f"  ❌ [+0] MA5({ma5:,.0f if ma5 else 0}) < MA20 — 하락 추세")
+        log.append(f"  ❌ [+0] MA5({ma5 or 0:,.0f}) < MA20 — 하락 추세")
 
     # ❸ 저 PER  [+1점] ──────────────────────────────────────────────────────────
     per = fund.get('per', 0)
