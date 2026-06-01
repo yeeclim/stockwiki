@@ -160,7 +160,7 @@ class KISApi:
             'volume':   _i(out.get('acml_vol')),
             'prdy_ctrt': _f(out.get('prdy_ctrt')),   # 전일 대비율 (%)
             'open':     _i(out.get('stck_oprc')),     # 당일 시가
-            'prdy_clpr': _i(out.get('stck_prdy_clpr')), # 전일 종가
+            'prdy_clpr': _i(out.get('stck_prdy_clpr') or 0), # 전일 종가
         }
 
     def get_ma_data(self, code: str) -> dict:
