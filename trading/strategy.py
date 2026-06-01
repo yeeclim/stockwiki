@@ -180,6 +180,13 @@ def run(api, stock_code: str, stock_name: str):
         print(f"\n  📊 [{bar}] {score}/{max_score}점  (매수 기준: {BUY_THRESHOLD}점 이상)")
 
         if score >= BUY_THRESHOLD:
+            # 당일 급등 종목 고점 추격 매수 방지
+            DAILY_SURGE_LIMIT = 5.0
+            if daily_drop >= DAILY_SURGE_LIMIT:
+                print(f"\n⛔ 당일 급등 +{daily_drop:.2f}% (기준 +{DAILY_SURGE_LIMIT}%) → 고점 추격 매수 금지")
+                print("⏸  이미 많이 오른 종목 — 진입 보류")
+                return
+
             buy_amount = int(cash * 0.25)
             print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
             result = api.buy(stock_code, buy_amount)
