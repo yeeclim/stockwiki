@@ -8,16 +8,38 @@ from kis_api import KISApi
 import kakao_notify
 from strategy import _score_entry
 
-# ── 스크리닝 후보 종목 ─────────────────────────────────────────────────────────
+# ── 스크리닝 후보 종목 (StockWiki 테마별 추천 전 종목) ────────────────────────
 CANDIDATES = [
-    {'code': '097230', 'name': 'HJ중공업',    'sector': '조선'},
-    {'code': '022100', 'name': '포스코DX',    'sector': '스마트홈/AI'},
-    {'code': '010140', 'name': '삼성중공업',  'sector': '조선'},
-    {'code': '042660', 'name': '한화오션',    'sector': '조선'},
-    {'code': '267260', 'name': 'HD현대일렉트릭', 'sector': '전력설비'},
-    {'code': '298040', 'name': 'HD현대마린엔진', 'sector': '조선'},
-    {'code': '009540', 'name': 'HD한국조선해양', 'sector': '조선'},
-    {'code': '329180', 'name': 'HD현대중공업', 'sector': '조선'},
+    # 피지컬 AI / 휴머노이드 로봇
+    {'code': '108490', 'name': '로보티즈',       'sector': 'AI로봇'},
+    {'code': '056080', 'name': '유진로봇',        'sector': 'AI로봇'},
+    {'code': '466100', 'name': '클로봇',          'sector': 'AI로봇'},
+    {'code': '022100', 'name': '포스코DX',        'sector': 'AI로봇'},
+    {'code': '011070', 'name': 'LG이노텍',        'sector': 'AI로봇'},
+    {'code': '307950', 'name': '현대오토에버',    'sector': 'AI로봇'},
+    {'code': '066570', 'name': 'LG전자',          'sector': 'AI로봇'},
+    # 전력설비
+    {'code': '010120', 'name': 'LS ELECTRIC',    'sector': '전력설비'},
+    {'code': '000500', 'name': '가온전선',        'sector': '전력설비'},
+    {'code': '001440', 'name': '대한전선',        'sector': '전력설비'},
+    {'code': '006260', 'name': 'LS',              'sector': '전력설비'},
+    {'code': '034020', 'name': '두산에너빌리티',  'sector': '전력설비'},
+    {'code': '103590', 'name': '일진전기',        'sector': '전력설비'},
+    {'code': '229640', 'name': 'LS에코에너지',    'sector': '전력설비'},
+    {'code': '060370', 'name': 'LS마린솔루션',    'sector': '전력설비'},
+    # 반도체
+    {'code': '005930', 'name': '삼성전자',        'sector': '반도체'},
+    {'code': '000660', 'name': 'SK하이닉스',      'sector': '반도체'},
+    {'code': '000990', 'name': 'DB하이텍',        'sector': '반도체'},
+    # AI 챗봇
+    {'code': '018260', 'name': '삼성에스디에스',  'sector': 'AI챗봇'},
+    {'code': '035420', 'name': 'NAVER',           'sector': 'AI챗봇'},
+    {'code': '007660', 'name': '이수페타시스',    'sector': 'AI챗봇'},
+    {'code': '035720', 'name': '카카오',          'sector': 'AI챗봇'},
+    # 조선
+    {'code': '097230', 'name': 'HJ중공업',        'sector': '조선'},
+    {'code': '010140', 'name': '삼성중공업',      'sector': '조선'},
+    {'code': '042660', 'name': '한화오션',        'sector': '조선'},
 ]
 
 BUY_THRESHOLD = 6
