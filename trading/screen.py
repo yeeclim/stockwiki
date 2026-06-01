@@ -15,7 +15,7 @@ CANDIDATES = [
     {'code': '079940', 'name': '가비아',              'sector': '클라우드'},
     {'code': '181710', 'name': 'NHN',                 'sector': '클라우드'},
     {'code': '018260', 'name': '삼성에스디에스',      'sector': '클라우드'},
-    {'code': '093520', 'name': '케이아이엔엑스',      'sector': '클라우드'},
+    {'code': '093320', 'name': '케이아이엔엑스',      'sector': '클라우드'},
     {'code': '234340', 'name': '틸론',                'sector': '클라우드'},
     {'code': '041510', 'name': '영림원소프트랩',      'sector': '클라우드'},
     {'code': '294570', 'name': '쿠콘',                'sector': '클라우드'},
@@ -89,25 +89,30 @@ def screen():
     ok.sort(key=lambda x: x['score'], reverse=True)
     others.sort(key=lambda x: x.get('score', 0), reverse=True)
 
+    def chart_url(code):
+        return f"https://m.finance.naver.com/item/main.naver?code={code}"
+
     if ok:
         lines.append(f"\n✅ 진입 가능 종목 ({BUY_THRESHOLD}점 이상)")
         for r in ok:
             disc = f"  MA60대비 -{r['discount']:.1f}%" if r['discount'] else ""
             lines.append(
-                f"  [{r['score']}/{r['max_score'] if 'max_score' in r else 10}점] "
-                f"{r['name']}({r['code']})  {r['price']:,}원"
+                f"  [{r['score']}/10점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
                 f"  전일{r['prdy_ctrt']:+.1f}%{disc}"
                 f"  [{r['sector']}]"
+                f"\n  📊 {chart_url(r['code'])}"
             )
 
     lines.append(f"\n⏸  조건 미달")
     for r in others:
         ma60_str = f"MA60 {r['ma60']:,.0f}원" if r.get('ma60') else "MA60 없음"
         above = "위" if r.get('ma60') and r.get('price', 0) >= r['ma60'] else "아래"
+        disc = f" ({-r['discount']:.1f}%↓)" if r.get('discount') and above == "아래" else ""
         lines.append(
             f"  [{r.get('score',0)}/10점] {r['name']}({r['code']})  "
-            f"{r.get('price',0):,}원  {ma60_str} {above}  [{r['sector']}]"
+            f"{r.get('price',0):,}원  {ma60_str} {above}{disc}  [{r['sector']}]"
+            f"\n  📊 {chart_url(r['code'])}"
         )
 
     if errors:
