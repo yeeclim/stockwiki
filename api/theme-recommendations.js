@@ -456,115 +456,112 @@ async function fetchTechnicalData(symbol) {
   }
 }
 
-// 기술적 필터
+// 기술적 필터 — 가치투자 기준 (MA60 이하 저평가 종목 발굴)
 // - pass=false → 추천 목록에서 제외
 // - warning → 카드에 뱃지로 경고 표시 (제외하지 않음)
 function applyTechnicalFilter(price, tech) {
-  if (!tech || !price) return { pass: true, warning: null };
+  // 데이터 없으면 제외 (기존: 통과 → 변경: 제외)
+  if (!tech || !price) return { pass: false, warning: null };
 
   const { ma20, ma60, high52w } = tech;
 
-  // ① MA 데드크로스 (MA20 < MA60) — 중기 하락 추세 → 제외
-  if (ma20 && ma60 && ma20 < ma60) {
-    return { pass: false, warning: null };
-  }
+  // ① MA60 데이터 없으면 제외
+  if (!ma60) return { pass: false, warning: null };
 
-  // ② 가격이 MA20 아래 — 단기 하락 추세 → 제외
-  if (ma20 && price < ma20) {
-    return { pass: false, warning: null };
-  }
+  // ② 핵심 조건: 현재가 < MA60 (이평선 아래 = 저평가 구간)
+  if (price >= ma60) return { pass: false, warning: null };
 
-  // ③ 52주 신고가 돌파 → 강세 신호이므로 제외하지 않고 경고 뱃지만 표시
+  // ③ 과도한 급락 제외: MA60 대비 40% 이상 하락 (펀더멘털 붕괴 가능성)
+  if (price < ma60 * 0.60) return { pass: false, warning: null };
 
-  // ④ MA20 대비 20% 초과 과열 → 제외
-  if (ma20 && price > ma20 * 1.20) {
-    return { pass: false, warning: null };
-  }
-
-  // ⑤ 52주 고가 돌파/근접 → 경고 뱃지 (제외 안함)
-  const above52wHigh = high52w && price > high52w;
-  const near52wHigh  = high52w && price >= high52w * 0.95;
-
-  // ⑥ MA20 대비 10~20% 구간 → 주의 뱃지
-  const nearMA20Top = ma20 && price > ma20 * 1.10;
-
+  // ④ 경고 뱃지
   let warning = null;
-  if (above52wHigh)  warning = '52주 신고가 돌파';
-  else if (near52wHigh)  warning = '52주 고가 근접';
-  else if (nearMA20Top) warning = 'MA20 대비 고점';
+  if (ma20 && ma20 < ma60)       warning = '데드크로스 주의';  // 단기도 하락 추세
+  else if (ma20 && price < ma20) warning = 'MA20 아래';        // 단기 하락 중
 
   return { pass: true, warning };
 }
 
-// ── 점수 산정 (100점 만점, ai-recommend-list와 동일 기준) ───────
-// · 모멘텀  60점: 등락률 기반 (테마 스크랩은 volume 불확실해서 비중 올림)
-// · 거래량  25점: volume이 있을 경우만 반영
-// · 안정성  15점: 과도한 급등락 없이 건전한 상승
+// ── 점수 산정 (100점 만점) — 가치투자 기준 ────────────────────────
+// · 저평가도  50점: MA60 대비 할인율 (많이 빠질수록 고점수)
+// · 거래량    30점: 유동성 확인
+// · 반등 신호 20점: 오늘 소폭 상승 = 바닥 탈출 신호
 function calcThemeScore(stock) {
-  const cp = stock.changePercent ?? 0;
+  const cp  = stock.changePercent ?? 0;
   const vol = stock.volume ?? 0;
+  const price = stock.price ?? 0;
+  const ma60  = stock.ma60 ?? 0;
 
-  // 하락 중 종목은 0점 (추천 제외)
-  if (cp < -1) return 0;
+  // ① 저평가도 (MA60 대비 할인율)
+  let valueScore = 0;
+  if (ma60 && price) {
+    const discount = (ma60 - price) / ma60 * 100; // MA60 대비 몇% 아래인지
+    if (discount >= 30)      valueScore = 50;
+    else if (discount >= 20) valueScore = 42;
+    else if (discount >= 15) valueScore = 35;
+    else if (discount >= 10) valueScore = 26;
+    else if (discount >= 5)  valueScore = 16;
+    else                     valueScore = 8;
+  }
 
-  // ① 모멘텀
-  let momentumScore;
-  if (cp >= 5)       momentumScore = 60;
-  else if (cp >= 3)  momentumScore = 55;
-  else if (cp >= 2)  momentumScore = 46;
-  else if (cp >= 1)  momentumScore = 35;
-  else if (cp >= 0)  momentumScore = 20;
-  else               momentumScore = 8;
-
-  // ② 거래량
+  // ② 거래량 (유동성)
   let volScore;
-  if (vol >= 1_000_000)      volScore = 25;
-  else if (vol >= 300_000)   volScore = 20;
-  else if (vol >= 100_000)   volScore = 14;
-  else if (vol >= 30_000)    volScore = 8;
-  else if (vol > 0)          volScore = 4;
-  else                       volScore = 10; // 거래량 미수집 시 중립값
+  if (vol >= 1_000_000)    volScore = 30;
+  else if (vol >= 300_000) volScore = 24;
+  else if (vol >= 100_000) volScore = 17;
+  else if (vol >= 30_000)  volScore = 10;
+  else if (vol > 0)        volScore = 5;
+  else                     volScore = 8; // 미수집 시 중립
 
-  // ③ 안정성
-  const abs = Math.abs(cp);
-  let stabilityScore;
-  if (abs >= 1 && abs <= 5)  stabilityScore = 15;
-  else if (abs < 1)          stabilityScore = 9;
-  else if (abs <= 8)         stabilityScore = 7;
-  else                       stabilityScore = 3;
+  // ③ 반등 신호 (당일 소폭 상승 = 바닥 다지기)
+  let reboundScore;
+  if (cp >= 3)        reboundScore = 20; // 강한 반등
+  else if (cp >= 1)   reboundScore = 16;
+  else if (cp >= 0)   reboundScore = 10; // 보합
+  else if (cp >= -2)  reboundScore = 4;  // 소폭 하락
+  else                reboundScore = 0;  // 급락 중
 
-  return momentumScore + volScore + stabilityScore;
+  return valueScore + volScore + reboundScore;
 }
 
 function scoreToRecommendation(score, cp) {
-  if (score >= 75) return '강력 매수';
-  if (score >= 55) return '매수';
+  if (score >= 75) return '매수 적극 검토';
+  if (score >= 55) return '분할 매수 검토';
   if (score >= 35) return '관망';
-  return '보유';
+  return '대기';
 }
 
 function buildThemeReasons(stock, score) {
-  const cp = stock.changePercent ?? 0;
-  const vol = stock.volume ?? 0;
+  const cp    = stock.changePercent ?? 0;
+  const vol   = stock.volume ?? 0;
+  const price = stock.price ?? 0;
+  const ma60  = stock.ma60 ?? 0;
   const reasons = [];
 
+  // 저평가 근거
+  if (ma60 && price) {
+    const discount = ((ma60 - price) / ma60 * 100).toFixed(1);
+    reasons.push(`60일 이평선(${ma60.toLocaleString()}원) 대비 ${discount}% 저평가 구간`);
+  }
+
+  // 당일 반등 신호
   if (cp >= 3) {
-    reasons.push(`오늘 +${cp.toFixed(2)}% 강한 상승 — 테마 수혜 모멘텀 확인`);
+    reasons.push(`오늘 +${cp.toFixed(2)}% 강한 반등 — 바닥 탈출 신호`);
   } else if (cp >= 1) {
-    reasons.push(`오늘 +${cp.toFixed(2)}% 안정적 상승 — 테마 수요 유입 중`);
+    reasons.push(`오늘 +${cp.toFixed(2)}% 소폭 반등 — 매수세 유입 감지`);
   } else if (cp >= 0) {
-    reasons.push(`오늘 ${cp.toFixed(2)}% 보합 — 추가 모멘텀 확인 권장`);
+    reasons.push(`오늘 보합 — 추가 하락 멈춤, 반등 대기`);
   } else {
-    reasons.push(`오늘 ${cp.toFixed(2)}% 소폭 조정 — 단기 관망 유효`);
+    reasons.push(`오늘 ${cp.toFixed(2)}% 하락 중 — 추가 확인 권장`);
   }
 
   if (vol >= 300_000) {
-    reasons.push(`거래량 ${vol.toLocaleString()}주 — 활발한 매수세`);
+    reasons.push(`거래량 ${vol.toLocaleString()}주 — 유동성 충분`);
   } else if (vol > 0) {
     reasons.push(`거래량 ${vol.toLocaleString()}주`);
   }
 
-  reasons.push(`${stock.sector} 테마 — 스크리닝 점수 ${score}점 / 100점`);
+  reasons.push(`${stock.sector} 테마 — 저평가 스크리닝 점수 ${score}점 / 100점`);
   return reasons;
 }
 
