@@ -146,10 +146,13 @@ def run(api, stock_code: str, stock_name: str):
     cash      = api.get_cash()
 
     # 기본 정보 출력
-    prdy_ctrt  = fund.get('prdy_ctrt', 0.0)   # 전일 대비율
-    open_price = fund.get('open', 0)            # 당일 시가
-    prdy_clpr  = fund.get('prdy_clpr', 0)       # 전일 종가
-    gap_pct    = (open_price - prdy_clpr) / prdy_clpr * 100 if prdy_clpr else 0.0
+    prdy_ctrt  = fund.get('prdy_ctrt', 0.0)
+    open_price = fund.get('open', 0)
+    prdy_clpr  = fund.get('prdy_clpr', 0)
+    # 전일종가가 없으면 prdy_ctrt로 역산
+    if not prdy_clpr and prdy_ctrt and price:
+        prdy_clpr = round(price / (1 + prdy_ctrt / 100))
+    gap_pct = (open_price - prdy_clpr) / prdy_clpr * 100 if prdy_clpr else 0.0
 
     print(f"현재가     : {price:>10,}원")
     print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
