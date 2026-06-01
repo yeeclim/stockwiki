@@ -199,65 +199,37 @@ def run(api, stock_code: str, stock_name: str):
             print(f"\n⏸  조건 미달 ({score}점 < {BUY_THRESHOLD}점) → 대기")
         return
 
-    # ── 포지션 있음 → 수익률 기준 분할매도 / 추가매수 ───────────────────────
+    # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)
     chg = (price - avg_price) / avg_price * 100
     print(f"수익률     : {chg:>+10.2f}%")
+    print(f"\n📌 매도는 사용자가 직접 판단합니다.")
 
     # ── 당일 급락 안전장치 ────────────────────────────────────────────────────
-    # 전일 대비 -5% 이상 하락 중이면 추가매수 금지 (악재·갭하락 대응)
     DAILY_DROP_LIMIT = -5.0
-    daily_drop = prdy_ctrt  # 이미 계산된 전일 대비율
-    if daily_drop <= DAILY_DROP_LIMIT:
-        print(f"\n⛔ 당일 급락 {daily_drop:.2f}% (기준 {DAILY_DROP_LIMIT}%) → 추가매수 전면 금지")
-        print("⏸  악재 가능성 — 매수 보류")
+    if prdy_ctrt <= DAILY_DROP_LIMIT:
+        print(f"⛔ 당일 급락 {prdy_ctrt:.2f}% → 추가매수 금지")
         return
 
-    print()
-    acted = False
-
-    if chg >= 10 and not state.get('sell_10_done'):
-        qty = max(1, int(shares * 0.10))
-        print(f"✅ +10% 도달 → {qty}주 매도 (보유량 10%)")
-        result = api.sell(stock_code, qty)
-        if result:
-            db.upsert_position(stock_code, sell_10_done=True)
-            db.log_trade(stock_code, stock_name, 'SELL',
-                         result['price'], result['shares'], result['amount'],
-                         '+10% 익절 10% 매도')
-        acted = True
-
-    elif chg >= 5 and not state.get('sell_5_done'):
-        qty = max(1, int(shares * 0.05))
-        print(f"✅ +5% 도달 → {qty}주 매도 (보유량 5%)")
-        result = api.sell(stock_code, qty)
-        if result:
-            db.upsert_position(stock_code, sell_5_done=True)
-            db.log_trade(stock_code, stock_name, 'SELL',
-                         result['price'], result['shares'], result['amount'],
-                         '+5% 익절 5% 매도')
-        acted = True
-
-    elif chg <= -10 and not state.get('buy_minus10_done'):
+    # ── 추가매수 (물타기) ─────────────────────────────────────────────────────
+    if chg <= -10 and not state.get('buy_minus10_done'):
         buy_amount = int(cash * 0.10)
-        print(f"✅ -10% 도달 → 예수금 10% ({buy_amount:,}원) 추가매수")
+        print(f"\n✅ -10% 도달 → 예수금 10% ({buy_amount:,}원) 추가매수")
         result = api.buy(stock_code, buy_amount)
         if result:
             db.upsert_position(stock_code, buy_minus10_done=True)
             db.log_trade(stock_code, stock_name, 'BUY',
                          result['price'], result['shares'], result['amount'],
                          '-10% 물타기 10%')
-        acted = True
 
     elif chg <= -5 and not state.get('buy_minus5_done'):
         buy_amount = int(cash * 0.05)
-        print(f"✅ -5% 도달 → 예수금 5% ({buy_amount:,}원) 추가매수")
+        print(f"\n✅ -5% 도달 → 예수금 5% ({buy_amount:,}원) 추가매수")
         result = api.buy(stock_code, buy_amount)
         if result:
             db.upsert_position(stock_code, buy_minus5_done=True)
             db.log_trade(stock_code, stock_name, 'BUY',
                          result['price'], result['shares'], result['amount'],
                          '-5% 물타기 5%')
-        acted = True
 
-    if not acted:
-        print("⏸  조건 미달 또는 이미 실행됨 → 대기")
+    else:
+        print("⏸  추가매수 조건 미달 → 대기")
