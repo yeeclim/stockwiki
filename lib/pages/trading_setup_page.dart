@@ -48,23 +48,32 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
   }
 
   Future<void> _loadExisting() async {
-    final cfg = await TradingConfigService.load();
-    if (!mounted) return;
-    setState(() {
-      _existing = cfg;
-      _loading  = false;
-      if (cfg != null) {
-        _selectedBroker     = cfg.brokerType;
-        _appKeyCtrl.text    = cfg.kisAppKey;
-        _appSecretCtrl.text = cfg.kisAppSecret;
-        _accountCtrl.text   = cfg.kisAccountNo;
-        _prodCodeCtrl.text  = cfg.kisAccountProdCode;
-        _emailCtrl.text     = cfg.notifyEmail;
-      } else {
+    try {
+      final cfg = await TradingConfigService.load();
+      if (!mounted) return;
+      setState(() {
+        _existing = cfg;
+        _loading  = false;
+        if (cfg != null) {
+          _selectedBroker     = cfg.brokerType;
+          _appKeyCtrl.text    = cfg.kisAppKey;
+          _appSecretCtrl.text = cfg.kisAppSecret;
+          _accountCtrl.text   = cfg.kisAccountNo;
+          _prodCodeCtrl.text  = cfg.kisAccountProdCode;
+          _emailCtrl.text     = cfg.notifyEmail;
+        } else {
+          final email = context.read<AuthProvider>().currentUser?.email ?? '';
+          _emailCtrl.text = email;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
         final email = context.read<AuthProvider>().currentUser?.email ?? '';
         _emailCtrl.text = email;
-      }
-    });
+      });
+    }
   }
 
   Future<void> _submit() async {
