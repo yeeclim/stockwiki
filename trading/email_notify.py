@@ -8,6 +8,8 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.header import Header
+from email.utils import formataddr
 from datetime import datetime
 import pytz
 
@@ -50,8 +52,8 @@ def _send(text: str, recipients: list[str]) -> bool:
 </body></html>"""
 
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From']    = f'StockWiki <{_SENDER}>'
+    msg['Subject'] = Header(subject, 'utf-8')
+    msg['From']    = formataddr(('StockWiki', _SENDER))
     msg['To']      = ', '.join(recipients)
     msg.attach(MIMEText(text, 'plain', 'utf-8'))
     msg.attach(MIMEText(html, 'html', 'utf-8'))
