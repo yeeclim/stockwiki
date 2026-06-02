@@ -149,10 +149,13 @@ def screen():
     # 가입 유저 전체: 이메일
     recipients = _fetch_user_emails()
     if recipients:
-        print(f"📧 스크리닝 결과 이메일 발송 → {len(recipients)}명")
-        email_notify.send_to(report, recipients)
+        ok = email_notify.send_to(report, recipients)
+        if ok:
+            print(f"📧 이메일 발송 완료 → {len(recipients)}명")
+        else:
+            print("⚠️  이메일 발송 실패 (EMAIL_SENDER / EMAIL_PASSWORD 환경변수 확인)")
     else:
-        print("⚠️  이메일 수신자 없음 (등록된 유저 없거나 환경변수 미설정)")
+        print("⚠️  이메일 수신자 없음")
 
     return ok
 
