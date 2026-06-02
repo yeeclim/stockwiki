@@ -59,7 +59,7 @@ class TradingConfigService {
         .limit(1);
 
     if (rows.isEmpty) return null;
-    return TradingConfig.fromMap(rows.first as Map<String, dynamic>);
+    return TradingConfig.fromMap(rows.first);
   }
 
   /// 설정 저장 + GitHub Actions 시크릿 자동 등록
@@ -75,7 +75,7 @@ class TradingConfigService {
       body: cfg.toMap(),
     );
 
-    if (res.status != null && res.status! >= 400) {
+    if (res.status >= 400) {
       final msg = (res.data as Map?)?['error'] ?? '알 수 없는 오류';
       throw Exception(msg);
     }

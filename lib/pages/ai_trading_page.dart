@@ -343,30 +343,3 @@ class _StepCard extends StatelessWidget {
   }
 }
 
-class _CodeBlock extends StatelessWidget {
-  final ThemeData theme;
-  final String code;
-  const _CodeBlock({required this.theme, required this.code});
-  @override
-  Widget build(BuildContext context) {
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: isDark ? const Color(0xFF444444) : const Color(0xFFDDDDDD)),
-      ),
-      child: Text(
-        code,
-        style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 12,
-          height: 1.7,
-        ),
-      ),
-    );
-  }
-}
