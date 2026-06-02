@@ -2,8 +2,10 @@ name: 종목 스크리닝
 
 on:
   schedule:
-    # 평일 KST 08:50 = UTC 23:50 (전날)
-    - cron: '50 23 * * 0-4'
+    # 평일 KST 08:00 = UTC 23:00 (전날)
+    - cron: '0 23 * * 0-4'
+    # 평일 KST 15:00 = UTC 06:00
+    - cron: '0 6 * * 1-5'
   workflow_dispatch:  # 수동 실행
 
 jobs:
