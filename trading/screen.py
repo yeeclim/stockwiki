@@ -52,7 +52,7 @@ CANDIDATES = [
     {'code': '036570', 'name': '엔씨소프트',          'sector': '클라우드'},
 ]
 
-BUY_THRESHOLD = 6
+BUY_THRESHOLD = 5
 
 
 def screen():
@@ -120,7 +120,7 @@ def screen():
         return f"https://m.finance.naver.com/item/main.naver?code={code}"
 
     if ok:
-        lines.append(f"\n✅ 진입 가능 종목 ({BUY_THRESHOLD}점 이상)")
+        lines.append(f"\n✅ 주목 종목 ({BUY_THRESHOLD}점 이상, {len(ok)}개)")
         for r in ok:
             disc = f"  MA60대비 -{r['discount']:.1f}%" if r['discount'] else ""
             lines.append(
@@ -130,17 +130,8 @@ def screen():
                 f"  [{r['sector']}]"
                 f"\n  📊 {chart_url(r['code'])}"
             )
-
-    lines.append(f"\n⏸  조건 미달")
-    for r in others:
-        ma60_str = f"MA60 {r['ma60']:,.0f}원" if r.get('ma60') else "MA60 없음"
-        above = "위" if r.get('ma60') and r.get('price', 0) >= r['ma60'] else "아래"
-        disc = f" ({-r['discount']:.1f}%↓)" if r.get('discount') and above == "아래" else ""
-        lines.append(
-            f"  [{r.get('score',0)}/10점] {r['name']}({r['code']})  "
-            f"{r.get('price',0):,}원  {ma60_str} {above}{disc}  [{r['sector']}]"
-            f"\n  📊 {chart_url(r['code'])}"
-        )
+    else:
+        lines.append(f"\n⏸  {BUY_THRESHOLD}점 이상 종목 없음")
 
     if errors:
         lines.append(f"\n❌ 조회 실패")
