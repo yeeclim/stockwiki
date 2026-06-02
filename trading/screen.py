@@ -35,58 +35,56 @@ def _fetch_user_emails() -> list[str]:
         print(f"⚠️  유저 이메일 조회 실패: {e}")
         return []
 
-# ── 스크리닝 후보 종목 ────────────────────────────────────────────────────────
-CANDIDATES = [
-    # 반도체
-    {'code': '005930', 'name': '삼성전자',       'sector': '반도체'},
-    {'code': '000660', 'name': 'SK하이닉스',     'sector': '반도체'},
-    {'code': '042700', 'name': '한미반도체',     'sector': '반도체'},
-    {'code': '058470', 'name': '리노공업',       'sector': '반도체'},
-    {'code': '036930', 'name': '주성엔지니어링', 'sector': '반도체'},
-    {'code': '000990', 'name': 'DB하이텍',       'sector': '반도체'},
-    {'code': '064760', 'name': '두산테스나',     'sector': '반도체'},
-    {'code': '240810', 'name': '원익IPS',        'sector': '반도체'},
-    {'code': '140860', 'name': '파크시스템스',   'sector': '반도체'},
-    # AI
-    {'code': '035420', 'name': 'NAVER',          'sector': 'AI'},
-    {'code': '035720', 'name': '카카오',         'sector': 'AI'},
-    {'code': '030200', 'name': 'KT',             'sector': 'AI'},
-    {'code': '017670', 'name': 'SK텔레콤',       'sector': 'AI'},
-    {'code': '181710', 'name': 'NHN',            'sector': 'AI'},
-    {'code': '095700', 'name': '제이씨현시스템', 'sector': 'AI'},
-    # 데이터센터
-    {'code': '093320', 'name': '케이아이엔엑스', 'sector': '데이터센터'},
-    {'code': '032640', 'name': 'LG유플러스',     'sector': '데이터센터'},
-    {'code': '012510', 'name': '더존비즈온',     'sector': '데이터센터'},
-    {'code': '079940', 'name': '가비아',         'sector': '데이터센터'},
-    {'code': '018260', 'name': '삼성에스디에스', 'sector': '데이터센터'},
-    # 유리기판
-    {'code': '011790', 'name': 'SKC',            'sector': '유리기판'},
-    {'code': '011070', 'name': 'LG이노텍',       'sector': '유리기판'},
-    {'code': '009150', 'name': '삼성전기',       'sector': '유리기판'},
-    {'code': '357780', 'name': '솔브레인',       'sector': '유리기판'},
-    # 양자컴퓨터
-    {'code': '115440', 'name': '우리넷',         'sector': '양자컴퓨터'},
-    {'code': '203650', 'name': '드림시큐리티',   'sector': '양자컴퓨터'},
-    {'code': '056360', 'name': '코위버',         'sector': '양자컴퓨터'},
-    # 클라우드
-    {'code': '234340', 'name': '틸론',           'sector': '클라우드'},
-    {'code': '041510', 'name': '영림원소프트랩', 'sector': '클라우드'},
-    {'code': '294570', 'name': '쿠콘',           'sector': '클라우드'},
-    {'code': '053580', 'name': '웹케시',         'sector': '클라우드'},
-    {'code': '036570', 'name': '엔씨소프트',     'sector': '클라우드'},
-]
-
 BUY_THRESHOLD = 5
+
+
+def _fetch_candidates() -> list[dict]:
+    """Supabase에서 활성 스크리닝 후보 조회 (시스템 + 전체 유저 추가 종목)"""
+    if not (_SUPABASE_URL and _SUPABASE_KEY):
+        return []
+    try:
+        r = requests.get(
+            f"{_SUPABASE_URL}/rest/v1/screening_candidates"
+            "?is_active=eq.true&order=sector,stock_code",
+            headers={
+                'apikey':        _SUPABASE_KEY,
+                'Authorization': f'Bearer {_SUPABASE_KEY}',
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        rows = r.json()
+        # 중복 종목코드 제거 (같은 종목이 여러 유저에 의해 추가된 경우)
+        seen = set()
+        result = []
+        for row in rows:
+            code = row['stock_code']
+            if code not in seen:
+                seen.add(code)
+                result.append({
+                    'code':   code,
+                    'name':   row['stock_name'],
+                    'sector': row['sector'],
+                })
+        print(f"📋 스크리닝 대상 {len(result)}종목 로드 완료")
+        return result
+    except Exception as e:
+        print(f"⚠️  후보 종목 조회 실패: {e}")
+        return []
 
 
 def screen():
     api = KISApi()
     api.auth()
 
+    candidates = _fetch_candidates()
+    if not candidates:
+        print("⚠️  후보 종목 없음 — 스크리닝 종료")
+        return []
+
     results = []
 
-    for stock in CANDIDATES:
+    for stock in candidates:
         code = stock['code']
         name = stock['name']
         sector = stock['sector']
