@@ -104,8 +104,10 @@ class KISApi:
             raise RuntimeError(f"예수금 오류: {d['msg1']}")
         return int(d['output']['ord_psbl_cash'])
 
-    def get_holdings(self, code) -> dict:
-        """보유 수량 + 평단가"""
+    def _fetch_all_holdings(self) -> dict:
+        """전체 잔고를 한 번 조회하여 {종목코드: {shares, avg_price}} 캐시 반환"""
+        if hasattr(self, '_holdings_cache'):
+            return self._holdings_cache
         r = requests.get(
             f"{BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance",
             headers=self._h("TTTC8434R"),
@@ -113,7 +115,7 @@ class KISApi:
                 "CANO":                  self.account_no,
                 "ACNT_PRDT_CD":          self.acnt_code,
                 "AFHR_FLPR_YN":          "N",
-                "OFL_YN":                "",
+                "OFL_YN":                "N",
                 "INQR_DVSN":             "02",
                 "UNPR_DVSN":             "01",
                 "FUND_STTL_ICLD_YN":     "N",
@@ -125,13 +127,19 @@ class KISApi:
         )
         r.raise_for_status()
         d = r.json()
-        for item in d.get('output1', []):
-            if item['pdno'] == code:
-                return {
-                    'shares':    int(item['hldg_qty']),
-                    'avg_price': float(item['pchs_avg_pric']),
-                }
-        return {'shares': 0, 'avg_price': 0.0}
+        self._holdings_cache = {
+            item['pdno']: {
+                'shares':    int(item['hldg_qty']),
+                'avg_price': float(item['pchs_avg_pric']),
+            }
+            for item in d.get('output1', [])
+            if item.get('pdno')
+        }
+        return self._holdings_cache
+
+    def get_holdings(self, code) -> dict:
+        """보유 수량 + 평단가 (세션당 1회 조회 후 캐시 사용)"""
+        return self._fetch_all_holdings().get(code, {'shares': 0, 'avg_price': 0.0})
 
     def get_fundamentals(self, code: str) -> dict:
         """현재가 + PER + PBR + 거래량 (FHKST01010100 재활용)"""
