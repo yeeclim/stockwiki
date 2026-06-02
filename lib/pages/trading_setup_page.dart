@@ -47,12 +47,6 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     _loadExisting();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadExisting();
-  }
-
   Future<void> _loadExisting() async {
     final cfg = await TradingConfigService.load();
     if (!mounted) return;
