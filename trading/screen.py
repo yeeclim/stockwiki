@@ -37,19 +37,44 @@ def _fetch_user_emails() -> list[str]:
 
 # ── 스크리닝 후보 종목 ────────────────────────────────────────────────────────
 CANDIDATES = [
+    # 반도체
+    {'code': '005930', 'name': '삼성전자',       'sector': '반도체'},
+    {'code': '000660', 'name': 'SK하이닉스',     'sector': '반도체'},
+    {'code': '042700', 'name': '한미반도체',     'sector': '반도체'},
+    {'code': '058470', 'name': '리노공업',       'sector': '반도체'},
+    {'code': '036930', 'name': '주성엔지니어링', 'sector': '반도체'},
+    {'code': '000990', 'name': 'DB하이텍',       'sector': '반도체'},
+    {'code': '064760', 'name': '두산테스나',     'sector': '반도체'},
+    {'code': '240810', 'name': '원익IPS',        'sector': '반도체'},
+    {'code': '140860', 'name': '파크시스템스',   'sector': '반도체'},
+    # AI
+    {'code': '035420', 'name': 'NAVER',          'sector': 'AI'},
+    {'code': '035720', 'name': '카카오',         'sector': 'AI'},
+    {'code': '030200', 'name': 'KT',             'sector': 'AI'},
+    {'code': '017670', 'name': 'SK텔레콤',       'sector': 'AI'},
+    {'code': '181710', 'name': 'NHN',            'sector': 'AI'},
+    {'code': '095700', 'name': '제이씨현시스템', 'sector': 'AI'},
+    # 데이터센터
+    {'code': '093320', 'name': '케이아이엔엑스', 'sector': '데이터센터'},
+    {'code': '032640', 'name': 'LG유플러스',     'sector': '데이터센터'},
+    {'code': '012510', 'name': '더존비즈온',     'sector': '데이터센터'},
+    {'code': '079940', 'name': '가비아',         'sector': '데이터센터'},
+    {'code': '018260', 'name': '삼성에스디에스', 'sector': '데이터센터'},
+    # 유리기판
+    {'code': '011790', 'name': 'SKC',            'sector': '유리기판'},
+    {'code': '011070', 'name': 'LG이노텍',       'sector': '유리기판'},
+    {'code': '009150', 'name': '삼성전기',       'sector': '유리기판'},
+    {'code': '357780', 'name': '솔브레인',       'sector': '유리기판'},
+    # 양자컴퓨터
+    {'code': '115440', 'name': '우리넷',         'sector': '양자컴퓨터'},
+    {'code': '203650', 'name': '드림시큐리티',   'sector': '양자컴퓨터'},
+    {'code': '056360', 'name': '코위버',         'sector': '양자컴퓨터'},
     # 클라우드
-    {'code': '012510', 'name': '더존비즈온',          'sector': '클라우드'},
-    {'code': '079940', 'name': '가비아',              'sector': '클라우드'},
-    {'code': '181710', 'name': 'NHN',                 'sector': '클라우드'},
-    {'code': '018260', 'name': '삼성에스디에스',      'sector': '클라우드'},
-    {'code': '093320', 'name': '케이아이엔엑스',      'sector': '클라우드'},
-    {'code': '234340', 'name': '틸론',                'sector': '클라우드'},
-    {'code': '041510', 'name': '영림원소프트랩',      'sector': '클라우드'},
-    {'code': '294570', 'name': '쿠콘',                'sector': '클라우드'},
-    {'code': '053580', 'name': '웹케시',              'sector': '클라우드'},
-    {'code': '035420', 'name': 'NAVER',               'sector': '클라우드'},
-    {'code': '035720', 'name': '카카오',              'sector': '클라우드'},
-    {'code': '036570', 'name': '엔씨소프트',          'sector': '클라우드'},
+    {'code': '234340', 'name': '틸론',           'sector': '클라우드'},
+    {'code': '041510', 'name': '영림원소프트랩', 'sector': '클라우드'},
+    {'code': '294570', 'name': '쿠콘',           'sector': '클라우드'},
+    {'code': '053580', 'name': '웹케시',         'sector': '클라우드'},
+    {'code': '036570', 'name': '엔씨소프트',     'sector': '클라우드'},
 ]
 
 BUY_THRESHOLD = 5
