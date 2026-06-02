@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TradingConfig {
+  final String brokerType;
   final String kisAppKey;
   final String kisAppSecret;
   final String kisAccountNo;
@@ -10,6 +11,7 @@ class TradingConfig {
   final DateTime? githubRegisteredAt;
 
   const TradingConfig({
+    this.brokerType = 'kis',
     required this.kisAppKey,
     required this.kisAppSecret,
     required this.kisAccountNo,
@@ -20,6 +22,7 @@ class TradingConfig {
   });
 
   factory TradingConfig.fromMap(Map<String, dynamic> m) => TradingConfig(
+        brokerType:          m['broker_type'] as String? ?? 'kis',
         kisAppKey:           m['kis_app_key'] as String,
         kisAppSecret:        m['kis_app_secret'] as String,
         kisAccountNo:        m['kis_account_no'] as String,
@@ -32,6 +35,7 @@ class TradingConfig {
       );
 
   Map<String, dynamic> toMap() => {
+        'broker_type':           brokerType,
         'kis_app_key':           kisAppKey,
         'kis_app_secret':        kisAppSecret,
         'kis_account_no':        kisAccountNo,

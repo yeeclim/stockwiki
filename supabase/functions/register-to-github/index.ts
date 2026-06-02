@@ -19,6 +19,7 @@ const GITHUB_OWNER = Deno.env.get("GITHUB_OWNER") ?? "";
 const GITHUB_REPO  = Deno.env.get("GITHUB_REPO")  ?? "";
 
 interface RequestBody {
+  broker_type?:          string;
   kis_app_key:           string;
   kis_app_secret:        string;
   kis_account_no:        string;
@@ -59,7 +60,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "잘못된 요청 본문" }, 400);
   }
 
-  const { kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_email } = body;
+  const { broker_type, kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_email } = body;
   if (!kis_app_key || !kis_app_secret || !kis_account_no) {
     return json({ error: "필수 항목 누락 (App Key, App Secret, 계좌번호)" }, 400);
   }
@@ -69,6 +70,7 @@ Deno.serve(async (req: Request) => {
     .from("trading_configs")
     .upsert({
       user_id:               user.id,
+      broker_type:           broker_type || "kis",
       kis_app_key,
       kis_app_secret,
       kis_account_no,
