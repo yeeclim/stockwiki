@@ -16,21 +16,21 @@ _SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
 
 
 def _fetch_user_emails() -> list[str]:
-    """활성 유저의 notify_email 목록 조회"""
+    """가입한 모든 유저 이메일 조회 (API 키 등록 여부 무관)"""
     if not (_SUPABASE_URL and _SUPABASE_KEY):
         return []
     try:
         r = requests.get(
-            f"{_SUPABASE_URL}/rest/v1/trading_configs"
-            "?is_active=eq.true&select=notify_email",
+            f"{_SUPABASE_URL}/auth/v1/admin/users?per_page=1000",
             headers={
                 'apikey':        _SUPABASE_KEY,
                 'Authorization': f'Bearer {_SUPABASE_KEY}',
             },
             timeout=10,
         )
-        return [row['notify_email'] for row in r.json()
-                if row.get('notify_email')]
+        r.raise_for_status()
+        users = r.json().get('users', [])
+        return [u['email'] for u in users if u.get('email')]
     except Exception as e:
         print(f"⚠️  유저 이메일 조회 실패: {e}")
         return []
