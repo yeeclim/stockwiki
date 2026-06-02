@@ -1,38 +1,44 @@
 """
-이메일 알림 — Resend API 사용
+이메일 알림 — Gmail SMTP
 환경변수:
-  RESEND_API_KEY : Resend에서 발급받은 API 키
+  EMAIL_SENDER   : 발신 Gmail 주소 (예: stockwiki.kr@gmail.com)
+  EMAIL_PASSWORD : Gmail 앱 비밀번호 (16자리)
 """
 import os
-import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from datetime import datetime
+import pytz
 
-_API_KEY   = os.environ.get('RESEND_API_KEY', '').strip()
-_FROM      = 'StockWiki <noreply@stockwiki.vercel.app>'
-_RESEND_URL = 'https://api.resend.com/emails'
+_SENDER   = os.environ.get('EMAIL_SENDER', '').strip()
+_PASSWORD = os.environ.get('EMAIL_PASSWORD', '').strip()
+_SMTP_HOST = 'smtp.gmail.com'
+_SMTP_PORT = 587
 
 
 def send_to(text: str, recipients: list[str]) -> bool:
-    """지정 수신자에게 이메일 발송 (사용자별 알림용)"""
-    if not _API_KEY or not recipients:
-        print('⚠️  이메일 발송 실패 (RESEND_API_KEY 미설정)')
+    """지정 수신자에게 이메일 발송"""
+    if not (_SENDER and _PASSWORD):
+        print('⚠️  이메일 발송 실패 (EMAIL_SENDER / EMAIL_PASSWORD 미설정)')
+        return False
+    if not recipients:
         return False
     return _send(text, recipients)
 
 
 def send(text: str) -> bool:
-    """관리자 알림용 — 현재는 send_to와 동일"""
-    if not _API_KEY:
-        print('⚠️  이메일 발송 실패 (RESEND_API_KEY 미설정)')
+    """관리자용"""
+    if not (_SENDER and _PASSWORD):
+        print('⚠️  이메일 발송 실패 (EMAIL_SENDER / EMAIL_PASSWORD 미설정)')
         return False
-    return _send(text, [])
+    return _send(text, [_SENDER])
 
 
 def _send(text: str, recipients: list[str]) -> bool:
-    if not recipients:
-        return False
-
-    kst_str = _now_kst()
-    subject = f'StockWiki 알림 | {kst_str}'
+    kst = pytz.timezone('Asia/Seoul')
+    now_str = datetime.now(kst).strftime('%Y-%m-%d %H:%M KST')
+    subject = f'StockWiki 알림 | {now_str}'
 
     html = f"""\
 <html><body style="font-family:monospace;background:#111;color:#eee;padding:20px;">
@@ -43,37 +49,24 @@ def _send(text: str, recipients: list[str]) -> bool:
 </p>
 </body></html>"""
 
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From']    = f'StockWiki <{_SENDER}>'
+    msg['To']      = ', '.join(recipients)
+    msg.attach(MIMEText(text, 'plain', 'utf-8'))
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+
     try:
-        r = requests.post(
-            _RESEND_URL,
-            headers={
-                'Authorization': f'Bearer {_API_KEY}',
-                'Content-Type':  'application/json',
-            },
-            json={
-                'from':    _FROM,
-                'to':      recipients,
-                'subject': subject,
-                'text':    text,
-                'html':    html,
-            },
-            timeout=15,
-        )
-        if r.ok:
-            print(f'📧 이메일 발송 완료 → {", ".join(recipients)}')
-            return True
-        else:
-            print(f'⚠️  이메일 발송 실패: {r.status_code} {r.text}')
-            return False
+        with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(_SENDER, _PASSWORD)
+            smtp.sendmail(_SENDER, recipients, msg.as_string())
+        print(f'📧 이메일 발송 완료 → {", ".join(recipients)}')
+        return True
     except Exception as e:
-        print(f'⚠️  이메일 발송 오류: {e}')
+        print(f'⚠️  이메일 발송 실패: {e}')
         return False
-
-
-def _now_kst() -> str:
-    from datetime import datetime
-    import pytz
-    return datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M KST')
 
 
 def _escape(text: str) -> str:
