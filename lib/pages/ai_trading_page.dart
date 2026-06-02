@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
 import 'trading_setup_page.dart';
+import 'kis_guide_page.dart';
 
 class AiTradingPage extends StatelessWidget {
   const AiTradingPage({super.key});
@@ -107,6 +108,22 @@ class AiTradingPage extends StatelessWidget {
                 label: const Text('API 키 등록 / 수정'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const KisGuidePage()),
+                ),
+                icon: const Icon(Icons.menu_book_outlined),
+                label: const Text('KIS API 키 발급 방법'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),

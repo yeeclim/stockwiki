@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/trading_config_service.dart';
+import 'kis_guide_page.dart';
 
 class TradingSetupPage extends StatefulWidget {
   const TradingSetupPage({super.key});
@@ -141,6 +142,15 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
           'API 키 등록',
           style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const KisGuidePage()),
+            ),
+            icon: Icon(Icons.help_outline, size: 18, color: theme.colorScheme.primary),
+            label: Text('발급 가이드', style: TextStyle(color: theme.colorScheme.primary)),
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
