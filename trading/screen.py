@@ -1,12 +1,39 @@
 """
 종목 스크리닝 — 진입 조건 사전 평가
-GitHub Actions workflow_dispatch 또는 로컬에서 실행
-결과를 카카오톡으로 수신
+GitHub Actions 매일 장 시작 전(08:50 KST) 자동 실행
+결과를 카카오톡(관리자) + 이메일(가입 유저 전체) 발송
 """
+import os
 import sys
+import requests
 from kis_api import KISApi
 import kakao_notify
+import email_notify
 from strategy import _score_entry
+
+_SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
+_SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+
+
+def _fetch_user_emails() -> list[str]:
+    """활성 유저의 notify_email 목록 조회"""
+    if not (_SUPABASE_URL and _SUPABASE_KEY):
+        return []
+    try:
+        r = requests.get(
+            f"{_SUPABASE_URL}/rest/v1/trading_configs"
+            "?is_active=eq.true&select=notify_email",
+            headers={
+                'apikey':        _SUPABASE_KEY,
+                'Authorization': f'Bearer {_SUPABASE_KEY}',
+            },
+            timeout=10,
+        )
+        return [row['notify_email'] for row in r.json()
+                if row.get('notify_email')]
+    except Exception as e:
+        print(f"⚠️  유저 이메일 조회 실패: {e}")
+        return []
 
 # ── 스크리닝 후보 종목 ────────────────────────────────────────────────────────
 CANDIDATES = [
@@ -124,7 +151,17 @@ def screen():
 
     report = "\n".join(lines)
     print(report)
+
+    # 관리자: 카카오톡
     kakao_notify.send(report)
+
+    # 가입 유저 전체: 이메일
+    recipients = _fetch_user_emails()
+    if recipients:
+        print(f"📧 스크리닝 결과 이메일 발송 → {len(recipients)}명")
+        email_notify.send_to(report, recipients)
+    else:
+        print("⚠️  이메일 수신자 없음 (등록된 유저 없거나 환경변수 미설정)")
 
     return ok
 
