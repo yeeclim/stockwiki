@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/krx_loader.dart';
+import '../services/screening_service.dart';
 import '../utils/tradingview_helper.dart';
 import 'us_stock_search_page.dart';
 import 'ai_stock_recommend_page.dart';
@@ -34,20 +35,44 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   Future<void> _initThemesAndController() async {
     setState(() => _isLoading = true);
     try {
-      final themes = await KrxLoader.getThemes();
+      // 스크리닝 후보 (Supabase) + KRX 테마 병렬 로드
+      final results = await Future.wait([
+        ScreeningService.loadAll(),
+        KrxLoader.getThemes(),
+      ]);
+
+      final screeningCandidates = results[0] as List<ScreeningCandidate>;
+      final krxThemes           = results[1] as List<String>;
+
+      // 스크리닝 후보를 섹터별로 _themeStocks에 주입
+      final sectorMap = <String, List<Map<String, dynamic>>>{};
+      for (final c in screeningCandidates) {
+        sectorMap.putIfAbsent(c.sector, () => []).add({
+          'symbol': c.stockCode,
+          'name':   c.stockName,
+          'sector': c.sector,
+          'reason': '스크리닝 관리 종목',
+        });
+      }
+      for (final entry in sectorMap.entries) {
+        _themeStocks[entry.key] = entry.value;
+      }
+
+      // 스크리닝 섹터 먼저, 그 다음 KRX 테마 (중복 제거)
+      final screeningSectors = sectorMap.keys.toList();
+      final extraKrx = krxThemes.where((t) => !screeningSectors.contains(t)).toList();
+      final allThemes = [...screeningSectors, ...extraKrx];
+
       if (mounted) {
         setState(() {
-          _themes = themes;
+          _themes = allThemes;
           if (_themes.isNotEmpty) {
             _tabController = TabController(length: _themes.length, vsync: this);
             _tabController.addListener(() { if (mounted) setState(() {}); });
           }
         });
-        if (_themes.isNotEmpty) {
-          _loadData();
-        } else {
-           setState(() => _isLoading = false);
-        }
+        if (extraKrx.isNotEmpty) _loadData(themesToLoad: extraKrx);
+        else setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('테마 초기화 오류: $e');
@@ -61,15 +86,18 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({List<String>? themesToLoad}) async {
     if (_themes.isEmpty) return;
 
     setState(() => _isLoading = true);
 
+    // 스크리닝 섹터는 이미 로드됐으므로 KRX 테마만 로드
+    final targets = themesToLoad ?? _themes;
+
     try {
-      // 병렬 로딩 (순차 → 동시)
       await Future.wait(
-        List<String>.from(_themes).map((theme) async {
+        targets.map((theme) async {
+          if (_themeStocks.containsKey(theme)) return; // 이미 있으면 스킵
           final stocks = await KrxLoader.getThemeStocks(theme);
           if (mounted) setState(() { _themeStocks[theme] = stocks; });
         }),
