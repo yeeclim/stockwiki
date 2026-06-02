@@ -14,7 +14,8 @@ from datetime import datetime
 import pytz
 
 _SENDER   = os.environ.get('EMAIL_SENDER', '').strip()
-_PASSWORD = os.environ.get('EMAIL_PASSWORD', '').strip()
+# 앱 비밀번호 표시용 공백(일반·비표준 모두) 제거 — 실제 인증은 16자리 연속
+_PASSWORD = os.environ.get('EMAIL_PASSWORD', '').replace('\xa0', '').replace(' ', '').strip()
 _SMTP_HOST = 'smtp.gmail.com'
 _SMTP_PORT = 587
 
