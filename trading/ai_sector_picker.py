@@ -57,7 +57,7 @@ def _ask_claude(sector: str) -> list[dict]:
             'content-type':      'application/json',
         },
         json={
-            'model':      'claude-opus-4-8',
+            'model':      'claude-haiku-4-5-20251001',
             'max_tokens': 1024,
             'messages':   [{'role': 'user', 'content': prompt}],
         },
