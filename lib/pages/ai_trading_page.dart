@@ -6,6 +6,7 @@ import 'login_page.dart';
 import 'trading_setup_page.dart';
 import 'kis_guide_page.dart';
 import 'screening_manage_page.dart';
+import 'admin_screening_page.dart';
 
 class AiTradingPage extends StatelessWidget {
   const AiTradingPage({super.key});
@@ -146,6 +147,26 @@ class AiTradingPage extends StatelessWidget {
                 ),
               ),
             ),
+            if (authProvider.currentUser?.email == 'eklim4254@gmail.com') ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AdminScreeningPage()),
+                  ),
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  label: const Text('AI 추천 종목 검토 (관리자)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.deepPurple,
+                    side: const BorderSide(color: Colors.deepPurple),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
 
             // ── 공지 ──────────────────────────────────────────────────────
