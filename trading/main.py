@@ -13,7 +13,7 @@ from io import StringIO
 import pytz
 import requests
 
-from kis_api import KISApi
+from brokers import create_api
 import strategy
 import kakao_notify
 import email_notify
@@ -78,17 +78,12 @@ def run_for_user(user_cfg: dict) -> str:
     """한 사용자에 대한 전략 실행. 결과 텍스트 반환."""
     buf = StringIO()
 
-    # KIS API 키를 환경변수로 임시 설정
-    os.environ['KIS_APP_KEY']         = user_cfg['kis_app_key']
-    os.environ['KIS_APP_SECRET']      = user_cfg['kis_app_secret']
-    os.environ['KIS_ACCOUNT_NO']      = user_cfg['kis_account_no']
-    os.environ['KIS_ACCOUNT_PROD_CODE'] = user_cfg.get('kis_account_prod_code', '01')
-
-    api = KISApi()
+    broker = user_cfg.get('broker_type', 'kis')
+    api = create_api(broker, user_cfg)
     try:
         api.auth()
     except Exception as e:
-        return f"❌ KIS 인증 실패: {e}\n"
+        return f"❌ [{broker}] 인증 실패: {e}\n"
 
     kst = pytz.timezone('Asia/Seoul')
     now_str = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S KST')

@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "@std/encoding/base64": "jsr:@std/encoding/base64",
+    "libsodium-wrappers": "npm:libsodium-wrappers"
+  }
+}

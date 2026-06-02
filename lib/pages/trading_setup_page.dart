@@ -5,13 +5,28 @@ import '../services/trading_config_service.dart';
 import 'kis_guide_page.dart';
 
 class TradingSetupPage extends StatefulWidget {
-  const TradingSetupPage({super.key});
+  final String initialBroker;
+  const TradingSetupPage({super.key, this.initialBroker = 'kis'});
 
   @override
   State<TradingSetupPage> createState() => _TradingSetupPageState();
 }
 
+class _BrokerOption {
+  final String id;
+  final String name;
+  final Color color;
+  const _BrokerOption(this.id, this.name, this.color);
+}
+
 class _TradingSetupPageState extends State<TradingSetupPage> {
+  static const _brokers = [
+    _BrokerOption('kis',     '한국투자증권', Color(0xFF0066CC)),
+    _BrokerOption('kiwoom',  '키움증권',    Color(0xFFE8001C)),
+    _BrokerOption('nh',      'NH 나무',     Color(0xFF00A651)),
+    _BrokerOption('samsung', '삼성증권',    Color(0xFF1428A0)),
+  ];
+
   final _formKey       = GlobalKey<FormState>();
   final _appKeyCtrl    = TextEditingController();
   final _appSecretCtrl = TextEditingController();
@@ -19,10 +34,18 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
   final _prodCodeCtrl  = TextEditingController(text: '01');
   final _emailCtrl     = TextEditingController();
 
+  late String _selectedBroker;
   bool _loading        = true;
   bool _saving         = false;
   bool _obscureSecret  = true;
   TradingConfig? _existing;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedBroker = widget.initialBroker;
+    _loadExisting();
+  }
 
   @override
   void initState() {
@@ -37,13 +60,13 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
       _existing = cfg;
       _loading  = false;
       if (cfg != null) {
+        _selectedBroker     = cfg.brokerType;
         _appKeyCtrl.text    = cfg.kisAppKey;
         _appSecretCtrl.text = cfg.kisAppSecret;
         _accountCtrl.text   = cfg.kisAccountNo;
         _prodCodeCtrl.text  = cfg.kisAccountProdCode;
         _emailCtrl.text     = cfg.notifyEmail;
       } else {
-        // 로그인 이메일 기본값
         final email = context.read<AuthProvider>().currentUser?.email ?? '';
         _emailCtrl.text = email;
       }
@@ -55,6 +78,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     setState(() => _saving = true);
 
     final cfg = TradingConfig(
+      brokerType:          _selectedBroker,
       kisAppKey:           _appKeyCtrl.text.trim(),
       kisAppSecret:        _appSecretCtrl.text.trim(),
       kisAccountNo:        _accountCtrl.text.trim(),
@@ -163,13 +187,49 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                   _StatusBanner(existing: _existing, theme: theme),
                   const SizedBox(height: 24),
 
+                  // ── 증권사 선택 ────────────────────────────────────────────
+                  Text('증권사 선택',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _brokers.map((b) {
+                      final selected = _selectedBroker == b.id;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedBroker = b.id),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: selected ? b.color : theme.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? b.color : theme.dividerColor,
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          child: Text(
+                            b.name,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: selected ? Colors.white : theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
                   // ── 입력 폼 ────────────────────────────────────────────────
-                  Text('한국투자증권 KIS Open API',
+                  Text('API 키 정보',
                       style: theme.textTheme.titleSmall
                           ?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(
-                    'developers.koreainvestment.com 에서 발급받은 키를 입력하세요.',
+                    '선택한 증권사 개발자 사이트에서 발급받은 키를 입력하세요.',
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
