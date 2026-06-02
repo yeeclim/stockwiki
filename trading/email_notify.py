@@ -61,7 +61,7 @@ def _send(text: str, recipients: list[str]) -> bool:
             smtp.ehlo()
             smtp.starttls()
             smtp.login(_SENDER, _PASSWORD)
-            smtp.sendmail(_SENDER, recipients, msg.as_string())
+            smtp.send_message(msg)
         print(f'📧 이메일 발송 완료 → {", ".join(recipients)}')
         return True
     except Exception as e:
