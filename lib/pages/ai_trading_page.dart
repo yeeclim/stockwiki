@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
+import 'trading_setup_page.dart';
 
 class AiTradingPage extends StatelessWidget {
   const AiTradingPage({super.key});
@@ -73,8 +74,8 @@ class AiTradingPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // ── API 키 설정 가이드 ─────────────────────────────────────────
-            _sectionTitle(context, '🔑 나만의 자동매매 설정 방법'),
+            // ── API 키 등록 버튼 ───────────────────────────────────────────
+            _sectionTitle(context, '🔑 나만의 자동매매 시작하기'),
             const SizedBox(height: 12),
             _StepCard(
               theme: theme,
@@ -89,52 +90,27 @@ class AiTradingPage extends StatelessWidget {
             _StepCard(
               theme: theme,
               stepNumber: '2',
-              title: 'StockWiki 레포지토리 Fork',
+              title: 'StockWiki에 API 키 등록',
               content:
-                  'github.com/bermont/stockwiki 를 Fork 하세요.\n'
-                  'Fork한 레포의 Settings → Secrets and variables\n'
-                  '→ Actions 에 아래 키를 등록합니다:',
+                  '아래 버튼을 눌러 발급받은 키를 입력하면\n'
+                  'GitHub Actions에 자동으로 등록되고\n'
+                  '평일 장중 5분마다 자동매매가 실행됩니다.',
             ),
-            const SizedBox(height: 8),
-            _CodeBlock(
-              theme: theme,
-              code: 'KIS_APP_KEY          = 발급받은 App Key\n'
-                    'KIS_APP_SECRET       = 발급받은 App Secret\n'
-                    'KIS_ACCOUNT_NO       = 계좌번호 (8자리)\n'
-                    'KIS_ACCOUNT_PROD_CD  = 상품코드 (보통 01)\n'
-                    'SUPABASE_URL         = Supabase 프로젝트 URL\n'
-                    'SUPABASE_SERVICE_ROLE_KEY = Supabase 서비스 키',
-            ),
-            const SizedBox(height: 12),
-            _StepCard(
-              theme: theme,
-              stepNumber: '3',
-              title: '감시 종목 설정 (trading/main.py)',
-              content:
-                  'WATCHLIST 리스트에 매매할 종목의\n'
-                  '종목코드(6자리)와 이름을 추가하세요.\n'
-                  '복수 종목도 지원합니다.',
-            ),
-            const SizedBox(height: 12),
-            _StepCard(
-              theme: theme,
-              stepNumber: '4',
-              title: '카카오톡 알림 설정 (선택)',
-              content:
-                  'developers.kakao.com 에서 앱을 만들고\n'
-                  'KAKAO_REST_API_KEY / KAKAO_REFRESH_TOKEN\n'
-                  'KAKAO_CLIENT_SECRET 를 GitHub Secrets에 추가하면\n'
-                  '매매 실행 결과를 카카오톡으로 받을 수 있어요.',
-            ),
-            const SizedBox(height: 12),
-            _StepCard(
-              theme: theme,
-              stepNumber: '5',
-              title: 'GitHub Actions 활성화',
-              content:
-                  'Fork한 레포의 Actions 탭에서\n'
-                  '"자동매매" 워크플로우를 활성화하면\n'
-                  '평일 09:00~15:30 KST 동안 5분마다 자동 실행됩니다.',
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TradingSetupPage()),
+                ),
+                icon: const Icon(Icons.vpn_key_outlined),
+                label: const Text('API 키 등록 / 수정'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
 
