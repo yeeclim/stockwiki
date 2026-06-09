@@ -5,6 +5,11 @@ on:
     # 평일 KST 09:00~15:30 = UTC 00:00~06:30, 5분마다
     - cron: '*/5 0-6 * * 1-5'
   workflow_dispatch:  # 수동 실행 (테스트용)
+    inputs:
+      dry_run:
+        description: 'Dry run - simulate orders without placing them (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   trade:
@@ -12,6 +17,7 @@ jobs:
     timeout-minutes: 5
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
 
     steps:
       - uses: actions/checkout@v4
