@@ -168,26 +168,6 @@ class _LoginPageState extends State<LoginPage> {
               textColor: isDark ? Colors.white : const Color(0xFF1F1F1F),
               borderColor: isDark ? Colors.transparent : const Color(0xFFDADCE0),
             ),
-            const SizedBox(height: 12),
-            _SocialButton(
-              label: '카카오로 계속하기',
-              icon: const _KakaoIcon(),
-              onTap: _loading ? null : _signInKakao,
-              backgroundColor: const Color(0xFFFEE500),
-              textColor: const Color(0xFF1A1A1A),
-            ),
-            const SizedBox(height: 12),
-            // 네이버 — 준비 중
-            Tooltip(
-              message: '네이버 로그인은 준비 중입니다.',
-              child: _SocialButton(
-                label: '네이버로 계속하기  (준비 중)',
-                icon: const _NaverIcon(),
-                onTap: null, // disabled
-                backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFEEEEEE),
-                textColor: isDark ? Colors.grey : Colors.grey[600]!,
-              ),
-            ),
 
             const SizedBox(height: 28),
 
