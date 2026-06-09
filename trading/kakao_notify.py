@@ -16,10 +16,16 @@ def _get_access_token() -> str | None:
     """리프레시 토큰 → 액세스 토큰 발급"""
     if not _REST_KEY or not _REFRESH_TOKEN:
         return None
+    return _get_access_token_from_refresh(_REFRESH_TOKEN)
+
+
+def _get_access_token_from_refresh(refresh_token: str) -> str | None:
+    if not _REST_KEY or not refresh_token:
+        return None
     data = {
         'grant_type':    'refresh_token',
         'client_id':     _REST_KEY,
-        'refresh_token': _REFRESH_TOKEN,
+        'refresh_token': refresh_token,
     }
     if _CLIENT_SECRET:
         data['client_secret'] = _CLIENT_SECRET
@@ -62,3 +68,47 @@ def send(text: str) -> bool:
     else:
         print(f'⚠️  카카오톡 전송 실패: {r.status_code} {r.text}')
     return ok
+
+
+def send_to_refresh(refresh_token: str, text: str) -> bool:
+    """Given a user's refresh token, obtain an access token and send text to that user's KakaoTalk."""
+    access_token = _get_access_token_from_refresh(refresh_token)
+    if not access_token:
+        print('⚠️  카카오 전송 불가 (리프레시 토큰으로 액세스 토큰 발급 실패)')
+        return False
+
+    r = requests.post(
+        'https://kapi.kakao.com/v2/api/talk/memo/default/send',
+        headers={'Authorization': f'Bearer {access_token}'},
+        data={
+            'template_object': json.dumps({
+                'object_type': 'text',
+                'text': text[:1000],
+                'link': {
+                    'web_url':        'https://stockwiki.vercel.app',
+                    'mobile_web_url': 'https://stockwiki.vercel.app',
+                },
+            }, ensure_ascii=False),
+        },
+        timeout=10,
+    )
+    ok = r.status_code == 200
+    if ok:
+        print('📱 카카오톡(사용자) 전송 완료')
+    else:
+        print(f'⚠️  카카오톡(사용자) 전송 실패: {r.status_code} {r.text}')
+    return ok
+
+
+def send_to_users(text: str, refresh_tokens: list[str]) -> int:
+    """Send `text` to multiple users identified by their refresh tokens. Returns number of successful sends."""
+    success = 0
+    for t in refresh_tokens:
+        try:
+            if not t:
+                continue
+            if send_to_refresh(t, text):
+                success += 1
+        except Exception as e:
+            print(f'⚠️  카카오톡 전송 중 오류: {e}')
+    return success

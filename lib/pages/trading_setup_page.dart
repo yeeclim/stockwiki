@@ -33,6 +33,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
   final _accountCtrl   = TextEditingController();
   final _prodCodeCtrl  = TextEditingController(text: '01');
   final _emailCtrl     = TextEditingController();
+  final _kakaoCtrl     = TextEditingController();
 
   late String _selectedBroker;
   bool _loading        = true;
@@ -61,6 +62,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
           _accountCtrl.text   = cfg.kisAccountNo;
           _prodCodeCtrl.text  = cfg.kisAccountProdCode;
           _emailCtrl.text     = cfg.notifyEmail;
+          _kakaoCtrl.text     = cfg.notifyKakaoRefreshToken;
         } else {
           final email = context.read<AuthProvider>().currentUser?.email ?? '';
           _emailCtrl.text = email;
@@ -87,6 +89,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
       kisAccountNo:        _accountCtrl.text.trim(),
       kisAccountProdCode:  _prodCodeCtrl.text.trim(),
       notifyEmail:         _emailCtrl.text.trim(),
+      notifyKakaoRefreshToken: _kakaoCtrl.text.trim(),
     );
 
     try {
@@ -150,6 +153,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     _accountCtrl.dispose();
     _prodCodeCtrl.dispose();
     _emailCtrl.dispose();
+    _kakaoCtrl.dispose();
     super.dispose();
   }
 
@@ -306,6 +310,23 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                             if (!v.contains('@')) return '올바른 이메일 형식이 아닙니다.';
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 12),
+                        Text('카카오톡 알림 (선택)',
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        _Field(
+                          controller: _kakaoCtrl,
+                          label: '카카오 리프레시 토큰',
+                          hint: '카카오 앱에서 발급된 리프레시 토큰',
+                          icon: Icons.chat_bubble_outline,
+                          validator: (v) => null,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '입력하면 종목 스크리닝 결과를 카카오톡으로 수신합니다. 토큰은 안전하게 저장됩니다.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 28),
 

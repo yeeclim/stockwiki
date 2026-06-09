@@ -166,10 +166,37 @@ def screen():
     report = "\n".join(lines)
     print(report)
 
-    # 관리자: 카카오톡
+    # 관리자: 카카오톡 (기존)
     kakao_notify.send(report)
 
-    # 가입 유저 전체: 이메일
+    # 가입 유저: 카카오톡 (등록된 리프레시 토큰을 가진 사용자에 한해)
+    def _fetch_user_kakao_tokens() -> list[str]:
+        if not (_SUPABASE_URL and _SUPABASE_KEY):
+            return []
+        try:
+            r = requests.get(
+                f"{_SUPABASE_URL}/rest/v1/trading_configs?is_active=eq.true",
+                headers={
+                    'apikey':        _SUPABASE_KEY,
+                    'Authorization': f'Bearer {_SUPABASE_KEY}',
+                },
+                timeout=10,
+            )
+            r.raise_for_status()
+            rows = r.json()
+            return [row.get('notify_kakao_refresh_token') for row in rows if row.get('notify_kakao_refresh_token')]
+        except Exception as e:
+            print(f"⚠️  카카오 수신자 조회 실패: {e}")
+            return []
+
+    kakao_tokens = _fetch_user_kakao_tokens()
+    if kakao_tokens:
+        sent = kakao_notify.send_to_users(report, kakao_tokens)
+        print(f"📱 카카오톡 발송 완료 → {sent}명 (시도 {len(kakao_tokens)}명)")
+    else:
+        print("⚠️  카카오톡 수신자 없음")
+
+    # 가입 유저 전체: 이메일 (기존 동작)
     recipients = _fetch_user_emails()
     if recipients:
         ok = email_notify.send_to(report, recipients)
