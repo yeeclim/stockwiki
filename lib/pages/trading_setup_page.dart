@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/trading_config_service.dart';
 import 'kis_guide_page.dart';
+import 'kakao_guide_page.dart';
 
 class TradingSetupPage extends StatefulWidget {
   final String initialBroker;
@@ -327,6 +328,17 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                         Text(
                           '입력하면 종목 스크리닝 결과를 카카오톡으로 수신합니다. 토큰은 안전하게 저장됩니다.',
                           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const KakaoGuidePage()),
+                            ),
+                            icon: Icon(Icons.help_outline, size: 16, color: theme.colorScheme.primary),
+                            label: Text('카카오 발급 가이드 보기', style: TextStyle(color: theme.colorScheme.primary)),
+                          ),
                         ),
                         const SizedBox(height: 28),
 
