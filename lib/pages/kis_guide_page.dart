@@ -287,6 +287,45 @@ class _BrokerGuideTab extends StatelessWidget {
             answer: '네. App Key/Secret으로 매수·매도 주문을 실행합니다. 원금 손실이 발생할 수 있으며 모든 투자 결과는 본인 책임입니다.',
           ),
           const SizedBox(height: 24),
+          // ── 카카오 알림 (선택) 가이드 ───────────────────────────────────
+          const SizedBox(height: 8),
+          Text('카카오톡 알림 설정 (선택)',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('앱 이용자는 카카오 리프레시 토큰을 입력하면 스크리닝 결과를 카카오톡으로 수신할 수 있습니다. 발급 절차는 다음과 같습니다.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          _StepRow(theme: theme, index: 1, text: 'developers.kakao.com에 접속 → "내 애플리케이션" → 새 앱 등록', color: broker.color, isLast: false),
+          _StepRow(theme: theme, index: 2, text: '앱 설정 → 플랫폼에 Redirect URI를 추가 (예: https://stockwiki.vercel.app/_kakao_callback 또는 http://localhost:3000/auth/kakao)', color: broker.color, isLast: false),
+          _StepRow(theme: theme, index: 3, text: '앱 키에서 "REST API Key"를 복사 (이 값은 서버에만 보관)', color: broker.color, isLast: false),
+          _StepRow(theme: theme, index: 4, text: '아래 인증 URL을 브라우저에서 열어 로그인 후 리다이렉트된 코드로 토큰 발급(POST /oauth/token) → 응답의 refresh_token을 복사', color: broker.color, isLast: false),
+          const SizedBox(height: 8),
+          Text('인증 URL 예시 (브라우저에 붙여넣기, {REST_API_KEY}·{REDIRECT_URI} 교체):', style: theme.textTheme.bodySmall),
+          const SizedBox(height: 6),
+          SelectableText('https://kauth.kakao.com/oauth/authorize?client_id={REST_API_KEY}&redirect_uri={REDIRECT_URI}&response_type=code&scope=talk_message,profile', style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: theme.colorScheme.onSurface)),
+          const SizedBox(height: 8),
+          Text('토큰 발급(예시):', style: theme.textTheme.bodySmall),
+          SelectableText('POST https://kauth.kakao.com/oauth/token\ngrant_type=authorization_code&client_id={REST_API_KEY}&redirect_uri={REDIRECT_URI}&code={AUTH_CODE}', style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: theme.colorScheme.onSurface)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.18)),
+            ),
+            child: Text('주의: refresh_token은 60일 유효합니다. 만료 시 재발급이 필요하며, REST API Key는 서버 환경변수로 안전하게 보관하세요.', style: theme.textTheme.bodySmall?.copyWith(height: 1.4)),
+          ),
+          const SizedBox(height: 16),
+
+          // ── 개발자 사이트(카카오) 이동 ───────────────────────────────────
+          _OutlineBtn(
+            label: 'Kakao Developers 열기',
+            icon: Icons.open_in_new,
+            onTap: () => _open('https://developers.kakao.com'),
+            fullWidth: true,
+          ),
+          const SizedBox(height: 20),
 
           // ── 등록 버튼 ─────────────────────────────────────────────────
           SizedBox(
