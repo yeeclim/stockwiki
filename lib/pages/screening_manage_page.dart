@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/screening_service.dart';
 
 class ScreeningManagePage extends StatefulWidget {
@@ -82,6 +83,9 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final userEmail = Supabase.instance.client.auth.currentUser?.email;
+    const adminEmail = 'eklim4254@gmail.com';
+    final isAdmin = userEmail == adminEmail;
 
     return Scaffold(
       appBar: AppBar(
@@ -157,7 +161,7 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
                           ),
                           ...entry.value.map((c) => _CandidateTile(
                                 candidate: c,
-                                onRemove:  c.isUserAdded ? () => _remove(c) : null,
+                                onRemove:  (c.isUserAdded || isAdmin) ? () => _remove(c) : null,
                                 theme:     theme,
                               )),
                         ],
