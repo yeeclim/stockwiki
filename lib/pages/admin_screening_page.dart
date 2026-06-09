@@ -72,22 +72,38 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     });
 
     try {
-      await _sb
+      final updated = await _sb
           .from('screening_candidates')
           .update({'status': 'approved'})
-          .eq('id', id);
+          .eq('id', id)
+          .select();
 
-      // refresh approved list
-      final approved = await _sb
-          .from('screening_candidates')
-          .select()
-          .eq('status', 'approved')
-          .eq('source', 'ai')
-          .order('sector')
-          .order('stock_name');
-      if (!mounted) return;
-      setState(() => _approved = List<Map<String, dynamic>>.from(approved));
-      _snack('✅ 승인됐습니다. 전체 유저에게 노출됩니다.');
+      final List<Map<String, dynamic>> rows =
+          (updated is List ? updated : (updated == null ? [] : [updated]))
+              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+              .toList();
+
+      debugPrint('approve: id=$id updatedRows=${rows.length}');
+
+      if (rows.isNotEmpty) {
+        // refresh approved list
+        final approved = await _sb
+            .from('screening_candidates')
+            .select()
+            .eq('status', 'approved')
+            .eq('source', 'ai')
+            .order('sector')
+            .order('stock_name');
+        if (!mounted) return;
+        setState(() => _approved = List<Map<String, dynamic>>.from(approved));
+        _snack('✅ 승인됐습니다. 전체 유저에게 노출됩니다.');
+      } else {
+        if (!mounted) return;
+        setState(() {
+          if (removed != null) _pending.insert(0, removed!);
+        });
+        _snack('승인 실패: 항목을 찾을 수 없습니다.');
+      }
     } catch (e) {
       // revert optimistic removal on failure
       if (!mounted) return;
@@ -108,11 +124,28 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     });
 
     try {
-      await _sb
+      final updated = await _sb
           .from('screening_candidates')
           .update({'status': 'rejected', 'is_active': false})
-          .eq('id', id);
-      _snack('❌ $name 거절됐습니다.');
+          .eq('id', id)
+          .select();
+
+      final List<Map<String, dynamic>> rows =
+          (updated is List ? updated : (updated == null ? [] : [updated]))
+              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+              .toList();
+
+      debugPrint('reject: id=$id updatedRows=${rows.length}');
+
+      if (rows.isNotEmpty) {
+        _snack('❌ $name 거절됐습니다.');
+      } else {
+        if (!mounted) return;
+        setState(() {
+          if (removed != null) _pending.insert(0, removed!);
+        });
+        _snack('거절 실패: 항목을 찾을 수 없습니다.');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -132,11 +165,28 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     });
 
     try {
-      await _sb
+      final updated = await _sb
           .from('screening_candidates')
           .update({'status': 'rejected', 'is_active': false})
-          .eq('id', id);
-      _snack('$name 비활성화됐습니다.');
+          .eq('id', id)
+          .select();
+
+      final List<Map<String, dynamic>> rows =
+          (updated is List ? updated : (updated == null ? [] : [updated]))
+              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+              .toList();
+
+      debugPrint('revoke: id=$id updatedRows=${rows.length}');
+
+      if (rows.isNotEmpty) {
+        _snack('$name 비활성화됐습니다.');
+      } else {
+        if (!mounted) return;
+        setState(() {
+          if (removed != null) _approved.insert(0, removed!);
+        });
+        _snack('비활성화 실패: 항목을 찾을 수 없습니다.');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
