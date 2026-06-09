@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh run *)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('build/web/assets/krx_basic_info.json','r',encoding='utf-8'\\)\\); print\\(type\\(d\\)\\); print\\(list\\(d.items\\(\\)\\)[:3] if isinstance\\(d,dict\\) else d[:3]\\)\")",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

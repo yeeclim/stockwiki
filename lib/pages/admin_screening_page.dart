@@ -61,28 +61,89 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     }
   }
 
-  Future<void> _approve(String id) async {
-    await _sb.from('screening_candidates')
-        .update({'status': 'approved', 'source': 'system'})
-        .eq('id', id);
-    await _load();
-    _snack('✅ 승인됐습니다. 전체 유저에게 노출됩니다.');
+  Future<void> _approve(dynamic id) async {
+    if (!mounted) return;
+    Map<String, dynamic>? removed;
+    // optimistic remove from pending for immediate UI feedback
+    setState(() {
+      final idx = _pending.indexWhere((item) =>
+          (item['id'] ?? '').toString() == (id ?? '').toString());
+      if (idx >= 0) removed = _pending.removeAt(idx);
+    });
+
+    try {
+      await _sb
+          .from('screening_candidates')
+          .update({'status': 'approved'})
+          .eq('id', id);
+
+      // refresh approved list
+      final approved = await _sb
+          .from('screening_candidates')
+          .select()
+          .eq('status', 'approved')
+          .eq('source', 'ai')
+          .order('sector')
+          .order('stock_name');
+      if (!mounted) return;
+      setState(() => _approved = List<Map<String, dynamic>>.from(approved));
+      _snack('✅ 승인됐습니다. 전체 유저에게 노출됩니다.');
+    } catch (e) {
+      // revert optimistic removal on failure
+      if (!mounted) return;
+      setState(() {
+        if (removed != null) _pending.insert(0, removed!);
+      });
+      _snack('승인 실패: $e');
+    }
   }
 
-  Future<void> _reject(String id, String name) async {
-    await _sb.from('screening_candidates')
-        .update({'status': 'rejected', 'is_active': false})
-        .eq('id', id);
-    await _load();
-    _snack('❌ $name 거절됐습니다.');
+  Future<void> _reject(dynamic id, String name) async {
+    if (!mounted) return;
+    Map<String, dynamic>? removed;
+    setState(() {
+      final idx = _pending.indexWhere((item) =>
+          (item['id'] ?? '').toString() == (id ?? '').toString());
+      if (idx >= 0) removed = _pending.removeAt(idx);
+    });
+
+    try {
+      await _sb
+          .from('screening_candidates')
+          .update({'status': 'rejected', 'is_active': false})
+          .eq('id', id);
+      _snack('❌ $name 거절됐습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (removed != null) _pending.insert(0, removed!);
+      });
+      _snack('거절 실패: $e');
+    }
   }
 
-  Future<void> _revoke(String id, String name) async {
-    await _sb.from('screening_candidates')
-        .update({'status': 'rejected', 'is_active': false})
-        .eq('id', id);
-    await _load();
-    _snack('$name 비활성화됐습니다.');
+  Future<void> _revoke(dynamic id, String name) async {
+    if (!mounted) return;
+    Map<String, dynamic>? removed;
+    setState(() {
+      final idx = _approved.indexWhere((item) =>
+          (item['id'] ?? '').toString() == (id ?? '').toString());
+      if (idx >= 0) removed = _approved.removeAt(idx);
+    });
+
+    try {
+      await _sb
+          .from('screening_candidates')
+          .update({'status': 'rejected', 'is_active': false})
+          .eq('id', id);
+      _snack('$name 비활성화됐습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (removed != null) _approved.insert(0, removed!);
+      });
+      _snack('비활성화 실패: $e');
+    }
   }
 
   void _snack(String msg) {
@@ -152,8 +213,8 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
 
 class _PendingTab extends StatelessWidget {
   final List<Map<String, dynamic>> items;
-  final Future<void> Function(String id) onApprove;
-  final Future<void> Function(String id, String name) onReject;
+  final Future<void> Function(dynamic id) onApprove;
+  final Future<void> Function(dynamic id, String name) onReject;
   final ThemeData theme;
 
   const _PendingTab({
@@ -187,8 +248,8 @@ class _PendingTab extends StatelessWidget {
         final item = items[i];
         return _PendingCard(
           item:      item,
-          onApprove: () => onApprove(item['id'] as String),
-          onReject:  () => onReject(item['id'] as String, item['stock_name'] as String),
+          onApprove: () => onApprove(item['id']),
+          onReject:  () => onReject(item['id'], item['stock_name'] as String),
           theme:     theme,
         );
       },
@@ -196,10 +257,10 @@ class _PendingTab extends StatelessWidget {
   }
 }
 
-class _PendingCard extends StatelessWidget {
+class _PendingCard extends StatefulWidget {
   final Map<String, dynamic> item;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+  final Future<void> Function() onApprove;
+  final Future<void> Function() onReject;
   final ThemeData theme;
 
   const _PendingCard({
@@ -208,7 +269,27 @@ class _PendingCard extends StatelessWidget {
   });
 
   @override
+  State<_PendingCard> createState() => _PendingCardState();
+}
+
+class _PendingCardState extends State<_PendingCard> {
+  bool _processing = false;
+
+  Future<void> _handle(Future<void> Function() action) async {
+    if (_processing) return;
+    setState(() => _processing = true);
+    try {
+      await action();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _processing = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item  = widget.item;
+    final theme = widget.theme;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -250,35 +331,39 @@ class _PendingCard extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.5)),
           ],
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onReject,
-                  icon: const Icon(Icons.close, size: 16),
-                  label: const Text('거절'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
-                    side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
+          _processing
+              ? const Center(child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: CircularProgressIndicator(strokeWidth: 2)))
+              : Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _handle(widget.onReject),
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('거절'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.colorScheme.error,
+                          side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _handle(widget.onApprove),
+                        icon: const Icon(Icons.check, size: 16),
+                        label: const Text('승인'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: onApprove,
-                  icon: const Icon(Icons.check, size: 16),
-                  label: const Text('승인'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -289,7 +374,7 @@ class _PendingCard extends StatelessWidget {
 
 class _ApprovedTab extends StatelessWidget {
   final List<Map<String, dynamic>> items;
-  final Future<void> Function(String id, String name) onRevoke;
+  final Future<void> Function(dynamic id, String name) onRevoke;
   final ThemeData theme;
 
   const _ApprovedTab({required this.items, required this.onRevoke, required this.theme});
@@ -339,7 +424,7 @@ class _ApprovedTab extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 18),
                 color: theme.colorScheme.error,
-                onPressed: () => onRevoke(item['id'] as String, item['stock_name'] as String),
+                onPressed: () => onRevoke(item['id'], item['stock_name'] as String),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),

@@ -8,9 +8,12 @@ CREATE TABLE IF NOT EXISTS screening_candidates (
   source      TEXT NOT NULL DEFAULT 'system',  -- 'system' | 'user'
   user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   is_active   BOOLEAN NOT NULL DEFAULT true,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (stock_code, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::UUID))
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 같은 종목코드를 동일 유저가 중복 추가 방지 (user_id NULL = 시스템)
+CREATE UNIQUE INDEX IF NOT EXISTS screening_candidates_unique
+  ON screening_candidates (stock_code, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::UUID));
 
 -- RLS
 ALTER TABLE screening_candidates ENABLE ROW LEVEL SECURITY;
