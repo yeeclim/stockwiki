@@ -153,6 +153,8 @@ def run(api, stock_code: str, stock_name: str):
     if not prdy_clpr and prdy_ctrt and price:
         prdy_clpr = round(price / (1 + prdy_ctrt / 100))
     gap_pct = (open_price - prdy_clpr) / prdy_clpr * 100 if prdy_clpr else 0.0
+    # 당일 등락(%) — 전략 내부에서 daily_drop으로 사용
+    daily_drop = prdy_ctrt
 
     print(f"현재가     : {price:>10,}원")
     print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
@@ -190,8 +192,13 @@ def run(api, stock_code: str, stock_name: str):
                 print("⏸  이미 많이 오른 종목 — 진입 보류")
                 return
 
-            buy_amount = int(cash * 0.25)
-            print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
+            orig_buy = int(cash * 0.25)
+            MAX_BUY_CAP = 500_000
+            buy_amount = orig_buy if orig_buy <= MAX_BUY_CAP else MAX_BUY_CAP
+            if orig_buy > MAX_BUY_CAP:
+                print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {MAX_BUY_CAP:,}원 제한, {buy_amount:,}원 매수")
+            else:
+                print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
             result = api.buy(stock_code, buy_amount)
             if result:
                 db.reset_position(stock_code, stock_name)
