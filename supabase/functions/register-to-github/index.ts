@@ -24,6 +24,7 @@ interface RequestBody {
   kis_app_secret:        string;
   kis_account_no:        string;
   kis_account_prod_code: string;
+  notify_kakao_refresh_token?: string;
   notify_email?:         string;
 }
 
@@ -60,7 +61,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "잘못된 요청 본문" }, 400);
   }
 
-  const { broker_type, kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_email } = body;
+  const { broker_type, kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_kakao_refresh_token, notify_email } = body;
   if (!kis_app_key || !kis_app_secret || !kis_account_no) {
     return json({ error: "필수 항목 누락 (App Key, App Secret, 계좌번호)" }, 400);
   }
@@ -69,14 +70,16 @@ Deno.serve(async (req: Request) => {
   const { error: dbErr } = await supabase
     .from("trading_configs")
     .upsert({
-      user_id:               user.id,
-      broker_type:           broker_type || "kis",
+      user_id:                       user.id,
+      broker_type:                   broker_type || "kis",
       kis_app_key,
       kis_app_secret,
       kis_account_no,
-      kis_account_prod_code: kis_account_prod_code || "01",
-      notify_email:          notify_email || user.email || null,
-      is_active:             true,
+      kis_account_prod_code:         kis_account_prod_code || "01",
+      notify_email:                  notify_email || user.email || null,
+      notify_kakao_refresh_token:    notify_kakao_refresh_token || null,
+      notify_kakao_active:           !!notify_kakao_refresh_token,
+      is_active:                     true,
     }, { onConflict: "user_id" });
 
   if (dbErr) {
