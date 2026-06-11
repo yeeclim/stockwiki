@@ -98,7 +98,7 @@ def run_for_user(user_cfg: dict) -> str:
             # strategy.run은 sys.stdout에 출력 → buf로 리다이렉트
             _orig = sys.stdout
             sys.stdout = _TeeWriter(_orig, buf)
-            strategy.run(api, stock['code'], stock['name'])
+            strategy.run(api, stock['code'], stock['name'], user_cfg)
             sys.stdout = _orig
         except Exception as e:
             sys.stdout = sys.__stdout__

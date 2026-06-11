@@ -128,7 +128,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
 
 
 # ── 메인 전략 실행 ─────────────────────────────────────────────────────────────
-def run(api, stock_code: str, stock_name: str):
+def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
     sep = "=" * 55
     print(f"\n{sep}")
     print(f"  {stock_name} ({stock_code})")
@@ -171,6 +171,9 @@ def run(api, stock_code: str, stock_name: str):
     print(f"예수금     : {cash:>10,}원")
 
     state = db.get_position(stock_code)
+    user_id = None
+    if user_cfg:
+        user_id = user_cfg.get('user_id')
 
     # ── 포지션 없음 → 복합 진입 조건 평가 ───────────────────────────────────
     if shares == 0:
@@ -193,18 +196,41 @@ def run(api, stock_code: str, stock_name: str):
                 return
 
             orig_buy = int(cash * 0.25)
-            MAX_BUY_CAP = 500_000
-            buy_amount = orig_buy if orig_buy <= MAX_BUY_CAP else MAX_BUY_CAP
-            if orig_buy > MAX_BUY_CAP:
-                print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {MAX_BUY_CAP:,}원 제한, {buy_amount:,}원 매수")
+            # per-user cap (daily_max_buy) preferred; otherwise global cap
+            user_cap = None
+            if user_cfg:
+                try:
+                    dm = user_cfg.get('daily_max_buy')
+                    if dm is not None:
+                        user_cap = int(dm)
+                except Exception:
+                    user_cap = None
+
+            GLOBAL_MAX_BUY = 500_000
+            cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
+
+            # Respect today's already bought sum if available
+            if user_id:
+                bought_today = db.get_today_buy_sum(user_id)
+                remaining = cap - bought_today if cap else cap
+                if remaining <= 0:
+                    print(f"\n⏸  오늘 이미 일일 최대 매수금액({cap:,}원)을 소진했습니다. 매수 취소")
+                    return
+            else:
+                remaining = cap
+
+            buy_amount = orig_buy if orig_buy <= remaining else remaining
+            if orig_buy > remaining:
+                print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
             else:
                 print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
+
             result = api.buy(stock_code, buy_amount)
             if result:
                 db.reset_position(stock_code, stock_name)
                 db.log_trade(stock_code, stock_name, 'BUY',
                              result['price'], result['shares'], result['amount'],
-                             f'복합조건 {score}/{max_score}점 진입')
+                             f'복합조건 {score}/{max_score}점 진입', user_id)
         else:
             print(f"\n⏸  조건 미달 ({score}점 < {BUY_THRESHOLD}점) → 대기")
         return
@@ -223,23 +249,61 @@ def run(api, stock_code: str, stock_name: str):
     # ── 추가매수 (물타기) ─────────────────────────────────────────────────────
     if chg <= -10 and not state.get('buy_minus10_done'):
         buy_amount = int(cash * 0.10)
+        # apply per-user daily cap if available
+        user_cap = None
+        try:
+            if user_cfg:
+                dm = user_cfg.get('daily_max_buy')
+                if dm is not None:
+                    user_cap = int(dm)
+        except Exception:
+            user_cap = None
+        GLOBAL_MAX_BUY = 500_000
+        cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
+        if user_id:
+            bought_today = db.get_today_buy_sum(user_id)
+            remaining = cap - bought_today if cap else cap
+            if remaining <= 0:
+                print(f"\n⏸  오늘 이미 일일 최대 매수금액({cap:,}원)을 소진했습니다. 추가매수 취소")
+                return
+            buy_amount = buy_amount if buy_amount <= remaining else remaining
+
         print(f"\n✅ -10% 도달 → 예수금 10% ({buy_amount:,}원) 추가매수")
         result = api.buy(stock_code, buy_amount)
         if result:
-            db.upsert_position(stock_code, buy_minus10_done=True)
+            db.upsert_position(stock_code, buy_minus10_done=True, user_id=user_id)
             db.log_trade(stock_code, stock_name, 'BUY',
                          result['price'], result['shares'], result['amount'],
-                         '-10% 물타기 10%')
+                         '-10% 물타기 10%', user_id)
 
     elif chg <= -5 and not state.get('buy_minus5_done'):
         buy_amount = int(cash * 0.05)
+        # apply per-user daily cap if available
+        user_cap = None
+        try:
+            if user_cfg:
+                dm = user_cfg.get('daily_max_buy')
+                if dm is not None:
+                    user_cap = int(dm)
+        except Exception:
+            user_cap = None
+        GLOBAL_MAX_BUY = 500_000
+        cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
+        if user_id:
+            bought_today = db.get_today_buy_sum(user_id)
+            remaining = cap - bought_today if cap else cap
+            if remaining <= 0:
+                print(f"\n⏸  오늘 이미 일일 최대 매수금액({cap:,}원)을 소진했습니다. 추가매수 취소")
+                return
+            buy_amount = buy_amount if buy_amount <= remaining else remaining
+
         print(f"\n✅ -5% 도달 → 예수금 5% ({buy_amount:,}원) 추가매수")
         result = api.buy(stock_code, buy_amount)
         if result:
-            db.upsert_position(stock_code, buy_minus5_done=True)
+            db.upsert_position(stock_code, buy_minus5_done=True, user_id=user_id)
             db.log_trade(stock_code, stock_name, 'BUY',
                          result['price'], result['shares'], result['amount'],
-                         '-5% 물타기 5%')
+                         '-5% 물타기 5%', user_id)
 
     else:
         print("⏸  추가매수 조건 미달 → 대기")
