@@ -77,6 +77,7 @@ if __name__ == '__main__':
     fake_db.upsert_position = lambda stock_code, **fields: {}
     fake_db.reset_position = lambda stock_code, stock_name='': {}
     fake_db.log_trade = lambda *args, **kwargs: {}
+    fake_db.get_today_buy_sum = lambda user_id: 0
     strategy.db = fake_db
-
-    strategy.run(api, '096350', '대창솔루션')
+    # pass a sample user_cfg with daily_max_buy for testing
+    strategy.run(api, '096350', '대창솔루션', {'user_id': 'localtest', 'daily_max_buy': 500000})

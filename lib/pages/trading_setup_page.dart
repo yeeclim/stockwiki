@@ -35,6 +35,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
   final _prodCodeCtrl  = TextEditingController(text: '01');
   final _emailCtrl     = TextEditingController();
   final _kakaoCtrl     = TextEditingController();
+  final _dailyMaxCtrl  = TextEditingController();
 
   late String _selectedBroker;
   bool _loading        = true;
@@ -64,6 +65,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
           _prodCodeCtrl.text  = cfg.kisAccountProdCode;
           _emailCtrl.text     = cfg.notifyEmail;
           _kakaoCtrl.text     = cfg.notifyKakaoRefreshToken;
+          if (cfg.dailyMaxBuy != null) _dailyMaxCtrl.text = cfg.dailyMaxBuy.toString();
         } else {
           final email = context.read<AuthProvider>().currentUser?.email ?? '';
           _emailCtrl.text = email;
@@ -91,6 +93,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
       kisAccountProdCode:  _prodCodeCtrl.text.trim(),
       notifyEmail:         _emailCtrl.text.trim(),
       notifyKakaoRefreshToken: _kakaoCtrl.text.trim(),
+      dailyMaxBuy:         int.tryParse(_dailyMaxCtrl.text.trim()),
     );
 
     try {
@@ -155,6 +158,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     _prodCodeCtrl.dispose();
     _emailCtrl.dispose();
     _kakaoCtrl.dispose();
+    _dailyMaxCtrl.dispose();
     super.dispose();
   }
 
@@ -339,6 +343,25 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                             icon: Icon(Icons.help_outline, size: 16, color: theme.colorScheme.primary),
                             label: Text('카카오 발급 가이드 보기', style: TextStyle(color: theme.colorScheme.primary)),
                           ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Text('일일 최대 매수금액 (원, 선택)',
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        _Field(
+                          controller: _dailyMaxCtrl,
+                          label: '일일 최대 매수금액',
+                          hint: '예: 500000',
+                          icon: Icons.monetization_on_outlined,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null;
+                            final n = int.tryParse(v.trim());
+                            if (n == null || n <= 0) return '유효한 금액을 입력하세요.';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 28),
 

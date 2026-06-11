@@ -75,7 +75,16 @@ def _fetch_candidates() -> list[dict]:
 
 def screen():
     api = KISApi()
-    api.auth()
+    try:
+        api.auth()
+    except Exception as e:
+        print(f"⚠️ KIS API 인증 실패: {e}")
+        # 관리자에게 간단 알림 전송 시도
+        try:
+            kakao_notify.send(f"[오류] 종목 스크리닝 중 KIS API 인증 실패: {e}")
+        except Exception:
+            pass
+        return False
 
     candidates = _fetch_candidates()
     if not candidates:

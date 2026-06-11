@@ -10,7 +10,8 @@
  *   GITHUB_OWNER     — 레포지토리 소유자 (예: bermont)
  *   GITHUB_REPO      — 레포지토리 이름 (예: stockwiki)
  */
-import { createClient } from "jsr:@supabase/supabase-js@2";
+// Use the ESM CDN build which works reliably in Deno/Supabase Edge Functions
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 import * as base64 from "jsr:@std/encoding/base64";
 import sodium from "npm:libsodium-wrappers";
 
@@ -26,6 +27,7 @@ interface RequestBody {
   kis_account_prod_code: string;
   notify_kakao_refresh_token?: string;
   notify_email?:         string;
+  daily_max_buy?:        number | string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -61,9 +63,16 @@ Deno.serve(async (req: Request) => {
     return json({ error: "잘못된 요청 본문" }, 400);
   }
 
-  const { broker_type, kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_kakao_refresh_token, notify_email } = body;
+  const { broker_type, kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_kakao_refresh_token, notify_email, daily_max_buy } = body;
   if (!kis_app_key || !kis_app_secret || !kis_account_no) {
     return json({ error: "필수 항목 누락 (App Key, App Secret, 계좌번호)" }, 400);
+  }
+
+  // normalize daily_max_buy (allow string or number)
+  let dailyMax: number | null = null;
+  if (daily_max_buy !== undefined && daily_max_buy !== null && daily_max_buy !== '') {
+    const parsed = typeof daily_max_buy === 'string' ? parseInt(daily_max_buy, 10) : Number(daily_max_buy);
+    if (!Number.isNaN(parsed) && parsed > 0) dailyMax = parsed;
   }
 
   // ── 1. Supabase DB에 저장 ──────────────────────────────────────────────────
@@ -79,6 +88,7 @@ Deno.serve(async (req: Request) => {
       notify_email:                  notify_email || user.email || null,
       notify_kakao_refresh_token:    notify_kakao_refresh_token || null,
       notify_kakao_active:           !!notify_kakao_refresh_token,
+      daily_max_buy:                 dailyMax,
       is_active:                     true,
     }, { onConflict: "user_id" });
 
@@ -113,6 +123,8 @@ Deno.serve(async (req: Request) => {
       [`USR_${uid}_KIS_ACCOUNT_NO`]:        kis_account_no,
       [`USR_${uid}_KIS_ACCOUNT_PROD_CODE`]: kis_account_prod_code || "01",
       [`USR_${uid}_NOTIFY_EMAIL`]:          notify_email || user.email || "",
+      // optional daily max buy as repo secret (stringified)
+      [`USR_${uid}_DAILY_MAX_BUY`]:         dailyMax ? String(dailyMax) : "",
     };
 
     const results: Record<string, boolean> = {};

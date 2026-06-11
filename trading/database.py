@@ -17,6 +17,7 @@ def _headers():
 
 # ── 포지션 상태 ────────────────────────────────────────────────────────────────
 def get_position(stock_code: str) -> dict:
+    # If table has user_id column, callers may include user_id in query externally.
     r = requests.get(
         f"{_URL}/rest/v1/trading_positions?stock_code=eq.{stock_code}",
         headers=_headers(),
@@ -56,19 +57,43 @@ def reset_position(stock_code: str, stock_name: str = ''):
     )
 
 # ── 거래 로그 ─────────────────────────────────────────────────────────────────
-def log_trade(stock_code, stock_name, action, price, shares, amount, reason):
+def log_trade(stock_code, stock_name, action, price, shares, amount, reason, user_id: str | None = None):
+    payload: dict = {
+        'stock_code': stock_code,
+        'stock_name': stock_name,
+        'action':     action,
+        'price':      price,
+        'shares':     shares,
+        'amount':     amount,
+        'reason':     reason,
+        'created_at': datetime.now().isoformat(),
+    }
+    if user_id:
+        payload['user_id'] = user_id
+
     r = requests.post(
         f"{_URL}/rest/v1/trading_logs",
         headers={**_headers(), 'Prefer': 'return=representation'},
-        json={
-            'stock_code': stock_code,
-            'stock_name': stock_name,
-            'action':     action,
-            'price':      price,
-            'shares':     shares,
-            'amount':     amount,
-            'reason':     reason,
-            'created_at': datetime.now().isoformat(),
-        },
+        json=payload,
     )
     return r.json()
+
+
+def get_today_buy_sum(user_id: str) -> int:
+    """Sum of BUY amounts for the given user for today (00:00 KST → now)."""
+    if not user_id:
+        return 0
+    today = datetime.now().date().isoformat()
+    try:
+        r = requests.get(
+            f"{_URL}/rest/v1/trading_logs?user_id=eq.{user_id}&action=eq.BUY&created_at=gte.{today}T00:00:00",
+            headers=_headers(),
+            timeout=10,
+        )
+        if not r.ok:
+            return 0
+        rows = r.json()
+        total = sum(int(x.get('amount', 0) or 0) for x in rows)
+        return total
+    except Exception:
+        return 0

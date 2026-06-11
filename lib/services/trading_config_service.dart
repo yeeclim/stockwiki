@@ -8,6 +8,7 @@ class TradingConfig {
   final String kisAccountProdCode;
   final String notifyEmail;
   final String notifyKakaoRefreshToken;
+  final int? dailyMaxBuy;
   final bool isActive;
   final DateTime? githubRegisteredAt;
 
@@ -19,6 +20,7 @@ class TradingConfig {
     this.kisAccountProdCode = '01',
     this.notifyEmail = '',
     this.notifyKakaoRefreshToken = '',
+    this.dailyMaxBuy,
     this.isActive = true,
     this.githubRegisteredAt,
   });
@@ -31,6 +33,7 @@ class TradingConfig {
         kisAccountProdCode:  m['kis_account_prod_code'] as String? ?? '01',
         notifyEmail:         m['notify_email'] as String? ?? '',
         notifyKakaoRefreshToken: m['notify_kakao_refresh_token'] as String? ?? '',
+        dailyMaxBuy: m['daily_max_buy'] != null ? (m['daily_max_buy'] as num).toInt() : null,
         isActive:            m['is_active'] as bool? ?? true,
         githubRegisteredAt:  m['github_registered_at'] != null
             ? DateTime.parse(m['github_registered_at'] as String)
@@ -45,6 +48,7 @@ class TradingConfig {
         'kis_account_prod_code': kisAccountProdCode,
       'notify_email':          notifyEmail,
       'notify_kakao_refresh_token': notifyKakaoRefreshToken,
+      'daily_max_buy':          dailyMaxBuy,
       };
 }
 
