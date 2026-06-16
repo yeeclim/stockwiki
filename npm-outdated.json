@@ -1,0 +1,28 @@
+{
+  "@vercel/kv": {
+    "current": "1.0.1",
+    "wanted": "1.0.1",
+    "latest": "3.0.0",
+    "dependent": "stockwiki",
+    "location": "E:\\stockwiki\\node_modules\\@vercel\\kv"
+  },
+  "dotenv": {
+    "current": "17.3.1",
+    "wanted": "17.4.2",
+    "latest": "17.4.2",
+    "dependent": "stockwiki",
+    "location": "E:\\stockwiki\\node_modules\\dotenv"
+  },
+  "jsdom": {
+    "current": "22.1.0",
+    "wanted": "22.1.0",
+    "latest": "29.1.1",
+    "dependent": "stockwiki",
+    "location": "E:\\stockwiki\\node_modules\\jsdom"
+  },
+  "node-fetch": {
+    "wanted": "3.3.2",
+    "latest": "3.3.2",
+    "dependent": "stockwiki"
+  }
+}
