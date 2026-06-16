@@ -49,6 +49,10 @@ app.*.map.json
 # Build outputs
 *.zip
 
+# Flutter web build outputs
+/build/
+/build/web/
+
 # Documentation (keep README.md only)
 *.md
 !README.md
