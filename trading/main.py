@@ -64,14 +64,20 @@ def _fetch_watchlist(user_id: str) -> list[dict]:
 
 
 def is_market_open() -> bool:
-    """KST 기준 장중 시간 여부 (평일 09:00~15:30)"""
-    kst  = pytz.timezone('Asia/Seoul')
-    now  = datetime.now(kst)
+    """KST 기준 거래 가능 시간 여부 (NXT 포함)
+    프리마켓 08:00~09:00 / 정규장 09:00~15:30 / 포스트마켓 15:40~20:00
+    """
+    from datetime import time as _time
+    kst = pytz.timezone('Asia/Seoul')
+    now = datetime.now(kst)
     if now.weekday() >= 5:
         return False
-    open_  = now.replace(hour=9,  minute=0,  second=0, microsecond=0)
-    close_ = now.replace(hour=15, minute=30, second=0, microsecond=0)
-    return open_ <= now <= close_
+    t = now.time()
+    return (
+        _time(8,  0)  <= t < _time(9,  0)   # 프리마켓
+        or _time(9,  0)  <= t <= _time(15, 30)  # 정규장
+        or _time(15, 40) <= t < _time(20, 0)    # 포스트마켓
+    )
 
 
 def run_for_user(user_cfg: dict) -> str:
