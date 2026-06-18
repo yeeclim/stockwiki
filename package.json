@@ -6,7 +6,7 @@
     "build": "echo 'Using pre-built files from build/web'"
   },
   "dependencies": {
-    "@vercel/kv": "^1.0.1",
+    "@vercel/kv": "^3.0.0",
     "dotenv": "^17.3.1",
     "iconv-lite": "^0.7.2",
     "jsdom": "^22.1.0",
