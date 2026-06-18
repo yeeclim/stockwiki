@@ -10,11 +10,6 @@ on:
         description: 'Dry run - simulate orders without placing them (true/false)'
         required: false
         default: 'false'
-    inputs:
-      dry_run:
-        description: 'Dry run - simulate orders without placing them (true/false)'
-        required: false
-        default: 'false'
 
 jobs:
   trade:
@@ -22,7 +17,6 @@ jobs:
     timeout-minutes: 5
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      DRY_RUN: ${{ github.event.inputs.dry_run }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
 
     steps:
