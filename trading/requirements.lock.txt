@@ -42,7 +42,7 @@ lxml==5.2.2
     # via -r trading/requirements.txt
 pydantic==2.13.4
     # via anthropic
-pydantic-core==2.46.4
+pydantic-core==2.47.0
     # via pydantic
 pytz==2024.1
     # via -r trading/requirements.txt
