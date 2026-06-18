@@ -295,6 +295,16 @@ class KISApi:
             return None
 
     # ── 주문 ──────────────────────────────────────────────────────────────────
+    def _ord_dvsn(self) -> str:
+        """시간대에 따른 주문구분: 정규장 시장가(01) / NXT 시간외 최유리지정가(03)"""
+        from datetime import time as _time
+        import pytz
+        kst = pytz.timezone('Asia/Seoul')
+        t = datetime.now(kst).time()
+        if _time(8, 0) <= t < _time(9, 0) or _time(15, 40) <= t < _time(20, 0):
+            return "03"  # NXT 프리/포스트마켓 — 최유리지정가
+        return "01"  # 정규장 — 시장가
+
     def buy(self, code, amount: int) -> dict | None:
         """시장가 매수 (금액 → 수량 계산)"""
         price  = self.get_price(code)
@@ -310,7 +320,7 @@ class KISApi:
                     "CANO":         self.account_no,
                     "ACNT_PRDT_CD": self.acnt_code,
                     "PDNO":         code,
-                    "ORD_DVSN":     "01",
+                    "ORD_DVSN":     self._ord_dvsn(),
                     "ORD_QTY":      str(shares),
                     "ORD_UNPR":     "0",
                 },
@@ -338,7 +348,7 @@ class KISApi:
                     "CANO":         self.account_no,
                     "ACNT_PRDT_CD": self.acnt_code,
                     "PDNO":         code,
-                    "ORD_DVSN":     "01",
+                    "ORD_DVSN":     self._ord_dvsn(),
                     "ORD_QTY":      str(shares),
                     "ORD_UNPR":     "0",
                 },
