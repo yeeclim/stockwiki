@@ -43,7 +43,12 @@ def _send(text: str, recipients: list[str]) -> bool:
     msg = EmailMessage(policy=email.policy.SMTP)
     msg['Subject'] = f'StockWiki | {now_str}'   # ASCII only
     msg['From']    = f'StockWiki <{_SENDER}>'
-    msg['To']      = ', '.join(recipients)
+    # If sending to multiple recipients, hide them using Bcc
+    if len(recipients) == 1:
+        msg['To'] = recipients[0]
+    else:
+        msg['To'] = f'Undisclosed recipients <{_SENDER}>'
+        msg['Bcc'] = ', '.join(recipients)
     msg.set_content(text, charset='utf-8')
 
     try:
@@ -52,7 +57,11 @@ def _send(text: str, recipients: list[str]) -> bool:
             smtp.starttls()
             smtp.login(_SENDER, _PASSWORD)
             smtp.send_message(msg)
-        print(f'📧 이메일 발송 완료 → {", ".join(recipients)}')
+        # Avoid printing the full recipient list for privacy
+        if len(recipients) == 1:
+            print(f'📧 이메일 발송 완료 → {recipients[0]}')
+        else:
+            print(f'📧 이메일 발송 완료 → {len(recipients)} recipients (hidden)')
         return True
     except Exception as e:
         print(f'⚠️  이메일 발송 실패: {e}')
