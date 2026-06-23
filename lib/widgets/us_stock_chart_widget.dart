@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class UsStockChartWidget extends StatefulWidget {
@@ -45,6 +44,7 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
       final url = _getChartUrl();
       final response = await http.get(Uri.parse(url));
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           _imageBytes = response.bodyBytes;
@@ -57,6 +57,7 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = '연결 오류 발생';
         _isLoading = false;
@@ -80,12 +81,12 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
         periodParam = 'm';
         break;
     }
-    
+
     // 한국 주식 여부 판별
-    final isKorean = RegExp(r'^\d+$').hasMatch(widget.symbol) || 
-                     widget.symbol.endsWith('.KS') || 
-                     widget.symbol.endsWith('.KQ') || 
-                     RegExp(r'[가-힣]').hasMatch(widget.symbol);
+    final isKorean = RegExp(r'^\d+$').hasMatch(widget.symbol) ||
+        widget.symbol.endsWith('.KS') ||
+        widget.symbol.endsWith('.KQ') ||
+        RegExp(r'[가-힣]').hasMatch(widget.symbol);
 
     // 환경별 API URL 설정
     String baseUrl = 'https://stockwiki.vercel.app';
@@ -93,13 +94,14 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
     try {
       if (kIsWeb) {
         baseUrl = Uri.base.origin;
-        isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+        isLocalDev =
+            baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
       }
     } catch (_) {}
-    
+
     final apiBaseUrl = isLocalDev ? 'http://localhost:3000' : baseUrl;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    
+
     return '$apiBaseUrl/api/utils?type=chart&symbol=${widget.symbol}&period=$periodParam&isKorean=$isKorean&cb=$timestamp';
   }
 
@@ -162,7 +164,8 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? '차트 이미지를 불러올 수 없습니다.',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.error),
               textAlign: TextAlign.center,
             ),
           ],
@@ -178,7 +181,12 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
 
   Widget _buildPeriodSelector() {
     final periods = ['Intraday', 'Daily', 'Weekly', 'Monthly'];
-    final displayNames = {'Intraday': '1일', 'Daily': '일봉', 'Weekly': '주봉', 'Monthly': '월봉'};
+    final displayNames = {
+      'Intraday': '1일',
+      'Daily': '일봉',
+      'Weekly': '주봉',
+      'Monthly': '월봉'
+    };
     final theme = Theme.of(context);
 
     return Container(
@@ -204,14 +212,15 @@ class _UsStockChartWidgetState extends State<UsStockChartWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                color:
+                    isSelected ? theme.colorScheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 displayNames[period]!,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: isSelected 
-                      ? theme.colorScheme.onPrimary 
+                  color: isSelected
+                      ? theme.colorScheme.onPrimary
                       : theme.colorScheme.onSurfaceVariant,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),

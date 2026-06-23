@@ -69,13 +69,16 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
 
     try {
       final detail = await FMPService.fetchStockDetail(widget.stock.symbol);
+      if (!mounted) return;
       setState(() {
         _stockDetail = detail != null ? Stock.fromJson(detail) : widget.stock;
         _isLoadingDetail = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _stockDetail = widget.stock;
+        _error = '시세 데이터를 불러오지 못했습니다 (캐시 표시 중)';
         _isLoadingDetail = false;
       });
     }
@@ -103,13 +106,16 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
           symbol: widget.stock.symbol,
         );
       } else {
-        news = await UsStockNewsService.fetchStockNews(widget.stock.symbol, stockName: widget.stock.name);
+        news = await UsStockNewsService.fetchStockNews(widget.stock.symbol,
+            stockName: widget.stock.name);
       }
+      if (!mounted) return;
       setState(() {
         _newsList = news;
         _isLoadingNews = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoadingNews = false;
       });
@@ -154,14 +160,35 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_error != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.orange, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(_error!,
+                          style: const TextStyle(
+                              color: Colors.orange, fontSize: 12))),
+                ]),
+              ),
             // 주식 기본 정보
             _buildStockInfoCard(),
             const SizedBox(height: 16),
-            
+
             // 차트 섹션
             UsStockChartWidget(symbol: widget.stock.symbol),
             const SizedBox(height: 16),
-            
+
             // 뉴스 섹션
             _buildNewsSection(),
           ],
@@ -227,7 +254,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isPositive ? Icons.trending_up : Icons.trending_down,
+                            isPositive
+                                ? Icons.trending_up
+                                : Icons.trending_down,
                             color: isPositive ? Colors.green : Colors.red,
                             size: 16,
                           ),
@@ -246,7 +275,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // 추가 정보
             if (stock.volume != null || stock.marketCap != null) ...[
               Divider(color: theme.dividerColor),
@@ -272,7 +301,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                 ],
               ),
             ],
-            
+
             if (_error != null) ...[
               const SizedBox(height: 12),
               Container(
@@ -283,12 +312,14 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error, color: theme.colorScheme.onErrorContainer, size: 20),
+                    Icon(Icons.error,
+                        color: theme.colorScheme.onErrorContainer, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _error!,
-                        style: TextStyle(color: theme.colorScheme.onErrorContainer),
+                        style: TextStyle(
+                            color: theme.colorScheme.onErrorContainer),
                       ),
                     ),
                   ],
@@ -382,7 +413,8 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                   )
                 else
                   IconButton(
-                    icon: Icon(Icons.refresh, color: theme.colorScheme.onSurface),
+                    icon:
+                        Icon(Icons.refresh, color: theme.colorScheme.onSurface),
                     onPressed: _loadStockNews,
                   ),
               ],
@@ -391,7 +423,8 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
 
             // 뉴스 감정 분석 요약 — 로딩 완료 후 항상 표시
             Builder(builder: (ctx) {
-              debugPrint('🧩 감정블럭 조건: isLoading=$_isLoadingNews newsCount=${_newsList.length}');
+              debugPrint(
+                  '🧩 감정블럭 조건: isLoading=$_isLoadingNews newsCount=${_newsList.length}');
               if (!_isLoadingNews) return _buildSentimentSummary();
               return const SizedBox.shrink();
             }),
@@ -444,18 +477,28 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                 if (news.sentiment != 'Neutral')
                   Container(
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: (news.sentiment == 'Positive' ? Colors.green : Colors.red).withOpacity(0.1),
+                      color: (news.sentiment == 'Positive'
+                              ? Colors.green
+                              : Colors.red)
+                          .withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: (news.sentiment == 'Positive' ? Colors.green : Colors.red), width: 1),
+                      border: Border.all(
+                          color: (news.sentiment == 'Positive'
+                              ? Colors.green
+                              : Colors.red),
+                          width: 1),
                     ),
                     child: Text(
                       news.sentiment == 'Positive' ? '호재' : '악재',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: news.sentiment == 'Positive' ? Colors.green : Colors.red,
+                        color: news.sentiment == 'Positive'
+                            ? Colors.green
+                            : Colors.red,
                       ),
                     ),
                   ),
@@ -516,7 +559,8 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
   }
 
   Widget _buildSentimentSummary() {
-    debugPrint('🔍 _buildSentimentSummary 호출됨: 뉴스 ${_newsList.length}개, isLoading=$_isLoadingNews');
+    debugPrint(
+        '🔍 _buildSentimentSummary 호출됨: 뉴스 ${_newsList.length}개, isLoading=$_isLoadingNews');
     int score = 0;
     int positiveCount = 0;
     int negativeCount = 0;
@@ -541,14 +585,19 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         ),
         child: Row(
           children: [
-            Icon(Icons.analytics_outlined, color: Colors.grey.shade400, size: 20),
+            Icon(Icons.analytics_outlined,
+                color: Colors.grey.shade400, size: 20),
             const SizedBox(width: 8),
             Text(
               '뉴스 감정 분석 동향',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Spacer(),
-            Text('데이터 없음', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+            Text('데이터 없음',
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
           ],
         ),
       );
@@ -597,8 +646,8 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                 child: Text(
                   '뉴스 감정 분석 동향',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ),
               Text(
@@ -632,8 +681,10 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('호재성 $positiveCount건', style: const TextStyle(fontSize: 12, color: Colors.green)),
-              Text('악재성 $negativeCount건', style: const TextStyle(fontSize: 12, color: Colors.red)),
+              Text('호재성 $positiveCount건',
+                  style: const TextStyle(fontSize: 12, color: Colors.green)),
+              Text('악재성 $negativeCount건',
+                  style: const TextStyle(fontSize: 12, color: Colors.red)),
             ],
           )
         ],

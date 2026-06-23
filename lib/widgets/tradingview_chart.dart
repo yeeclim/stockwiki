@@ -24,7 +24,8 @@ class _TradingViewChartState extends State<TradingViewChart> {
   void initState() {
     super.initState();
     final safeId = widget.tvSymbol.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-    _viewType = 'tv_$safeId';
+    final themeId = widget.isDark ? 'dark' : 'light';
+    _viewType = 'tv_${safeId}_$themeId';
     try {
       ui_web.platformViewRegistry.registerViewFactory(_viewType, (int id) {
         final theme = widget.isDark ? 'dark' : 'light';

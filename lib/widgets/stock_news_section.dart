@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/news.dart';
+import '../utils/date_utils.dart';
 
 /// Renders the "관련 뉴스" container that was previously embedded in
 /// `_StockCardState._buildNewsSection` / `_buildNewsItem`.
@@ -20,25 +21,7 @@ class StockNewsSection extends StatelessWidget {
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
   static String formatNewsTime(String publishedAt) {
-    try {
-      final dateTime = DateTime.parse(publishedAt);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-
-      if (difference.inMinutes < 1) {
-        return '방금 전';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}분 전';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}시간 전';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}일 전';
-      } else {
-        return '${dateTime.month}/${dateTime.day}';
-      }
-    } catch (_) {
-      return '알 수 없음';
-    }
+    return formatTimeAgoFromString(publishedAt);
   }
 
   Future<void> _launchUrl(String url) async {
@@ -47,21 +30,23 @@ class StockNewsSection extends StatelessWidget {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {
-      // URL 실행 오류 — 무시
-    }
+    } catch (_) {}
   }
 
   // ─── News item ────────────────────────────────────────────────────────────
 
-  Widget _buildNewsItem(News news) {
+  Widget _buildNewsItem(BuildContext context, News news) {
+    final theme = Theme.of(context);
+
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey[600]!, width: 0.5),
+        border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+            width: 0.5),
       ),
       child: InkWell(
         onTap: () => _launchUrl(news.link),
@@ -74,8 +59,8 @@ class StockNewsSection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     news.title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -83,14 +68,16 @@ class StockNewsSection extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Icon(Icons.open_in_new, color: Colors.grey[400], size: 16),
+                Icon(Icons.open_in_new,
+                    color: theme.colorScheme.onSurfaceVariant, size: 16),
               ],
             ),
             if (news.description.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
                 news.description,
-                style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -101,14 +88,18 @@ class StockNewsSection extends StatelessWidget {
               children: [
                 Text(
                   news.source,
-                  style:
-                      TextStyle(color: Colors.grey[500], fontSize: 10),
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.7),
+                      fontSize: 10),
                 ),
                 if (news.publishedAt != null)
                   Text(
                     formatNewsTime(news.publishedAt!),
-                    style:
-                        TextStyle(color: Colors.grey[500], fontSize: 10),
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.7),
+                        fontSize: 10),
                   ),
               ],
             ),
@@ -122,12 +113,15 @@ class StockNewsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[850],
+        color: theme.colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[700]!, width: 1),
+        border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.4), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,29 +132,30 @@ class StockNewsSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   '관련 뉴스',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
                 if (isLoading)
-                  const SizedBox(
+                  SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.blue),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.primary),
                     ),
                   )
                 else
                   Text(
                     '${newsList.length}개',
-                    style: const TextStyle(
-                        color: Colors.white60, fontSize: 12),
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 12),
                   ),
               ],
             ),
@@ -168,29 +163,29 @@ class StockNewsSection extends StatelessWidget {
 
           // Body
           if (isLoading)
-            const Padding(
-              padding: EdgeInsets.all(20.0),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
               child: Center(
                 child: Text(
                   '뉴스를 불러오는 중...',
-                  style:
-                      TextStyle(color: Colors.white60, fontSize: 12),
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
               ),
             )
           else if (newsList.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20.0),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
               child: Center(
                 child: Text(
                   '관련 뉴스가 없습니다',
-                  style:
-                      TextStyle(color: Colors.white60, fontSize: 12),
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
               ),
             )
           else
-            ...newsList.map(_buildNewsItem),
+            ...newsList.map((n) => _buildNewsItem(context, n)),
         ],
       ),
     );

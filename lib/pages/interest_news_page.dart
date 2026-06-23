@@ -16,12 +16,14 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
   final TextEditingController _controller = TextEditingController();
   List<Map<String, String>> _newsList = [];
   bool _isLoading = false;
+  String? _error;
 
   Future<void> _fetchNews(String keyword) async {
     if (keyword.isEmpty) return;
     setState(() {
       _isLoading = true;
       _newsList = [];
+      _error = null;
     });
 
     try {
@@ -33,12 +35,14 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
         );
         if (naverNews.isNotEmpty) {
           // News 객체를 Map으로 변환
-          final newsMap = naverNews.map((news) => {
-            'title': news.title,
-            'description': news.description,
-            'link': news.link,
-            'source': news.source,
-          }).toList();
+          final newsMap = naverNews
+              .map((news) => {
+                    'title': news.title,
+                    'description': news.description,
+                    'link': news.link,
+                    'source': news.source,
+                  })
+              .toList();
           setState(() => _newsList = newsMap);
           debugPrint('네이버 뉴스 우선 표시: ${newsMap.length}개');
         }
@@ -56,8 +60,9 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
       }
     } catch (e) {
       debugPrint('뉴스 검색 오류: $e');
+      if (mounted) setState(() => _error = '뉴스를 불러오지 못했습니다');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -84,18 +89,19 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
     try {
       final encoded = Uri.encodeQueryComponent(keyword);
       final uri = Uri.parse('$baseUrl/api/news-search?keyword=$encoded');
-      final response =
-          await http.get(uri).timeout(const Duration(seconds: 5));
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         if (jsonData['success'] == true) {
           final results = jsonData['results'] as List<dynamic>? ?? [];
-          return results.map<Map<String, String>>((item) => {
-                'title': item['title']?.toString() ?? '',
-                'description': item['description']?.toString() ?? '',
-                'link': item['link']?.toString() ?? '',
-                'source': item['source']?.toString() ?? 'News',
-              }).toList();
+          return results
+              .map<Map<String, String>>((item) => {
+                    'title': item['title']?.toString() ?? '',
+                    'description': item['description']?.toString() ?? '',
+                    'link': item['link']?.toString() ?? '',
+                    'source': item['source']?.toString() ?? 'News',
+                  })
+              .toList();
         }
       }
     } catch (_) {}
@@ -104,17 +110,18 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
 
   Future<List<Map<String, String>>> _fetchFromMkRss(Uri uri) async {
     try {
-      final response =
-          await http.get(uri).timeout(const Duration(seconds: 3));
+      final response = await http.get(uri).timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
         final jsonData = json.decode(utf8.decode(response.bodyBytes));
         final results = jsonData['results'] as List<dynamic>? ?? [];
-        return results.map<Map<String, String>>((item) => {
-              'title': item['title']?.toString() ?? '',
-              'description': item['summary']?.toString() ?? '',
-              'link': item['link']?.toString() ?? '',
-              'source': '매일경제',
-            }).toList();
+        return results
+            .map<Map<String, String>>((item) => {
+                  'title': item['title']?.toString() ?? '',
+                  'description': item['summary']?.toString() ?? '',
+                  'link': item['link']?.toString() ?? '',
+                  'source': '매일경제',
+                })
+            .toList();
       }
     } catch (_) {}
     return [];
@@ -148,6 +155,18 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
             const SizedBox(height: 16),
             if (_isLoading)
               const CircularProgressIndicator()
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 32),
+                child: Column(
+                  children: [
+                    const Icon(Icons.cloud_off_outlined,
+                        size: 48, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    Text(_error!, style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              )
             else if (_newsList.isEmpty)
               const Text('검색 결과가 없습니다.')
             else
@@ -172,7 +191,8 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.blue.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
@@ -189,7 +209,8 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
                                 if (news['date']?.isNotEmpty == true) ...[
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Colors.grey.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
@@ -212,7 +233,8 @@ class _InterestNewsPageState extends State<InterestNewsPage> {
                           final url = news['link'] ?? '';
                           final uri = Uri.tryParse(url);
                           if (uri != null && await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
                           }
                         },
                       ),

@@ -26,19 +26,33 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
   }
 
   Future<void> _fetchPost() async {
-    setState(() { _isLoading = true; _error = ''; });
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
     try {
       final origin = Uri.base.origin;
-      final res = await http.get(Uri.parse('$origin/api/board?id=${widget.postId}'))
+      final res = await http
+          .get(Uri.parse('$origin/api/board?id=${widget.postId}'))
           .timeout(const Duration(seconds: 10));
       final data = json.decode(res.body);
       if (data['success'] == true) {
-        setState(() { _post = data['post']; _refreshKey++; _isLoading = false; });
+        setState(() {
+          _post = data['post'];
+          _refreshKey++;
+          _isLoading = false;
+        });
       } else {
-        setState(() { _error = data['error'] ?? '불러오기 실패'; _isLoading = false; });
+        setState(() {
+          _error = data['error'] ?? '불러오기 실패';
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      setState(() { _error = '오류: $e'; _isLoading = false; });
+      setState(() {
+        _error = '오류: $e';
+        _isLoading = false;
+      });
     }
   }
 
@@ -69,11 +83,13 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
         ),
         title: Text('게시글',
             style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
         actions: [
           if (_post != null) ...[
             IconButton(
-              icon: Icon(Icons.edit_outlined, color: theme.colorScheme.onSurface),
+              icon:
+                  Icon(Icons.edit_outlined, color: theme.colorScheme.onSurface),
               onPressed: () => _showEditDialog(context, theme),
               tooltip: '수정',
             ),
@@ -86,7 +102,9 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+          ? Center(
+              child:
+                  CircularProgressIndicator(color: theme.colorScheme.primary))
           : _error.isNotEmpty
               ? Center(child: Text(_error, style: theme.textTheme.bodyMedium))
               : Column(
@@ -96,7 +114,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
                       child: Row(
                         children: [
-                          Icon(Icons.person_outline, size: 14,
+                          Icon(Icons.person_outline,
+                              size: 14,
                               color: theme.colorScheme.onSurfaceVariant),
                           const SizedBox(width: 4),
                           Text(_post!['nickname'] ?? '',
@@ -112,7 +131,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                                     fontStyle: FontStyle.italic)),
                             const SizedBox(width: 8),
                           ],
-                          Icon(Icons.access_time_outlined, size: 13,
+                          Icon(Icons.access_time_outlined,
+                              size: 13,
                               color: theme.colorScheme.onSurfaceVariant),
                           const SizedBox(width: 4),
                           Text(_formatDate(_post!['created_at'] as String?),
@@ -142,7 +162,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
     }
   }
 
-  Future<T?> _showDialogDisablingIframe<T>(BuildContext context, Widget Function(BuildContext) builder) {
+  Future<T?> _showDialogDisablingIframe<T>(
+      BuildContext context, Widget Function(BuildContext) builder) {
     _setIframePointerEvents(false);
     return showDialog<T>(context: context, builder: builder)
         .whenComplete(() => _setIframePointerEvents(true));
@@ -150,7 +171,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
 
   // ── 수정 다이얼로그 ──────────────────────────────────────────────────────────
   void _showEditDialog(BuildContext context, ThemeData theme) {
-    final contentCtrl = TextEditingController(text: _post!['content'] as String? ?? '');
+    final contentCtrl =
+        TextEditingController(text: _post!['content'] as String? ?? '');
     final passwordCtrl = TextEditingController();
     bool submitting = false;
     String error = '';
@@ -187,7 +209,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                 if (error.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(error,
-                      style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
+                      style: TextStyle(
+                          color: theme.colorScheme.error, fontSize: 12)),
                 ],
               ],
             ),
@@ -201,31 +224,44 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
               onPressed: submitting
                   ? null
                   : () async {
-                      setS(() { submitting = true; error = ''; });
+                      setS(() {
+                        submitting = true;
+                        error = '';
+                      });
                       try {
                         final origin = Uri.base.origin;
-                        final res = await http.put(
-                          Uri.parse('$origin/api/board?id=${widget.postId}'),
-                          headers: {'Content-Type': 'application/json'},
-                          body: json.encode({
-                            'password': passwordCtrl.text.trim(),
-                            'content': contentCtrl.text.trim(),
-                          }),
-                        ).timeout(const Duration(seconds: 10));
+                        final res = await http
+                            .put(
+                              Uri.parse(
+                                  '$origin/api/board?id=${widget.postId}'),
+                              headers: {'Content-Type': 'application/json'},
+                              body: json.encode({
+                                'password': passwordCtrl.text.trim(),
+                                'content': contentCtrl.text.trim(),
+                              }),
+                            )
+                            .timeout(const Duration(seconds: 10));
                         final data = json.decode(res.body);
                         if (data['success'] == true) {
-                          Navigator.of(ctx).pop();
+                          if (ctx.mounted) Navigator.of(ctx).pop();
                           _fetchPost();
                         } else {
-                          setS(() { error = data['error'] ?? '수정 실패'; submitting = false; });
+                          setS(() {
+                            error = data['error'] ?? '수정 실패';
+                            submitting = false;
+                          });
                         }
                       } catch (e) {
-                        setS(() { error = '오류: $e'; submitting = false; });
+                        setS(() {
+                          error = '오류: $e';
+                          submitting = false;
+                        });
                       }
                     },
               child: submitting
                   ? const SizedBox(
-                      width: 16, height: 16,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2))
                   : const Text('저장'),
             ),
@@ -249,8 +285,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('삭제하면 복구할 수 없습니다.',
-                  style: theme.textTheme.bodyMedium),
+              Text('삭제하면 복구할 수 없습니다.', style: theme.textTheme.bodyMedium),
               const SizedBox(height: 12),
               TextField(
                 controller: passwordCtrl,
@@ -264,7 +299,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
               if (error.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(error,
-                    style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
+                    style: TextStyle(
+                        color: theme.colorScheme.error, fontSize: 12)),
               ],
             ],
           ),
@@ -277,31 +313,46 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
               onPressed: submitting
                   ? null
                   : () async {
-                      setS(() { submitting = true; error = ''; });
+                      setS(() {
+                        submitting = true;
+                        error = '';
+                      });
                       try {
                         final origin = Uri.base.origin;
-                        final req = http.Request(
-                            'DELETE', Uri.parse('$origin/api/board?id=${widget.postId}'));
+                        final req = http.Request('DELETE',
+                            Uri.parse('$origin/api/board?id=${widget.postId}'));
                         req.headers['Content-Type'] = 'application/json';
-                        req.body = json.encode({'password': passwordCtrl.text.trim()});
-                        final streamed = await req.send().timeout(const Duration(seconds: 10));
+                        req.body =
+                            json.encode({'password': passwordCtrl.text.trim()});
+                        final streamed = await req
+                            .send()
+                            .timeout(const Duration(seconds: 10));
                         final res = await http.Response.fromStream(streamed);
                         final data = json.decode(res.body);
                         if (data['success'] == true) {
-                          Navigator.of(ctx).pop();
-                          Navigator.of(context).pop();
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+                          if (context.mounted) Navigator.of(context).pop();
                         } else {
-                          setS(() { error = data['error'] ?? '삭제 실패'; submitting = false; });
+                          setS(() {
+                            error = data['error'] ?? '삭제 실패';
+                            submitting = false;
+                          });
                         }
                       } catch (e) {
-                        setS(() { error = '오류: $e'; submitting = false; });
+                        setS(() {
+                          error = '오류: $e';
+                          submitting = false;
+                        });
                       }
                     },
-              style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error),
               child: submitting
                   ? const SizedBox(
-                      width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Text('삭제', style: TextStyle(color: Colors.white)),
             ),
           ],
@@ -336,7 +387,8 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
     final bg = widget.isDark ? '#1A1A1A' : '#FFFFFF';
     final fg = widget.isDark ? '#E0E0E0' : '#212121';
     final link = widget.isDark ? '#90CAF9' : '#1565C0';
-    final codeBg = widget.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+    final codeBg =
+        widget.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
     final srcdoc = '''<!DOCTYPE html>
 <html>
 <head>
@@ -377,7 +429,7 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
           ..style.height = '100%'
           ..style.border = 'none'
           ..tabIndex = -1
-          ..setAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox');
+          ..setAttribute('sandbox', '');
       });
     } catch (_) {}
   }

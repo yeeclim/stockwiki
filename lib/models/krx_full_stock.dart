@@ -31,19 +31,19 @@ class KrxFullStock {
 
   factory KrxFullStock.fromJson(Map<String, dynamic> json) {
     return KrxFullStock(
-      code: json['code'],
-      name: json['name'],
-      market: json['market'],
-      listedDate: json['listed_date'],
-      parValue: json['par_value'],
-      closePrice: json['close_price'],
-      change: json['change'],
-      changeRate: (json['change_rate'] ?? 0).toDouble(),
-      openPrice: json['open_price'],
-      highPrice: json['high_price'],
-      lowPrice: json['low_price'],
-      volume: json['volume'],
-      marketCap: json['market_cap'],
+      code: (json['code'] as String?) ?? '',
+      name: (json['name'] as String?) ?? '',
+      market: (json['market'] as String?) ?? '',
+      listedDate: (json['listed_date'] as String?) ?? '',
+      parValue: (json['par_value'] as String?) ?? '',
+      closePrice: (json['close_price'] as num?)?.toInt() ?? 0,
+      change: (json['change'] as num?)?.toInt() ?? 0,
+      changeRate: (json['change_rate'] as num?)?.toDouble() ?? 0.0,
+      openPrice: (json['open_price'] as num?)?.toInt() ?? 0,
+      highPrice: (json['high_price'] as num?)?.toInt() ?? 0,
+      lowPrice: (json['low_price'] as num?)?.toInt() ?? 0,
+      volume: (json['volume'] as num?)?.toInt() ?? 0,
+      marketCap: (json['market_cap'] as num?)?.toInt() ?? 0,
     );
   }
 }

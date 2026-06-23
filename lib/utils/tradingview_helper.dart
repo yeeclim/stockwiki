@@ -9,17 +9,56 @@ String krxSymbol(String code) => 'KRX:$code';
 /// 미국 티커 → TradingView 거래소:티커
 String usSymbol(String ticker) {
   const nyse = {
-    'JPM', 'V',    'MA',   'BAC', 'BLK', 'XOM', 'CVX', 'WMT',
-    'KO',  'PG',   'COP',  'SLB', 'NEE', 'UNH', 'JNJ', 'MRK',
-    'LLY', 'NVO',  'AMZN', 'COST','ACN', 'TMO', 'ABBV','PEP',
-    'HD',  'MCD',  'CAT',  'GS',  'AXP',
+    'JPM',
+    'V',
+    'MA',
+    'BAC',
+    'BLK',
+    'XOM',
+    'CVX',
+    'WMT',
+    'KO',
+    'PG',
+    'COP',
+    'SLB',
+    'NEE',
+    'UNH',
+    'JNJ',
+    'MRK',
+    'LLY',
+    'NVO',
+    'AMZN',
+    'COST',
+    'ACN',
+    'TMO',
+    'ABBV',
+    'PEP',
+    'HD',
+    'MCD',
+    'CAT',
+    'GS',
+    'AXP',
   };
   const nasdaq = {
-    'AAPL','MSFT','NVDA','GOOGL','GOOG','META','TSLA','AVGO',
-    'AMD', 'NFLX','CRM', 'ORCL', 'QCOM','ADBE','INTC','CSCO',
+    'AAPL',
+    'MSFT',
+    'NVDA',
+    'GOOGL',
+    'GOOG',
+    'META',
+    'TSLA',
+    'AVGO',
+    'AMD',
+    'NFLX',
+    'CRM',
+    'ORCL',
+    'QCOM',
+    'ADBE',
+    'INTC',
+    'CSCO',
   };
-  if (nyse.contains(ticker))    return 'NYSE:$ticker';
-  if (nasdaq.contains(ticker))  return 'NASDAQ:$ticker';
+  if (nyse.contains(ticker)) return 'NYSE:$ticker';
+  if (nasdaq.contains(ticker)) return 'NASDAQ:$ticker';
   return ticker;
 }
 
@@ -42,9 +81,11 @@ void showChart(
     ),
     builder: (ctx) {
       final th = Theme.of(ctx);
-      final code = naverCode ?? tvSymbol.replaceFirst(RegExp(r'^[A-Za-z]+:'), '');
+      final code =
+          naverCode ?? tvSymbol.replaceFirst(RegExp(r'^[A-Za-z]+:'), '');
       final isKrx = tvSymbol.startsWith('KRX:');
-      final isAlphanumeric = isKrx && !RegExp(r'^\d{6}$').hasMatch(tvSymbol.substring(4));
+      final isAlphanumeric =
+          isKrx && !RegExp(r'^\d{6}$').hasMatch(tvSymbol.substring(4));
 
       return SizedBox(
         height: MediaQuery.of(context).size.height * 0.80,
@@ -53,7 +94,8 @@ void showChart(
             // 핸들
             Container(
               margin: const EdgeInsets.symmetric(vertical: 10),
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: th.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
@@ -69,8 +111,8 @@ void showChart(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(stockName,
-                            style: th.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold)),
+                            style: th.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold)),
                         Text(tvSymbol,
                             style: th.textTheme.bodySmall?.copyWith(
                                 color: th.colorScheme.onSurfaceVariant)),
@@ -80,7 +122,8 @@ void showChart(
                   if (naverCode != null)
                     TextButton.icon(
                       onPressed: () => launchUrl(
-                        Uri.parse('https://finance.naver.com/item/main.naver?code=$naverCode'),
+                        Uri.parse(
+                            'https://finance.naver.com/item/main.naver?code=$naverCode'),
                         mode: LaunchMode.externalApplication,
                       ),
                       icon: const Icon(Icons.open_in_new, size: 13),
@@ -93,7 +136,8 @@ void showChart(
                   if (yahooTicker != null)
                     TextButton.icon(
                       onPressed: () => launchUrl(
-                        Uri.parse('https://finance.yahoo.com/quote/$yahooTicker'),
+                        Uri.parse(
+                            'https://finance.yahoo.com/quote/$yahooTicker'),
                         mode: LaunchMode.externalApplication,
                       ),
                       icon: const Icon(Icons.open_in_new, size: 13),
@@ -140,7 +184,10 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
     return '$origin/api/utils?type=chart&symbol=${widget.code}&isKorean=true&period=$_period';
   }
 
-  void _changePeriod(String p) => setState(() { _period = p; _hasError = false; });
+  void _changePeriod(String p) => setState(() {
+        _period = p;
+        _hasError = false;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +220,9 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.image_not_supported_outlined,
-                          size: 40, color: th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                          size: 40,
+                          color:
+                              th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
                       const SizedBox(height: 12),
                       Text('차트를 불러올 수 없습니다.',
                           style: th.textTheme.bodyMedium?.copyWith(
@@ -181,7 +230,8 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: () => launchUrl(
-                          Uri.parse('https://finance.naver.com/item/main.naver?code=${widget.code}'),
+                          Uri.parse(
+                              'https://finance.naver.com/item/main.naver?code=${widget.code}'),
                           mode: LaunchMode.externalApplication,
                         ),
                         icon: const Icon(Icons.open_in_new, size: 16),
@@ -198,10 +248,12 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
                     fit: BoxFit.contain,
                     loadingBuilder: (_, child, progress) => progress == null
                         ? child
-                        : Center(child: CircularProgressIndicator(
+                        : Center(
+                            child: CircularProgressIndicator(
                             color: th.colorScheme.primary,
                             value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                ? progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!
                                 : null,
                           )),
                     errorBuilder: (_, __, ___) {
@@ -228,16 +280,18 @@ Widget _buildNewListingPanel(BuildContext ctx, String code) {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.bar_chart_outlined,
-              size: 56, color: th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+              size: 56,
+              color: th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
           const SizedBox(height: 20),
           Text('차트 데이터 준비 중',
-              style: th.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              style: th.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           Text(
             '신규 상장 종목($code)으로\n차트 데이터가 아직 없습니다.\n아래 링크에서 확인하세요.',
             textAlign: TextAlign.center,
-            style: th.textTheme.bodySmall?.copyWith(
-                color: th.colorScheme.onSurfaceVariant, height: 1.6),
+            style: th.textTheme.bodySmall
+                ?.copyWith(color: th.colorScheme.onSurfaceVariant, height: 1.6),
           ),
           const SizedBox(height: 28),
           _linkButton(ctx,
@@ -257,7 +311,8 @@ Widget _buildNewListingPanel(BuildContext ctx, String code) {
   );
 }
 
-Widget _linkButton(BuildContext ctx, {
+Widget _linkButton(
+  BuildContext ctx, {
   required IconData icon,
   required String label,
   required Color color,
@@ -266,9 +321,11 @@ Widget _linkButton(BuildContext ctx, {
   return SizedBox(
     width: double.infinity,
     child: OutlinedButton.icon(
-      onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      onPressed: () =>
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
       icon: Icon(icon, size: 18, color: color),
-      label: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+      label: Text(label,
+          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
       style: OutlinedButton.styleFrom(
         side: BorderSide(color: color.withOpacity(0.4)),
         padding: const EdgeInsets.symmetric(vertical: 14),

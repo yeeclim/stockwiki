@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../pages/ai_stock_recommend_page.dart';
-import 'portfolio_add_sheet.dart';
+import '../utils/date_utils.dart' as date_utils;
 
 /// A self-contained card that renders a single [StockRecommendation].
 ///
@@ -12,33 +12,20 @@ class AiRecommendCard extends StatelessWidget {
   final VoidCallback? onChartTap;
   final VoidCallback? onPortfolioTap;
 
-  const AiRecommendCard({super.key, required this.rec, this.onChartTap, this.onPortfolioTap});
+  const AiRecommendCard(
+      {super.key, required this.rec, this.onChartTap, this.onPortfolioTap});
 
   // ─── Formatters ──────────────────────────────────────────────────────────
 
   static String formatPrice(int price) {
     return price.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
 
-  static String formatTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return '방금 전';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}분 전';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}시간 전';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}일 전';
-    } else {
-      return '${dateTime.month}월 ${dateTime.day}일';
-    }
-  }
+  static String formatTimeAgo(DateTime dateTime) =>
+      date_utils.formatTimeAgo(dateTime);
 
   // ─── Action badge ─────────────────────────────────────────────────────────
 
@@ -117,8 +104,7 @@ class AiRecommendCard extends StatelessWidget {
             if (priceLabel.isNotEmpty) ...[
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceVariant,
                   borderRadius: BorderRadius.circular(4),
@@ -338,8 +324,7 @@ class AiRecommendCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
@@ -497,8 +482,7 @@ class AiRecommendCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color:
-                        theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -507,8 +491,7 @@ class AiRecommendCard extends StatelessWidget {
                       Row(
                         children: [
                           Icon(Icons.lightbulb_outline,
-                              size: 16,
-                              color: theme.colorScheme.primary),
+                              size: 16, color: theme.colorScheme.primary),
                           const SizedBox(width: 8),
                           Text(
                             '추천 근거',
@@ -535,11 +518,9 @@ class AiRecommendCard extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     reason,
-                                    style: theme.textTheme.bodyMedium
-                                        ?.copyWith(
+                                    style: theme.textTheme.bodyMedium?.copyWith(
                                       height: 1.4,
-                                      color: theme
-                                          .colorScheme.onSurfaceVariant,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
@@ -565,8 +546,8 @@ class AiRecommendCard extends StatelessWidget {
                       onTap: onPortfolioTap,
                       child: Row(
                         children: [
-                          Icon(Icons.add_circle_outline, size: 14,
-                              color: theme.colorScheme.secondary),
+                          Icon(Icons.add_circle_outline,
+                              size: 14, color: theme.colorScheme.secondary),
                           const SizedBox(width: 4),
                           Text('포트폴리오 추가',
                               style: theme.textTheme.labelSmall?.copyWith(
@@ -579,7 +560,8 @@ class AiRecommendCard extends StatelessWidget {
                       onTap: onChartTap,
                       child: Row(
                         children: [
-                          Icon(Icons.bar_chart, size: 13, color: theme.colorScheme.primary),
+                          Icon(Icons.bar_chart,
+                              size: 13, color: theme.colorScheme.primary),
                           const SizedBox(width: 4),
                           Text('차트 보기',
                               style: theme.textTheme.labelSmall?.copyWith(

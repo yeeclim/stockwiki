@@ -20,14 +20,12 @@ class StockChartSection extends StatefulWidget {
 }
 
 class _StockChartSectionState extends State<StockChartSection> {
-  // Shared cache across all StockChartSection instances
   static final Map<String, String> _chartCache = {};
 
   // ─── URL helpers ─────────────────────────────────────────────────────────
 
   String _getChartUrl(String symbol) {
-    final secondsSinceEpoch =
-        DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final secondsSinceEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final cacheKey = '${symbol}_$secondsSinceEpoch';
 
     if (_chartCache.containsKey(cacheKey)) {
@@ -50,14 +48,12 @@ class _StockChartSectionState extends State<StockChartSection> {
   }
 
   String _getDetailedChartUrl(String symbol) {
-    final secondsSinceEpoch =
-        DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final secondsSinceEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     return 'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$secondsSinceEpoch&w=800&h=600&cache=false';
   }
 
   String _getDetailedChartUrlWithPeriod(String symbol, String period) {
-    final secondsSinceEpoch =
-        DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final secondsSinceEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     String chartType;
     switch (period) {
       case 'year':
@@ -90,7 +86,7 @@ class _StockChartSectionState extends State<StockChartSection> {
       context: context,
       builder: (BuildContext ctx) {
         return Dialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHigh,
           child: _buildDetailedChartDialog(
             ctx,
             imageUrl: _getDetailedChartUrl(widget.symbol),
@@ -106,11 +102,10 @@ class _StockChartSectionState extends State<StockChartSection> {
       context: context,
       builder: (BuildContext ctx) {
         return Dialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHigh,
           child: _buildDetailedChartDialog(
             ctx,
-            imageUrl:
-                _getDetailedChartUrlWithPeriod(widget.symbol, period),
+            imageUrl: _getDetailedChartUrlWithPeriod(widget.symbol, period),
             title:
                 '${widget.stockName} (${widget.symbol}) - ${_getPeriodLabel(period)} 차트',
           ),
@@ -127,10 +122,9 @@ class _StockChartSectionState extends State<StockChartSection> {
         _showDetailedChartWithPeriod(period);
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue[800],
-        foregroundColor: Colors.white,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        backgroundColor: Theme.of(ctx).colorScheme.primary,
+        foregroundColor: Theme.of(ctx).colorScheme.onPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
       child: Text(label, style: const TextStyle(fontSize: 12)),
     );
@@ -141,6 +135,8 @@ class _StockChartSectionState extends State<StockChartSection> {
     required String imageUrl,
     required String title,
   }) {
+    final theme = Theme.of(ctx);
+
     return Container(
       width: MediaQuery.of(ctx).size.width * 0.95,
       height: MediaQuery.of(ctx).size.height * 0.8,
@@ -154,8 +150,8 @@ class _StockChartSectionState extends State<StockChartSection> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -163,7 +159,7 @@ class _StockChartSectionState extends State<StockChartSection> {
               ),
               IconButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                icon: const Icon(Icons.close, color: Colors.white),
+                icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
               ),
             ],
           ),
@@ -172,9 +168,11 @@ class _StockChartSectionState extends State<StockChartSection> {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.grey[800],
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[600]!, width: 1),
+                border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                    width: 1),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -183,19 +181,20 @@ class _StockChartSectionState extends State<StockChartSection> {
                   fit: BoxFit.contain,
                   loadingBuilder: (_, child, progress) {
                     if (progress == null) return child;
-                    return const Center(
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircularProgressIndicator(
                             valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.blue),
+                                theme.colorScheme.primary),
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           Text(
                             '상세 차트를 불러오는 중...',
                             style: TextStyle(
-                                color: Colors.white60, fontSize: 14),
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 14),
                           ),
                         ],
                       ),
@@ -206,12 +205,14 @@ class _StockChartSectionState extends State<StockChartSection> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.show_chart,
-                            color: Colors.grey[600], size: 48),
+                            color: theme.colorScheme.onSurfaceVariant,
+                            size: 48),
                         const SizedBox(height: 16),
                         Text(
                           '상세 차트를 불러올 수 없습니다',
                           style: TextStyle(
-                              color: Colors.grey[600], fontSize: 14),
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 14),
                         ),
                       ],
                     ),
@@ -237,15 +238,19 @@ class _StockChartSectionState extends State<StockChartSection> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return GestureDetector(
       onTap: _showDetailedChart,
       child: Container(
         width: double.infinity,
         height: 200,
         decoration: BoxDecoration(
-          color: Colors.grey[850],
+          color: theme.colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[700]!, width: 1),
+          border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.5),
+              width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,10 +260,10 @@ class _StockChartSectionState extends State<StockChartSection> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     '일봉 차트',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -266,12 +271,13 @@ class _StockChartSectionState extends State<StockChartSection> {
                   Row(
                     children: [
                       Icon(Icons.touch_app,
-                          color: Colors.grey[400], size: 16),
+                          color: theme.colorScheme.onSurfaceVariant, size: 16),
                       const SizedBox(width: 4),
                       Text(
                         '클릭하여 상세 차트 보기',
                         style: TextStyle(
-                            color: Colors.grey[400], fontSize: 10),
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10),
                       ),
                     ],
                   ),
@@ -282,10 +288,10 @@ class _StockChartSectionState extends State<StockChartSection> {
               child: Container(
                 margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                      color: Colors.grey[600]!, width: 0.5),
+                      color: theme.colorScheme.outlineVariant, width: 0.5),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
@@ -303,21 +309,20 @@ class _StockChartSectionState extends State<StockChartSection> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                value: progress.expectedTotalBytes !=
-                                        null
+                                value: progress.expectedTotalBytes != null
                                     ? progress.cumulativeBytesLoaded /
                                         progress.expectedTotalBytes!
                                     : null,
-                                valueColor:
-                                    const AlwaysStoppedAnimation<Color>(
-                                        Colors.blue),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    theme.colorScheme.primary),
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
+                            Text(
                               '차트 로딩 중...',
                               style: TextStyle(
-                                  color: Colors.white60, fontSize: 10),
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 10),
                             ),
                           ],
                         ),
@@ -328,12 +333,14 @@ class _StockChartSectionState extends State<StockChartSection> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.show_chart,
-                              color: Colors.grey[600], size: 24),
+                              color: theme.colorScheme.onSurfaceVariant,
+                              size: 24),
                           const SizedBox(height: 4),
                           Text(
                             '차트를 불러올 수 없습니다',
                             style: TextStyle(
-                                color: Colors.grey[600], fontSize: 10),
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 10),
                           ),
                         ],
                       ),

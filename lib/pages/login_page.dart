@@ -74,32 +74,13 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // ── 카카오 ────────────────────────────────────────────────────────────────
-  Future<void> _signInKakao() async {
-    _setLoading(true);
-    _setError(null);
-    try {
-      await AuthService.signInWithKakao();
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
-      _setError('카카오 로그인 실패: $e');
-    } finally {
-      if (mounted) _setLoading(false);
-    }
-  }
-
-  void _showSnack(String msg, {bool isError = true}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? Colors.red[700] : Colors.green[700],
-    ));
-  }
-
   String _translateAuthError(String msg) {
-    if (msg.contains('Invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다.';
+    if (msg.contains('Invalid login credentials'))
+      return '이메일 또는 비밀번호가 올바르지 않습니다.';
     if (msg.contains('Email not confirmed')) return '이메일 인증이 완료되지 않았습니다.';
     if (msg.contains('User already registered')) return '이미 가입된 이메일입니다.';
-    if (msg.contains('Password should be at least')) return '비밀번호는 최소 6자리 이상이어야 합니다.';
+    if (msg.contains('Password should be at least'))
+      return '비밀번호는 최소 6자리 이상이어야 합니다.';
     return msg;
   }
 
@@ -166,7 +147,8 @@ class _LoginPageState extends State<LoginPage> {
               onTap: _loading ? null : _signInGoogle,
               backgroundColor: isDark ? const Color(0xFF3C3C3C) : Colors.white,
               textColor: isDark ? Colors.white : const Color(0xFF1F1F1F),
-              borderColor: isDark ? Colors.transparent : const Color(0xFFDADCE0),
+              borderColor:
+                  isDark ? Colors.transparent : const Color(0xFFDADCE0),
             ),
 
             const SizedBox(height: 28),
@@ -177,8 +159,8 @@ class _LoginPageState extends State<LoginPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text('또는 이메일로',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant)),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ),
               Expanded(child: Divider(color: theme.dividerColor)),
             ]),
@@ -196,7 +178,8 @@ class _LoginPageState extends State<LoginPage> {
               controller: _pwCtrl,
               obscureText: _obscurePw,
               onSubmitted: (_) => _submitEmail(),
-              decoration: _inputDec(context, '비밀번호', Icons.lock_outline).copyWith(
+              decoration:
+                  _inputDec(context, '비밀번호', Icons.lock_outline).copyWith(
                 suffixIcon: IconButton(
                   icon: Icon(
                       _obscurePw ? Icons.visibility_off : Icons.visibility,
@@ -209,7 +192,8 @@ class _LoginPageState extends State<LoginPage> {
             if (_errorMsg != null) ...[
               const SizedBox(height: 10),
               Text(_errorMsg!,
-                  style: TextStyle(color: theme.colorScheme.error, fontSize: 13)),
+                  style:
+                      TextStyle(color: theme.colorScheme.error, fontSize: 13)),
             ],
 
             const SizedBox(height: 20),
@@ -341,25 +325,5 @@ class _SocialButton extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _KakaoIcon extends StatelessWidget {
-  const _KakaoIcon();
-  @override
-  Widget build(BuildContext context) {
-    return const Text('K',
-        style: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)));
-  }
-}
-
-class _NaverIcon extends StatelessWidget {
-  const _NaverIcon();
-  @override
-  Widget build(BuildContext context) {
-    return const Text('N',
-        style: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF03C75A)));
   }
 }

@@ -27,12 +27,11 @@ class AiTradingPage extends StatelessWidget {
               Icon(Icons.lock_outline,
                   size: 64, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(height: 16),
-              Text('로그인이 필요한 서비스입니다.',
-                  style: theme.textTheme.titleMedium),
+              Text('로그인이 필요한 서비스입니다.', style: theme.textTheme.titleMedium),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LoginPage())),
+                onPressed: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const LoginPage())),
                 child: const Text('로그인 / 회원가입'),
               ),
             ],
@@ -84,8 +83,7 @@ class AiTradingPage extends StatelessWidget {
               theme: theme,
               stepNumber: '1',
               title: '한국투자증권 Open API 신청',
-              content:
-                  'developers.koreainvestment.com 에서 앱 등록 후\n'
+              content: 'developers.koreainvestment.com 에서 앱 등록 후\n'
                   'App Key · App Secret 을 발급받으세요.\n'
                   '(실전 계좌 이용 신청 필수)',
             ),
@@ -94,8 +92,7 @@ class AiTradingPage extends StatelessWidget {
               theme: theme,
               stepNumber: '2',
               title: 'StockWiki에 API 키 등록',
-              content:
-                  '아래 버튼을 눌러 발급받은 키를 입력하면\n'
+              content: '아래 버튼을 눌러 발급받은 키를 입력하면\n'
                   'GitHub Actions에 자동으로 등록되고\n'
                   '평일 장중 5분마다 자동매매가 실행됩니다.',
             ),
@@ -136,7 +133,8 @@ class AiTradingPage extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ScreeningManagePage()),
+                  MaterialPageRoute(
+                      builder: (_) => const ScreeningManagePage()),
                 ),
                 icon: const Icon(Icons.manage_search),
                 label: const Text('스크리닝 종목 관리'),
@@ -147,13 +145,16 @@ class AiTradingPage extends StatelessWidget {
                 ),
               ),
             ),
-            if (authProvider.currentUser?.email == 'eklim4254@gmail.com') ...[
+            if (const String.fromEnvironment('ADMIN_EMAIL').isNotEmpty &&
+                authProvider.currentUser?.email ==
+                    const String.fromEnvironment('ADMIN_EMAIL')) ...[
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AdminScreeningPage()),
+                    MaterialPageRoute(
+                        builder: (_) => const AdminScreeningPage()),
                   ),
                   icon: const Icon(Icons.admin_panel_settings_outlined),
                   label: const Text('AI 추천 종목 검토 (관리자)'),
@@ -173,10 +174,10 @@ class AiTradingPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withValues(alpha:0.3),
+                color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: theme.colorScheme.error.withValues(alpha:0.4)),
+                    color: theme.colorScheme.error.withValues(alpha: 0.4)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,7 +238,8 @@ class AiTradingPage extends StatelessWidget {
         children: [
           Text('• ',
               style: TextStyle(
-                  color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold)),
           Expanded(
               child: Text(text,
                   style: theme.textTheme.bodySmall?.copyWith(height: 1.5))),
@@ -260,7 +262,7 @@ class _UserCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.5),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.dividerColor),
       ),
@@ -268,7 +270,7 @@ class _UserCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: theme.colorScheme.primary.withValues(alpha:0.15),
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
             backgroundImage: authProvider.avatarUrl != null
                 ? NetworkImage(authProvider.avatarUrl!)
                 : null,
@@ -288,8 +290,8 @@ class _UserCard extends StatelessWidget {
                 if (authProvider.currentUser?.email != null &&
                     authProvider.displayName != authProvider.currentUser?.email)
                   Text(authProvider.currentUser!.email!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis),
               ],
             ),
@@ -301,8 +303,8 @@ class _UserCard extends StatelessWidget {
             },
             icon: const Icon(Icons.logout, size: 16),
             label: const Text('로그아웃'),
-            style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.error),
+            style:
+                TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
           ),
         ],
       ),
@@ -380,4 +382,3 @@ class _StepCard extends StatelessWidget {
     );
   }
 }
-

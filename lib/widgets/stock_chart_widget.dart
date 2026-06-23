@@ -35,20 +35,22 @@ class _StockChartWidgetState extends State<StockChartWidget> {
     });
 
     try {
-      // 캐시 방지를 위한 타임스탬프 생성
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      
-      // 다양한 차트 소스 제공 (캐시 방지 파라미터 추가)
       _chartUrls = {
-        'candle': 'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${widget.symbol}.png?t=$timestamp',
-        'line': 'https://ssl.pstatic.net/imgfinance/chart/item/area/day/${widget.symbol}.png?t=$timestamp',
-        'volume': 'https://ssl.pstatic.net/imgfinance/chart/item/volume/day/${widget.symbol}.png?t=$timestamp',
+        'candle':
+            'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${widget.symbol}.png?t=$timestamp',
+        'line':
+            'https://ssl.pstatic.net/imgfinance/chart/item/area/day/${widget.symbol}.png?t=$timestamp',
+        'volume':
+            'https://ssl.pstatic.net/imgfinance/chart/item/volume/day/${widget.symbol}.png?t=$timestamp',
       };
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -57,8 +59,9 @@ class _StockChartWidgetState extends State<StockChartWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
-      color: Colors.grey[900],
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -70,8 +73,8 @@ class _StockChartWidgetState extends State<StockChartWidget> {
               children: [
                 Text(
                   '차트 스냅샷',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -81,8 +84,8 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                     if (_chartUrls != null)
                       DropdownButton<String>(
                         value: _selectedChartType,
-                        dropdownColor: Colors.grey[800],
-                        style: const TextStyle(color: Colors.white),
+                        dropdownColor: theme.colorScheme.surfaceContainerHigh,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
                         items: _chartUrls!.keys.map((String type) {
                           return DropdownMenuItem<String>(
                             value: type,
@@ -97,7 +100,8 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                       ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      icon: Icon(Icons.refresh,
+                          color: theme.colorScheme.onSurface),
                       onPressed: _loadChartUrls,
                       tooltip: '실시간 차트 새로고침',
                     ),
@@ -107,9 +111,10 @@ class _StockChartWidgetState extends State<StockChartWidget> {
             ),
             const SizedBox(height: 16),
             if (_isLoading)
-              const Center(
+              Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                 ),
               )
             else if (_chartUrls != null && _selectedChartType != null)
@@ -117,7 +122,8 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                 width: double.infinity,
                 height: 200,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[600]!),
+                  border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.5)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: ClipRRect(
@@ -125,7 +131,7 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                   child: Image.network(
                     _chartUrls![_selectedChartType!]!,
                     fit: BoxFit.contain,
-                    headers: {
+                    headers: const {
                       'Cache-Control': 'no-cache, no-store, must-revalidate',
                       'Pragma': 'no-cache',
                       'Expires': '0',
@@ -138,27 +144,28 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                               ? loadingProgress.cumulativeBytesLoaded /
                                   loadingProgress.expectedTotalBytes!
                               : null,
-                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              theme.colorScheme.primary),
                         ),
                       );
                     },
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        color: Colors.grey[800],
-                        child: const Center(
+                        color: theme.colorScheme.surfaceContainerHigh,
+                        child: Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
                                 Icons.error_outline,
-                                color: Colors.red,
+                                color: theme.colorScheme.error,
                                 size: 48,
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
                                 '차트를 불러올 수 없습니다',
                                 style: TextStyle(
-                                  color: Colors.white70,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                   fontSize: 14,
                                 ),
                               ),
@@ -175,14 +182,14 @@ class _StockChartWidgetState extends State<StockChartWidget> {
                 width: double.infinity,
                 height: 200,
                 decoration: BoxDecoration(
-                  color: Colors.grey[800],
+                  color: theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '차트 데이터를 불러오는 중...',
                     style: TextStyle(
-                      color: Colors.white70,
+                      color: theme.colorScheme.onSurfaceVariant,
                       fontSize: 14,
                     ),
                   ),
@@ -192,8 +199,8 @@ class _StockChartWidgetState extends State<StockChartWidget> {
             if (_chartUrls != null)
               Text(
                 '차트 타입: ${_getChartTypeName(_selectedChartType!)}',
-                style: const TextStyle(
-                  color: Colors.white60,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),

@@ -59,7 +59,8 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: _lightPrimary,
           foregroundColor: _lightOnPrimary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           elevation: 2,
         ),
@@ -106,7 +107,8 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: _darkPrimary,
           foregroundColor: _darkOnPrimary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           elevation: 2,
         ),

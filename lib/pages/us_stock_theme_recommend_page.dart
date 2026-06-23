@@ -2,13 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/us_sector_loader.dart';
 import '../utils/tradingview_helper.dart';
-import 'us_stock_search_page.dart';
-import 'ai_stock_recommend_page.dart';
-import 'us_stock_ai_recommend_page.dart';
-import 'us_stock_ai_committee_page.dart';
-import 'ai_algorithm_explain_page.dart';
-import 'bookmark_list_page.dart';
-import 'theme_recommendations_page.dart';
 import '../widgets/app_drawer.dart';
 
 class UsStockThemeRecommendPage extends StatefulWidget {
@@ -24,14 +17,14 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
   late TabController _tabController;
   List<String> _sectors = [];
   final Map<String, List<Map<String, dynamic>>> _sectorStocks = {};
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
     _sectors = UsSectorLoader.getSectors();
     _tabController = TabController(length: _sectors.length, vsync: this);
-    _tabController.addListener(() { if (mounted) setState(() {}); });
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadAllSectors();
   }
 
@@ -42,17 +35,14 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
   }
 
   Future<void> _loadAllSectors() async {
-    setState(() => _isLoading = true);
-
     try {
       for (String sector in _sectors) {
         _sectorStocks[sector] = UsSectorLoader.getSectorStocks(sector);
       }
     } catch (e) {
       debugPrint('Sector별 주식 로드 오류: $e');
-    } finally {
-      setState(() => _isLoading = false);
     }
+    if (mounted) setState(() {});
   }
 
   String _getSectorIcon(String sector) {
@@ -94,36 +84,48 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
               children: [
                 const SizedBox(height: 8),
                 Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('섹터 선택', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('섹터 선택',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Expanded(
                   child: ListView.separated(
                     controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: _sectors.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: theme.colorScheme.outlineVariant.withOpacity(0.4)),
+                    separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        color:
+                            theme.colorScheme.outlineVariant.withOpacity(0.4)),
                     itemBuilder: (_, index) {
                       final isSelected = _tabController.index == index;
                       return ListTile(
                         dense: true,
                         leading: Text(_getSectorIcon(_sectors[index]),
-                          style: const TextStyle(fontSize: 18)),
+                            style: const TextStyle(fontSize: 18)),
                         title: Text(
                           _sectors[index],
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
                         trailing: isSelected
-                            ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                            ? Icon(Icons.check,
+                                size: 16, color: theme.colorScheme.primary)
                             : null,
                         onTap: () {
                           Navigator.pop(ctx);
@@ -176,14 +178,17 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _sectors.isNotEmpty ? '${_getSectorIcon(_sectors[_tabController.index])} ${_sectors[_tabController.index]}' : '📊 Sector별 추천 종목',
+                _sectors.isNotEmpty
+                    ? '${_getSectorIcon(_sectors[_tabController.index])} ${_sectors[_tabController.index]}'
+                    : '📊 Sector별 추천 종목',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface, size: 20),
+              Icon(Icons.arrow_drop_down,
+                  color: theme.colorScheme.onSurface, size: 20),
             ],
           ),
         ),
@@ -226,10 +231,9 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     );
   }
 
-
   Widget _buildSectorContent(String sector) {
     final stocks = _sectorStocks[sector] ?? [];
-    
+
     return Column(
       children: [
         Expanded(
@@ -252,10 +256,12 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     final themeData = Theme.of(context);
     final symbol = stock['symbol'] as String;
     final name = stock['name'] as String;
-    final reason = stock['reason'] as String? ?? 'Key sector leader with strong fundamentals.';
-    
+    final reason = stock['reason'] as String? ??
+        'Key sector leader with strong fundamentals.';
+
     // 뉴스 데이터 타입 변경 대응 (List<Map<String, String>>)
-    final newsList = (stock['news'] as List<dynamic>? ?? []).cast<Map<String, String>>();
+    final newsList =
+        (stock['news'] as List<dynamic>? ?? []).cast<Map<String, String>>();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -298,11 +304,8 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios, 
-                    size: 16, 
-                    color: themeData.colorScheme.onSurfaceVariant
-                  ),
+                  Icon(Icons.arrow_forward_ios,
+                      size: 16, color: themeData.colorScheme.onSurfaceVariant),
                 ],
               ),
               const SizedBox(height: 12),
@@ -312,16 +315,19 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: themeData.colorScheme.primaryContainer.withOpacity(0.3),
+                  color:
+                      themeData.colorScheme.primaryContainer.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeData.colorScheme.primary.withOpacity(0.2)),
+                  border: Border.all(
+                      color: themeData.colorScheme.primary.withOpacity(0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.lightbulb, size: 16, color: themeData.colorScheme.primary),
+                        Icon(Icons.lightbulb,
+                            size: 16, color: themeData.colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
                           '투자 포인트',
@@ -348,7 +354,8 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.article_outlined, size: 16, color: themeData.colorScheme.secondary),
+                    Icon(Icons.article_outlined,
+                        size: 16, color: themeData.colorScheme.secondary),
                     const SizedBox(width: 8),
                     Text(
                       '관련 뉴스',
@@ -363,7 +370,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 ...newsList.map((news) {
                   final title = news['title'] ?? '';
                   final url = news['url'] ?? '';
-                  
+
                   return InkWell(
                     onTap: () => _launchURL(url),
                     child: Padding(
@@ -371,7 +378,10 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('• ', style: TextStyle(color: themeData.colorScheme.onSurfaceVariant)),
+                          Text('• ',
+                              style: TextStyle(
+                                  color:
+                                      themeData.colorScheme.onSurfaceVariant)),
                           Expanded(
                             child: Text(
                               title,
@@ -390,14 +400,15 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                   );
                 }),
               ],
-              
+
               const SizedBox(height: 12),
-              
+
               // 차트 보기 힌트
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Icon(Icons.bar_chart, size: 13, color: themeData.colorScheme.primary),
+                  Icon(Icons.bar_chart,
+                      size: 13, color: themeData.colorScheme.primary),
                   const SizedBox(width: 4),
                   Text(
                     '차트 보기',

@@ -19,12 +19,12 @@ class ScreeningCandidate {
 
   factory ScreeningCandidate.fromMap(Map<String, dynamic> m) =>
       ScreeningCandidate(
-        id:        m['id'] as String,
+        id: m['id'] as String,
         stockCode: m['stock_code'] as String,
         stockName: m['stock_name'] as String,
-        sector:    m['sector'] as String,
-        source:    m['source'] as String? ?? 'system',
-        isActive:  m['is_active'] as bool? ?? true,
+        sector: m['sector'] as String,
+        source: m['source'] as String? ?? 'system',
+        isActive: m['is_active'] as bool? ?? true,
       );
 
   bool get isUserAdded => source == 'user';
@@ -69,10 +69,10 @@ class ScreeningService {
     await _sb.from('screening_candidates').insert({
       'stock_code': stockCode.trim(),
       'stock_name': stockName.trim(),
-      'sector':     sector.trim(),
-      'source':     'user',
-      'user_id':    user.id,
-      'is_active':  true,
+      'sector': sector.trim(),
+      'source': 'user',
+      'user_id': user.id,
+      'is_active': true,
     });
   }
 
@@ -80,7 +80,6 @@ class ScreeningService {
   static Future<void> remove(String id) async {
     await _sb
         .from('screening_candidates')
-        .update({'is_active': false})
-        .eq('id', id);
+        .update({'is_active': false}).eq('id', id);
   }
 }

@@ -8,8 +8,6 @@ import 'stock_news_section.dart';
 
 class StockCard extends StatefulWidget {
   final Stock stock;
-  static final Map<String, String> _chartCache = {};
-
   const StockCard({super.key, required this.stock});
 
   @override
@@ -38,11 +36,13 @@ class _StockCardState extends State<StockCard> {
         widget.stock.name,
         isKoreanStock: true,
       );
+      if (!mounted) return;
       setState(() {
         _newsList = news;
         _isLoadingNews = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _isLoadingNews = false;
       });
@@ -51,12 +51,12 @@ class _StockCardState extends State<StockCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final hasRealTimeData =
         widget.stock.price != null && widget.stock.price! > 0;
     final hasChartData = widget.stock.symbol.isNotEmpty;
 
     return Card(
-      color: Colors.grey[900],
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -73,8 +73,8 @@ class _StockCardState extends State<StockCard> {
                     children: [
                       Text(
                         widget.stock.symbol,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -82,8 +82,8 @@ class _StockCardState extends State<StockCard> {
                       const SizedBox(height: 4),
                       Text(
                         widget.stock.name,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 14,
                         ),
                         maxLines: 2,
@@ -95,7 +95,7 @@ class _StockCardState extends State<StockCard> {
                 // Right-hand price column
                 if (hasRealTimeData)
                   StockPriceBadge(price: widget.stock.price)
-                      .buildPriceColumn(),
+                      .buildPriceColumn(context),
               ],
             ),
 
@@ -106,7 +106,7 @@ class _StockCardState extends State<StockCard> {
                 volume: widget.stock.volume,
                 marketCap: widget.stock.marketCap,
                 lastUpdate: widget.stock.lastUpdate,
-              ).buildSecondaryRow(),
+              ).buildSecondaryRow(context),
 
             // ── Chart snapshot ────────────────────────────────────────────
             if (hasChartData) ...[

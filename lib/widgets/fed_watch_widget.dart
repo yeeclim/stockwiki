@@ -20,7 +20,10 @@ class _FedWatchWidgetState extends State<FedWatchWidget> {
 
   Future<void> _fetchFedWatch() async {
     try {
-      final response = await http.get(Uri.parse('https://dataneutrino.vercel.app/api/fedwatch'));
+      final response = await http
+          .get(Uri.parse('https://dataneutrino.vercel.app/api/fedwatch'))
+          .timeout(const Duration(seconds: 10));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
@@ -30,6 +33,7 @@ class _FedWatchWidgetState extends State<FedWatchWidget> {
         setState(() => _text = '불러오기 실패');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _text = '에러 발생');
     }
   }

@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/stock.dart';
 import '../services/fmp_service.dart';
-import '../widgets/stock_card.dart';
 import '../utils/tradingview_helper.dart';
 import '../widgets/portfolio_add_sheet.dart';
-import 'us_stock_detail_page.dart';
 
 class UsStockAiRecommendPage extends StatefulWidget {
   const UsStockAiRecommendPage({super.key});
@@ -32,7 +29,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
     });
 
     try {
-      final recommendations = await FMPService.fetchRecommendedStocks(limit: 20);
+      final recommendations =
+          await FMPService.fetchRecommendedStocks(limit: 20);
       setState(() {
         _recommendations = recommendations;
         _lastUpdated = DateTime.now();
@@ -124,7 +122,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurface),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -150,7 +149,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
             const SizedBox(height: 16),
             Text(
               '추천 주식을 불러오는 중입니다',
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 8),
             TextButton(
@@ -253,9 +253,9 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 12),
-                      
+
                       // 가격 정보
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -296,9 +296,9 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                           ],
                         ],
                       ),
-                      
+
                       const SizedBox(height: 12),
-                      
+
                       // 추천 이유
                       if (rec.reasons.isNotEmpty) ...[
                         Divider(color: theme.dividerColor, height: 1),
@@ -312,28 +312,30 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                         ),
                         const SizedBox(height: 6),
                         ...rec.reasons.map((reason) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '• ',
-                                style: TextStyle(
-                                  color: Colors.green[400],
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  reason,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '• ',
+                                    style: TextStyle(
+                                      color: Colors.green[400],
+                                      fontSize: 12,
+                                    ),
                                   ),
-                                ),
+                                  Expanded(
+                                    child: Text(
+                                      reason,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        )),
+                            )),
                       ],
                       const SizedBox(height: 12),
                       Row(
@@ -349,7 +351,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.add_circle_outline, size: 14,
+                                Icon(Icons.add_circle_outline,
+                                    size: 14,
                                     color: theme.colorScheme.secondary),
                                 const SizedBox(width: 4),
                                 Text('포트폴리오 추가',
@@ -361,7 +364,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                           ),
                           Row(
                             children: [
-                              Icon(Icons.bar_chart, size: 13, color: theme.colorScheme.primary),
+                              Icon(Icons.bar_chart,
+                                  size: 13, color: theme.colorScheme.primary),
                               const SizedBox(width: 4),
                               Text(
                                 '차트 보기',
@@ -404,4 +408,3 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
     }
   }
 }
-

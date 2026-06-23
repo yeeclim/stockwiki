@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Shows a loading spinner, an error message with retry button, or an
@@ -48,9 +49,9 @@ class AiRecommendEmptyState extends StatelessWidget {
     }
 
     // isEmpty == true
-    final baseUrl = Uri.base.origin;
-    final isLocalDev =
-        baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+    final isLocalDev = kIsWeb &&
+        (Uri.base.origin.contains('localhost') ||
+            Uri.base.origin.contains('127.0.0.1'));
 
     return Center(
       child: Column(
@@ -63,9 +64,7 @@ class AiRecommendEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            isLocalDev
-                ? 'AI 추천 서비스는 운영서버에서만 지원됩니다'
-                : '최신 데이터를 불러오는 중입니다',
+            isLocalDev ? 'AI 추천 서비스는 운영서버에서만 지원됩니다' : '최신 데이터를 불러오는 중입니다',
             style: const TextStyle(color: Colors.white70, fontSize: 16),
           ),
           const SizedBox(height: 8),

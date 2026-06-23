@@ -25,7 +25,7 @@ class ExchangeRateService {
       final prefs = await SharedPreferences.getInstance();
       final cachedRate = prefs.getDouble(_cacheKey);
       final cacheTime = prefs.getInt(_timeKey);
-      
+
       if (cachedRate != null && cacheTime != null) {
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - cacheTime < _cacheValidMinutes * 60 * 1000) {
@@ -40,7 +40,7 @@ class ExchangeRateService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final result = data['chart']?['result']?[0];
-        
+
         if (result != null) {
           final meta = result['meta'];
           if (meta != null) {
@@ -48,13 +48,14 @@ class ExchangeRateService {
             if (rate != null) {
               final rateValue = rate.toDouble();
               await prefs.setDouble(_cacheKey, rateValue);
-              await prefs.setInt(_timeKey, DateTime.now().millisecondsSinceEpoch);
+              await prefs.setInt(
+                  _timeKey, DateTime.now().millisecondsSinceEpoch);
               return rateValue;
             }
           }
         }
       }
-      
+
       if (cachedRate != null) return cachedRate;
       return null;
     } catch (e) {

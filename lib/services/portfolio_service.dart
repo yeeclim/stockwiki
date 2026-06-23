@@ -93,6 +93,7 @@ class PortfolioService {
 
   static Future<void> _save(List<PortfolioHolding> holdings) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, json.encode(holdings.map((h) => h.toJson()).toList()));
+    await prefs.setString(
+        _key, json.encode(holdings.map((h) => h.toJson()).toList()));
   }
 }

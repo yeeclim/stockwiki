@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const _adminEmail = 'eklim4254@gmail.com';
+const _adminEmail = String.fromEnvironment('ADMIN_EMAIL');
 
 class AdminScreeningPage extends StatefulWidget {
   const AdminScreeningPage({super.key});
@@ -15,7 +15,7 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
   final _sb = Supabase.instance.client;
   late final TabController _tab;
 
-  List<Map<String, dynamic>> _pending  = [];
+  List<Map<String, dynamic>> _pending = [];
   List<Map<String, dynamic>> _approved = [];
   bool _loading = true;
 
@@ -52,9 +52,9 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
 
       if (!mounted) return;
       setState(() {
-        _pending  = List<Map<String, dynamic>>.from(pending);
+        _pending = List<Map<String, dynamic>>.from(pending);
         _approved = List<Map<String, dynamic>>.from(approved);
-        _loading  = false;
+        _loading = false;
       });
     } catch (e) {
       if (mounted) setState(() => _loading = false);
@@ -66,8 +66,8 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     Map<String, dynamic>? removed;
     // optimistic remove from pending for immediate UI feedback
     setState(() {
-      final idx = _pending.indexWhere((item) =>
-          (item['id'] ?? '').toString() == (id ?? '').toString());
+      final idx = _pending.indexWhere(
+          (item) => (item['id'] ?? '').toString() == (id ?? '').toString());
       if (idx >= 0) removed = _pending.removeAt(idx);
     });
 
@@ -78,10 +78,9 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
           .eq('id', id)
           .select();
 
-      final List<Map<String, dynamic>> rows =
-          (updated is List ? updated : (updated == null ? [] : [updated]))
-              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-              .toList();
+      final List<Map<String, dynamic>> rows = (updated as List)
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+          .toList();
 
       debugPrint('approve: id=$id updatedRows=${rows.length}');
 
@@ -118,8 +117,8 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     if (!mounted) return;
     Map<String, dynamic>? removed;
     setState(() {
-      final idx = _pending.indexWhere((item) =>
-          (item['id'] ?? '').toString() == (id ?? '').toString());
+      final idx = _pending.indexWhere(
+          (item) => (item['id'] ?? '').toString() == (id ?? '').toString());
       if (idx >= 0) removed = _pending.removeAt(idx);
     });
 
@@ -130,10 +129,9 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
           .eq('id', id)
           .select();
 
-      final List<Map<String, dynamic>> rows =
-          (updated is List ? updated : (updated == null ? [] : [updated]))
-              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-              .toList();
+      final List<Map<String, dynamic>> rows = (updated as List)
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+          .toList();
 
       debugPrint('reject: id=$id updatedRows=${rows.length}');
 
@@ -159,8 +157,8 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
     if (!mounted) return;
     Map<String, dynamic>? removed;
     setState(() {
-      final idx = _approved.indexWhere((item) =>
-          (item['id'] ?? '').toString() == (id ?? '').toString());
+      final idx = _approved.indexWhere(
+          (item) => (item['id'] ?? '').toString() == (id ?? '').toString());
       if (idx >= 0) removed = _approved.removeAt(idx);
     });
 
@@ -171,10 +169,9 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
           .eq('id', id)
           .select();
 
-      final List<Map<String, dynamic>> rows =
-          (updated is List ? updated : (updated == null ? [] : [updated]))
-              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-              .toList();
+      final List<Map<String, dynamic>> rows = (updated as List)
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+          .toList();
 
       debugPrint('revoke: id=$id updatedRows=${rows.length}');
 
@@ -205,7 +202,7 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user  = _sb.auth.currentUser;
+    final user = _sb.auth.currentUser;
 
     // 관리자 이메일 체크
     if (user?.email != _adminEmail) {
@@ -224,8 +221,12 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text('AI 추천 종목 관리',
-            style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)],
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load)
+        ],
         bottom: TabBar(
           controller: _tab,
           tabs: [
@@ -243,15 +244,15 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
               controller: _tab,
               children: [
                 _PendingTab(
-                  items:    _pending,
+                  items: _pending,
                   onApprove: _approve,
-                  onReject:  _reject,
-                  theme:    theme,
+                  onReject: _reject,
+                  theme: theme,
                 ),
                 _ApprovedTab(
-                  items:    _approved,
+                  items: _approved,
                   onRevoke: _revoke,
-                  theme:    theme,
+                  theme: theme,
                 ),
               ],
             ),
@@ -268,8 +269,10 @@ class _PendingTab extends StatelessWidget {
   final ThemeData theme;
 
   const _PendingTab({
-    required this.items, required this.onApprove,
-    required this.onReject, required this.theme,
+    required this.items,
+    required this.onApprove,
+    required this.onReject,
+    required this.theme,
   });
 
   @override
@@ -279,8 +282,8 @@ class _PendingTab extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_outline, size: 48,
-                color: theme.colorScheme.onSurfaceVariant),
+            Icon(Icons.check_circle_outline,
+                size: 48, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 12),
             Text('검토할 종목이 없습니다.',
                 style: theme.textTheme.bodyMedium
@@ -297,10 +300,10 @@ class _PendingTab extends StatelessWidget {
       itemBuilder: (_, i) {
         final item = items[i];
         return _PendingCard(
-          item:      item,
+          item: item,
           onApprove: () => onApprove(item['id']),
-          onReject:  () => onReject(item['id'], item['stock_name'] as String),
-          theme:     theme,
+          onReject: () => onReject(item['id'], item['stock_name'] as String),
+          theme: theme,
         );
       },
     );
@@ -314,8 +317,10 @@ class _PendingCard extends StatefulWidget {
   final ThemeData theme;
 
   const _PendingCard({
-    required this.item, required this.onApprove,
-    required this.onReject, required this.theme,
+    required this.item,
+    required this.onApprove,
+    required this.onReject,
+    required this.theme,
   });
 
   @override
@@ -337,7 +342,7 @@ class _PendingCardState extends State<_PendingCard> {
 
   @override
   Widget build(BuildContext context) {
-    final item  = widget.item;
+    final item = widget.item;
     final theme = widget.theme;
 
     return Container(
@@ -359,17 +364,22 @@ class _PendingCardState extends State<_PendingCard> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(item['sector'] as String,
-                    style: const TextStyle(fontSize: 11, color: Colors.orange,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange,
                         fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 8),
               Text(item['stock_code'] as String,
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 12,
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
                       color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(item['stock_name'] as String,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold)),
               ),
               const _AIBadge(),
             ],
@@ -377,14 +387,15 @@ class _PendingCardState extends State<_PendingCard> {
           if ((item['ai_reason'] as String? ?? '').isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(item['ai_reason'] as String,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.5)),
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant, height: 1.5)),
           ],
           const SizedBox(height: 12),
           _processing
-              ? const Center(child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: CircularProgressIndicator(strokeWidth: 2)))
+              ? const Center(
+                  child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: CircularProgressIndicator(strokeWidth: 2)))
               : Row(
                   children: [
                     Expanded(
@@ -394,9 +405,12 @@ class _PendingCardState extends State<_PendingCard> {
                         label: const Text('거절'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: theme.colorScheme.error,
-                          side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
+                          side: BorderSide(
+                              color: theme.colorScheme.error
+                                  .withValues(alpha: 0.5)),
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                     ),
@@ -408,7 +422,8 @@ class _PendingCardState extends State<_PendingCard> {
                         label: const Text('승인'),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                     ),
@@ -427,7 +442,8 @@ class _ApprovedTab extends StatelessWidget {
   final Future<void> Function(dynamic id, String name) onRevoke;
   final ThemeData theme;
 
-  const _ApprovedTab({required this.items, required this.onRevoke, required this.theme});
+  const _ApprovedTab(
+      {required this.items, required this.onRevoke, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -454,7 +470,9 @@ class _ApprovedTab extends StatelessWidget {
           child: Row(
             children: [
               Text(item['stock_code'] as String,
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 12,
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
                       color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(width: 10),
               Expanded(
@@ -462,10 +480,11 @@ class _ApprovedTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(item['stock_name'] as String,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w500)),
                     Text(item['sector'] as String,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -474,7 +493,8 @@ class _ApprovedTab extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 18),
                 color: theme.colorScheme.error,
-                onPressed: () => onRevoke(item['id'], item['stock_name'] as String),
+                onPressed: () =>
+                    onRevoke(item['id'], item['stock_name'] as String),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -495,7 +515,10 @@ class _AIBadge extends StatelessWidget {
           color: Colors.deepPurple.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: const Text('AI', style: TextStyle(fontSize: 10, color: Colors.deepPurple,
-            fontWeight: FontWeight.bold)),
+        child: const Text('AI',
+            style: TextStyle(
+                fontSize: 10,
+                color: Colors.deepPurple,
+                fontWeight: FontWeight.bold)),
       );
 }

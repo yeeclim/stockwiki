@@ -22,25 +22,25 @@ class _BrokerOption {
 
 class _TradingSetupPageState extends State<TradingSetupPage> {
   static const _brokers = [
-    _BrokerOption('kis',     '한국투자증권', Color(0xFF0066CC)),
-    _BrokerOption('kiwoom',  '키움증권',    Color(0xFFE8001C)),
-    _BrokerOption('nh',      'NH 나무',     Color(0xFF00A651)),
-    _BrokerOption('samsung', '삼성증권',    Color(0xFF1428A0)),
+    _BrokerOption('kis', '한국투자증권', Color(0xFF0066CC)),
+    _BrokerOption('kiwoom', '키움증권', Color(0xFFE8001C)),
+    _BrokerOption('nh', 'NH 나무', Color(0xFF00A651)),
+    _BrokerOption('samsung', '삼성증권', Color(0xFF1428A0)),
   ];
 
-  final _formKey       = GlobalKey<FormState>();
-  final _appKeyCtrl    = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _appKeyCtrl = TextEditingController();
   final _appSecretCtrl = TextEditingController();
-  final _accountCtrl   = TextEditingController();
-  final _prodCodeCtrl  = TextEditingController(text: '01');
-  final _emailCtrl     = TextEditingController();
-  final _kakaoCtrl     = TextEditingController();
-  final _dailyMaxCtrl  = TextEditingController();
+  final _accountCtrl = TextEditingController();
+  final _prodCodeCtrl = TextEditingController(text: '01');
+  final _emailCtrl = TextEditingController();
+  final _kakaoCtrl = TextEditingController();
+  final _dailyMaxCtrl = TextEditingController();
 
   late String _selectedBroker;
-  bool _loading        = true;
-  bool _saving         = false;
-  bool _obscureSecret  = true;
+  bool _loading = true;
+  bool _saving = false;
+  bool _obscureSecret = true;
   TradingConfig? _existing;
 
   @override
@@ -56,16 +56,17 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
       if (!mounted) return;
       setState(() {
         _existing = cfg;
-        _loading  = false;
+        _loading = false;
         if (cfg != null) {
-          _selectedBroker     = cfg.brokerType;
-          _appKeyCtrl.text    = cfg.kisAppKey;
+          _selectedBroker = cfg.brokerType;
+          _appKeyCtrl.text = cfg.kisAppKey;
           _appSecretCtrl.text = cfg.kisAppSecret;
-          _accountCtrl.text   = cfg.kisAccountNo;
-          _prodCodeCtrl.text  = cfg.kisAccountProdCode;
-          _emailCtrl.text     = cfg.notifyEmail;
-          _kakaoCtrl.text     = cfg.notifyKakaoRefreshToken;
-          if (cfg.dailyMaxBuy != null) _dailyMaxCtrl.text = cfg.dailyMaxBuy.toString();
+          _accountCtrl.text = cfg.kisAccountNo;
+          _prodCodeCtrl.text = cfg.kisAccountProdCode;
+          _emailCtrl.text = cfg.notifyEmail;
+          _kakaoCtrl.text = cfg.notifyKakaoRefreshToken;
+          if (cfg.dailyMaxBuy != null)
+            _dailyMaxCtrl.text = cfg.dailyMaxBuy.toString();
         } else {
           final email = context.read<AuthProvider>().currentUser?.email ?? '';
           _emailCtrl.text = email;
@@ -86,14 +87,14 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     setState(() => _saving = true);
 
     final cfg = TradingConfig(
-      brokerType:          _selectedBroker,
-      kisAppKey:           _appKeyCtrl.text.trim(),
-      kisAppSecret:        _appSecretCtrl.text.trim(),
-      kisAccountNo:        _accountCtrl.text.trim(),
-      kisAccountProdCode:  _prodCodeCtrl.text.trim(),
-      notifyEmail:         _emailCtrl.text.trim(),
+      brokerType: _selectedBroker,
+      kisAppKey: _appKeyCtrl.text.trim(),
+      kisAppSecret: _appSecretCtrl.text.trim(),
+      kisAccountNo: _accountCtrl.text.trim(),
+      kisAccountProdCode: _prodCodeCtrl.text.trim(),
+      notifyEmail: _emailCtrl.text.trim(),
       notifyKakaoRefreshToken: _kakaoCtrl.text.trim(),
-      dailyMaxBuy:         int.tryParse(_dailyMaxCtrl.text.trim()),
+      dailyMaxBuy: int.tryParse(_dailyMaxCtrl.text.trim()),
     );
 
     try {
@@ -123,10 +124,13 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
         title: const Text('자동매매 비활성화'),
         content: const Text('자동매매를 중단하시겠습니까?\n등록된 키는 그대로 유지됩니다.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('비활성화', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text('비활성화',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -176,15 +180,18 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
         ),
         title: Text(
           'API 키 등록',
-          style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
         actions: [
           TextButton.icon(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const KisGuidePage()),
             ),
-            icon: Icon(Icons.help_outline, size: 18, color: theme.colorScheme.primary),
-            label: Text('발급 가이드', style: TextStyle(color: theme.colorScheme.primary)),
+            icon: Icon(Icons.help_outline,
+                size: 18, color: theme.colorScheme.primary),
+            label: Text('발급 가이드',
+                style: TextStyle(color: theme.colorScheme.primary)),
           ),
         ],
       ),
@@ -213,9 +220,11 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                         onTap: () => setState(() => _selectedBroker = b.id),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: selected ? b.color : theme.colorScheme.surface,
+                            color:
+                                selected ? b.color : theme.colorScheme.surface,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: selected ? b.color : theme.dividerColor,
@@ -225,7 +234,9 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                           child: Text(
                             b.name,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: selected ? Colors.white : theme.colorScheme.onSurface,
+                              color: selected
+                                  ? Colors.white
+                                  : theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -269,8 +280,8 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                             icon: Icon(_obscureSecret
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined),
-                            onPressed: () =>
-                                setState(() => _obscureSecret = !_obscureSecret),
+                            onPressed: () => setState(
+                                () => _obscureSecret = !_obscureSecret),
                           ),
                           validator: _required,
                         ),
@@ -282,7 +293,8 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                           icon: Icons.account_balance_outlined,
                           keyboardType: TextInputType.number,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return '계좌번호를 입력하세요.';
+                            if (v == null || v.trim().isEmpty)
+                              return '계좌번호를 입력하세요.';
                             if (v.trim().length != 8) return '계좌번호는 8자리입니다.';
                             return null;
                           },
@@ -311,7 +323,8 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return '이메일을 입력하세요.';
+                            if (v == null || v.trim().isEmpty)
+                              return '이메일을 입력하세요.';
                             if (!v.contains('@')) return '올바른 이메일 형식이 아닙니다.';
                             return null;
                           },
@@ -331,17 +344,22 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                         const SizedBox(height: 8),
                         Text(
                           '입력하면 종목 스크리닝 결과를 카카오톡으로 수신합니다. 토큰은 안전하게 저장됩니다.',
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 8),
                         Align(
                           alignment: Alignment.centerLeft,
                           child: TextButton.icon(
                             onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const KakaoGuidePage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const KakaoGuidePage()),
                             ),
-                            icon: Icon(Icons.help_outline, size: 16, color: theme.colorScheme.primary),
-                            label: Text('카카오 발급 가이드 보기', style: TextStyle(color: theme.colorScheme.primary)),
+                            icon: Icon(Icons.help_outline,
+                                size: 16, color: theme.colorScheme.primary),
+                            label: Text('카카오 발급 가이드 보기',
+                                style: TextStyle(
+                                    color: theme.colorScheme.primary)),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -397,8 +415,10 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                               label: const Text('자동매매 일시 중지'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: theme.colorScheme.error,
-                                side: BorderSide(color: theme.colorScheme.error),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side:
+                                    BorderSide(color: theme.colorScheme.error),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12)),
                               ),
@@ -412,10 +432,12 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.errorContainer.withValues(alpha: 0.25),
+                            color: theme.colorScheme.errorContainer
+                                .withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                                color: theme.colorScheme.error.withValues(alpha: 0.4)),
+                                color: theme.colorScheme.error
+                                    .withValues(alpha: 0.4)),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,7 +449,8 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                                 child: Text(
                                   '입력된 키는 암호화되어 저장되며, 자동매매 실행에만 사용됩니다.\n'
                                   '모든 투자 결과에 대한 책임은 본인에게 있습니다.',
-                                  style: theme.textTheme.bodySmall?.copyWith(height: 1.6),
+                                  style: theme.textTheme.bodySmall
+                                      ?.copyWith(height: 1.6),
                                 ),
                               ),
                             ],
@@ -536,18 +559,19 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return TextFormField(
-      controller:     controller,
-      obscureText:    obscure,
-      keyboardType:   keyboardType,
-      validator:      validator,
-      style:          theme.textTheme.bodyMedium,
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      validator: validator,
+      style: theme.textTheme.bodyMedium,
       decoration: InputDecoration(
-        labelText:    label,
-        hintText:     hint,
-        prefixIcon:   Icon(icon, size: 20),
-        suffixIcon:   suffixIcon,
-        border:       OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 20),
+        suffixIcon: suffixIcon,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
