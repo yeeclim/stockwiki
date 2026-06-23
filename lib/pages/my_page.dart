@@ -63,8 +63,8 @@ class MyPage extends StatelessWidget {
                       children: [
                         Text(
                           authProvider.displayName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold),
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (authProvider.currentUser?.email != null &&
@@ -81,7 +81,8 @@ class MyPage extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(

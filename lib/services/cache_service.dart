@@ -10,14 +10,15 @@ class CacheService {
   }
 
   /// 데이터 캐시 저장
-  static Future<void> set(String key, dynamic value, {Duration expiration = const Duration(minutes: 30)}) async {
+  static Future<void> set(String key, dynamic value,
+      {Duration expiration = const Duration(minutes: 30)}) async {
     if (_prefs == null) await init();
-    
+
     final data = {
       'value': value,
       'expiry': DateTime.now().add(expiration).millisecondsSinceEpoch,
     };
-    
+
     await _prefs!.setString(key, json.encode(data));
     debugPrint('💾 [Cache] 저장: $key (만료: ${expiration.inMinutes}분 후)');
   }
@@ -25,7 +26,7 @@ class CacheService {
   /// 데이터 캐시 조회
   static Future<dynamic> get(String key) async {
     if (_prefs == null) await init();
-    
+
     if (!_prefs!.containsKey(key)) {
       return null;
     }
@@ -36,7 +37,7 @@ class CacheService {
 
       final data = json.decode(jsonString);
       final expiry = data['expiry'] as int;
-      
+
       if (DateTime.now().millisecondsSinceEpoch > expiry) {
         debugPrint('🗑️ [Cache] 만료됨: $key');
         await _prefs!.remove(key);
@@ -58,9 +59,21 @@ class CacheService {
     await _prefs!.remove(key);
   }
 
-  /// 전체 캐시 삭제
+  /// 캐시 항목만 삭제 (value+expiry JSON 구조인 키만 제거, 앱 설정 보존)
   static Future<void> clear() async {
     if (_prefs == null) await init();
-    await _prefs!.clear();
+    final keys = _prefs!.getKeys().toList();
+    for (final key in keys) {
+      try {
+        final raw = _prefs!.getString(key);
+        if (raw == null) continue;
+        final decoded = json.decode(raw);
+        if (decoded is Map &&
+            decoded.containsKey('expiry') &&
+            decoded.containsKey('value')) {
+          await _prefs!.remove(key);
+        }
+      } catch (_) {}
+    }
   }
 }

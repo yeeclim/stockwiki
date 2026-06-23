@@ -25,7 +25,7 @@ class _TestNewsPageState extends State<TestNewsPage> {
 
   Future<void> _searchNews() async {
     if (_controller.text.isEmpty) return;
-    
+
     setState(() {
       _isLoading = true;
       _newsList = [];
@@ -84,13 +84,13 @@ class _TestNewsPageState extends State<TestNewsPage> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _searchNews,
-                  child: _isLoading 
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('검색'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('검색'),
                 ),
               ],
             ),
@@ -181,7 +181,7 @@ class _TestNewsPageState extends State<TestNewsPage> {
       final dateTime = DateTime.parse(publishedAt);
       final now = DateTime.now();
       final difference = now.difference(dateTime);
-      
+
       if (difference.inMinutes < 1) {
         return '방금 전';
       } else if (difference.inMinutes < 60) {

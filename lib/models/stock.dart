@@ -60,7 +60,10 @@ class Stock {
   // KRX 데이터에서 Stock 객체 생성
   factory Stock.fromKrxData(Map<String, dynamic> krxData) {
     return Stock(
-      symbol: krxData['symbol']?.toString() ?? krxData['단축코드']?.toString() ?? krxData['code']?.toString() ?? '',
+      symbol: krxData['symbol']?.toString() ??
+          krxData['단축코드']?.toString() ??
+          krxData['code']?.toString() ??
+          '',
       name: krxData['name']?.toString() ?? krxData['한글 종목명']?.toString() ?? '',
       price: krxData['price']?.toDouble(),
       change: krxData['change']?.toDouble(),

@@ -27,17 +27,24 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
   Future<void> _search() async {
     final q = _controller.text.trim();
     if (q.isEmpty) return;
-    setState(() { _isLoading = true; _error = ''; _results = []; });
+    setState(() {
+      _isLoading = true;
+      _error = '';
+      _results = [];
+    });
 
     try {
       final origin = Uri.base.origin;
-      final url = '$origin/api/kr-stock-search?query=${Uri.encodeComponent(q)}&type=$_type';
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final url =
+          '$origin/api/kr-stock-search?query=${Uri.encodeComponent(q)}&type=$_type';
+      final res =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         if (data['success'] == true) {
-          setState(() => _results = List<Map<String, dynamic>>.from(data['data'] ?? []));
+          setState(() =>
+              _results = List<Map<String, dynamic>>.from(data['data'] ?? []));
         } else {
           setState(() => _error = data['error'] ?? '검색 실패');
         }
@@ -64,7 +71,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
         elevation: 0,
         title: Text('🇰🇷 국내 검색',
             style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
@@ -87,8 +95,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
               onSubmitted: (_) => _search(),
               decoration: InputDecoration(
                 hintText: '종목명 또는 코드 (예: 삼성전자, KODEX, 005930)',
-                hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant),
+                hintStyle: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                 border: OutlineInputBorder(
@@ -99,13 +107,17 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                     borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
-                prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+                    borderSide: BorderSide(
+                        color: theme.colorScheme.primary, width: 1.5)),
+                prefixIcon: Icon(Icons.search,
+                    color: theme.colorScheme.onSurfaceVariant),
                 suffixIcon: IconButton(
-                  icon: Icon(Icons.arrow_forward, color: theme.colorScheme.primary),
+                  icon: Icon(Icons.arrow_forward,
+                      color: theme.colorScheme.primary),
                   onPressed: _search,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
             const SizedBox(height: 12),
@@ -127,7 +139,10 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
 
             // 결과
             if (_isLoading)
-              Expanded(child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)))
+              Expanded(
+                  child: Center(
+                      child: CircularProgressIndicator(
+                          color: theme.colorScheme.primary)))
             else if (_error.isNotEmpty)
               _buildError(theme)
             else if (_results.isEmpty && _controller.text.isNotEmpty)
@@ -151,16 +166,21 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
       label: Text(label),
       selected: selected,
       onSelected: (_) {
+        if (_isLoading) return;
         setState(() => _type = value);
         if (_controller.text.isNotEmpty) _search();
       },
       selectedColor: theme.colorScheme.primary.withOpacity(0.15),
       checkmarkColor: theme.colorScheme.primary,
       labelStyle: theme.textTheme.labelMedium?.copyWith(
-          color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface,
           fontWeight: selected ? FontWeight.bold : FontWeight.normal),
       side: BorderSide(
-          color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant),
     );
   }
 
@@ -172,7 +192,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
           children: [
             Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
             const SizedBox(height: 12),
-            Text(_error, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+            Text(_error,
+                style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 12),
             ElevatedButton(onPressed: _search, child: const Text('다시 시도')),
           ],
@@ -187,10 +208,13 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            Icon(Icons.search_off,
+                size: 48,
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
             const SizedBox(height: 12),
-            Text('검색 결과가 없습니다', style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant)),
+            Text('검색 결과가 없습니다',
+                style: theme.textTheme.bodyLarge
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
@@ -205,7 +229,7 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
     final price = item['price'] as num?;
     final changePct = item['changePercent'] as num?;
     final hasChange = changePct != null;
-    final isUp = hasChange && changePct! >= 0;
+    final isUp = hasChange && changePct >= 0;
     final changeColor = isUp ? Colors.red : Colors.blue;
 
     return Padding(
@@ -231,7 +255,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
               children: [
                 // 아이콘 박스
                 Container(
-                  width: 42, height: 42,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: isEtf
                         ? theme.colorScheme.tertiaryContainer
@@ -240,7 +265,11 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                   ),
                   child: Center(
                     child: Text(
-                      isEtf ? 'E' : name.isNotEmpty ? name[0] : '?',
+                      isEtf
+                          ? 'E'
+                          : name.isNotEmpty
+                              ? name[0]
+                              : '?',
                       style: TextStyle(
                         color: isEtf
                             ? theme.colorScheme.onTertiaryContainer
@@ -262,15 +291,16 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                         children: [
                           Flexible(
                             child: Text(name,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold),
+                                style: theme.textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis),
                           ),
                           if (isEtf) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.tertiaryContainer,
                                 borderRadius: BorderRadius.circular(4),
@@ -278,7 +308,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                               child: Text(
                                 code.startsWith('5') ? 'ETN' : 'ETF',
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onTertiaryContainer,
+                                    color:
+                                        theme.colorScheme.onTertiaryContainer,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 10),
                               ),
@@ -300,7 +331,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                   children: [
                     Text(
                       price != null ? _fmtPrice(price) : '-',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     if (hasChange) ...[
                       const SizedBox(height: 4),
@@ -309,12 +341,14 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                         children: [
                           Icon(
                             isUp ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                            color: changeColor, size: 16,
+                            color: changeColor,
+                            size: 16,
                           ),
                           Text(
-                            '${changePct!.abs().toStringAsFixed(2)}%',
+                            '${changePct.abs().toStringAsFixed(2)}%',
                             style: theme.textTheme.bodySmall?.copyWith(
-                                color: changeColor, fontWeight: FontWeight.bold),
+                                color: changeColor,
+                                fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),

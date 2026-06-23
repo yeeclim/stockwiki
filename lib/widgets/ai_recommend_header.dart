@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/date_utils.dart';
 
 /// Displays the AppBar title area: the page title and optional last-updated
 /// timestamp.  Rendered as a Column so it can be embedded directly in
@@ -7,23 +8,6 @@ class AiRecommendHeader extends StatelessWidget {
   final DateTime? lastUpdated;
 
   const AiRecommendHeader({super.key, this.lastUpdated});
-
-  String _formatLastUpdated(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return '방금 전';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}분 전';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}시간 전';
-    } else {
-      return '${dateTime.month}/${dateTime.day} '
-          '${dateTime.hour.toString().padLeft(2, '0')}:'
-          '${dateTime.minute.toString().padLeft(2, '0')}';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +26,7 @@ class AiRecommendHeader extends StatelessWidget {
         ),
         if (lastUpdated != null)
           Text(
-            '마지막 업데이트: ${_formatLastUpdated(lastUpdated!)}',
+            '마지막 업데이트: ${formatTimeAgo(lastUpdated!)}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontSize: 11,

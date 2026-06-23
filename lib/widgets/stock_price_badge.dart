@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/date_utils.dart';
 
 /// Renders the price column (current price + "전일 종가" label) shown on the
 /// right side of the stock card header row, and the secondary row containing
@@ -46,47 +47,32 @@ class StockPriceBadge extends StatelessWidget {
   }
 
   static String formatTime(String isoString) {
-    try {
-      final dateTime = DateTime.parse(isoString);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-
-      if (difference.inMinutes < 1) {
-        return '방금 전';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}분 전';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}시간 전';
-      } else {
-        return '${dateTime.month}/${dateTime.day}';
-      }
-    } catch (_) {
-      return '알 수 없음';
-    }
+    return formatTimeAgoFromString(isoString);
   }
 
   // ─── Widgets ─────────────────────────────────────────────────────────────
 
   /// Right-hand price column used inside the card header [Row].
-  Widget buildPriceColumn() {
+  Widget buildPriceColumn(BuildContext context) {
     if (!_hasRealTimeData) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
           '₩${price!.toStringAsFixed(0)}',
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           '전일 종가',
           style: TextStyle(
-            color: Colors.white60,
+            color: theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
             fontSize: 12,
           ),
@@ -96,8 +82,9 @@ class StockPriceBadge extends StatelessWidget {
   }
 
   /// Secondary row with volume, market-cap and timestamp.
-  Widget buildSecondaryRow() {
+  Widget buildSecondaryRow(BuildContext context) {
     if (!_hasRealTimeData) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,12 +96,14 @@ class StockPriceBadge extends StatelessWidget {
             if (volume != null)
               Text(
                 '거래량: ${formatVolume(volume!)}',
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
+                style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
               ),
             if (marketCap != null && marketCap! > 0)
               Text(
                 '시가총액: ${formatMarketCap(marketCap!)}',
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
+                style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
               ),
           ],
         ),
@@ -125,7 +114,8 @@ class StockPriceBadge extends StatelessWidget {
             children: [
               Text(
                 '업데이트: ${formatTime(lastUpdate!)}',
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
+                style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
               ),
             ],
           ),
@@ -142,7 +132,7 @@ class StockPriceBadge extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildSecondaryRow(),
+        buildSecondaryRow(context),
       ],
     );
   }

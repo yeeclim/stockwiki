@@ -25,15 +25,16 @@ class BookmarkService {
   }
 
   /// 북마크 추가
-  static Future<bool> addBookmark(String stockCode, Map<String, dynamic> details) async {
+  static Future<bool> addBookmark(
+      String stockCode, Map<String, dynamic> details) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 북마크 목록에 추가
       final bookmarks = await getBookmarkedStocks();
       bookmarks.add(stockCode);
       await prefs.setString(_bookmarkKey, json.encode(bookmarks.toList()));
-      
+
       // 북마크 상세 정보 저장
       final detailsJson = prefs.getString(_bookmarkDetailsKey);
       Map<String, dynamic> allDetails = {};
@@ -45,7 +46,7 @@ class BookmarkService {
         'bookmarkedAt': DateTime.now().toIso8601String(),
       };
       await prefs.setString(_bookmarkDetailsKey, json.encode(allDetails));
-      
+
       return true;
     } catch (e) {
       debugPrint('북마크 추가 오류: $e');
@@ -57,12 +58,12 @@ class BookmarkService {
   static Future<bool> removeBookmark(String stockCode) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 북마크 목록에서 제거
       final bookmarks = await getBookmarkedStocks();
       bookmarks.remove(stockCode);
       await prefs.setString(_bookmarkKey, json.encode(bookmarks.toList()));
-      
+
       // 북마크 상세 정보에서 제거
       final detailsJson = prefs.getString(_bookmarkDetailsKey);
       if (detailsJson != null) {
@@ -70,7 +71,7 @@ class BookmarkService {
         allDetails.remove(stockCode);
         await prefs.setString(_bookmarkDetailsKey, json.encode(allDetails));
       }
-      
+
       return true;
     } catch (e) {
       debugPrint('북마크 제거 오류: $e');
@@ -85,7 +86,8 @@ class BookmarkService {
   }
 
   /// 북마크 상세 정보 가져오기
-  static Future<Map<String, dynamic>?> getBookmarkDetails(String stockCode) async {
+  static Future<Map<String, dynamic>?> getBookmarkDetails(
+      String stockCode) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final detailsJson = prefs.getString(_bookmarkDetailsKey);
@@ -117,12 +119,12 @@ class BookmarkService {
       final prefs = await SharedPreferences.getInstance();
       final bookmarks = await getBookmarkedStocks();
       final detailsJson = prefs.getString(_bookmarkDetailsKey);
-      
+
       if (detailsJson == null) return [];
-      
+
       final Map<String, dynamic> allDetails = json.decode(detailsJson);
       final List<Map<String, dynamic>> result = [];
-      
+
       for (final stockCode in bookmarks) {
         final details = allDetails[stockCode];
         if (details != null) {
@@ -132,14 +134,14 @@ class BookmarkService {
           });
         }
       }
-      
+
       // 북마크한 시간순으로 정렬 (최신순)
       result.sort((a, b) {
         final aTime = a['bookmarkedAt'] as String? ?? '';
         final bTime = b['bookmarkedAt'] as String? ?? '';
         return bTime.compareTo(aTime);
       });
-      
+
       return result;
     } catch (e) {
       debugPrint('북마크 상세 정보 로드 오류: $e');

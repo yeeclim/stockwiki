@@ -10,13 +10,13 @@ class ScreeningManagePage extends StatefulWidget {
 }
 
 class _ScreeningManagePageState extends State<ScreeningManagePage> {
-  List<ScreeningCandidate> _all  = [];
+  List<ScreeningCandidate> _all = [];
   List<ScreeningCandidate> _mine = [];
   bool _loading = true;
 
   // 추가 폼
-  final _codeCtrl   = TextEditingController();
-  final _nameCtrl   = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _sectorCtrl = TextEditingController();
   bool _adding = false;
 
@@ -31,18 +31,22 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final all  = await ScreeningService.loadAll();
+      final all = await ScreeningService.loadAll();
       final mine = await ScreeningService.loadMine();
       if (!mounted) return;
-      setState(() { _all = all; _mine = mine; _loading = false; });
+      setState(() {
+        _all = all;
+        _mine = mine;
+        _loading = false;
+      });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _add() async {
-    final code   = _codeCtrl.text.trim();
-    final name   = _nameCtrl.text.trim();
+    final code = _codeCtrl.text.trim();
+    final name = _nameCtrl.text.trim();
     final sector = _sectorCtrl.text.trim();
     if (code.isEmpty || name.isEmpty || sector.isEmpty) return;
     if (code.length != 6 || int.tryParse(code) == null) {
@@ -51,8 +55,11 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
     }
     setState(() => _adding = true);
     try {
-      await ScreeningService.add(stockCode: code, stockName: name, sector: sector);
-      _codeCtrl.clear(); _nameCtrl.clear(); _sectorCtrl.clear();
+      await ScreeningService.add(
+          stockCode: code, stockName: name, sector: sector);
+      _codeCtrl.clear();
+      _nameCtrl.clear();
+      _sectorCtrl.clear();
       await _load();
       _snack('추가됐습니다.');
     } catch (e) {
@@ -70,13 +77,15 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
   }
 
   @override
   void dispose() {
-    _codeCtrl.dispose(); _nameCtrl.dispose(); _sectorCtrl.dispose();
+    _codeCtrl.dispose();
+    _nameCtrl.dispose();
+    _sectorCtrl.dispose();
     super.dispose();
   }
 
@@ -84,8 +93,8 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userEmail = Supabase.instance.client.auth.currentUser?.email;
-    const adminEmail = 'eklim4254@gmail.com';
-    final isAdmin = userEmail == adminEmail;
+    const adminEmail = String.fromEnvironment('ADMIN_EMAIL');
+    final isAdmin = adminEmail.isNotEmpty && userEmail == adminEmail;
 
     return Scaffold(
       appBar: AppBar(
@@ -96,7 +105,9 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text('스크리닝 종목 관리',
-            style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
@@ -112,41 +123,43 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
                   _SectionTitle(theme: theme, title: '종목 추가'),
                   const SizedBox(height: 10),
                   _AddForm(
-                    codeCtrl:   _codeCtrl,
-                    nameCtrl:   _nameCtrl,
+                    codeCtrl: _codeCtrl,
+                    nameCtrl: _nameCtrl,
                     sectorCtrl: _sectorCtrl,
-                    sectors:    _sectors,
-                    adding:     _adding,
-                    onAdd:      _add,
-                    theme:      theme,
+                    sectors: _sectors,
+                    adding: _adding,
+                    onAdd: _add,
+                    theme: theme,
                   ),
                   const SizedBox(height: 24),
 
                   // ── 내가 추가한 종목 ───────────────────────────────────────
-                  _SectionTitle(theme: theme, title: '내가 추가한 종목 (${_mine.length}개)'),
+                  _SectionTitle(
+                      theme: theme, title: '내가 추가한 종목 (${_mine.length}개)'),
                   const SizedBox(height: 8),
                   if (_mine.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Text('추가한 종목이 없습니다.',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant)),
                     )
                   else
                     ..._mine.map((c) => _CandidateTile(
                           candidate: c,
-                          onRemove:  () => _remove(c),
-                          theme:     theme,
+                          onRemove: () => _remove(c),
+                          theme: theme,
                         )),
 
                   const SizedBox(height: 24),
 
                   // ── 전체 후보 ──────────────────────────────────────────────
-                  _SectionTitle(theme: theme, title: '전체 스크리닝 대상 (${_all.length}개)'),
+                  _SectionTitle(
+                      theme: theme, title: '전체 스크리닝 대상 (${_all.length}개)'),
                   const SizedBox(height: 4),
                   Text('시스템 기본 + 모든 유저 추가 종목',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   ..._groupBySector(_all).entries.map((entry) => Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,8 +174,10 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
                           ),
                           ...entry.value.map((c) => _CandidateTile(
                                 candidate: c,
-                                onRemove:  (c.isUserAdded || isAdmin) ? () => _remove(c) : null,
-                                theme:     theme,
+                                onRemove: (c.isUserAdded || isAdmin)
+                                    ? () => _remove(c)
+                                    : null,
+                                theme: theme,
                               )),
                         ],
                       )),
@@ -173,7 +188,8 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
     );
   }
 
-  Map<String, List<ScreeningCandidate>> _groupBySector(List<ScreeningCandidate> list) {
+  Map<String, List<ScreeningCandidate>> _groupBySector(
+      List<ScreeningCandidate> list) {
     final map = <String, List<ScreeningCandidate>>{};
     for (final c in list) {
       map.putIfAbsent(c.sector, () => []).add(c);
@@ -197,7 +213,8 @@ class _CandidateTile extends StatelessWidget {
   final ScreeningCandidate candidate;
   final VoidCallback? onRemove;
   final ThemeData theme;
-  const _CandidateTile({required this.candidate, required this.onRemove, required this.theme});
+  const _CandidateTile(
+      {required this.candidate, required this.onRemove, required this.theme});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -218,7 +235,8 @@ class _CandidateTile extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(candidate.stockName,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w500)),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -227,7 +245,8 @@ class _CandidateTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(candidate.sector,
-                  style: TextStyle(fontSize: 11, color: theme.colorScheme.primary)),
+                  style: TextStyle(
+                      fontSize: 11, color: theme.colorScheme.primary)),
             ),
             if (onRemove != null) ...[
               const SizedBox(width: 8),
@@ -253,8 +272,13 @@ class _AddForm extends StatefulWidget {
   final VoidCallback onAdd;
   final ThemeData theme;
   const _AddForm({
-    required this.codeCtrl, required this.nameCtrl, required this.sectorCtrl,
-    required this.sectors, required this.adding, required this.onAdd, required this.theme,
+    required this.codeCtrl,
+    required this.nameCtrl,
+    required this.sectorCtrl,
+    required this.sectors,
+    required this.adding,
+    required this.onAdd,
+    required this.theme,
   });
   @override
   State<_AddForm> createState() => _AddFormState();
@@ -304,21 +328,28 @@ class _AddFormState extends State<_AddForm> {
           Row(children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                initialValue: widget.sectorCtrl.text.isEmpty ? null : widget.sectorCtrl.text,
+                initialValue: widget.sectorCtrl.text.isEmpty
+                    ? null
+                    : widget.sectorCtrl.text,
                 hint: const Text('섹터 선택'),
-                decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                    isDense: true, border: OutlineInputBorder()),
                 items: widget.sectors
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (v) => setState(() => widget.sectorCtrl.text = v ?? ''),
+                onChanged: (v) =>
+                    setState(() => widget.sectorCtrl.text = v ?? ''),
               ),
             ),
             const SizedBox(width: 8),
             FilledButton(
               onPressed: widget.adding ? null : widget.onAdd,
               child: widget.adding
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Text('추가'),
             ),
           ]),

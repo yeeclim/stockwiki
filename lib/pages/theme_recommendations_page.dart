@@ -3,20 +3,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/krx_loader.dart';
 import '../services/screening_service.dart';
 import '../utils/tradingview_helper.dart';
-import 'us_stock_search_page.dart';
-import 'ai_stock_recommend_page.dart';
-import 'us_stock_ai_recommend_page.dart';
-import 'us_stock_theme_recommend_page.dart';
-import 'us_stock_ai_committee_page.dart';
-import 'ai_algorithm_explain_page.dart';
-import 'bookmark_list_page.dart';
 import '../widgets/app_drawer.dart';
 
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
 
   @override
-  State<ThemeRecommendationsPage> createState() => _ThemeRecommendationsPageState();
+  State<ThemeRecommendationsPage> createState() =>
+      _ThemeRecommendationsPageState();
 }
 
 class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
@@ -42,14 +36,14 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
       ]);
 
       final screeningCandidates = results[0] as List<ScreeningCandidate>;
-      final krxThemes           = results[1] as List<String>;
+      final krxThemes = results[1] as List<String>;
 
       // 스크리닝 후보를 섹터별로 _themeStocks에 주입
       final sectorMap = <String, List<Map<String, dynamic>>>{};
       for (final c in screeningCandidates) {
         sectorMap.putIfAbsent(c.sector, () => []).add({
           'symbol': c.stockCode,
-          'name':   c.stockName,
+          'name': c.stockName,
           'sector': c.sector,
           'reason': '스크리닝 관리 종목',
         });
@@ -60,7 +54,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
 
       // 스크리닝 섹터 먼저, 그 다음 KRX 테마 (중복 제거)
       final screeningSectors = sectorMap.keys.toList();
-      final extraKrx = krxThemes.where((t) => !screeningSectors.contains(t)).toList();
+      final extraKrx =
+          krxThemes.where((t) => !screeningSectors.contains(t)).toList();
       final allThemes = [...screeningSectors, ...extraKrx];
 
       if (mounted) {
@@ -68,11 +63,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           _themes = allThemes;
           if (_themes.isNotEmpty) {
             _tabController = TabController(length: _themes.length, vsync: this);
-            _tabController.addListener(() { if (mounted) setState(() {}); });
+            _tabController.addListener(() {
+              if (mounted) setState(() {});
+            });
           }
         });
-        if (extraKrx.isNotEmpty) _loadData(themesToLoad: extraKrx);
-        else setState(() => _isLoading = false);
+        if (extraKrx.isNotEmpty)
+          _loadData(themesToLoad: extraKrx);
+        else
+          setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('테마 초기화 오류: $e');
@@ -99,17 +98,23 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         targets.map((theme) async {
           if (_themeStocks.containsKey(theme)) return; // 이미 있으면 스킵
           final stocks = await KrxLoader.getThemeStocks(theme);
-          if (mounted) setState(() { _themeStocks[theme] = stocks; });
+          if (mounted)
+            setState(() {
+              _themeStocks[theme] = stocks;
+            });
         }),
       );
 
       // 종목이 0개인 테마 숨기기
       if (mounted) {
-        final visible = _themes.where((t) => (_themeStocks[t] ?? []).isNotEmpty).toList();
+        final visible =
+            _themes.where((t) => (_themeStocks[t] ?? []).isNotEmpty).toList();
         if (visible.length != _themes.length) {
           final old = _tabController;
           final newCtrl = TabController(length: visible.length, vsync: this);
-          newCtrl.addListener(() { if (mounted) setState(() {}); });
+          newCtrl.addListener(() {
+            if (mounted) setState(() {});
+          });
           setState(() {
             _themes = visible;
             _tabController = newCtrl;
@@ -154,13 +159,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 const SizedBox(height: 12),
                 Text(
                   '테마 선택',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: ListView.separated(
                     controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: _themes.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
@@ -179,14 +186,17 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                         title: Text(
                           _themes[index],
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             color: isSelected
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurface,
                           ),
                         ),
                         trailing: isSelected
-                            ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                            ? Icon(Icons.check,
+                                size: 16, color: theme.colorScheme.primary)
                             : null,
                         onTap: () {
                           Navigator.pop(ctx);
@@ -229,7 +239,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     // 테마가 아직 로드되지 않았을 때의 처리
     if (_themes.isEmpty && _isLoading) {
       return Scaffold(
@@ -260,7 +270,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               ),
               if (_themes.isNotEmpty) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface, size: 20),
+                Icon(Icons.arrow_drop_down,
+                    color: theme.colorScheme.onSurface, size: 20),
               ],
             ],
           ),
@@ -271,19 +282,20 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         iconTheme: theme.iconTheme,
         elevation: 0,
         bottom: _themes.isEmpty
-          ? null
-          : TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              indicatorSize: TabBarIndicatorSize.label,
-              labelStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-              unselectedLabelStyle: theme.textTheme.labelMedium,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.colorScheme.primary,
-              tabs: _themes.map((themeName) => Tab(text: themeName)).toList(),
-            ),
+            ? null
+            : TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                indicatorSize: TabBarIndicatorSize.label,
+                labelStyle: theme.textTheme.labelLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+                unselectedLabelStyle: theme.textTheme.labelMedium,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                indicatorColor: theme.colorScheme.primary,
+                tabs: _themes.map((themeName) => Tab(text: themeName)).toList(),
+              ),
         actions: [
           Builder(
             builder: (BuildContext innerContext) {
@@ -302,16 +314,16 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
           ? Center(child: Text(_isLoading ? '데이터를 불러오는 중...' : '추천 테마가 없습니다.'))
           : TabBarView(
               controller: _tabController,
-              children: _themes.map((theme) => _buildThemeRecommendations(theme)).toList(),
+              children: _themes
+                  .map((theme) => _buildThemeRecommendations(theme))
+                  .toList(),
             ),
     );
   }
 
-
-
   Widget _buildThemeRecommendations(String theme) {
     final stocks = _themeStocks[theme] ?? [];
-    
+
     return Column(
       children: [
         // 경고 메시지 삭제됨
@@ -342,7 +354,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     final high52w = stock['high52w'] as num?;
     final price = (stock['price'] as num?)?.toDouble();
 
-    final newsList = (stock['news'] as List<dynamic>? ?? []).cast<Map<String, String>>();
+    final newsList =
+        (stock['news'] as List<dynamic>? ?? []).cast<Map<String, String>>();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -385,15 +398,12 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios, 
-                    size: 16, 
-                    color: themeData.colorScheme.onSurfaceVariant
-                  ),
+                  Icon(Icons.arrow_forward_ios,
+                      size: 16, color: themeData.colorScheme.onSurfaceVariant),
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // MA / 52주 고가 뱃지
               if (ma20 != null || high52w != null)
                 Padding(
@@ -429,16 +439,20 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: themeData.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  color: themeData.colorScheme.primaryContainer
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeData.colorScheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color:
+                          themeData.colorScheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.lightbulb, size: 16, color: themeData.colorScheme.primary),
+                        Icon(Icons.lightbulb,
+                            size: 16, color: themeData.colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
                           '투자 포인트',
@@ -465,7 +479,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.article_outlined, size: 16, color: themeData.colorScheme.secondary),
+                    Icon(Icons.article_outlined,
+                        size: 16, color: themeData.colorScheme.secondary),
                     const SizedBox(width: 8),
                     Text(
                       '관련 뉴스 (Tap to read)',
@@ -480,7 +495,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                 ...newsList.map((news) {
                   final title = news['title'] ?? '';
                   final url = news['url'] ?? '';
-                  
+
                   return InkWell(
                     onTap: () => _launchURL(url),
                     child: Padding(
@@ -488,7 +503,10 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('• ', style: TextStyle(color: themeData.colorScheme.onSurfaceVariant)),
+                          Text('• ',
+                              style: TextStyle(
+                                  color:
+                                      themeData.colorScheme.onSurfaceVariant)),
                           Expanded(
                             child: Text(
                               title,
@@ -507,14 +525,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                   );
                 }),
               ],
-              
+
               const SizedBox(height: 12),
-              
+
               // 차트 보기 힌트
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Icon(Icons.bar_chart, size: 13, color: themeData.colorScheme.primary),
+                  Icon(Icons.bar_chart,
+                      size: 13, color: themeData.colorScheme.primary),
                   const SizedBox(width: 4),
                   Text(
                     '차트 보기',
@@ -552,8 +571,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
 
   String _fmtPrice(num value) {
     return value.toInt().toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+$)'),
-      (m) => '${m[1]},',
-    );
+          RegExp(r'(\d)(?=(\d{3})+$)'),
+          (m) => '${m[1]},',
+        );
   }
 }

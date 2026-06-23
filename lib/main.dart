@@ -17,8 +17,8 @@ import 'package:stockwiki/widgets/app_drawer.dart';
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 // Supabase 설정 (--dart-define 으로 주입)
-const _supabaseUrl =
-    String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://xpiqctjidvrlmazslzyg.supabase.co');
+const _supabaseUrl = String.fromEnvironment('SUPABASE_URL',
+    defaultValue: 'https://xpiqctjidvrlmazslzyg.supabase.co');
 const _supabaseAnonKey =
     String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
 
@@ -130,7 +130,8 @@ class _StockSearchPageState extends State<StockSearchPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ThemeRecommendationsPage()),
+                          MaterialPageRoute(
+                              builder: (_) => const ThemeRecommendationsPage()),
                         );
                       },
                       icon: const Icon(Icons.trending_up),

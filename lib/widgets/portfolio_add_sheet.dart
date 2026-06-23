@@ -108,7 +108,8 @@ class _PortfolioAddSheetState extends State<_PortfolioAddSheet> {
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
@@ -117,58 +118,71 @@ class _PortfolioAddSheetState extends State<_PortfolioAddSheet> {
           ),
           const SizedBox(height: 16),
           Text('포트폴리오 추가',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('${widget.stockName} (${widget.stockCode})',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant)),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 20),
-
           Text('매입단가 (${isKr ? '원' : 'USD'})',
-              style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold)),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           TextField(
             controller: _priceCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
+            ],
             decoration: InputDecoration(
               hintText: isKr ? '예: 85000' : '예: 150.00',
               prefixText: isKr ? '₩ ' : '\$ ',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             ),
           ),
           const SizedBox(height: 16),
-
           Text('수량 (주)',
-              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           TextField(
             controller: _qtyCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))
+            ],
             decoration: InputDecoration(
               hintText: '예: 10',
               suffixText: '주',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             ),
           ),
           const SizedBox(height: 24),
-
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: _saving
-                  ? const SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('추가하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('추가하기',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),
         ],

@@ -1,7 +1,7 @@
-// 📄 lib/widgets/vix_widget.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../utils/api_utils.dart';
 
 class VixWidget extends StatefulWidget {
   const VixWidget({super.key});
@@ -23,22 +23,35 @@ class _VixWidgetState extends State<VixWidget> {
 
   Future<void> _fetchVix() async {
     try {
-      final response = await http.get(
-        Uri.parse('https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=1d'),
+      // CORS 우회를 위해 자체 서버 프록시를 사용합니다 (Yahoo Finance 직접 호출 금지).
+      final uri = Uri.parse(webBaseUrl).replace(
+        path: '/api/utils',
+        queryParameters: {'type': 'commodity', 'symbol': '^VIX'},
       );
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final price = data['chart']['result'][0]['meta']['regularMarketPrice'];
-        setState(() {
-          _vixValue = price.toDouble();
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Yahoo 응답 오류');
+        final result = data['chart']?['result']?[0];
+        final meta = result?['meta'];
+        final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+        if (price != null) {
+          setState(() {
+            _vixValue = (price as num).toDouble();
+            _isLoading = false;
+          });
+          return;
+        }
       }
-    } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = '데이터 없음';
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '에러 발생';
         _isLoading = false;
       });
     }
@@ -53,13 +66,17 @@ class _VixWidgetState extends State<VixWidget> {
         height: 80,
         child: Center(
           child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+              ? const CircularProgressIndicator(
+                  color: Colors.white, strokeWidth: 2)
               : _error != null
-                  ? Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 14))
+                  ? Text(_error!,
+                      style: const TextStyle(color: Colors.red, fontSize: 14))
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('VIX (변동성지수)', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        const Text('VIX (변동성지수)',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 14)),
                         Text(
                           _vixValue?.toStringAsFixed(2) ?? '',
                           style: const TextStyle(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../models/news.dart';
-import '../services/fmp_service.dart';
 import '../services/news_service.dart';
 import '../services/us_stock_news_service.dart';
 import 'package:http/http.dart' as http;
@@ -52,11 +51,17 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
           RegExp(r'[가-힣]').hasMatch(stock.name);
       final List<News> news;
       if (isKorean) {
-        news = await NewsService.searchStockNews(stock.name, isKoreanStock: true, symbol: stock.symbol);
+        news = await NewsService.searchStockNews(stock.name,
+            isKoreanStock: true, symbol: stock.symbol);
       } else {
-        news = await UsStockNewsService.fetchStockNews(stock.symbol, stockName: stock.name);
+        news = await UsStockNewsService.fetchStockNews(stock.symbol,
+            stockName: stock.name);
       }
-      if (mounted) setState(() { _stockNews = news; _isLoadingNews = false; });
+      if (mounted)
+        setState(() {
+          _stockNews = news;
+          _isLoadingNews = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _isLoadingNews = false);
     }
@@ -82,7 +87,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       List<Stock> stocks = [];
 
       // 한글 포함 또는 순수 숫자(종목코드)이면 국내 주식으로 바로 판단
-      final isDefinitelyKorean = RegExp(r'[가-힣]').hasMatch(query) || RegExp(r'^\d+$').hasMatch(query);
+      final isDefinitelyKorean =
+          RegExp(r'[가-힣]').hasMatch(query) || RegExp(r'^\d+$').hasMatch(query);
 
       if (isDefinitelyKorean) {
         stocks = await _searchKoreanStock(query);
@@ -131,24 +137,29 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   // 미국 주식 검색 (서버사이드 Yahoo Finance)
   Future<List<Stock>> _searchUsStock(String keyword) async {
     final baseUrl = Uri.base.origin;
-    final isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+    final isLocalDev =
+        baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
     final apiBaseUrl = isLocalDev ? 'http://localhost:3000' : baseUrl;
-    final url = '$apiBaseUrl/api/us-stock-search?keyword=${Uri.encodeComponent(keyword)}';
+    final url =
+        '$apiBaseUrl/api/us-stock-search?keyword=${Uri.encodeComponent(keyword)}';
 
     try {
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final response =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] is List) {
-          return (data['data'] as List).map((item) => Stock(
-            symbol: item['symbol'] ?? '',
-            name: item['name'] ?? '',
-            price: (item['price'] as num?)?.toDouble(),
-            change: (item['change'] as num?)?.toDouble(),
-            changePercent: (item['changePercent'] as num?)?.toDouble(),
-            volume: (item['volume'] as num?)?.toInt(),
-            marketCap: (item['marketCap'] as num?)?.toInt(),
-          )).toList();
+          return (data['data'] as List)
+              .map((item) => Stock(
+                    symbol: item['symbol'] ?? '',
+                    name: item['name'] ?? '',
+                    price: (item['price'] as num?)?.toDouble(),
+                    change: (item['change'] as num?)?.toDouble(),
+                    changePercent: (item['changePercent'] as num?)?.toDouble(),
+                    volume: (item['volume'] as num?)?.toInt(),
+                    marketCap: (item['marketCap'] as num?)?.toInt(),
+                  ))
+              .toList();
         }
       }
     } catch (e) {
@@ -161,142 +172,157 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   Future<List<Stock>> _searchKoreanStock(String keyword) async {
     // 로컬 개발 환경 감지 및 API URL 설정
     final baseUrl = Uri.base.origin;
-    final isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
-    
+    final isLocalDev =
+        baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+
     // 로컬 개발 환경에서는 별도 API 서버 사용 (Vercel dev 서버)
     // 운영 환경에서는 같은 도메인의 API 사용
-    final apiBaseUrl = isLocalDev 
-        ? 'http://localhost:3000'  // Vercel dev 서버 포트
+    final apiBaseUrl = isLocalDev
+        ? 'http://localhost:3000' // Vercel dev 서버 포트
         : baseUrl;
-    
+
     // URL 인코딩 처리
     final encodedKeyword = Uri.encodeComponent(keyword);
-    final url = '$apiBaseUrl/api/stock-search-full?keyword=$encodedKeyword&limit=1';
-    
+    final url =
+        '$apiBaseUrl/api/stock-search-full?keyword=$encodedKeyword&limit=1';
+
     debugPrint('🔍 국내 주식 검색 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
     debugPrint('🔍 국내 주식 검색 URL: $url');
-    
+
     try {
-        final response = await http.get(
-          Uri.parse(url),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        ).timeout(
-          const Duration(seconds: 10),
-        );
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+      );
 
-        debugPrint('📊 국내 주식 검색 응답 상태: ${response.statusCode}');
-        debugPrint('📄 국내 주식 검색 응답 Content-Type: ${response.headers['content-type']}');
-        
-        // 응답이 HTML인지 확인
-        final contentType = response.headers['content-type'] ?? '';
-        if (contentType.contains('text/html') || response.body.trim().startsWith('<!DOCTYPE') || response.body.trim().startsWith('<html')) {
-          debugPrint('❌ 국내 주식 검색 실패: API가 HTML을 반환했습니다 (404 또는 서버 오류)');
-          debugPrint('💡 Vercel dev 서버가 실행 중인지 확인하세요: vercel dev');
-          debugPrint('📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
-          return [];
-        }
+      debugPrint('📊 국내 주식 검색 응답 상태: ${response.statusCode}');
+      debugPrint(
+          '📄 국내 주식 검색 응답 Content-Type: ${response.headers['content-type']}');
 
-        if (response.statusCode == 200) {
-          try {
-            final data = json.decode(response.body);
-            debugPrint('📋 국내 주식 검색 데이터: $data');
-            
-            if (data['success'] == true && data['data'] != null) {
-              final stocks = (data['data'] as List)
-                  .map((item) => Stock.fromKrxData(item))
-                  .toList();
-              debugPrint('✅ 국내 주식 검색 성공: ${stocks.length}개');
-              return stocks;
-            } else {
-              debugPrint('⚠️ 국내 주식 검색 실패: success=${data['success']}, error=${data['error']}');
-            }
-          } catch (e) {
-            debugPrint('❌ JSON 파싱 오류: $e');
-            debugPrint('📄 응답 본문 (처음 500자): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
-            return [];
-          }
-        } else {
-          debugPrint('❌ 국내 주식 검색 실패: HTTP ${response.statusCode}');
-          debugPrint('📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
-        }
-        return [];
-      } on http.ClientException catch (e) {
-        debugPrint('❌ 네트워크 오류 (API 서버에 연결할 수 없음): $e');
-        debugPrint('💡 Vercel dev 서버가 실행 중인지 확인하세요:');
-        debugPrint('   1. 터미널에서 "vercel dev" 또는 "npm run dev" 실행');
-        debugPrint('   2. API 서버가 http://localhost:3000 에서 실행 중인지 확인');
-        return [];
-      } catch (e) {
-        debugPrint('💥 국내 주식 검색 오류: $e');
-        debugPrint('📚 오류 타입: ${e.runtimeType}');
-        if (e.toString().contains('XMLHttpRequest') || e.toString().contains('CORS')) {
-          debugPrint('💡 CORS 오류일 수 있습니다. API 서버의 CORS 설정을 확인하세요.');
-        }
+      // 응답이 HTML인지 확인
+      final contentType = response.headers['content-type'] ?? '';
+      if (contentType.contains('text/html') ||
+          response.body.trim().startsWith('<!DOCTYPE') ||
+          response.body.trim().startsWith('<html')) {
+        debugPrint('❌ 국내 주식 검색 실패: API가 HTML을 반환했습니다 (404 또는 서버 오류)');
+        debugPrint('💡 Vercel dev 서버가 실행 중인지 확인하세요: vercel dev');
+        debugPrint(
+            '📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
         return [];
       }
+
+      if (response.statusCode == 200) {
+        try {
+          final data = json.decode(response.body);
+          debugPrint('📋 국내 주식 검색 데이터: $data');
+
+          if (data['success'] == true && data['data'] != null) {
+            final stocks = (data['data'] as List)
+                .map((item) => Stock.fromKrxData(item))
+                .toList();
+            debugPrint('✅ 국내 주식 검색 성공: ${stocks.length}개');
+            return stocks;
+          } else {
+            debugPrint(
+                '⚠️ 국내 주식 검색 실패: success=${data['success']}, error=${data['error']}');
+          }
+        } catch (e) {
+          debugPrint('❌ JSON 파싱 오류: $e');
+          debugPrint(
+              '📄 응답 본문 (처음 500자): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+          return [];
+        }
+      } else {
+        debugPrint('❌ 국내 주식 검색 실패: HTTP ${response.statusCode}');
+        debugPrint(
+            '📄 응답 본문 (처음 200자): ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+      }
+      return [];
+    } on http.ClientException catch (e) {
+      debugPrint('❌ 네트워크 오류 (API 서버에 연결할 수 없음): $e');
+      debugPrint('💡 Vercel dev 서버가 실행 중인지 확인하세요:');
+      debugPrint('   1. 터미널에서 "vercel dev" 또는 "npm run dev" 실행');
+      debugPrint('   2. API 서버가 http://localhost:3000 에서 실행 중인지 확인');
+      return [];
+    } catch (e) {
+      debugPrint('💥 국내 주식 검색 오류: $e');
+      debugPrint('📚 오류 타입: ${e.runtimeType}');
+      if (e.toString().contains('XMLHttpRequest') ||
+          e.toString().contains('CORS')) {
+        debugPrint('💡 CORS 오류일 수 있습니다. API 서버의 CORS 설정을 확인하세요.');
+      }
+      return [];
+    }
   }
 
   Future<CommitteeRecommendation> _askAiCommittee(Stock stock) async {
     try {
       // 로컬 개발 환경 감지 및 API URL 설정
       final baseUrl = Uri.base.origin;
-      final isLocalDev = baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
-      
+      final isLocalDev =
+          baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+
       // 로컬 개발 환경에서는 별도 API 서버 사용 (Vercel dev 서버)
       // 운영 환경에서는 같은 도메인의 API 사용
-      final apiBaseUrl = isLocalDev 
-          ? 'http://localhost:3000'  // Vercel dev 서버 포트
+      final apiBaseUrl = isLocalDev
+          ? 'http://localhost:3000' // Vercel dev 서버 포트
           : baseUrl;
-      
+
       final url = '$apiBaseUrl/api/ai-committee-verify';
-      
+
       debugPrint('🔍 AI 검증위원회 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
-      
+
       // 가격 포맷 (국내 주식은 원화, 미국 주식은 달러)
-      final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) || 
-                       stock.symbol.endsWith('.KS') || 
-                       stock.symbol.endsWith('.KQ') || 
-                       RegExp(r'[가-힣]').hasMatch(stock.name);
-      
-      final priceFormat = isKorean 
+      final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) ||
+          stock.symbol.endsWith('.KS') ||
+          stock.symbol.endsWith('.KQ') ||
+          RegExp(r'[가-힣]').hasMatch(stock.name);
+
+      final priceFormat = isKorean
           ? '₩${stock.price?.toStringAsFixed(0) ?? 'N/A'}'
           : '\$${stock.price?.toStringAsFixed(2) ?? 'N/A'}';
-      
+
       // 더 상세한 질문 구성
-      final changeInfo = stock.changePercent != null 
+      final changeInfo = stock.changePercent != null
           ? '현재 ${stock.changePercent! >= 0 ? '상승' : '하락'}률: ${(stock.changePercent!).abs().toStringAsFixed(2)}%'
           : '가격 변동 정보 없음';
-      
-      final question = '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n'
-          '현재 가격: $priceFormat\n'
-          '$changeInfo\n\n'
-          '다음 관점에서 종합적으로 분석해주세요:\n' +
-          '1. 재무 건전성 및 수익성\n' +
-          '2. 성장 가능성 및 시장 전망\n' +
-          '3. 기술적 분석 (가격 추세, 거래량 등)\n' +
-          '4. 리스크 요인\n' +
-          '5. 투자 가치 평가\n\n' +
-          '위 분석을 바탕으로 투자 의견을 제시해주세요.';
-      
+
+      final question =
+          '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n'
+                  '현재 가격: $priceFormat\n'
+                  '$changeInfo\n\n'
+                  '다음 관점에서 종합적으로 분석해주세요:\n' +
+              '1. 재무 건전성 및 수익성\n' +
+              '2. 성장 가능성 및 시장 전망\n' +
+              '3. 기술적 분석 (가격 추세, 거래량 등)\n' +
+              '4. 리스크 요인\n' +
+              '5. 투자 가치 평가\n\n' +
+              '위 분석을 바탕으로 투자 의견을 제시해주세요.';
+
       debugPrint('🎯 AI 검증위원회 질문: $question');
-      debugPrint('📊 주식 정보: ${stock.name} (${stock.symbol}), 가격: ${stock.price}, 변동률: ${stock.changePercent}');
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'question': question,
-          'symbol': stock.symbol,
-          'price': stock.price,
-          'changePercent': stock.changePercent,
-          'isKorean': isKorean,
-        }),
-      ).timeout(const Duration(seconds: 60));
+      debugPrint(
+          '📊 주식 정보: ${stock.name} (${stock.symbol}), 가격: ${stock.price}, 변동률: ${stock.changePercent}');
+
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'question': question,
+              'symbol': stock.symbol,
+              'price': stock.price,
+              'changePercent': stock.changePercent,
+              'isKorean': isKorean,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
 
       debugPrint('📊 AI 검증위원회 응답 상태: ${response.statusCode}');
       debugPrint('📄 AI 검증위원회 응답 본문: ${response.body}');
@@ -304,17 +330,16 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         debugPrint('📋 AI 검증위원회 데이터: $data');
-        
+
         // success 필드 확인
         if (data['success'] == false) {
           throw Exception('API 응답 실패: ${data['error'] ?? '알 수 없는 오류'}');
         }
-        
+
         return CommitteeRecommendation(
           stock: stock,
-          models: List<AiModelResponse>.from(
-            (data['models'] as List? ?? []).map((m) => AiModelResponse.fromJson(m))
-          ),
+          models: List<AiModelResponse>.from((data['models'] as List? ?? [])
+              .map((m) => AiModelResponse.fromJson(m))),
           verificationScore: (data['verificationScore'] ?? 0).toDouble(),
           agreement: data['agreement'] ?? '분산',
           finalRecommendation: data['finalRecommendation'] ?? 'Watch',
@@ -322,13 +347,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         );
       } else {
         final errorBody = response.body;
-        debugPrint('❌ AI 검증위원회 API 호출 실패: HTTP ${response.statusCode}, 응답: $errorBody');
+        debugPrint(
+            '❌ AI 검증위원회 API 호출 실패: HTTP ${response.statusCode}, 응답: $errorBody');
         throw Exception('API 호출 실패: ${response.statusCode} - $errorBody');
       }
     } catch (e) {
       debugPrint('💥 AI 검증위원회 오류: $e');
       debugPrint('📚 오류 타입: ${e.runtimeType}');
-      
+
       // 에러 시 기본 응답 반환
       return CommitteeRecommendation(
         stock: stock,
@@ -358,13 +384,13 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
   String _formatPrice(Stock stock) {
     if (stock.price == null) return 'N/A';
-    
+
     // 국내 주식인지 판단
-    final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) || 
-                     stock.symbol.endsWith('.KS') || 
-                     stock.symbol.endsWith('.KQ') || 
-                     RegExp(r'[가-힣]').hasMatch(stock.name);
-    
+    final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) ||
+        stock.symbol.endsWith('.KS') ||
+        stock.symbol.endsWith('.KQ') ||
+        RegExp(r'[가-힣]').hasMatch(stock.name);
+
     if (isKorean) {
       // 원화 표시
       final price = stock.price!.toInt();
@@ -446,15 +472,18 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
-                        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        fillColor:
+                            theme.colorScheme.surfaceVariant.withOpacity(0.3),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+                        prefixIcon: Icon(Icons.search,
+                            color: theme.colorScheme.onSurfaceVariant),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant),
+                                icon: Icon(Icons.clear,
+                                    color: theme.colorScheme.onSurfaceVariant),
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() {});
@@ -468,7 +497,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: _isLoading ? null : () => _searchStock(_searchController.text),
+                    onPressed: _isLoading
+                        ? null
+                        : () => _searchStock(_searchController.text),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,
                       foregroundColor: theme.colorScheme.onPrimary,
@@ -509,7 +540,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             ],
           ),
         ),
-        
+
         // 결과 영역
         Expanded(
           child: _buildResults(),
@@ -529,12 +560,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             const SizedBox(height: 16),
             Text(
               'AI 검증위원회가 분석 중입니다...',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             Text(
               '다수의 최신 AI 모델이 동시에 동시 검증하고 있습니다',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 12),
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  fontSize: 12),
             ),
           ],
         ),
@@ -550,7 +584,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurface),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -597,7 +632,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 margin: const EdgeInsets.symmetric(horizontal: 24),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withOpacity(0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -612,7 +648,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     ),
                     const SizedBox(height: 12),
                     _buildProcessStep('1', '주식 검색', '미국주식 또는 국내주식 검색'),
-                    _buildProcessStep('2', 'AI 분석', 'ChatGPT, Gemini, DeepSeek 등 다수 AI의 동시 분석'),
+                    _buildProcessStep('2', 'AI 분석',
+                        'ChatGPT, Gemini, DeepSeek 등 다수 AI의 동시 분석'),
                     _buildProcessStep('3', '결과 검증', '여러 AI의 의견을 비교하여 검증도 계산'),
                     _buildProcessStep('4', '리포팅', '종합 분석 결과를 리포트로 제공'),
                   ],
@@ -674,7 +711,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         ],
       );
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -732,7 +769,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   Widget _buildRecommendationCard(CommitteeRecommendation rec) {
     final theme = Theme.of(context);
     final stock = rec.stock;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Card(
@@ -789,16 +826,21 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                               const SizedBox(width: 8),
                               if (stock.changePercent != null)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: (stock.changePercent! >= 0 ? Colors.green : Colors.red)
+                                    color: (stock.changePercent! >= 0
+                                            ? Colors.green
+                                            : Colors.red)
                                         .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     '${stock.changePercent! >= 0 ? '+' : ''}${stock.changePercent!.toStringAsFixed(2)}%',
                                     style: TextStyle(
-                                      color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                      color: stock.changePercent! >= 0
+                                          ? Colors.green
+                                          : Colors.red,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
@@ -818,7 +860,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                           child: CustomPaint(
                             painter: GaugePainter(
                               score: rec.verificationScore,
-                              color: _getVerificationColor(rec.verificationScore),
+                              color:
+                                  _getVerificationColor(rec.verificationScore),
                             ),
                           ),
                         ),
@@ -834,7 +877,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                         Text(
                           rec.finalRecommendation,
                           style: TextStyle(
-                            color: _getRecommendationColor(rec.finalRecommendation),
+                            color: _getRecommendationColor(
+                                rec.finalRecommendation),
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -843,9 +887,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // 2. AI 투표 섹션 (Voting Plates)
                 Text(
                   'AI 위원회 투표 결과',
@@ -859,11 +903,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   alignment: WrapAlignment.center,
                   spacing: 12,
                   runSpacing: 12,
-                  children: rec.models.map((model) => _buildVotingPlate(model)).toList(),
+                  children: rec.models
+                      .map((model) => _buildVotingPlate(model))
+                      .toList(),
                 ),
 
                 // 전체 모델 오류 시 안내 배너
-                if (rec.models.isNotEmpty && rec.models.every((m) => m.recommendation == 'Error'))
+                if (rec.models.isNotEmpty &&
+                    rec.models.every((m) => m.recommendation == 'Error'))
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: Container(
@@ -871,13 +918,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.orange.withOpacity(0.1),
-                        border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                        border:
+                            Border.all(color: Colors.orange.withOpacity(0.4)),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                          const Icon(Icons.warning_amber_rounded,
+                              color: Colors.orange, size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -896,11 +945,12 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 const SizedBox(height: 24),
                 Divider(color: theme.dividerColor),
                 const SizedBox(height: 16),
-                
+
                 // 3. AI 분석 요약
                 Row(
                   children: [
-                    Icon(Icons.auto_awesome, size: 20, color: theme.colorScheme.primary),
+                    Icon(Icons.auto_awesome,
+                        size: 20, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
                       '위원회 종합 의견',
@@ -915,7 +965,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withOpacity(0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -934,7 +985,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 // 4. 관련 뉴스
                 Row(
                   children: [
-                    Icon(Icons.newspaper, size: 20, color: theme.colorScheme.primary),
+                    Icon(Icons.newspaper,
+                        size: 20, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
                       '관련 뉴스',
@@ -946,25 +998,30 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                     if (_isLoadingNews) ...[
                       const SizedBox(width: 8),
                       SizedBox(
-                        width: 12, height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary),
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: theme.colorScheme.primary),
                       ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (!_isLoadingNews)
-                  _buildSentimentSummary(),
+                if (!_isLoadingNews) _buildSentimentSummary(),
                 const SizedBox(height: 8),
                 if (_isLoadingNews)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text('뉴스를 불러오는 중...', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    child: Text('뉴스를 불러오는 중...',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant)),
                   )
                 else if (_stockNews.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text('관련 뉴스가 없습니다', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    child: Text('관련 뉴스가 없습니다',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant)),
                   )
                 else
                   ..._stockNews.take(5).map((news) => _buildNewsItem(news)),
@@ -983,8 +1040,13 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     int negativeCount = 0;
 
     for (final news in _stockNews) {
-      if (news.sentiment == 'Positive') { score++; positiveCount++; }
-      else if (news.sentiment == 'Negative') { score--; negativeCount++; }
+      if (news.sentiment == 'Positive') {
+        score++;
+        positiveCount++;
+      } else if (news.sentiment == 'Negative') {
+        score--;
+        negativeCount++;
+      }
     }
 
     if (_stockNews.isEmpty) {
@@ -997,11 +1059,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         ),
         child: Row(
           children: [
-            Icon(Icons.analytics_outlined, color: Colors.grey.shade400, size: 18),
+            Icon(Icons.analytics_outlined,
+                color: Colors.grey.shade400, size: 18),
             const SizedBox(width: 8),
-            Text('뉴스 감정 분석', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text('뉴스 감정 분석',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const Spacer(),
-            Text('데이터 없음', style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
+            Text('데이터 없음',
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
           ],
         ),
       );
@@ -1011,11 +1077,27 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     String signal;
     IconData signalIcon;
 
-    if (score >= 3) { signal = '긍정적 흐름'; signalColor = Colors.green[700]!; signalIcon = Icons.trending_up; }
-    else if (score >= 1) { signal = '다소 긍정적'; signalColor = Colors.green; signalIcon = Icons.sentiment_satisfied; }
-    else if (score <= -3) { signal = '부정적 흐름'; signalColor = Colors.red[700]!; signalIcon = Icons.trending_down; }
-    else if (score <= -1) { signal = '다소 부정적'; signalColor = Colors.red; signalIcon = Icons.sentiment_dissatisfied; }
-    else { signal = '중립'; signalColor = Colors.grey; signalIcon = Icons.remove_circle_outline; }
+    if (score >= 3) {
+      signal = '긍정적 흐름';
+      signalColor = Colors.green[700]!;
+      signalIcon = Icons.trending_up;
+    } else if (score >= 1) {
+      signal = '다소 긍정적';
+      signalColor = Colors.green;
+      signalIcon = Icons.sentiment_satisfied;
+    } else if (score <= -3) {
+      signal = '부정적 흐름';
+      signalColor = Colors.red[700]!;
+      signalIcon = Icons.trending_down;
+    } else if (score <= -1) {
+      signal = '다소 부정적';
+      signalColor = Colors.red;
+      signalIcon = Icons.sentiment_dissatisfied;
+    } else {
+      signal = '중립';
+      signalColor = Colors.grey;
+      signalIcon = Icons.remove_circle_outline;
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1031,29 +1113,41 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               Icon(signalIcon, color: signalColor, size: 18),
               const SizedBox(width: 8),
               Text('뉴스 감정 분석',
-                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(fontWeight: FontWeight.bold)),
               const Spacer(),
               Text(signal,
-                  style: TextStyle(color: signalColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                  style: TextStyle(
+                      color: signalColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
               if (positiveCount > 0)
-                Expanded(flex: positiveCount, child: Container(height: 3, color: Colors.green)),
+                Expanded(
+                    flex: positiveCount,
+                    child: Container(height: 3, color: Colors.green)),
               if (negativeCount > 0)
-                Expanded(flex: negativeCount, child: Container(height: 3, color: Colors.red)),
+                Expanded(
+                    flex: negativeCount,
+                    child: Container(height: 3, color: Colors.red)),
               if (positiveCount == 0 && negativeCount == 0)
-                Expanded(child: Container(height: 3, color: Colors.grey.withOpacity(0.3))),
+                Expanded(
+                    child: Container(
+                        height: 3, color: Colors.grey.withOpacity(0.3))),
             ],
           ),
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('호재 $positiveCount건', style: const TextStyle(fontSize: 11, color: Colors.green)),
-              Text('악재 $negativeCount건', style: const TextStyle(fontSize: 11, color: Colors.red)),
+              Text('호재 $positiveCount건',
+                  style: const TextStyle(fontSize: 11, color: Colors.green)),
+              Text('악재 $negativeCount건',
+                  style: const TextStyle(fontSize: 11, color: Colors.red)),
             ],
           ),
         ],
@@ -1066,7 +1160,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     return GestureDetector(
       onTap: () async {
         final uri = Uri.tryParse(news.link);
-        if (uri != null && await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (uri != null && await canLaunchUrl(uri))
+          launchUrl(uri, mode: LaunchMode.externalApplication);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -1083,16 +1178,23 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(news.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(news.title,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w500),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
                   if (news.source.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text(news.source, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      child: Text(news.source,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant)),
                     ),
                 ],
               ),
             ),
-            Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.onSurfaceVariant),
+            Icon(Icons.open_in_new,
+                size: 14, color: theme.colorScheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -1102,16 +1204,21 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   String _resolveDisplayName(String modelName) {
     final lowerName = modelName.toLowerCase();
     if (lowerName.contains('gemini')) return 'Gemini';
-    if (lowerName.contains('llama 3.3') || lowerName.contains('llama-3.3')) return 'Llama 3.3';
-    if (lowerName.contains('llama 3.1') || lowerName.contains('llama-3.1') || lowerName.contains('llama-3.1-8b')) return 'Llama 3.1';
+    if (lowerName.contains('llama 3.3') || lowerName.contains('llama-3.3'))
+      return 'Llama 3.3';
+    if (lowerName.contains('llama 3.1') ||
+        lowerName.contains('llama-3.1') ||
+        lowerName.contains('llama-3.1-8b')) return 'Llama 3.1';
     if (lowerName.contains('llama')) return 'Llama';
     if (lowerName.contains('qwen')) return 'Qwen';
     if (lowerName.contains('nemotron')) return 'Nemotron';
     if (lowerName.contains('gemma')) return 'Gemma 2';
     if (lowerName.contains('mixtral')) return 'Mixtral';
     if (lowerName.contains('mistral')) return 'Mistral';
-    if (lowerName.contains('gpt') || lowerName.contains('openai')) return 'ChatGPT';
-    if (lowerName.contains('claude') || lowerName.contains('anthropic')) return 'Claude';
+    if (lowerName.contains('gpt') || lowerName.contains('openai'))
+      return 'ChatGPT';
+    if (lowerName.contains('claude') || lowerName.contains('anthropic'))
+      return 'Claude';
     if (lowerName.contains('deepseek')) return 'DeepSeek';
     return modelName;
   }
@@ -1120,7 +1227,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   String _abbreviateReasoning(String reasoning) {
     if (reasoning.isEmpty) return '';
     final newlineIdx = reasoning.indexOf('\n');
-    final end = newlineIdx > 0 && newlineIdx <= 50 ? newlineIdx : reasoning.length;
+    final end =
+        newlineIdx > 0 && newlineIdx <= 50 ? newlineIdx : reasoning.length;
     final first = reasoning.substring(0, end.clamp(0, 50));
     return reasoning.length > 50 ? '$first…' : first;
   }
@@ -1128,7 +1236,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   void _showReasoningSheet(AiModelResponse model, String displayName) {
     final color = _getRecommendationColor(model.recommendation);
     final isError = model.recommendation == 'Error';
-    final fullText = model.fullResponse.isNotEmpty ? model.fullResponse : model.reasoning;
+    final fullText =
+        model.fullResponse.isNotEmpty ? model.fullResponse : model.reasoning;
 
     showModalBottomSheet(
       context: context,
@@ -1149,7 +1258,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               // 핸들
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                   color: theme.dividerColor,
                   borderRadius: BorderRadius.circular(2),
@@ -1161,23 +1271,28 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 child: Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: color.withOpacity(0.1),
                         shape: BoxShape.circle,
                         border: Border.all(color: color, width: 2),
                       ),
-                      child: Icon(_getRecommendationIcon(model.recommendation), color: color, size: 20),
+                      child: Icon(_getRecommendationIcon(model.recommendation),
+                          color: color, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(displayName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(displayName,
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold)),
                           Text(
                             isError ? '분석 실패' : model.recommendation,
-                            style: theme.textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.bold),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: color, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -1243,13 +1358,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 ),
                 // 탭 힌트 아이콘
                 Container(
-                  width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     shape: BoxShape.circle,
                     border: Border.all(color: theme.dividerColor),
                   ),
-                  child: Icon(Icons.info_outline, size: 12, color: theme.colorScheme.onSurfaceVariant),
+                  child: Icon(Icons.info_outline,
+                      size: 12, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -1384,5 +1501,6 @@ class GaugePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant GaugePainter oldDelegate) =>
+      oldDelegate.score != score || oldDelegate.color != color;
 }

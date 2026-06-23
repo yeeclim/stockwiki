@@ -23,7 +23,8 @@ class _KisGuidePageState extends State<KisGuidePage>
       devUrl: 'https://developers.koreainvestment.com',
       signupUrl: 'https://www.truefriend.com',
       iosUrl: 'https://apps.apple.com/kr/app/id1539710559',
-      aosUrl: 'https://play.google.com/store/apps/details?id=com.truefriend.csnative',
+      aosUrl:
+          'https://play.google.com/store/apps/details?id=com.truefriend.csnative',
       steps: [
         '한국투자증권 앱(MTS)으로 계좌를 개설합니다.',
         'developers.koreainvestment.com 접속 → 로그인',
@@ -42,7 +43,8 @@ class _KisGuidePageState extends State<KisGuidePage>
       devUrl: 'https://openapi.kiwoom.com',
       signupUrl: 'https://www.kiwoom.com',
       iosUrl: 'https://apps.apple.com/kr/app/id594911206',
-      aosUrl: 'https://play.google.com/store/apps/details?id=com.kiwoom.ksystem.hero',
+      aosUrl:
+          'https://play.google.com/store/apps/details?id=com.kiwoom.ksystem.hero',
       steps: [
         '키움증권 영웅문 앱으로 계좌를 개설합니다.',
         'openapi.kiwoom.com 접속 → 로그인',
@@ -80,7 +82,8 @@ class _KisGuidePageState extends State<KisGuidePage>
       devUrl: 'https://openapi.samsungpop.com',
       signupUrl: 'https://www.samsungpop.com',
       iosUrl: 'https://apps.apple.com/kr/app/id370152619',
-      aosUrl: 'https://play.google.com/store/apps/details?id=com.samsung.android.spop.mts',
+      aosUrl:
+          'https://play.google.com/store/apps/details?id=com.samsung.android.spop.mts',
       steps: [
         '삼성증권 mPOP 앱으로 계좌를 개설합니다.',
         'openapi.samsungpop.com 접속 → 삼성증권 로그인',
@@ -120,15 +123,20 @@ class _KisGuidePageState extends State<KisGuidePage>
         ),
         title: Text(
           'API 키 발급 가이드',
-          style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
         bottom: TabBar(
           controller: _tab,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
           tabs: [
-            ..._brokers.map((b) => Tab(child: Text(b.shortName, style: const TextStyle(fontWeight: FontWeight.bold)))),
-            const Tab(child: Text('카카오', style: TextStyle(fontWeight: FontWeight.bold))),
+            ..._brokers.map((b) => Tab(
+                child: Text(b.shortName,
+                    style: const TextStyle(fontWeight: FontWeight.bold)))),
+            const Tab(
+                child:
+                    Text('카카오', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
           indicatorColor: theme.colorScheme.primary,
           labelColor: theme.colorScheme.primary,
@@ -177,7 +185,8 @@ class _BrokerGuideTab extends StatelessWidget {
                   backgroundColor: broker.color,
                   child: Text(
                     broker.shortName[0],
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -201,7 +210,8 @@ class _BrokerGuideTab extends StatelessWidget {
 
           // ── 앱 다운로드 ───────────────────────────────────────────────
           Text('① 앱 다운로드 / 계좌 개설',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -226,7 +236,8 @@ class _BrokerGuideTab extends StatelessWidget {
 
           // ── 단계별 가이드 ─────────────────────────────────────────────
           Text('② API 키 발급 단계',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           ...broker.steps.asMap().entries.map((e) => _StepRow(
                 theme: theme,
@@ -248,12 +259,13 @@ class _BrokerGuideTab extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+                const Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(broker.secretNote,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          height: 1.6, fontWeight: FontWeight.w600)),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(height: 1.6, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -271,12 +283,14 @@ class _BrokerGuideTab extends StatelessWidget {
 
           // ── FAQ ───────────────────────────────────────────────────────
           Text('자주 묻는 질문',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           _FaqItem(
             theme: theme,
             question: 'API 신청 후 바로 사용할 수 있나요?',
-            answer: '실전 계좌 API는 신청 즉시 발급됩니다. 단, 계좌 개설 직후에는 영업일 1일 정도 대기가 필요할 수 있습니다.',
+            answer:
+                '실전 계좌 API는 신청 즉시 발급됩니다. 단, 계좌 개설 직후에는 영업일 1일 정도 대기가 필요할 수 있습니다.',
           ),
           _FaqItem(
             theme: theme,
@@ -286,7 +300,8 @@ class _BrokerGuideTab extends StatelessWidget {
           _FaqItem(
             theme: theme,
             question: '자동매매가 내 계좌에 직접 접근하나요?',
-            answer: '네. App Key/Secret으로 매수·매도 주문을 실행합니다. 원금 손실이 발생할 수 있으며 모든 투자 결과는 본인 책임입니다.',
+            answer:
+                '네. App Key/Secret으로 매수·매도 주문을 실행합니다. 원금 손실이 발생할 수 있으며 모든 투자 결과는 본인 책임입니다.',
           ),
           const SizedBox(height: 24),
 
@@ -304,7 +319,8 @@ class _BrokerGuideTab extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: broker.color,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
@@ -378,11 +394,14 @@ class _StepRow extends StatelessWidget {
                   backgroundColor: color,
                   child: Text('$index',
                       style: const TextStyle(
-                          color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
                 ),
                 if (!isLast)
                   Expanded(
-                    child: Container(width: 2, color: color.withValues(alpha: 0.2)),
+                    child: Container(
+                        width: 2, color: color.withValues(alpha: 0.2)),
                   ),
               ],
             ),
@@ -433,7 +452,8 @@ class _FaqItem extends StatefulWidget {
   final ThemeData theme;
   final String question;
   final String answer;
-  const _FaqItem({required this.theme, required this.question, required this.answer});
+  const _FaqItem(
+      {required this.theme, required this.question, required this.answer});
 
   @override
   State<_FaqItem> createState() => _FaqItemState();

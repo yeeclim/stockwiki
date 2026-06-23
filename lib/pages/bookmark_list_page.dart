@@ -40,7 +40,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
         title: const Text('관심종목 제거'),
         content: Text('$stockName을(를) 관심종목에서 제거하시겠습니까?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('제거', style: TextStyle(color: Colors.red)),
@@ -54,7 +56,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
       await _loadBookmarks();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$stockName이(가) 관심종목에서 제거되었습니다.'), duration: const Duration(seconds: 1)),
+          SnackBar(
+              content: Text('$stockName이(가) 관심종목에서 제거되었습니다.'),
+              duration: const Duration(seconds: 1)),
         );
       }
     }
@@ -62,10 +66,13 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
   void _navigateToDetail(Map<String, dynamic> bookmark) {
     final type = bookmark['type'] as String? ?? 'us';
-    final code = bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
+    final code =
+        bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
     final isKr = type == 'kr' || RegExp(r'^\d{6}$').hasMatch(code);
     final stock = Stock(
-      symbol: bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '',
+      symbol: bookmark['symbol'] as String? ??
+          bookmark['stockCode'] as String? ??
+          '',
       name: bookmark['stockName'] as String? ?? '',
       price: (bookmark['price'] as num?)?.toDouble(),
       changePercent: (bookmark['changePercent'] as num?)?.toDouble(),
@@ -74,7 +81,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => UsStockDetailPage(stock: stock, isKorean: isKr)),
+      MaterialPageRoute(
+          builder: (_) => UsStockDetailPage(stock: stock, isKorean: isKr)),
     );
   }
 
@@ -96,7 +104,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
     final theme = Theme.of(context);
 
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
+      return Center(
+          child: CircularProgressIndicator(color: theme.colorScheme.primary));
     }
 
     if (_bookmarks.isEmpty) {
@@ -106,11 +115,14 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
           children: [
             Icon(Icons.star_border, size: 72, color: theme.colorScheme.outline),
             const SizedBox(height: 16),
-            Text('관심종목이 없습니다', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text('관심종목이 없습니다',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 8),
             Text(
               '종목 상세 페이지에서 ★ 버튼으로 추가하세요',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -131,7 +143,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
   Widget _buildCard(Map<String, dynamic> bookmark) {
     final theme = Theme.of(context);
     final stockName = bookmark['stockName'] as String? ?? 'N/A';
-    final stockCode = bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
+    final stockCode =
+        bookmark['symbol'] as String? ?? bookmark['stockCode'] as String? ?? '';
     final type = bookmark['type'] as String? ?? 'us';
     // 종목코드가 6자리 숫자면 한국 주식으로 간주 (type 저장 오류 fallback)
     final isKorean = type == 'kr' || RegExp(r'^\d{6}$').hasMatch(stockCode);
@@ -155,7 +168,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
               Expanded(
                 child: Row(
                   children: [
-                    Text(isKorean ? '🇰🇷' : '🇺🇸', style: const TextStyle(fontSize: 24)),
+                    Text(isKorean ? '🇰🇷' : '🇺🇸',
+                        style: const TextStyle(fontSize: 24)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -172,7 +186,8 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                           const SizedBox(height: 2),
                           Text(
                             stockCode,
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -186,7 +201,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                 children: [
                   if (price != null)
                     Text(
-                      isKorean ? '₩${price.toInt().toLocaleString()}' : '\$${price.toStringAsFixed(2)}',
+                      isKorean
+                          ? '₩${price.toInt().toLocaleString()}'
+                          : '\$${price.toStringAsFixed(2)}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,
@@ -195,9 +212,11 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                   if (changePercent != null) ...[
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+                        color: (isPositive ? Colors.green : Colors.red)
+                            .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

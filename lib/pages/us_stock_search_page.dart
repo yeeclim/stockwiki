@@ -22,25 +22,35 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
     final keyword = _controller.text.trim();
     if (keyword.isEmpty) return;
 
-    setState(() { _isLoading = true; _error = ''; _results = []; });
+    setState(() {
+      _isLoading = true;
+      _error = '';
+      _results = [];
+    });
 
     try {
       final origin = Uri.base.origin;
-      final url = '$origin/api/us-stock-search?keyword=${Uri.encodeComponent(keyword)}';
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final url =
+          '$origin/api/us-stock-search?keyword=${Uri.encodeComponent(keyword)}';
+      final res =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
       final data = json.decode(res.body);
 
       if (data['success'] == true) {
         final raw = List<Map<String, dynamic>>.from(data['data'] ?? []);
         final filtered = _type == 'stock'
-            ? raw.where((s) => !(s['exchange'] as String? ?? '').contains('ETF')).toList()
+            ? raw
+                .where((s) => !(s['exchange'] as String? ?? '').contains('ETF'))
+                .toList()
             : raw;
-        setState(() => _results = filtered.map((s) => Stock(
-          symbol: s['symbol'] as String? ?? '',
-          name: s['name'] as String? ?? '',
-          price: (s['price'] as num?)?.toDouble(),
-          changePercent: (s['changePercent'] as num?)?.toDouble(),
-        )).toList());
+        setState(() => _results = filtered
+            .map((s) => Stock(
+                  symbol: s['symbol'] as String? ?? '',
+                  name: s['name'] as String? ?? '',
+                  price: (s['price'] as num?)?.toDouble(),
+                  changePercent: (s['changePercent'] as num?)?.toDouble(),
+                ))
+            .toList());
       } else {
         setState(() => _error = data['error'] ?? '검색 결과가 없습니다');
       }
@@ -57,16 +67,21 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
       label: Text(label),
       selected: selected,
       onSelected: (_) {
+        if (_isLoading) return;
         setState(() => _type = value);
         if (_controller.text.isNotEmpty) _search();
       },
       selectedColor: theme.colorScheme.primary.withOpacity(0.15),
       checkmarkColor: theme.colorScheme.primary,
       labelStyle: theme.textTheme.labelMedium?.copyWith(
-          color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface,
           fontWeight: selected ? FontWeight.bold : FontWeight.normal),
       side: BorderSide(
-          color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant),
     );
   }
 
@@ -129,7 +144,8 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                       filled: true,
-                      fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      fillColor:
+                          theme.colorScheme.surfaceVariant.withOpacity(0.3),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -140,14 +156,18 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                        borderSide: BorderSide(
+                            color: theme.colorScheme.primary, width: 1.5),
                       ),
-                      prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+                      prefixIcon: Icon(Icons.search,
+                          color: theme.colorScheme.onSurfaceVariant),
                       suffixIcon: IconButton(
-                        icon: Icon(Icons.arrow_forward, color: theme.colorScheme.primary),
+                        icon: Icon(Icons.arrow_forward,
+                            color: theme.colorScheme.primary),
                         onPressed: _search,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                     ),
                   ),
                 ),
@@ -201,7 +221,10 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search_off, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    Icon(Icons.search_off,
+                        size: 48,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withOpacity(0.5)),
                     const SizedBox(height: 16),
                     Text(
                       '검색 결과가 없습니다.',
@@ -229,7 +252,8 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => UsStockDetailPage(stock: stock),
+                                builder: (context) =>
+                                    UsStockDetailPage(stock: stock),
                               ),
                             );
                           },
@@ -249,7 +273,8 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                     child: Text(
                                       stock.symbol.substring(0, 1),
                                       style: TextStyle(
-                                        color: theme.colorScheme.onPrimaryContainer,
+                                        color: theme
+                                            .colorScheme.onPrimaryContainer,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
                                       ),
@@ -259,11 +284,13 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         stock.name,
-                                        style: theme.textTheme.titleMedium?.copyWith(
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: theme.colorScheme.onSurface,
                                         ),
@@ -273,8 +300,10 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                       const SizedBox(height: 4),
                                       Text(
                                         '${stock.symbol} • US',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -285,7 +314,8 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                   children: [
                                     Text(
                                       '\$${stock.price?.toStringAsFixed(2) ?? '-'}',
-                                      style: theme.textTheme.titleMedium?.copyWith(
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: theme.colorScheme.onSurface,
                                       ),
@@ -293,23 +323,35 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                     if (stock.changePercent != null) ...[
                                       const SizedBox(height: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: (stock.changePercent! >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: (stock.changePercent! >= 0
+                                                  ? Colors.green
+                                                  : Colors.red)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(
-                                              stock.changePercent! >= 0 ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                                              color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                              stock.changePercent! >= 0
+                                                  ? Icons.arrow_drop_up
+                                                  : Icons.arrow_drop_down,
+                                              color: stock.changePercent! >= 0
+                                                  ? Colors.green
+                                                  : Colors.red,
                                               size: 16,
                                             ),
                                             Text(
                                               '${stock.changePercent!.abs().toStringAsFixed(2)}%',
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: stock.changePercent! >= 0 ? Colors.green : Colors.red,
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                color: stock.changePercent! >= 0
+                                                    ? Colors.green
+                                                    : Colors.red,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),

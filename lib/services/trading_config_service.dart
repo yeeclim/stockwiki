@@ -26,29 +26,32 @@ class TradingConfig {
   });
 
   factory TradingConfig.fromMap(Map<String, dynamic> m) => TradingConfig(
-        brokerType:          m['broker_type'] as String? ?? 'kis',
-        kisAppKey:           m['kis_app_key'] as String,
-        kisAppSecret:        m['kis_app_secret'] as String,
-        kisAccountNo:        m['kis_account_no'] as String,
-        kisAccountProdCode:  m['kis_account_prod_code'] as String? ?? '01',
-        notifyEmail:         m['notify_email'] as String? ?? '',
-        notifyKakaoRefreshToken: m['notify_kakao_refresh_token'] as String? ?? '',
-        dailyMaxBuy: m['daily_max_buy'] != null ? (m['daily_max_buy'] as num).toInt() : null,
-        isActive:            m['is_active'] as bool? ?? true,
-        githubRegisteredAt:  m['github_registered_at'] != null
+        brokerType: m['broker_type'] as String? ?? 'kis',
+        kisAppKey: m['kis_app_key'] as String,
+        kisAppSecret: m['kis_app_secret'] as String,
+        kisAccountNo: m['kis_account_no'] as String,
+        kisAccountProdCode: m['kis_account_prod_code'] as String? ?? '01',
+        notifyEmail: m['notify_email'] as String? ?? '',
+        notifyKakaoRefreshToken:
+            m['notify_kakao_refresh_token'] as String? ?? '',
+        dailyMaxBuy: m['daily_max_buy'] != null
+            ? (m['daily_max_buy'] as num).toInt()
+            : null,
+        isActive: m['is_active'] as bool? ?? true,
+        githubRegisteredAt: m['github_registered_at'] != null
             ? DateTime.parse(m['github_registered_at'] as String)
             : null,
       );
 
   Map<String, dynamic> toMap() => {
-        'broker_type':           brokerType,
-        'kis_app_key':           kisAppKey,
-        'kis_app_secret':        kisAppSecret,
-        'kis_account_no':        kisAccountNo,
+        'broker_type': brokerType,
+        'kis_app_key': kisAppKey,
+        'kis_app_secret': kisAppSecret,
+        'kis_account_no': kisAccountNo,
         'kis_account_prod_code': kisAccountProdCode,
-      'notify_email':          notifyEmail,
-      'notify_kakao_refresh_token': notifyKakaoRefreshToken,
-      'daily_max_buy':          dailyMaxBuy,
+        'notify_email': notifyEmail,
+        'notify_kakao_refresh_token': notifyKakaoRefreshToken,
+        'daily_max_buy': dailyMaxBuy,
       };
 }
 
@@ -97,7 +100,6 @@ class TradingConfigService {
     if (user == null) return;
     await _sb
         .from('trading_configs')
-        .update({'is_active': false})
-        .eq('user_id', user.id);
+        .update({'is_active': false}).eq('user_id', user.id);
   }
 }

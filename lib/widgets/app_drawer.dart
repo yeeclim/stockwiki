@@ -68,9 +68,10 @@ class AppDrawer extends StatelessWidget {
                     radius: 16,
                     backgroundColor:
                         theme.colorScheme.primary.withValues(alpha: 0.12),
-                    backgroundImage: isLoggedIn && authProvider.avatarUrl != null
-                        ? NetworkImage(authProvider.avatarUrl!)
-                        : null,
+                    backgroundImage:
+                        isLoggedIn && authProvider.avatarUrl != null
+                            ? NetworkImage(authProvider.avatarUrl!)
+                            : null,
                     child: !isLoggedIn || authProvider.avatarUrl == null
                         ? Icon(Icons.person,
                             size: 18, color: theme.colorScheme.primary)
@@ -83,15 +84,13 @@ class AppDrawer extends StatelessWidget {
                         TextStyle(color: theme.colorScheme.onSurface),
                   ),
                   subtitle: Text(
-                    isLoggedIn
-                        ? authProvider.displayName
-                        : '로그인 / 회원가입',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant),
+                    isLoggedIn ? authProvider.displayName : '로그인 / 회원가입',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing:
-                      Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+                  trailing: Icon(Icons.chevron_right,
+                      color: theme.colorScheme.onSurfaceVariant),
                   onTap: () {
                     Navigator.of(context).pop();
                     if (isLoggedIn) {
@@ -115,8 +114,8 @@ class AppDrawer extends StatelessWidget {
                       title: Text('다크 모드',
                           style: theme.textTheme.bodyLarge ??
                               TextStyle(color: theme.colorScheme.onSurface)),
-                      secondary:
-                          Icon(Icons.dark_mode, color: theme.colorScheme.onSurface),
+                      secondary: Icon(Icons.dark_mode,
+                          color: theme.colorScheme.onSurface),
                       value: currentMode == ThemeMode.dark,
                       onChanged: (val) {
                         themeNotifier.value =
@@ -148,7 +147,8 @@ class AppDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const AiTradingPage()),
+                        MaterialPageRoute(
+                            builder: (_) => const AiTradingPage()),
                       );
                     },
                   ),
@@ -170,8 +170,8 @@ class AppDrawer extends StatelessWidget {
                               fontSize: 11)),
                   onTap: () {
                     Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const BookmarkListPage()));
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const BookmarkListPage()));
                   },
                 ),
                 ListTile(
@@ -188,8 +188,8 @@ class AppDrawer extends StatelessWidget {
                               fontSize: 11)),
                   onTap: () {
                     Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const PortfolioPage()));
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const PortfolioPage()));
                   },
                 ),
                 ListTile(
@@ -319,8 +319,7 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  Widget _sectionLabel(
-      BuildContext context, ThemeData theme, String label) {
+  Widget _sectionLabel(BuildContext context, ThemeData theme, String label) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
       child: Text(
@@ -336,107 +335,6 @@ class AppDrawer extends StatelessWidget {
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
             ),
-      ),
-    );
-  }
-}
-
-// (더 이상 사용하지 않는 타일 — 마이페이지 ListTile로 대체됨)
-// ignore: unused_element
-class _LoginTile extends StatelessWidget {
-  final ThemeData theme;
-  const _LoginTile({required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).pop();
-        Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const LoginPage()));
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha:0.12),
-              child:
-                  Icon(Icons.person, color: theme.colorScheme.primary, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('로그인 / 회원가입',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.bold)),
-                  Text('AI 자동매매 기능을 이용하세요',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
-class _UserTile extends StatelessWidget {
-  final AuthProvider authProvider;
-  final ThemeData theme;
-  const _UserTile({required this.authProvider, required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: theme.colorScheme.primary.withValues(alpha:0.15),
-            backgroundImage: authProvider.avatarUrl != null
-                ? NetworkImage(authProvider.avatarUrl!)
-                : null,
-            child: authProvider.avatarUrl == null
-                ? Icon(Icons.person,
-                    color: theme.colorScheme.primary, size: 20)
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(authProvider.displayName,
-                    style: theme.textTheme.bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis),
-                if (authProvider.currentUser?.email != null &&
-                    authProvider.displayName != authProvider.currentUser?.email)
-                  Text(authProvider.currentUser!.email!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: '로그아웃',
-            icon: Icon(Icons.logout,
-                size: 20, color: theme.colorScheme.onSurfaceVariant),
-            onPressed: () async {
-              await AuthService.signOut();
-            },
-          ),
-        ],
       ),
     );
   }

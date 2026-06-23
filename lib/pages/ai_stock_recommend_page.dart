@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -24,7 +22,6 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
   String? _error;
   DateTime? _lastUpdated;
   Timer? _autoRefreshTimer;
-  final Set<String> _likedStocks = {};
   final Set<String> _bookmarkedStocks = {};
 
   @override
@@ -37,6 +34,7 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
 
   Future<void> _loadBookmarks() async {
     final bookmarks = await BookmarkService.getBookmarkedStocks();
+    if (!mounted) return;
     setState(() {
       _bookmarkedStocks.clear();
       _bookmarkedStocks.addAll(bookmarks);
@@ -141,8 +139,10 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
           '📄 API 응답 본문 (첫 500자): ${response.body.length > 500 ? response.body.substring(0, 500) : response.body}');
 
       if (response.statusCode != 200) {
-        debugPrint('❌ HTTP 에러: ${response.statusCode} ${response.reasonPhrase}');
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        debugPrint(
+            '❌ HTTP 에러: ${response.statusCode} ${response.reasonPhrase}');
+        throw Exception(
+            'HTTP ${response.statusCode}: ${response.reasonPhrase}');
       }
 
       final responseBody = response.body.trim();
@@ -252,37 +252,12 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
     await _loadRecommendations();
   }
 
-  void _shareRecommendation(StockRecommendation rec) {
-    final shareText = '''
-🤖 AI 종목 추천: ${rec.stockName} (${rec.stockCode})
-
-현재가: ₩${AiRecommendCard.formatPrice(rec.currentPrice)}
-추천: ${rec.action}
-목표가: ₩${AiRecommendCard.formatPrice(rec.targetPrice)}
-
-추천 근거:
-${rec.reasons.map((r) => '• $r').join('\n')}
-
-StockWiki AI 추천
-    ''';
-
-    Clipboard.setData(ClipboardData(text: shareText));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('추천 내용이 클립보드에 복사되었습니다.'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final showEmpty =
-        !_isLoading && _error == null && _recommendations.isEmpty;
+    final showEmpty = !_isLoading && _error == null && _recommendations.isEmpty;
     final showError = !_isLoading && _error != null;
 
     return Scaffold(
@@ -331,7 +306,8 @@ StockWiki AI 추천
               stockCode: rec.stockCode,
               stockName: rec.stockName,
               market: 'kr',
-              currentPrice: rec.currentPrice > 0 ? rec.currentPrice.toDouble() : null,
+              currentPrice:
+                  rec.currentPrice > 0 ? rec.currentPrice.toDouble() : null,
             ),
           );
         },

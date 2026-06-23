@@ -13,6 +13,7 @@ class BoardPage extends StatefulWidget {
 class _BoardPageState extends State<BoardPage> {
   List<Map<String, dynamic>> _posts = [];
   bool _isLoading = true;
+  String? _error;
   int _page = 1;
   int _total = 0;
   static const int _limit = 20;
@@ -35,18 +36,28 @@ class _BoardPageState extends State<BoardPage> {
 
   void _onScroll() {
     final pos = _scrollController.position;
-    if (pos.pixels >= pos.maxScrollExtent - 200 && !_loadingMore && _posts.length < _total) {
+    if (pos.pixels >= pos.maxScrollExtent - 200 &&
+        !_loadingMore &&
+        _posts.length < _total) {
       _loadMore();
     }
   }
 
   Future<void> _fetchPosts({bool reset = false}) async {
-    if (reset) setState(() { _page = 1; _posts = []; _isLoading = true; });
+    if (reset)
+      setState(() {
+        _page = 1;
+        _posts = [];
+        _isLoading = true;
+        _error = null;
+      });
     try {
       final origin = Uri.base.origin;
-      final res = await http.get(Uri.parse('$origin/api/board?page=$_page&limit=$_limit'))
+      final res = await http
+          .get(Uri.parse('$origin/api/board?page=$_page&limit=$_limit'))
           .timeout(const Duration(seconds: 10));
       final data = json.decode(res.body);
+      if (!mounted) return;
       if (data['success'] == true) {
         final incoming = List<Map<String, dynamic>>.from(data['posts'] ?? []);
         setState(() {
@@ -55,17 +66,33 @@ class _BoardPageState extends State<BoardPage> {
           _isLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = data['error'] ?? '불러오기 실패';
+          _isLoading = false;
+        });
       }
-    } catch (_) {
-      setState(() => _isLoading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '네트워크 오류가 발생했습니다';
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _loadMore() async {
-    setState(() { _loadingMore = true; _page++; });
-    await _fetchPosts();
-    setState(() => _loadingMore = false);
+    if (_loadingMore || _posts.length >= _total) return;
+    setState(() {
+      _loadingMore = true;
+      _page++;
+    });
+    try {
+      await _fetchPosts();
+    } catch (_) {
+      setState(() => _page--);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
   }
 
   String _relativeTime(String? isoStr) {
@@ -89,7 +116,8 @@ class _BoardPageState extends State<BoardPage> {
         elevation: 0,
         title: Text('자유게시판',
             style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
@@ -102,37 +130,44 @@ class _BoardPageState extends State<BoardPage> {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+          ? Center(
+              child:
+                  CircularProgressIndicator(color: theme.colorScheme.primary))
           : RefreshIndicator(
               onRefresh: () => _fetchPosts(reset: true),
-              child: _posts.isEmpty
-                  ? _buildEmpty(theme)
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                      itemCount: _posts.length + (_loadingMore ? 1 : 0),
-                      itemBuilder: (ctx, i) {
-                        if (i == _posts.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        final post = _posts[i];
-                        return _PostCard(
-                          post: post,
-                          relTime: _relativeTime(post['created_at'] as String?),
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => BoardDetailPage(postId: post['id'].toString()),
-                              ),
+              child: (_error != null && _posts.isEmpty)
+                  ? _buildError(theme)
+                  : _posts.isEmpty
+                      ? _buildEmpty(theme)
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+                          itemCount: _posts.length + (_loadingMore ? 1 : 0),
+                          itemBuilder: (ctx, i) {
+                            if (i == _posts.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            final post = _posts[i];
+                            return _PostCard(
+                              post: post,
+                              relTime:
+                                  _relativeTime(post['created_at'] as String?),
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => BoardDetailPage(
+                                        postId: post['id'].toString()),
+                                  ),
+                                );
+                                _fetchPosts(reset: true);
+                              },
                             );
-                            _fetchPosts(reset: true);
                           },
-                        );
-                      },
-                    ),
+                        ),
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showWriteSheet(context, theme),
@@ -144,19 +179,43 @@ class _BoardPageState extends State<BoardPage> {
     );
   }
 
+  Widget _buildError(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cloud_off_outlined,
+              size: 56, color: theme.colorScheme.error.withValues(alpha: 0.6)),
+          const SizedBox(height: 16),
+          Text(_error ?? '오류가 발생했습니다',
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: () => _fetchPosts(reset: true),
+            child: const Text('다시 시도'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmpty(ThemeData theme) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.forum_outlined, size: 56,
+          Icon(Icons.forum_outlined,
+              size: 56,
               color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4)),
           const SizedBox(height: 16),
-          Text('아직 게시글이 없습니다', style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant)),
+          Text('아직 게시글이 없습니다',
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 8),
-          Text('첫 번째 글을 작성해보세요!', style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant)),
+          Text('첫 번째 글을 작성해보세요!',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -184,14 +243,16 @@ class _PostCard extends StatelessWidget {
   final Map<String, dynamic> post;
   final String relTime;
   final VoidCallback onTap;
-  const _PostCard({required this.post, required this.relTime, required this.onTap});
+  const _PostCard(
+      {required this.post, required this.relTime, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final preview = post['preview'] as String? ?? '';
     final nickname = post['nickname'] as String? ?? '익명';
-    final isUpdated = post['updated_at'] != null && post['updated_at'] != post['created_at'];
+    final isUpdated =
+        post['updated_at'] != null && post['updated_at'] != post['created_at'];
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Card(
@@ -217,8 +278,8 @@ class _PostCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.person_outline, size: 13,
-                        color: theme.colorScheme.onSurfaceVariant),
+                    Icon(Icons.person_outline,
+                        size: 13, color: theme.colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(nickname,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -232,8 +293,8 @@ class _PostCard extends StatelessWidget {
                               fontStyle: FontStyle.italic)),
                       const SizedBox(width: 8),
                     ],
-                    Icon(Icons.access_time_outlined, size: 12,
-                        color: theme.colorScheme.onSurfaceVariant),
+                    Icon(Icons.access_time_outlined,
+                        size: 12, color: theme.colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(relTime,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -276,26 +337,37 @@ class _WriteSheetState extends State<_WriteSheet> {
 
   Future<void> _submit() async {
     if (_submitting) return;
-    setState(() { _submitting = true; _error = ''; });
+    setState(() {
+      _submitting = true;
+      _error = '';
+    });
     try {
       final origin = Uri.base.origin;
-      final res = await http.post(
-        Uri.parse('$origin/api/board'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'nickname': _nicknameCtrl.text.trim(),
-          'password': _passwordCtrl.text.trim(),
-          'content': _contentCtrl.text.trim(),
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final res = await http
+          .post(
+            Uri.parse('$origin/api/board'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'nickname': _nicknameCtrl.text.trim(),
+              'password': _passwordCtrl.text.trim(),
+              'content': _contentCtrl.text.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
       final data = json.decode(res.body);
       if (data['success'] == true) {
         widget.onSubmitted();
       } else {
-        setState(() { _error = data['error'] ?? '등록 실패'; _submitting = false; });
+        setState(() {
+          _error = data['error'] ?? '등록 실패';
+          _submitting = false;
+        });
       }
     } catch (e) {
-      setState(() { _error = '오류: $e'; _submitting = false; });
+      setState(() {
+        _error = '오류: $e';
+        _submitting = false;
+      });
     }
   }
 
@@ -306,13 +378,17 @@ class _WriteSheetState extends State<_WriteSheet> {
         filled: true,
         fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            borderSide:
+                BorderSide(color: theme.colorScheme.primary, width: 1.5)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       );
 
   @override
@@ -327,7 +403,8 @@ class _WriteSheetState extends State<_WriteSheet> {
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.outlineVariant,
@@ -336,7 +413,8 @@ class _WriteSheetState extends State<_WriteSheet> {
             ),
           ),
           Text('새 게시글 작성',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -358,7 +436,8 @@ class _WriteSheetState extends State<_WriteSheet> {
                     suffixIcon: IconButton(
                       icon: Icon(
                         _pwVisible ? Icons.visibility_off : Icons.visibility,
-                        size: 18, color: theme.colorScheme.onSurfaceVariant,
+                        size: 18,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                       onPressed: () => setState(() => _pwVisible = !_pwVisible),
                     ),
@@ -378,7 +457,8 @@ class _WriteSheetState extends State<_WriteSheet> {
           if (_error.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(_error,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.error)),
           ],
           const SizedBox(height: 14),
           SizedBox(
@@ -389,11 +469,13 @@ class _WriteSheetState extends State<_WriteSheet> {
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: _submitting
                   ? SizedBox(
-                      width: 20, height: 20,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: theme.colorScheme.onPrimary))
                   : const Text('등록'),
