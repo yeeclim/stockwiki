@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:stockwiki/main.dart' show themeNotifier;
 import 'package:stockwiki/providers/auth_provider.dart';
-import 'package:stockwiki/services/auth_service.dart';
 import '../pages/us_stock_search_page.dart';
 import '../pages/ai_stock_recommend_page.dart';
 import '../pages/us_stock_ai_recommend_page.dart';
