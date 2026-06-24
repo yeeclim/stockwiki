@@ -3,11 +3,12 @@
 GitHub Actions 매주 월요일 07:00 KST 실행
 
 흐름:
-  1. KRX 공공 API → 전체 상장 종목 코드 수집
-  2. 기초 필터 (가격·거래량)로 1500→300 수준으로 축소
-  3. KIS API 병렬 조회 (fundamentals + MA) → 예비 점수 계산
+  1. FinanceDataReader → 전체 상장 종목 코드+이름 수집
+  2. 코드 패턴 필터 (ETF·우선주 제외)
+  3. KIS API 병렬 조회 (fundamentals + 가격/거래량 필터 + MA) → 예비 점수
   4. 예비 점수 4점 이상 종목만 FnGuide 재무비율 조회 → 최종 점수
   5. 최종 점수 4점 이상 종목을 screening_candidates 테이블에 upsert
+     단, 결과가 0개이면 기존 candidates를 보존(삭제하지 않음)
 """
 import os
 import time
@@ -21,87 +22,80 @@ from strategy import _score_entry
 _SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 _SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
-# KIS API 인스턴스 (auth()는 main에서 한 번만)
 _api: KISApi | None = None
 
-MAX_WORKERS   = 5    # 병렬 스레드 수 (KIS API rate limit 고려)
-CALL_DELAY    = 0.1  # 스레드별 API 호출 간 최소 대기(초)
+MAX_WORKERS   = 5    # 병렬 스레드 수
+CALL_DELAY    = 0.15 # 스레드별 API 호출 간 최소 대기(초)
 PRE_THRESHOLD = 4    # 예비 점수 이상이면 재무비율 조회
 MIN_THRESHOLD = 4    # 최종 점수 이상이면 candidates에 등록
 TOP_N         = 60   # candidates에 저장할 최대 종목 수
 
 
-# ── KRX 전체 종목 조회 ──────────────────────────────────────────────────────────
+# ── 전체 종목 수집 ──────────────────────────────────────────────────────────────
 
-def _fetch_krx_stocks() -> list[dict]:
-    """KRX 공공 데이터 포털에서 KOSPI/KOSDAQ 전체 종목 조회"""
-    today = datetime.now().strftime("%Y%m%d")
+def _fetch_all_stocks() -> list[dict]:
+    """FinanceDataReader로 KOSPI/KOSDAQ 전체 종목 목록 수집"""
+    try:
+        import FinanceDataReader as fdr
+    except ImportError:
+        print("❌ FinanceDataReader 미설치 — pip install finance-datareader")
+        return []
+
     all_stocks = []
-    for mkt_id, sector in [("STK", "KOSPI"), ("KSQ", "KOSDAQ")]:
+    for market in ["KOSPI", "KOSDAQ"]:
         try:
-            r = requests.post(
-                "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd",
-                data={
-                    "bld":          "dbms/MDC/STAT/standard/MDCSTAT01501",
-                    "mktId":        mkt_id,
-                    "trdDd":        today,
-                    "share":        "1",
-                    "money":        "1",
-                    "csvxls_isNo":  "false",
-                },
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent":   "Mozilla/5.0",
-                    "Referer":      "http://data.krx.co.kr/",
-                },
-                timeout=20,
-            )
-            r.raise_for_status()
-            for item in r.json().get("OutBlock_1", []):
-                code   = item.get("ISU_SRT_CD", "")
-                name   = item.get("ISU_ABBRV", "")
-                price  = int(item.get("TDD_CLSPRC",  "0").replace(",", "") or 0)
-                volume = int(item.get("ACC_TRDVOL",  "0").replace(",", "") or 0)
-                if code and name:
-                    all_stocks.append({
-                        "code":   code,
-                        "name":   name,
-                        "sector": sector,
-                        "price":  price,
-                        "volume": volume,
-                    })
+            df = fdr.StockListing(market)
+            count = 0
+            for _, row in df.iterrows():
+                code = str(row.get("Code", "")).strip()
+                name = str(row.get("Name", "")).strip()
+                if not code or not name:
+                    continue
+                # 6자리가 아닌 경우 제로패딩
+                code = code.zfill(6)
+                all_stocks.append({
+                    "code":   code,
+                    "name":   name,
+                    "sector": market,
+                })
+                count += 1
+            print(f"📋 {market}: {count}종목 수집")
         except Exception as e:
-            print(f"⚠️  KRX {mkt_id} 조회 실패: {e}")
+            print(f"⚠️  {market} 종목 조회 실패: {e}")
     return all_stocks
 
 
 def _prefilter(stocks: list[dict]) -> list[dict]:
-    """기초 필터: ETF/관리종목 제외, 가격·거래량 기준"""
+    """코드 패턴으로 ETF·우선주 등 비대상 제외"""
     filtered = []
     for s in stocks:
-        code, price, volume = s["code"], s["price"], s["volume"]
-        # ETF·ETN: 6자리가 아니거나 1로 시작(ETF) — 단순 근사 필터
-        if not (len(code) == 6 and code.isdigit()):
+        code = s["code"]
+        if len(code) != 6 or not code.isdigit():
             continue
-        if code.startswith("1"):   # ETF 코드 대역
+        if code.startswith("1"):          # ETF 코드 대역 (10xxxx)
             continue
-        if price < 1_000 or price > 800_000:
-            continue
-        if volume < 50_000:
+        if code.endswith(("5", "7")):     # 우선주 (삼성전자우 005935 등)
             continue
         filtered.append(s)
     return filtered
 
 
-# ── 종목 점수 계산 (스레드 내에서 실행) ─────────────────────────────────────────
+# ── 종목 점수 계산 ──────────────────────────────────────────────────────────────
 
 def _score_stock(stock: dict) -> dict | None:
-    """단일 종목 예비 점수 계산 (fundamentals + MA만, 재무비율 없이)"""
+    """예비 점수 계산: fundamentals 조회 → 가격/거래량 필터 → MA 조회 → 점수"""
     global _api
-    code, name = stock["code"], stock["name"]
+    code = stock["code"]
     try:
         time.sleep(CALL_DELAY)
-        fund    = _api.get_fundamentals(code)
+        fund = _api.get_fundamentals(code)
+
+        # 가격·거래량 기초 필터 (KIS 실데이터 기준)
+        price  = fund.get("price", 0)
+        volume = fund.get("volume", 0)
+        if price < 1_000 or price > 800_000 or volume < 50_000:
+            return None
+
         ma_data = _api.get_ma_data(code)
         score, _, _ = _score_entry(fund, ma_data, ratios=None)
         return {**stock, "score": score, "fund": fund, "ma": ma_data}
@@ -110,7 +104,7 @@ def _score_stock(stock: dict) -> dict | None:
 
 
 def _score_with_ratios(stock: dict) -> dict:
-    """재무비율까지 포함한 최종 점수 계산"""
+    """재무비율 포함 최종 점수 계산"""
     global _api
     try:
         ratios = _api.get_financial_ratios(stock["code"])
@@ -120,10 +114,16 @@ def _score_with_ratios(stock: dict) -> dict:
         return stock
 
 
-# ── Supabase 저장 ──────────────────────────────────────────────────────────────
+# ── Supabase 저장 ───────────────────────────────────────────────────────────────
 
 def _upsert_candidates(candidates: list[dict]):
-    """screening_candidates 테이블에 upsert (기존 시스템 종목 삭제 후 교체)"""
+    """screening_candidates 테이블 갱신 (시스템 종목 교체)
+    결과가 비어 있으면 기존 데이터를 보존하고 아무것도 하지 않는다.
+    """
+    if not candidates:
+        print("⚠️  후보 종목 없음 — 기존 candidates 보존 (삭제 생략)")
+        return
+
     if not (_SUPABASE_URL and _SUPABASE_KEY):
         print("⚠️  Supabase 환경변수 없음 — 저장 생략")
         return
@@ -134,74 +134,91 @@ def _upsert_candidates(candidates: list[dict]):
         "Content-Type":  "application/json",
     }
 
-    # 기존 시스템 자동 추가 종목 삭제 (source='system')
-    try:
-        requests.delete(
-            f"{_SUPABASE_URL}/rest/v1/screening_candidates"
-            f"?source=eq.system&user_id=is.null",
-            headers=headers,
-            timeout=10,
-        )
-    except Exception as e:
-        print(f"⚠️  기존 시스템 종목 삭제 실패: {e}")
-
-    # 새 종목 upsert
+    # 새 종목 insert 먼저 시도 → 성공한 경우에만 기존 삭제
     rows = [
         {
             "stock_code": c["code"],
             "stock_name": c["name"],
             "sector":     c.get("sector", ""),
             "is_active":  True,
-            "source":   "system",
+            "source":     "system",
         }
         for c in candidates
     ]
+
     try:
         resp = requests.post(
             f"{_SUPABASE_URL}/rest/v1/screening_candidates",
             headers={**headers, "Prefer": "resolution=merge-duplicates"},
             json=rows,
-            timeout=15,
+            timeout=30,
         )
-        if resp.ok:
-            print(f"✅ screening_candidates 갱신 완료 — {len(rows)}종목")
-        else:
-            print(f"⚠️  저장 실패: {resp.status_code} {resp.text[:200]}")
+        if not resp.ok:
+            print(f"⚠️  새 종목 저장 실패: {resp.status_code} {resp.text[:200]}")
+            return
     except Exception as e:
-        print(f"⚠️  저장 오류: {e}")
+        print(f"⚠️  새 종목 저장 오류: {e}")
+        return
+
+    # 새 종목 저장 성공 → 기존 시스템 종목 중 새 목록에 없는 것만 삭제
+    new_codes = {c["code"] for c in candidates}
+    try:
+        existing_resp = requests.get(
+            f"{_SUPABASE_URL}/rest/v1/screening_candidates"
+            "?source=eq.system&user_id=is.null&select=stock_code",
+            headers=headers,
+            timeout=10,
+        )
+        if existing_resp.ok:
+            old_codes = {r["stock_code"] for r in existing_resp.json()}
+            to_delete = old_codes - new_codes
+            for code in to_delete:
+                requests.delete(
+                    f"{_SUPABASE_URL}/rest/v1/screening_candidates"
+                    f"?source=eq.system&user_id=is.null&stock_code=eq.{code}",
+                    headers=headers,
+                    timeout=10,
+                )
+    except Exception as e:
+        print(f"⚠️  구 종목 정리 실패 (신규 저장은 완료): {e}")
+
+    print(f"✅ screening_candidates 갱신 완료 — {len(rows)}종목")
 
 
-# ── 메인 ──────────────────────────────────────────────────────────────────────
+# ── 메인 ────────────────────────────────────────────────────────────────────────
 
 def main():
     global _api
 
     print("🔍 전체 KOSPI/KOSDAQ 광역 스캔 시작")
 
-    # KIS API 인증
     _api = KISApi()
     try:
         _api.auth()
+        print("✅ KIS 토큰 발급 완료")
     except Exception as e:
         print(f"❌ KIS 인증 실패: {e}")
         return
 
     # 1. 전체 종목 수집
-    all_stocks = _fetch_krx_stocks()
-    print(f"📋 KRX 전체 종목: {len(all_stocks)}개")
+    all_stocks = _fetch_all_stocks()
+    print(f"📋 전체 종목: {len(all_stocks)}개")
+    if not all_stocks:
+        print("❌ 종목 수집 실패 — 종료")
+        return
 
-    # 2. 기초 필터
+    # 2. 코드 패턴 필터
     candidates = _prefilter(all_stocks)
-    print(f"📋 기초 필터 후: {len(candidates)}개")
+    print(f"📋 패턴 필터 후: {len(candidates)}개")
 
-    # 3. 병렬 예비 점수 계산 (fundamentals + MA)
+    # 3. 병렬 예비 점수 계산 (fundamentals + 가격/거래량 필터 + MA)
     pre_results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         futures = {ex.submit(_score_stock, s): s for s in candidates}
         done = 0
         for fut in as_completed(futures):
             done += 1
-            if done % 100 == 0:
+            if done % 200 == 0:
                 print(f"  진행: {done}/{len(candidates)}")
             result = fut.result()
             if result and result["score"] >= PRE_THRESHOLD:
@@ -210,9 +227,9 @@ def main():
     pre_results.sort(key=lambda x: x["score"], reverse=True)
     print(f"📊 예비 통과 ({PRE_THRESHOLD}점 이상): {len(pre_results)}개")
 
-    # 4. 재무비율 포함 최종 점수 (예비 통과 종목만)
+    # 4. 재무비율 포함 최종 점수 (예비 통과 종목만, 최대 150개)
     final_results = []
-    for stock in pre_results[:150]:  # 최대 150개만 재무비율 조회
+    for stock in pre_results[:150]:
         scored = _score_with_ratios(stock)
         if scored["score"] >= MIN_THRESHOLD:
             final_results.append(scored)
@@ -222,7 +239,7 @@ def main():
     top = final_results[:TOP_N]
 
     print(f"\n{'='*55}")
-    print(f"  🏆 광역 스캔 결과 — 상위 {len(top)}종목 (최종 {MIN_THRESHOLD}점 이상)")
+    print(f"  🏆 광역 스캔 결과 — 상위 {len(top)}종목 ({MIN_THRESHOLD}점 이상)")
     print(f"{'='*55}")
     for r in top[:20]:
         print(f"  [{r['score']}/10점] {r['name']}({r['code']})  {r['fund']['price']:,}원")
