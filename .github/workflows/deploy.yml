@@ -36,11 +36,11 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
 
     - name: Deploy to Vercel
       env:
         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       run: |
-        npx vercel --prod ./build/web --token $VERCEL_TOKEN --confirm
+        npx vercel --prod ./build/web --token "$VERCEL_TOKEN" --yes
 
