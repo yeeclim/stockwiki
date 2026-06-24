@@ -120,7 +120,7 @@ class AiTradingPage extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const KisGuidePage()),
                 ),
                 icon: const Icon(Icons.menu_book_outlined),
-                label: const Text('KIS API 키 발급 방법'),
+                label: const Text('API 키발급 방법'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
