@@ -1,5 +1,5 @@
 requests==2.31.0
-pytz==2024.1
+pytz==2026.2
 beautifulsoup4==4.12.3
 lxml==5.2.2
 anthropic>=0.40.0

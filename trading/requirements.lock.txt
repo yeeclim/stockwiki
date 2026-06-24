@@ -44,7 +44,7 @@ pydantic==2.13.4
     # via anthropic
 pydantic-core==2.46.4
     # via pydantic
-pytz==2024.1
+pytz==2026.2
     # via -r trading/requirements.txt
 requests==2.31.0
     # via -r trading/requirements.txt
