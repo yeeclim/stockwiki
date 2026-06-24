@@ -50,6 +50,8 @@ jobs:
     - name: Deploy to Vercel
       env:
         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        VERCEL_ORG_ID: team_1ODbUjfrBlWhqRwWgQDUVHxR
+        VERCEL_PROJECT_ID: prj_sqBTPacjbRKZuop1ZZL4qOhThZC4
       run: |
         npx vercel --prod ./build/web --token "$VERCEL_TOKEN" --yes
 
