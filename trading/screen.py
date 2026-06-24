@@ -263,9 +263,4 @@ def screen():
 
 
 if __name__ == '__main__':
-    ok = screen()
-    if not ok:
-        print("\n진입 가능 종목 없음 — WATCHLIST 변경 불필요")
-        sys.exit(0)
-    else:
-        print(f"\n👆 위 종목을 trading/main.py WATCHLIST에 추가하세요.")
+    screen()
