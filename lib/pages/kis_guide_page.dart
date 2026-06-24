@@ -20,7 +20,7 @@ class _KisGuidePageState extends State<KisGuidePage>
       name: '한국투자증권',
       shortName: '한국투자',
       color: Color(0xFF0066CC),
-      devUrl: 'https://developers.koreainvestment.com',
+      devUrl: 'https://apiportal.koreainvestment.com',
       signupUrl: 'https://www.truefriend.com',
       iosUrl: 'https://apps.apple.com/kr/app/id1539710559',
       aosUrl:
