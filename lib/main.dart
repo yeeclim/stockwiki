@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:stockwiki/providers/auth_provider.dart';
+import 'utils/pkce_storage.dart'
+    if (dart.library.js_interop) 'utils/pkce_storage_web.dart';
 import 'package:stockwiki/providers/bookmark_provider.dart';
 import 'package:stockwiki/theme/app_theme.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
@@ -30,6 +32,9 @@ void main() async {
     url: _supabaseUrl,
     anonKey: _supabaseAnonKey,
     debug: true,
+    authOptions: FlutterAuthClientOptions(
+      pkceAsyncStorage: createPkceStorage(),
+    ),
   );
 
   runApp(
