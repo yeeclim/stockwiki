@@ -208,34 +208,8 @@ class _BrokerGuideTab extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // ── 앱 다운로드 ───────────────────────────────────────────────
-          Text('① 앱 다운로드 / 계좌 개설',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _OutlineBtn(
-                  label: 'App Store',
-                  icon: Icons.apple,
-                  onTap: () => _open(broker.iosUrl),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _OutlineBtn(
-                  label: 'Google Play',
-                  icon: Icons.android,
-                  onTap: () => _open(broker.aosUrl),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
           // ── 단계별 가이드 ─────────────────────────────────────────────
-          Text('② API 키 발급 단계',
+          Text('① API 키 발급 단계',
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
