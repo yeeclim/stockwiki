@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from .base_api import BaseBrokerApi
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
+_TIMEOUT = 15  # seconds
 
 
 class KISApi(BaseBrokerApi):
@@ -24,6 +25,7 @@ class KISApi(BaseBrokerApi):
             headers={"content-type": "application/json"},
             json={"grant_type": "client_credentials",
                   "appkey": self.app_key, "appsecret": self.app_secret},
+            timeout=_TIMEOUT,
         )
         res.raise_for_status()
         self.token = res.json()['access_token']
@@ -44,6 +46,7 @@ class KISApi(BaseBrokerApi):
             f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
             headers=self._h("FHKST01010100"),
             params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -56,6 +59,7 @@ class KISApi(BaseBrokerApi):
             f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
             headers=self._h("FHKST01010100"),
             params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -94,6 +98,7 @@ class KISApi(BaseBrokerApi):
                 "FID_PERIOD_DIV_CODE":    "D",
                 "FID_ORG_ADJ_PRC":        "0",
             },
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -134,6 +139,7 @@ class KISApi(BaseBrokerApi):
                 "CTX_AREA_FK100":        "",
                 "CTX_AREA_NK100":        "",
             },
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -163,6 +169,7 @@ class KISApi(BaseBrokerApi):
                 "CMA_EVLU_AMT_ICLD_YN": "N",
                 "OVRS_ICLD_YN":      "N",
             },
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -187,6 +194,7 @@ class KISApi(BaseBrokerApi):
                 "ORD_QTY":      str(shares),
                 "ORD_UNPR":     "0",
             },
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -210,6 +218,7 @@ class KISApi(BaseBrokerApi):
                 "ORD_QTY":      str(shares),
                 "ORD_UNPR":     "0",
             },
+            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()

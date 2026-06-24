@@ -36,6 +36,14 @@ jobs:
       - name: 패키지 설치
         run: pip install -r trading/requirements.txt
 
+      - name: KIS API 연결 확인
+        run: |
+          echo "🔍 GitHub Actions runner IP:"
+          curl -s https://api.ipify.org
+          echo ""
+          echo "🔍 KIS API 포트 연결 테스트 (5초 타임아웃):"
+          timeout 5 bash -c 'echo > /dev/tcp/openapi.koreainvestment.com/9443' && echo "✅ 포트 열려 있음" || echo "❌ 포트 연결 실패 (방화벽 차단 가능성)"
+
       - name: 자동매매 실행
         env:
           KIS_APP_KEY:              ${{ secrets.KIS_APP_KEY }}
