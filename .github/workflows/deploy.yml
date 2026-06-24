@@ -30,6 +30,15 @@ jobs:
     - name: Check formatting
       run: dart format --set-exit-if-changed lib/
 
+    - name: Verify required secrets
+      run: |
+        if [ -z "$SUPABASE_ANON_KEY" ]; then
+          echo "ERROR: SUPABASE_ANON_KEY secret is not set. Google OAuth will fail silently."
+          exit 1
+        fi
+      env:
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
     - name: Build web
       run: flutter build web --release --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
