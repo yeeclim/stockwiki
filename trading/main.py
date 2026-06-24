@@ -42,8 +42,12 @@ def _fetch_active_users() -> list[dict]:
 
 
 def _fetch_watchlist(user_id: str) -> list[dict]:
-    """사용자별 감시 종목 조회 (trading_watchlist 테이블)
-    없으면 기본 WATCHLIST 반환"""
+    """감시 종목 조회 우선순위:
+    1. 사용자 지정 trading_watchlist
+    2. 최신 스크리닝 결과 상위 5종목 (2일 이내)
+    3. 하드코딩 fallback
+    """
+    # 1. 사용자 지정 watchlist
     try:
         r = requests.get(
             f"{_SUPABASE_URL}/rest/v1/trading_watchlist"
@@ -56,7 +60,26 @@ def _fetch_watchlist(user_id: str) -> list[dict]:
             return [{'code': w['stock_code'], 'name': w['stock_name']} for w in items]
     except Exception:
         pass
-    # fallback: 기존 하드코딩 목록
+
+    # 2. 최신 스크리닝 결과 상위 5종목
+    try:
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        r = requests.get(
+            f"{_SUPABASE_URL}/rest/v1/screening_results"
+            f"?pass=eq.true&screened_at=gte.{cutoff}&order=score.desc&limit=5",
+            headers=_supabase_headers(),
+            timeout=10,
+        )
+        picks = r.json() if r.ok else []
+        if picks:
+            print(f"📋 스크리닝 상위 {len(picks)}종목 사용: "
+                  f"{', '.join(p['stock_name'] for p in picks)}")
+            return [{'code': p['stock_code'], 'name': p['stock_name']} for p in picks]
+    except Exception:
+        pass
+
+    # 3. fallback
     return [
         {'code': '096350', 'name': '대창솔루션'},
         {'code': '079550', 'name': 'LIG디펜스앤에어로스페이스'},

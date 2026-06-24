@@ -73,6 +73,46 @@ def _fetch_candidates() -> list[dict]:
         return []
 
 
+def _save_results(results: list[dict]):
+    """스크리닝 결과를 Supabase screening_results 테이블에 upsert"""
+    if not (_SUPABASE_URL and _SUPABASE_KEY):
+        return
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    rows = [
+        {
+            'stock_code':  r['code'],
+            'stock_name':  r['name'],
+            'sector':      r.get('sector', ''),
+            'score':       r.get('score', 0),
+            'price':       r.get('price'),
+            'pass':        r.get('pass', False),
+            'screened_at': now,
+        }
+        for r in results if not r.get('error')
+    ]
+    if not rows:
+        return
+    try:
+        resp = requests.post(
+            f"{_SUPABASE_URL}/rest/v1/screening_results",
+            headers={
+                'apikey':        _SUPABASE_KEY,
+                'Authorization': f'Bearer {_SUPABASE_KEY}',
+                'Content-Type':  'application/json',
+                'Prefer':        'resolution=merge-duplicates',
+            },
+            json=rows,
+            timeout=10,
+        )
+        if resp.ok:
+            print(f"💾 스크리닝 결과 {len(rows)}개 저장 완료")
+        else:
+            print(f"⚠️  스크리닝 결과 저장 실패: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        print(f"⚠️  스크리닝 결과 저장 오류: {e}")
+
+
 def screen():
     api = KISApi()
     try:
@@ -174,6 +214,9 @@ def screen():
 
     report = "\n".join(lines)
     print(report)
+
+    # 스크리닝 결과 Supabase 저장 (main.py watchlist 자동 연동용)
+    _save_results(results)
 
     # 관리자: 카카오톡 (기존)
     kakao_notify.send(report)
