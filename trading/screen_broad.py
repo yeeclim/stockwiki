@@ -27,7 +27,7 @@ _api: KISApi | None = None
 MAX_WORKERS   = 5    # 병렬 스레드 수
 CALL_DELAY    = 0.15 # 스레드별 API 호출 간 최소 대기(초)
 PRE_THRESHOLD = 4    # 예비 점수 이상이면 재무비율 조회
-MIN_THRESHOLD = 4    # 최종 점수 이상이면 candidates에 등록
+MIN_THRESHOLD = 6    # 최종 점수 이상이면 candidates에 등록
 TOP_N         = 60   # candidates에 저장할 최대 종목 수
 
 
@@ -134,7 +134,19 @@ def _upsert_candidates(candidates: list[dict]):
         "Content-Type":  "application/json",
     }
 
-    # 새 종목 insert 먼저 시도 → 성공한 경우에만 기존 삭제
+    # 1. 기존 시스템 종목 삭제 (functional unique index 충돌 방지)
+    try:
+        requests.delete(
+            f"{_SUPABASE_URL}/rest/v1/screening_candidates"
+            "?source=eq.system&user_id=is.null",
+            headers=headers,
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"⚠️  기존 시스템 종목 삭제 실패: {e}")
+        return
+
+    # 2. 새 종목 삽입
     rows = [
         {
             "stock_code": c["code"],
@@ -145,44 +157,19 @@ def _upsert_candidates(candidates: list[dict]):
         }
         for c in candidates
     ]
-
     try:
         resp = requests.post(
             f"{_SUPABASE_URL}/rest/v1/screening_candidates",
-            headers={**headers, "Prefer": "resolution=merge-duplicates"},
+            headers={**headers, "Prefer": "return=minimal"},
             json=rows,
             timeout=30,
         )
-        if not resp.ok:
+        if resp.ok:
+            print(f"✅ screening_candidates 갱신 완료 — {len(rows)}종목")
+        else:
             print(f"⚠️  새 종목 저장 실패: {resp.status_code} {resp.text[:200]}")
-            return
     except Exception as e:
         print(f"⚠️  새 종목 저장 오류: {e}")
-        return
-
-    # 새 종목 저장 성공 → 기존 시스템 종목 중 새 목록에 없는 것만 삭제
-    new_codes = {c["code"] for c in candidates}
-    try:
-        existing_resp = requests.get(
-            f"{_SUPABASE_URL}/rest/v1/screening_candidates"
-            "?source=eq.system&user_id=is.null&select=stock_code",
-            headers=headers,
-            timeout=10,
-        )
-        if existing_resp.ok:
-            old_codes = {r["stock_code"] for r in existing_resp.json()}
-            to_delete = old_codes - new_codes
-            for code in to_delete:
-                requests.delete(
-                    f"{_SUPABASE_URL}/rest/v1/screening_candidates"
-                    f"?source=eq.system&user_id=is.null&stock_code=eq.{code}",
-                    headers=headers,
-                    timeout=10,
-                )
-    except Exception as e:
-        print(f"⚠️  구 종목 정리 실패 (신규 저장은 완료): {e}")
-
-    print(f"✅ screening_candidates 갱신 완료 — {len(rows)}종목")
 
 
 # ── 메인 ────────────────────────────────────────────────────────────────────────

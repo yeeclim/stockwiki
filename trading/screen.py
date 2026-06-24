@@ -35,7 +35,7 @@ def _fetch_user_emails() -> list[str]:
         print(f"⚠️  유저 이메일 조회 실패: {e}")
         return []
 
-BUY_THRESHOLD = 5
+BUY_THRESHOLD = 6
 
 
 def _fetch_candidates() -> list[dict]:
