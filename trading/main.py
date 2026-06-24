@@ -175,9 +175,8 @@ def main():
         print(f"\n▶ 사용자: {notify_email_addr or user_cfg.get('user_id', '?')}")
 
         content = run_for_user(user_cfg)
-        print(content)
-
-        # 이메일 알림 (사용자별)
+        # TeeWriter가 이미 실시간으로 stdout에 출력했으므로 재출력 불필요
+        # content는 이메일 발송에만 사용
         if notify_email_addr:
             email_notify.send_to(content, recipients=[notify_email_addr])
 
