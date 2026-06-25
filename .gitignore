@@ -52,9 +52,9 @@ app.*.map.json
 # Build outputs
 *.zip
 
-# Flutter web build outputs
+# Flutter web build outputs (build/web은 Vercel 배포를 위해 git 추적)
 /build/
-/build/web/
+!/build/web/
 
 # Documentation (keep README.md only)
 *.md
