@@ -1,5 +1,6 @@
 {
-  "outputDirectory": "build/web",
+  "buildCommand": "mkdir -p public && cp -r build/web/. public/",
+  "outputDirectory": "public",
   "framework": null,
   "functions": {
     "api/ai-committee-verify.js": { "maxDuration": 60 },
