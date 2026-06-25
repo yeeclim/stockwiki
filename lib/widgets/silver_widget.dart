@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exchange_rate_service.dart';
-import '../utils/api_utils.dart';
 import 'market_data_card.dart';
 
 class SilverWidget extends StatefulWidget {
@@ -60,15 +58,14 @@ class _SilverWidgetState extends State<SilverWidget> {
   }
 
   Future<void> _fetchSilverPrice() async {
-    final symbols = ['SI=F', 'XAGUSD=X'];
-    for (final symbol in symbols) {
+    for (final symbol in ['SI=F', 'XAGUSD=X']) {
       try {
-        final response = await http
-            .get(Uri.parse(
-                '$webBaseUrl/api/utils?type=commodity&symbol=$symbol'))
-            .timeout(const Duration(seconds: 5));
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
+        final res = await Supabase.instance.client.functions.invoke(
+          'market-data',
+          body: {'symbol': symbol},
+        );
+        if (res.status == 200 && res.data != null) {
+          final data = res.data as Map<String, dynamic>;
           final meta = data['chart']?['result']?[0]?['meta'];
           final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
           if (price != null && (price as num) > 0) {

@@ -1,4 +1,4 @@
-# Vercel에서 무시할 파일들
+# Vercel에서 무시할 파일들 (public/ 과 api/ 는 포함)
 *.zip
 .venv/
 .dart_tool/
@@ -10,8 +10,11 @@ macos/
 windows/
 test/
 scripts/
+supabase/
+lib/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+.gitignore
 *.md
 !README.md
-.gitignore
-analysis_options.yaml
-pubspec.lock

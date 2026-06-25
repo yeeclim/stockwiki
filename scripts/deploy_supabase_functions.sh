@@ -9,5 +9,6 @@ fi
 echo "Deploying functions to Supabase project: $PROJECT_REF"
 supabase functions deploy register-to-github --project-ref "$PROJECT_REF"
 supabase functions deploy admin-register-to-github --project-ref "$PROJECT_REF"
+supabase functions deploy market-data --project-ref "$PROJECT_REF"
 
 echo "Done."

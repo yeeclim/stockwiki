@@ -42,6 +42,11 @@ jobs:
     - name: Build web
       run: flutter build web --release --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
+    - name: Copy build output to public/
+      run: |
+        rm -rf public
+        cp -r build/web public
+
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
@@ -53,5 +58,5 @@ jobs:
         VERCEL_ORG_ID: team_1ODbUjfrBlWhqRwWgQDUVHxR
         VERCEL_PROJECT_ID: prj_sqBTPacjbRKZuop1ZZL4qOhThZC4
       run: |
-        npx vercel --prod ./build/web --token "$VERCEL_TOKEN" --yes
+        npx vercel --prod --token "$VERCEL_TOKEN" --yes
 

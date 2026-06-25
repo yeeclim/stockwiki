@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/api_utils.dart';
 import 'market_data_card.dart';
 
 class BtcWidget extends StatefulWidget {
@@ -52,13 +51,14 @@ class _BtcWidgetState extends State<BtcWidget> {
 
   Future<void> _fetchPrice() async {
     try {
+      // CoinGecko — 무료 공개 API, CORS 지원, API 키 불필요
       final res = await http
-          .get(Uri.parse('$webBaseUrl/api/utils?type=commodity&symbol=BTC'))
+          .get(Uri.parse(
+              'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'))
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
-        final meta = data['chart']?['result']?[0]?['meta'];
-        final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+        final price = data['bitcoin']?['usd'];
         if (price != null) {
           if (!mounted) return;
           setState(() {
