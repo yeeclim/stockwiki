@@ -2,8 +2,6 @@
 // Charts, Commodity Prices, Fear & Greed Index
 
 export default async function handler(req, res) {
-    const fetch = globalThis.fetch || (await import('node-fetch')).default;
-    // CORS 헤더 설정
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -16,7 +14,7 @@ export default async function handler(req, res) {
     try {
         const { type } = req.query;
 
-        if (type === 'chart') return await handleChartProxy(req, res);
+        if (type === 'chart')     return await handleChartProxy(req, res);
         if (type === 'commodity') return await handleCommodityPrice(req, res);
         if (type === 'fear-greed') return await handleFearGreed(req, res);
 
@@ -24,6 +22,33 @@ export default async function handler(req, res) {
     } catch (error) {
         console.error('Utils API Error:', error);
         return res.status(200).json({ success: false, error: 'Internal Server Error', fallback: true });
+    }
+}
+
+// Flutter 코드가 기대하는 Yahoo Finance 형식으로 가격을 감싸는 헬퍼
+function wrapPrice(price) {
+    return {
+        chart: {
+            result: [{
+                meta: {
+                    regularMarketPrice: price,
+                    previousClose: price,
+                }
+            }]
+        }
+    };
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const r = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(tid);
+        return r;
+    } catch (e) {
+        clearTimeout(tid);
+        throw e;
     }
 }
 
@@ -37,13 +62,13 @@ async function handleChartProxy(req, res) {
     };
 
     if (isKorean === 'true') {
-        const periods = period === 'm' ? ['month', 'week'] // 월 없으면 주로 fallback
+        const periods = period === 'm' ? ['month', 'week']
                       : period === 'w' ? ['week']
                       : ['day'];
         const cleanSymbol = symbol.replace('.KS', '').replace('.KQ', '');
         for (const periodStr of periods) {
             targetUrl = `https://ssl.pstatic.net/imgfinance/chart/item/area/${periodStr}/${cleanSymbol}.png`;
-            const response = await fetch(targetUrl, { headers: naverHeaders });
+            const response = await fetchWithTimeout(targetUrl, { headers: naverHeaders });
             if (response.ok) {
                 res.setHeader('Content-Type', 'image/png');
                 res.setHeader('Cache-Control', 'public, max-age=60');
@@ -55,7 +80,7 @@ async function handleChartProxy(req, res) {
         targetUrl = `https://charts.finviz.com/chart.ashx?t=${symbol}&ty=c&ta=0&p=${period}&cb=${Date.now()}`;
     }
 
-    const response = await fetch(targetUrl, {
+    const response = await fetchWithTimeout(targetUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': 'https://finviz.com/',
@@ -66,42 +91,89 @@ async function handleChartProxy(req, res) {
 
     res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=60');
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return res.status(200).send(buffer);
+    return res.status(200).send(Buffer.from(await response.arrayBuffer()));
 }
 
 async function handleCommodityPrice(req, res) {
     const { symbol } = req.query;
     if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
 
-    let targetUrl;
     const s = symbol.toUpperCase();
-    if (s === 'WTI' || s === 'CL=F') targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/CL=F';
-    else if (s === 'SILVER' || s === 'SI=F' || s === 'XAGUSD=X') targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/SI=F';
-    else if (s === 'GOLD' || s === 'GC=F' || s === 'XAUUSD=X') targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/GC=F';
-    else if (s === 'BTC' || s === 'BITCOIN') targetUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD';
-    else targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
 
-    const fetch = globalThis.fetch || (await import('node-fetch')).default;
-    const response = await fetch(targetUrl, {
-        headers: { 
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json'
+    // ── USD/KRW: open.er-api.com (무료, 인증 불필요, Vercel에서 안정적) ───────
+    if (s === 'KRW=X') {
+        try {
+            const r = await fetchWithTimeout('https://open.er-api.com/v6/latest/USD');
+            if (r.ok) {
+                const data = await r.json();
+                const rate = data?.rates?.KRW;
+                if (rate) return res.status(200).json(wrapPrice(rate));
+            }
+        } catch (_) {}
+        // fallback: Exchangerate.host
+        try {
+            const r = await fetchWithTimeout('https://api.exchangerate.host/latest?base=USD&symbols=KRW');
+            if (r.ok) {
+                const data = await r.json();
+                const rate = data?.rates?.KRW;
+                if (rate) return res.status(200).json(wrapPrice(rate));
+            }
+        } catch (_) {}
+        return res.status(200).json(wrapPrice(1380)); // 최후 fallback
+    }
+
+    // ── 기타 상품: Yahoo Finance (query1 → query2 순서로 시도) ───────────────
+    let yahooSymbol = symbol;
+    if (s === 'WTI')    yahooSymbol = 'CL=F';
+    if (s === 'SILVER') yahooSymbol = 'SI=F';
+    if (s === 'GOLD')   yahooSymbol = 'GC=F';
+    if (s === 'BTC' || s === 'BITCOIN') yahooSymbol = 'BTC-USD';
+
+    const yahooHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+    };
+
+    for (const host of ['query1', 'query2']) {
+        try {
+            const url = `https://${host}.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`;
+            const r = await fetchWithTimeout(url, { headers: yahooHeaders }, 6000);
+            if (r.ok) {
+                const data = await r.json();
+                const meta = data?.chart?.result?.[0]?.meta;
+                if (meta?.regularMarketPrice || meta?.previousClose) {
+                    return res.status(200).json(data);
+                }
+            }
+        } catch (_) {}
+    }
+
+    // v7 quote 엔드포인트로 최후 시도
+    try {
+        const r = await fetchWithTimeout(
+            `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooSymbol}`,
+            { headers: yahooHeaders },
+            6000
+        );
+        if (r.ok) {
+            const data = await r.json();
+            const q = data?.quoteResponse?.result?.[0];
+            if (q?.regularMarketPrice) {
+                return res.status(200).json(wrapPrice(q.regularMarketPrice));
+            }
         }
-    });
+    } catch (_) {}
 
-    if (!response.ok) throw new Error(`API responded with status: ${response.status}`);
-    const data = await response.json();
-    return res.status(200).json(data);
+    return res.status(200).json({ success: false, error: 'Price unavailable' });
 }
 
 async function handleFearGreed(req, res) {
-    const fetch = globalThis.fetch || (await import('node-fetch')).default;
     try {
-        const response = await fetch('https://api.alternative.me/fng/?limit=1', {
+        const r = await fetchWithTimeout('https://api.alternative.me/fng/?limit=1', {
             headers: { 'Accept': 'application/json' }
         });
-        const json = await response.json();
+        const json = await r.json();
         const item = json?.data?.[0];
         const value = item ? parseInt(item.value) : 50;
         const label = item?.value_classification ?? 'Neutral';
