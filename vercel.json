@@ -5,14 +5,7 @@
     "api/ai-committee-verify.js": { "maxDuration": 60 },
     "api/kr-stock-search.js": { "regions": ["sin1"] }
   },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
