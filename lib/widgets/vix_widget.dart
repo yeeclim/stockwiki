@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import '../utils/api_utils.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VixWidget extends StatefulWidget {
   const VixWidget({super.key});
@@ -23,17 +21,14 @@ class _VixWidgetState extends State<VixWidget> {
 
   Future<void> _fetchVix() async {
     try {
-      // CORS 우회를 위해 자체 서버 프록시를 사용합니다 (Yahoo Finance 직접 호출 금지).
-      final uri = Uri.parse(webBaseUrl).replace(
-        path: '/api/utils',
-        queryParameters: {'type': 'commodity', 'symbol': '^VIX'},
+      final res = await Supabase.instance.client.functions.invoke(
+        'market-data',
+        body: {'symbol': '^VIX'},
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (!mounted) return;
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = data['chart']?['result']?[0];
-        final meta = result?['meta'];
+      if (res.status == 200 && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        final meta = data['chart']?['result']?[0]?['meta'];
         final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
         if (price != null) {
           setState(() {
@@ -48,7 +43,7 @@ class _VixWidgetState extends State<VixWidget> {
         _error = '데이터 없음';
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _error = '에러 발생';

@@ -7,19 +7,6 @@ class ExchangeRateService {
   static const String _timeKey = 'usd_krw_cache_time';
   static const int _cacheValidMinutes = 10;
 
-  static String get _baseUrl {
-    try {
-      final origin = Uri.base.origin;
-      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
-        return 'http://localhost:3000';
-      }
-      return origin;
-    } catch (e) {
-      return 'https://stockwiki.vercel.app';
-    }
-  }
-
-  // 환율 가져오기 (캐시 또는 API)
   static Future<double?> getUsdToKrw() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -33,26 +20,19 @@ class ExchangeRateService {
         }
       }
 
-      // API 호출
-      final url = Uri.parse('$_baseUrl/api/utils?type=commodity&symbol=KRW=X');
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      // open.er-api.com — 무료, API키 불필요, CORS 지원
+      final response = await http
+          .get(Uri.parse('https://open.er-api.com/v6/latest/USD'))
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final result = data['chart']?['result']?[0];
-
-        if (result != null) {
-          final meta = result['meta'];
-          if (meta != null) {
-            final rate = meta['regularMarketPrice'] ?? meta['previousClose'];
-            if (rate != null) {
-              final rateValue = rate.toDouble();
-              await prefs.setDouble(_cacheKey, rateValue);
-              await prefs.setInt(
-                  _timeKey, DateTime.now().millisecondsSinceEpoch);
-              return rateValue;
-            }
-          }
+        final rate = data['rates']?['KRW'];
+        if (rate != null) {
+          final rateValue = (rate as num).toDouble();
+          await prefs.setDouble(_cacheKey, rateValue);
+          await prefs.setInt(_timeKey, DateTime.now().millisecondsSinceEpoch);
+          return rateValue;
         }
       }
 

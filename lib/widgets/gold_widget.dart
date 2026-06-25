@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exchange_rate_service.dart';
-import '../utils/api_utils.dart';
 import 'market_data_card.dart';
 
 class GoldWidget extends StatefulWidget {
@@ -59,32 +57,33 @@ class _GoldWidgetState extends State<GoldWidget> {
   }
 
   Future<void> _fetchGoldPrice() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$webBaseUrl/api/utils?type=commodity&symbol=GOLD'))
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final meta = data['chart']?['result']?[0]?['meta'];
-        final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
-        if (price != null) {
-          if (!mounted) return;
-          setState(() {
-            _goldPrice = (price as num).toDouble();
-            _isLoading = false;
-          });
-          await _cachePrice(_goldPrice!);
-          return;
+    for (final symbol in ['GC=F', 'XAUUSD=X']) {
+      try {
+        final res = await Supabase.instance.client.functions.invoke(
+          'market-data',
+          body: {'symbol': symbol},
+        );
+        if (res.status == 200 && res.data != null) {
+          final data = res.data as Map<String, dynamic>;
+          final meta = data['chart']?['result']?[0]?['meta'];
+          final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+          if (price != null) {
+            if (!mounted) return;
+            setState(() {
+              _goldPrice = (price as num).toDouble();
+              _isLoading = false;
+            });
+            await _cachePrice(_goldPrice!);
+            return;
+          }
         }
-      }
-      throw Exception('데이터 없음');
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = '데이터 없음';
-        _isLoading = false;
-      });
+      } catch (_) {}
     }
+    if (!mounted) return;
+    setState(() {
+      _error = '데이터 없음';
+      _isLoading = false;
+    });
   }
 
   @override

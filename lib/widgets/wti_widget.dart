@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/api_utils.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'market_data_card.dart';
 
 class WtiWidget extends StatefulWidget {
@@ -28,12 +26,10 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedPrice = prefs.getDouble('wti_price');
-      final cachedDate = prefs.getString('wti_date');
       final cacheTime = prefs.getInt('wti_cache_time');
       if (cachedPrice != null && cacheTime != null) {
         if (DateTime.now().millisecondsSinceEpoch - cacheTime <
-                10 * 60 * 1000 &&
-            (cachedDate == null || !cachedDate.contains('Fallback'))) {
+            10 * 60 * 1000) {
           if (mounted)
             setState(() {
               _wtiPrice = cachedPrice;
@@ -48,7 +44,6 @@ class _WtiWidgetState extends State<WtiWidget> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('wti_price', price);
-      await prefs.setString('wti_date', 'Latest');
       await prefs.setInt(
           'wti_cache_time', DateTime.now().millisecondsSinceEpoch);
     } catch (_) {}
@@ -56,11 +51,12 @@ class _WtiWidgetState extends State<WtiWidget> {
 
   Future<void> _fetchWtiPrice() async {
     try {
-      final response = await http
-          .get(Uri.parse('$webBaseUrl/api/utils?type=commodity&symbol=CL=F'))
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      final res = await Supabase.instance.client.functions.invoke(
+        'market-data',
+        body: {'symbol': 'CL=F'},
+      );
+      if (res.status == 200 && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
         final meta = data['chart']?['result']?[0]?['meta'];
         final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
         if (price != null && (price as num) > 0) {
