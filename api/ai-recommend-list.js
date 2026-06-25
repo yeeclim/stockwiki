@@ -1,4 +1,4 @@
-import { fetchStockDataDirect } from './naver-stock.js';
+import { fetchStockDataDirect } from './_naver-stock.js';
 import { checkRateLimit, getClientIp, fail } from './_shared.js';
 
 // ── 캐시 ────────────────────────────────────────────────────────

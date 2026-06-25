@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { fetchStockDataDirect } from './naver-stock.js';
+import { fetchStockDataDirect } from './_naver-stock.js';
 import iconv from 'iconv-lite';
 import { JSDOM } from 'jsdom';
 
