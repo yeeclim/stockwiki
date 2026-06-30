@@ -38,7 +38,13 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
     log       = []
     price     = fund['price']
 
-    # ❶ 현재가 < 60일 이평선  [필수, +2점] ─────────────────────────────────────
+    # ❶ 시가총액 필터  [필수, 4천억 미만 제외] ──────────────────────────────────
+    market_cap = fund.get('market_cap', 0)
+    if market_cap and market_cap < 4000:
+        log.append(f"  ⛔ 시총 {market_cap:,}억원 — 4천억 미만 제외")
+        return 0, max_score, log
+
+    # ❷ 현재가 < 60일 이평선  [필수, +2점] ─────────────────────────────────────
     ma60 = ma_data.get('ma60')
     if ma60 is None:
         log.append("  ⛔ 60일 이평선 데이터 부족 → 진입 불가")

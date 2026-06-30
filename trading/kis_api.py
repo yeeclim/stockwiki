@@ -201,13 +201,14 @@ class KISApi:
                 except: return 0
 
             return {
-                'price':    _i(out.get('stck_prpr')),
-                'per':      _f(out.get('per')),
-                'pbr':      _f(out.get('pbr')),
-                'volume':   _i(out.get('acml_vol')),
-                'prdy_ctrt': _f(out.get('prdy_ctrt')),
-                'open':     _i(out.get('stck_oprc')),
-                'prdy_clpr': _i(out.get('stck_prdy_clpr') or 0),
+                'price':      _i(out.get('stck_prpr')),
+                'per':        _f(out.get('per')),
+                'pbr':        _f(out.get('pbr')),
+                'volume':     _i(out.get('acml_vol')),
+                'prdy_ctrt':  _f(out.get('prdy_ctrt')),
+                'open':       _i(out.get('stck_oprc')),
+                'prdy_clpr':  _i(out.get('stck_prdy_clpr') or 0),
+                'market_cap': _i(out.get('hts_avls')),  # 시가총액 (억원)
             }
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"시세 조회 실패: {e}") from e
