@@ -2,8 +2,8 @@ name: 자동매매
 
 on:
   schedule:
-    # 평일 KST 08:00 = UTC 23:00 (전날 일~목) — 하루 1회 단발 실행
-    - cron: '0 23 * * 0-4'
+    # 평일 KST 09:00 = UTC 00:00 (당일 월~금) — 하루 1회 단발 실행
+    - cron: '0 0 * * 1-5'
   workflow_dispatch:  # 수동 실행 (테스트용)
     inputs:
       dry_run:
