@@ -190,12 +190,17 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
     # ── 포지션 없음 → 복합 진입 조건 평가 ───────────────────────────────────
     if shares == 0:
         ratios = api.get_financial_ratios(stock_code)
-
-        print(f"\n[ 진입 조건 점수 ]")
         score, max_score, log_lines = _score_entry(fund, ma_data, ratios)
+
+        if score < BUY_THRESHOLD:
+            print(f"⏸  {score}/{max_score}점 미달 → 대기  "
+                  f"(현재가 {price:,}원  전일{prdy_ctrt:+.1f}%  예수금 {cash:,}원)")
+            return
+
+        # 매수 확정 시에만 상세 출력
+        print(f"\n[ 진입 조건 점수 ]")
         for line in log_lines:
             print(line)
-
         bar = '█' * score + '░' * (max_score - score)
         print(f"\n  📊 [{bar}] {score}/{max_score}점  (매수 기준: {BUY_THRESHOLD}점 이상)")
 
@@ -249,8 +254,7 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
 
     # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)
     chg = (price - avg_price) / avg_price * 100
-    print(f"수익률     : {chg:>+10.2f}%")
-    print(f"\n📌 매도는 사용자가 직접 판단합니다.")
+    print(f"수익률     : {chg:>+10.2f}%  📌 매도는 사용자 직접 판단")
 
     # ── 당일 급락 안전장치 ────────────────────────────────────────────────────
     DAILY_DROP_LIMIT = -5.0
@@ -318,4 +322,4 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
                          '-5% 물타기 5%', user_id)
 
     else:
-        print("⏸  추가매수 조건 미달 → 대기")
+        print(f"⏸  추가매수 조건 미달 (수익률 {chg:+.2f}%) → 대기")
