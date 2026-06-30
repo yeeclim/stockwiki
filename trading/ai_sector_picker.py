@@ -1,8 +1,8 @@
 """
 AI 섹터별 종목 추천 — Claude API
-주간 GitHub Actions로 실행되어 각 섹터의 유망 종목을 추천하고
-Supabase screening_candidates 테이블에 source='ai', status='ai_pending'으로 저장.
-관리자가 앱에서 승인(approved) / 거절(rejected)을 결정함.
+스크리닝을 통과한 종목(screening_results pass=True) 목록을 Claude에게 전달하여
+섹터 분류 및 추천 이유를 받아 screening_candidates(source='ai')에 저장.
+Claude가 종목코드를 직접 생성하지 않으므로 hallucination 없음.
 
 환경변수:
   ANTHROPIC_API_KEY        : Claude API 키
@@ -12,15 +12,15 @@ Supabase screening_candidates 테이블에 source='ai', status='ai_pending'으�
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import pytz
 
 _ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '').strip()
 _SUPABASE_URL  = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY  = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
 
-SECTORS = ['반도체', 'AI', '데이터센터', '유리기판', '양자컴퓨터', '클라우드']
-STOCKS_PER_SECTOR = 8   # 섹터당 추천 종목 수
+SECTORS = ['반도체', 'AI', '데이터센터', '유리기판', '양자컴퓨터', '클라우드', '기타']
+LOOKBACK_DAYS = 30   # 최근 N일 스크리닝 통과 종목을 풀로 사용
 
 
 def _supabase_headers():
@@ -28,26 +28,57 @@ def _supabase_headers():
         'apikey':        _SUPABASE_KEY,
         'Authorization': f'Bearer {_SUPABASE_KEY}',
         'Content-Type':  'application/json',
-        'Prefer':        'return=representation',
     }
 
 
-def _ask_claude(sector: str) -> list[dict]:
-    """Claude에게 섹터 관련 한국 상장 종목 추천 요청"""
-    prompt = f"""당신은 한국 주식 전문가입니다.
-현재 시장에서 **{sector}** 섹터와 관련된 한국 코스피/코스닥 상장 종목 {STOCKS_PER_SECTOR}개를 추천해주세요.
+def _fetch_passed_stocks() -> list[dict]:
+    """screening_results에서 최근 LOOKBACK_DAYS일 내 pass=True 종목 조회"""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).isoformat()
+    r = requests.get(
+        f"{_SUPABASE_URL}/rest/v1/screening_results"
+        f"?pass=eq.true&screened_at=gte.{cutoff}&order=score.desc,screened_at.desc",
+        headers=_supabase_headers(),
+        timeout=10,
+    )
+    r.raise_for_status()
+    rows = r.json()
 
-요구사항:
-- 실제 상장된 종목만 (종목코드 6자리 숫자)
-- {sector} 테마와 직접 관련된 사업을 영위하는 기업
-- 시가총액, 실적, 시장 트렌드를 고려한 유망 종목
-- 이미 잘 알려진 대형주와 성장 가능성 있는 중소형주 혼합
+    # 동일 종목 중 최신 결과만 유지
+    seen = set()
+    result = []
+    for row in rows:
+        code = row['stock_code']
+        if code not in seen:
+            seen.add(code)
+            result.append(row)
+    return result
+
+
+def _ask_claude(stocks: list[dict]) -> list[dict]:
+    """스크리닝 통과 종목 목록을 주고 섹터 분류 + 추천 이유 요청"""
+    stock_list = "\n".join([
+        f"- {s['stock_name']}({s['stock_code']}): {s['score']}점/11점"
+        f"  PER {s.get('per') or 'N/A'}  PBR {s.get('pbr') or 'N/A'}"
+        f"  현재가 {s.get('price') or 'N/A'}원"
+        for s in stocks
+    ])
+
+    prompt = f"""다음은 재무 스크리닝(PER·PBR·이동평균·부채비율·이자보상배율 등)을 통과한 한국 상장 종목들입니다.
+
+{stock_list}
+
+이 종목들을 아래 섹터 중 하나로 분류하고 추천 이유를 작성해주세요.
+가능한 섹터: {', '.join(SECTORS)}
+- 해당 섹터와 관련성이 낮은 종목은 '기타'로 분류
+- 종목의 실제 사업 내용 기반으로 분류 (억측 금지)
 
 반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
 [
-  {{"code": "000000", "name": "종목명", "reason": "추천 이유 1~2문장"}},
+  {{"code": "000000", "name": "종목명", "sector": "섹터명", "reason": "추천 이유 1~2문장"}},
   ...
-]"""
+]
+
+중요: 위 목록에 있는 종목코드와 종목명만 그대로 사용하세요. 새 종목 추가 금지."""
 
     resp = requests.post(
         'https://api.anthropic.com/v1/messages',
@@ -66,52 +97,55 @@ def _ask_claude(sector: str) -> list[dict]:
     resp.raise_for_status()
     text = resp.json()['content'][0]['text'].strip()
 
-    # JSON 파싱 (마크다운 코드블록 제거)
     if '```' in text:
         text = text.split('```')[1].lstrip('json').strip()
     return json.loads(text)
 
 
-def _get_existing_codes() -> set[str]:
-    """현재 approved/ai_pending 상태의 종목코드 조회 (중복 방지)"""
-    r = requests.get(
+def _clear_old_ai_candidates():
+    """기존 source='ai' 종목 삭제 후 새로 채움"""
+    r = requests.delete(
         f"{_SUPABASE_URL}/rest/v1/screening_candidates"
-        "?status=in.(approved,ai_pending)&select=stock_code",
+        "?source=eq.ai&user_id=is.null",
         headers=_supabase_headers(),
         timeout=10,
     )
     r.raise_for_status()
-    return {row['stock_code'] for row in r.json()}
 
 
-def _save_recommendations(sector: str, stocks: list[dict], existing: set[str]):
-    """AI 추천 종목을 Supabase에 저장 (신규만)"""
-    new_stocks = [s for s in stocks if s['code'] not in existing]
-    if not new_stocks:
-        print(f"  → 신규 종목 없음 (모두 기존 보유)")
+def _save_recommendations(recs: list[dict], passed_codes: set[str]):
+    """Claude 추천 결과 저장 (스크리닝 통과 종목만, 코드 검증 후)"""
+    # Claude가 목록 외 종목을 추가하는 hallucination 방지
+    valid = [r for r in recs if r['code'] in passed_codes]
+    invalid = [r for r in recs if r['code'] not in passed_codes]
+    if invalid:
+        print(f"  ⚠️  목록 외 종목 {len(invalid)}개 제거: {[r['name'] for r in invalid]}")
+
+    if not valid:
+        print("  저장할 유효 종목 없음")
         return 0
 
     rows = [
         {
-            'stock_code': s['code'],
-            'stock_name': s['name'],
-            'sector':     sector,
+            'stock_code': r['code'],
+            'stock_name': r['name'],
+            'sector':     r['sector'],
             'source':     'ai',
-            'status':     'ai_pending',
-            'ai_reason':  s.get('reason', ''),
+            'status':     'approved',
+            'ai_reason':  r.get('reason', ''),
             'user_id':    None,
         }
-        for s in new_stocks
+        for r in valid
     ]
-    r = requests.post(
+    resp = requests.post(
         f"{_SUPABASE_URL}/rest/v1/screening_candidates",
         headers={**_supabase_headers(), 'Prefer': 'resolution=ignore-duplicates,return=minimal'},
         json=rows,
         timeout=10,
     )
-    r.raise_for_status()
-    print(f"  → {len(new_stocks)}개 저장 완료")
-    return len(new_stocks)
+    resp.raise_for_status()
+    print(f"  → {len(rows)}개 저장 완료")
+    return len(rows)
 
 
 def main():
@@ -127,24 +161,33 @@ def main():
         print("❌ Supabase 환경변수 미설정")
         return
 
-    existing = _get_existing_codes()
-    print(f"기존 종목 {len(existing)}개 확인 완료\n")
+    # 1. 스크리닝 통과 종목 조회
+    stocks = _fetch_passed_stocks()
+    if not stocks:
+        print(f"⚠️  최근 {LOOKBACK_DAYS}일 내 스크리닝 통과 종목 없음 — 종료")
+        return
 
-    total = 0
-    for sector in SECTORS:
-        print(f"[{sector}] Claude 추천 요청 중...")
-        try:
-            stocks = _ask_claude(sector)
-            print(f"  Claude 추천: {[s['name'] for s in stocks]}")
-            saved = _save_recommendations(sector, stocks, existing)
-            total += saved
-            # 기존 종목도 existing에 추가 (같은 실행 내 중복 방지)
-            existing.update(s['code'] for s in stocks)
-        except Exception as e:
-            print(f"  ⚠️  [{sector}] 오류: {e}")
+    passed_codes = {s['stock_code'] for s in stocks}
+    print(f"📋 스크리닝 통과 종목 {len(stocks)}개 로드")
+    for s in stocks:
+        print(f"  [{s['score']}점] {s['stock_name']}({s['stock_code']})")
 
-    print(f"\n✅ 완료 — 총 {total}개 신규 종목이 검토 대기(ai_pending) 상태로 저장됐습니다.")
-    print("관리자 앱에서 승인/거절을 처리하세요.")
+    # 2. Claude에게 섹터 분류 + 추천 이유 요청
+    print(f"\nClaude 섹터 분류 요청 중...")
+    try:
+        recs = _ask_claude(stocks)
+        print(f"Claude 분류 완료: {len(recs)}개")
+    except Exception as e:
+        print(f"❌ Claude API 오류: {e}")
+        return
+
+    # 3. 기존 AI 추천 종목 교체
+    print(f"\n기존 AI 추천 종목 초기화...")
+    _clear_old_ai_candidates()
+
+    # 4. 저장
+    total = _save_recommendations(recs, passed_codes)
+    print(f"\n✅ 완료 — {total}개 AI 추천 종목 저장")
 
 
 if __name__ == '__main__':
