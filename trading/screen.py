@@ -154,20 +154,21 @@ def screen():
             discount = (ma60 - price) / ma60 * 100 if ma60 else None
 
             results.append({
-                'code':    code,
-                'name':    name,
-                'sector':  sector,
-                'price':   price,
-                'ma60':    ma60,
-                'ma5':     ma5,
-                'ma20':    ma20,
-                'per':     fund.get('per', 0),
-                'pbr':     fund.get('pbr', 0),
-                'volume':  fund.get('volume', 0),
-                'prdy_ctrt': prdy_ctrt,
-                'score':   score,
-                'discount': discount,
-                'pass':    score >= BUY_THRESHOLD,
+                'code':       code,
+                'name':       name,
+                'sector':     sector,
+                'price':      price,
+                'ma60':       ma60,
+                'ma5':        ma5,
+                'ma20':       ma20,
+                'per':        fund.get('per', 0),
+                'pbr':        fund.get('pbr', 0),
+                'volume':     fund.get('volume', 0),
+                'market_cap': fund.get('market_cap', 0),
+                'prdy_ctrt':  prdy_ctrt,
+                'score':      score,
+                'discount':   discount,
+                'pass':       score >= BUY_THRESHOLD,
             })
         except Exception as e:
             print(f"⚠️  {name} ({code}) 조회 실패: {e}")
@@ -195,10 +196,12 @@ def screen():
         lines.append(f"\n✅ 주목 종목 ({BUY_THRESHOLD}점 이상, {len(ok)}개)")
         for r in ok:
             disc = f"  MA60대비 -{r['discount']:.1f}%" if r['discount'] else ""
+            mcap = r.get('market_cap', 0)
+            mcap_str = f"  시총 {mcap:,}억" if mcap else ""
             lines.append(
                 f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
-                f"  전일{r['prdy_ctrt']:+.1f}%{disc}"
+                f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}"
                 f"  [{r['sector']}]"
                 f"\n  📊 {chart_url(r['code'])}"
             )
