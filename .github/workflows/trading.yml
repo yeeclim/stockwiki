@@ -2,8 +2,8 @@ name: 자동매매
 
 on:
   schedule:
-    # 평일 KST 08:40 = UTC 23:40 (전날 일~목) — 딜레이 감안, 실제 09:00 목표
-    - cron: '40 23 * * 0-4'
+    # 평일 KST 09~15시 정각 (UTC 00~06시) — 1시간 간격 7회
+    - cron: '0 0,1,2,3,4,5,6 * * 1-5'
   workflow_dispatch:  # 수동 실행 (테스트용)
     inputs:
       dry_run:

@@ -169,25 +169,27 @@ def main():
 
     print(f"👤 활성 사용자 {len(users)}명 처리 시작")
 
-    all_errors = False
+    any_trade = False
     for user_cfg in users:
         notify_email_addr = user_cfg.get('notify_email') or ''
         print(f"\n▶ 사용자: {notify_email_addr or user_cfg.get('user_id', '?')}")
 
         content = run_for_user(user_cfg)
-        # TeeWriter가 이미 실시간으로 stdout에 출력했으므로 재출력 불필요
-        # content는 이메일 발송에만 사용
-        if notify_email_addr:
-            email_notify.send_to(content, recipients=[notify_email_addr])
 
-    # 관리자(나)에게는 카카오 + 요약 이메일
-    summary = f"[{now_str}] 자동매매 완료 — 사용자 {len(users)}명 처리"
-    kakao_notify.send(summary)
+        # 매수 실행 또는 오류가 있을 때만 알림 발송
+        has_trade = '진입 확정' in content or '추가매수' in content
+        has_error = '❌' in content
+        if has_trade or has_error:
+            any_trade = True
+            if notify_email_addr:
+                email_notify.send_to(content, recipients=[notify_email_addr])
 
-    if all_errors:
-        sys.exit(1)
+    if any_trade:
+        summary = f"[{now_str}] 자동매매 체결 — 사용자 {len(users)}명"
+        kakao_notify.send(summary)
+        print("✅ 전체 완료 (알림 발송)")
     else:
-        print("✅ 전체 완료")
+        print("✅ 전체 완료 (매수 없음 — 알림 생략)")
 
 
 class _TeeWriter:
