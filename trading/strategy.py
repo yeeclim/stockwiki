@@ -157,30 +157,14 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
     avg_price = h['avg_price']
     cash      = api.get_cash()
 
-    # 기본 정보 출력
     prdy_ctrt  = fund.get('prdy_ctrt', 0.0)
     open_price = fund.get('open', 0)
     prdy_clpr  = fund.get('prdy_clpr', 0)
-    # 전일종가가 없으면 prdy_ctrt로 역산
     if not prdy_clpr and prdy_ctrt and price:
         prdy_clpr = round(price / (1 + prdy_ctrt / 100))
     gap_pct = (open_price - prdy_clpr) / prdy_clpr * 100 if prdy_clpr else 0.0
-    # 당일 등락(%) — 전략 내부에서 daily_drop으로 사용
     daily_drop = prdy_ctrt
-
-    print(f"현재가     : {price:>10,}원")
-    print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
-    print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
-    if ma60:
-        print(f"60일 MA    : {ma60:>10,.0f}원")
     ma5, ma20 = ma_data.get('ma5'), ma_data.get('ma20')
-    if ma5 and ma20:
-        cross_tag = ' 🔺골든크로스' if ma_data.get('golden_cross') else ''
-        print(f"MA5/MA20   : {ma5:>10,.0f} / {ma20:,.0f}원{cross_tag}")
-    print(f"PER / PBR  : {fund['per']:>9.1f} / {fund['pbr']:.2f}")
-    print(f"거래량     : {fund['volume']:>10,}주")
-    print(f"보유수량   : {shares:>10,}주  (평단가 {avg_price:,.0f}원)")
-    print(f"예수금     : {cash:>10,}원")
 
     state = db.get_position(stock_code)
     user_id = None
@@ -193,11 +177,24 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
         score, max_score, log_lines = _score_entry(fund, ma_data, ratios)
 
         if score < BUY_THRESHOLD:
-            print(f"⏸  {score}/{max_score}점 미달 → 대기  "
-                  f"(현재가 {price:,}원  전일{prdy_ctrt:+.1f}%  예수금 {cash:,}원)")
+            print(f"보유수량   : {shares:>10,}주")
+            print(f"예수금     : {cash:>10,}원")
+            print(f"⏸  {score}/{max_score}점 미달 → 대기")
             return
 
         # 매수 확정 시에만 상세 출력
+        print(f"현재가     : {price:>10,}원")
+        print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
+        print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
+        if ma60:
+            print(f"60일 MA    : {ma60:>10,.0f}원")
+        if ma5 and ma20:
+            cross_tag = ' 🔺골든크로스' if ma_data.get('golden_cross') else ''
+            print(f"MA5/MA20   : {ma5:>10,.0f} / {ma20:,.0f}원{cross_tag}")
+        print(f"PER / PBR  : {fund['per']:>9.1f} / {fund['pbr']:.2f}")
+        print(f"거래량     : {fund['volume']:>10,}주")
+        print(f"보유수량   : {shares:>10,}주  (평단가 {avg_price:,.0f}원)")
+        print(f"예수금     : {cash:>10,}원")
         print(f"\n[ 진입 조건 점수 ]")
         for line in log_lines:
             print(line)
@@ -254,6 +251,8 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
 
     # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)
     chg = (price - avg_price) / avg_price * 100
+    print(f"보유수량   : {shares:>10,}주  (평단가 {avg_price:,.0f}원)")
+    print(f"예수금     : {cash:>10,}원")
     print(f"수익률     : {chg:>+10.2f}%  📌 매도는 사용자 직접 판단")
 
     # ── 당일 급락 안전장치 ────────────────────────────────────────────────────
