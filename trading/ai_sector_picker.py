@@ -33,7 +33,7 @@ def _supabase_headers():
 
 def _fetch_passed_stocks() -> list[dict]:
     """screening_results에서 최근 LOOKBACK_DAYS일 내 pass=True 종목 조회"""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ')
     r = requests.get(
         f"{_SUPABASE_URL}/rest/v1/screening_results"
         f"?pass=eq.true&screened_at=gte.{cutoff}&order=score.desc,screened_at.desc",
