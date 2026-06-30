@@ -1,7 +1,7 @@
 """
-AI 섹터별 종목 분류 — Claude API
+AI 종목 추천 이유 생성 — Claude API
 스크리닝을 통과한 종목(screening_results pass=True) 목록을 Claude에게 전달하여
-섹터 분류 및 추천 이유를 받아 screening_candidates 레코드의 sector·ai_reason 컬럼을 업데이트.
+추천 이유를 받아 screening_candidates 레코드의 ai_reason 컬럼을 업데이트.
 Claude가 종목코드를 직접 생성하지 않으므로 hallucination 없음.
 
 환경변수:
@@ -19,7 +19,6 @@ _ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '').strip()
 _SUPABASE_URL  = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY  = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
 
-SECTORS = ['반도체', 'AI', '데이터센터', '유리기판', '양자컴퓨터', '클라우드', '기타']
 LOOKBACK_DAYS = 30   # 최근 N일 스크리닝 통과 종목을 풀로 사용
 
 
@@ -55,7 +54,7 @@ def _fetch_passed_stocks() -> list[dict]:
 
 
 def _ask_claude(stocks: list[dict]) -> list[dict]:
-    """스크리닝 통과 종목 목록을 주고 섹터 분류 + 추천 이유 요청"""
+    """스크리닝 통과 종목 목록을 주고 추천 이유 요청"""
     stock_list = "\n".join([
         f"- {s['stock_name']}({s['stock_code']}): {s['score']}점/11점"
         f"  PER {s.get('per') or 'N/A'}  PBR {s.get('pbr') or 'N/A'}"
@@ -67,14 +66,13 @@ def _ask_claude(stocks: list[dict]) -> list[dict]:
 
 {stock_list}
 
-이 종목들을 아래 섹터 중 하나로 분류하고 추천 이유를 작성해주세요.
-가능한 섹터: {', '.join(SECTORS)}
-- 해당 섹터와 관련성이 낮은 종목은 '기타'로 분류
-- 종목의 실제 사업 내용 기반으로 분류 (억측 금지)
+각 종목에 대해 재무 지표와 사업 내용을 바탕으로 주목할 만한 이유를 1~2문장으로 작성해주세요.
+- 실제 사업 내용 기반으로 작성 (억측 금지)
+- 재무 지표(PER, PBR, 점수 등)를 구체적으로 언급
 
 반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
 [
-  {{"code": "000000", "name": "종목명", "sector": "섹터명", "reason": "추천 이유 1~2문장"}},
+  {{"code": "000000", "name": "종목명", "reason": "추천 이유 1~2문장"}},
   ...
 ]
 
@@ -102,8 +100,8 @@ def _ask_claude(stocks: list[dict]) -> list[dict]:
     return json.loads(text)
 
 
-def _update_sectors(recs: list[dict], passed_codes: set[str]):
-    """Claude 분류 결과로 기존 system 레코드의 sector·ai_reason 업데이트"""
+def _update_reasons(recs: list[dict], passed_codes: set[str]):
+    """Claude 추천 이유로 기존 system 레코드의 ai_reason 업데이트"""
     valid   = [r for r in recs if r['code'] in passed_codes]
     invalid = [r for r in recs if r['code'] not in passed_codes]
     if invalid:
@@ -119,12 +117,12 @@ def _update_sectors(recs: list[dict], passed_codes: set[str]):
             f"{_SUPABASE_URL}/rest/v1/screening_candidates"
             f"?stock_code=eq.{r['code']}&user_id=is.null",
             headers=_supabase_headers(),
-            json={'sector': r['sector'], 'ai_reason': r.get('reason', '')},
+            json={'ai_reason': r.get('reason', '')},
             timeout=10,
         )
         if resp.ok:
             updated += 1
-            print(f"  ✅ [{r['sector']}] {r['name']}({r['code']})")
+            print(f"  ✅ {r['name']}({r['code']}): {r.get('reason', '')[:40]}...")
         else:
             print(f"  ⚠️  업데이트 실패 {r['name']}({r['code']}): {resp.status_code}")
     return updated
@@ -133,7 +131,7 @@ def _update_sectors(recs: list[dict], passed_codes: set[str]):
 def main():
     kst = pytz.timezone('Asia/Seoul')
     print(f"\n{'='*55}")
-    print(f"  AI 섹터 종목 추천  |  {datetime.now(kst).strftime('%Y-%m-%d %H:%M KST')}")
+    print(f"  AI 종목 추천 이유 생성  |  {datetime.now(kst).strftime('%Y-%m-%d %H:%M KST')}")
     print(f"{'='*55}\n")
 
     if not _ANTHROPIC_KEY:
@@ -154,19 +152,19 @@ def main():
     for s in stocks:
         print(f"  [{s['score']}점] {s['stock_name']}({s['stock_code']})")
 
-    # 2. Claude에게 섹터 분류 + 추천 이유 요청
-    print(f"\nClaude 섹터 분류 요청 중...")
+    # 2. Claude에게 추천 이유 요청
+    print(f"\nClaude 추천 이유 생성 중...")
     try:
         recs = _ask_claude(stocks)
-        print(f"Claude 분류 완료: {len(recs)}개")
+        print(f"Claude 완료: {len(recs)}개")
     except Exception as e:
         print(f"❌ Claude API 오류: {e}")
         return
 
-    # 3. 기존 system 레코드에 섹터 정보 업데이트
-    print(f"\nsupabase screening_candidates 섹터 업데이트 중...")
-    total = _update_sectors(recs, passed_codes)
-    print(f"\n✅ 완료 — {total}개 종목 섹터 업데이트")
+    # 3. ai_reason 업데이트
+    print(f"\nsupabase screening_candidates ai_reason 업데이트 중...")
+    total = _update_reasons(recs, passed_codes)
+    print(f"\n✅ 완료 — {total}개 종목 업데이트")
 
 
 if __name__ == '__main__':
