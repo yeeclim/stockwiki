@@ -59,13 +59,13 @@ class AiTradingPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _bullet(theme, '복합 조건 점수제 (10점 만점, 6점 이상 매수)'),
+                  _bullet(theme, '복합 조건 점수제 (11점 만점, 6점 이상 매수)'),
                   _bullet(theme, '현재가 < 60일 이평선 → 필수 조건 (+2점)'),
                   _bullet(theme, '골든크로스(MA5↑MA20) → +2점 / MA5>MA20 → +1점'),
                   _bullet(theme, '저PER(< 15) → +1점  |  저PBR(< 1.5) → +1점'),
                   _bullet(theme, '거래량 ≥ 10만주 → +1점'),
                   _bullet(theme, '부채비율 < 200% → +1점  |  유동비율 > 100% → +1점'),
-                  _bullet(theme, '현금비율 > 20% → +1점'),
+                  _bullet(theme, '현금비율 > 20% → +1점  |  이자보상배율 ≥ 400% → +1점'),
                   const SizedBox(height: 8),
                   _bullet(theme, '-5% 손절 → 예수금 5% 추가 매수'),
                   _bullet(theme, '-10% 손절 → 예수금 10% 추가 매수'),

@@ -1,7 +1,7 @@
 """
 복합 조건 매수 전략 — 점수제 (Score-based)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ 진입 조건  —  10점 만점, 6점 이상 매수 ]
+[ 진입 조건  —  11점 만점, 6점 이상 매수 ]
   필수(+2) 현재가 < 60일 이평선           ← 미달 시 즉시 종료
   +2       골든크로스  (MA5 > MA20 크로스 발생)
            or +1  MA5 > MA20 (크로스 미발생, 유지 중)
@@ -11,6 +11,7 @@
   +1       부채비율 < 200%
   +1       유동비율 > 100%
   +1       현금비율 > 20%
+  +1       이자보상배율 ≥ 400%
 
 [ 추가매수 ]
   -5%  → 예수금  5% 추가매수
@@ -33,7 +34,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
     반환    : (score, max_score, log_lines)
     """
     score     = 0
-    max_score = 10
+    max_score = 11
     log       = []
     price     = fund['price']
 
@@ -122,8 +123,18 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
                 log.append(f"  ❌ [+0] 현금비율 {cash_r:.0f}% — 낮음")
         else:
             log.append(f"  ⚠️  [+0] 현금비율 데이터 없음")
+
+        ic = ratios.get('interest_coverage')
+        if ic is not None:
+            if ic >= 400:
+                score += 1
+                log.append(f"  ✅ [+1] 이자보상배율 {ic:.0f}% (기준 ≥ 400%)")
+            else:
+                log.append(f"  ❌ [+0] 이자보상배율 {ic:.0f}% — 낮음")
+        else:
+            log.append(f"  ⚠️  [+0] 이자보상배율 데이터 없음")
     else:
-        log.append(f"  ⚠️  [+0] 재무비율 조회 실패 (부채·유동·현금 3점 미반영)")
+        log.append(f"  ⚠️  [+0] 재무비율 조회 실패 (부채·유동·현금·이자보상 4점 미반영)")
 
     return score, max_score, log
 

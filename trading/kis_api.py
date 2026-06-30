@@ -268,9 +268,10 @@ class KISApi:
             soup = BeautifulSoup(r.content, 'lxml')
 
             TARGETS = {
-                '부채비율': 'debt_ratio',
-                '유동비율': 'current_ratio',
-                '현금비율': 'cash_ratio',
+                '부채비율':    'debt_ratio',
+                '유동비율':    'current_ratio',
+                '현금비율':    'cash_ratio',
+                '이자보상배율': 'interest_coverage',
             }
             result = {}
             for row in soup.select('tr'):
