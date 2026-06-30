@@ -196,7 +196,7 @@ def screen():
         for r in ok:
             disc = f"  MA60대비 -{r['discount']:.1f}%" if r['discount'] else ""
             lines.append(
-                f"  [{r['score']}/10점] {r['name']}({r['code']})  {r['price']:,}원"
+                f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
                 f"  전일{r['prdy_ctrt']:+.1f}%{disc}"
                 f"  [{r['sector']}]"
