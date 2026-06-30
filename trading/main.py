@@ -64,7 +64,7 @@ def _fetch_watchlist(user_id: str) -> list[dict]:
     # 2. 최신 스크리닝 결과 상위 5종목
     try:
         from datetime import datetime, timedelta, timezone
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
         r = requests.get(
             f"{_SUPABASE_URL}/rest/v1/screening_results"
             f"?pass=eq.true&screened_at=gte.{cutoff}&order=score.desc&limit=5",
@@ -79,11 +79,7 @@ def _fetch_watchlist(user_id: str) -> list[dict]:
     except Exception:
         pass
 
-    # 3. fallback
-    return [
-        {'code': '096350', 'name': '대창솔루션'},
-        {'code': '079550', 'name': 'LIG디펜스앤에어로스페이스'},
-    ]
+    return []
 
 
 def is_market_open() -> bool:
@@ -121,6 +117,10 @@ def run_for_user(user_cfg: dict) -> str:
     buf.write(f"{'='*60}\n")
 
     watchlist = _fetch_watchlist(user_cfg.get('user_id', ''))
+    if not watchlist:
+        buf.write("⏸  스크리닝 통과 종목 없음 — 매매 건너뜀\n")
+        return buf.getvalue()
+
     errors = []
     for stock in watchlist:
         try:
