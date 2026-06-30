@@ -1,7 +1,7 @@
 """
-AI 섹터별 종목 추천 — Claude API
+AI 섹터별 종목 분류 — Claude API
 스크리닝을 통과한 종목(screening_results pass=True) 목록을 Claude에게 전달하여
-섹터 분류 및 추천 이유를 받아 screening_candidates(source='ai')에 저장.
+섹터 분류 및 추천 이유를 받아 screening_candidates 레코드의 sector·ai_reason 컬럼을 업데이트.
 Claude가 종목코드를 직접 생성하지 않으므로 hallucination 없음.
 
 환경변수:
@@ -102,50 +102,32 @@ def _ask_claude(stocks: list[dict]) -> list[dict]:
     return json.loads(text)
 
 
-def _clear_old_ai_candidates():
-    """기존 source='ai' 종목 삭제 후 새로 채움"""
-    r = requests.delete(
-        f"{_SUPABASE_URL}/rest/v1/screening_candidates"
-        "?source=eq.ai&user_id=is.null",
-        headers=_supabase_headers(),
-        timeout=10,
-    )
-    r.raise_for_status()
-
-
-def _save_recommendations(recs: list[dict], passed_codes: set[str]):
-    """Claude 추천 결과 저장 (스크리닝 통과 종목만, 코드 검증 후)"""
-    # Claude가 목록 외 종목을 추가하는 hallucination 방지
-    valid = [r for r in recs if r['code'] in passed_codes]
+def _update_sectors(recs: list[dict], passed_codes: set[str]):
+    """Claude 분류 결과로 기존 system 레코드의 sector·ai_reason 업데이트"""
+    valid   = [r for r in recs if r['code'] in passed_codes]
     invalid = [r for r in recs if r['code'] not in passed_codes]
     if invalid:
         print(f"  ⚠️  목록 외 종목 {len(invalid)}개 제거: {[r['name'] for r in invalid]}")
 
     if not valid:
-        print("  저장할 유효 종목 없음")
+        print("  업데이트할 종목 없음")
         return 0
 
-    rows = [
-        {
-            'stock_code': r['code'],
-            'stock_name': r['name'],
-            'sector':     r['sector'],
-            'source':     'ai',
-            'status':     'approved',
-            'ai_reason':  r.get('reason', ''),
-            'user_id':    None,
-        }
-        for r in valid
-    ]
-    resp = requests.post(
-        f"{_SUPABASE_URL}/rest/v1/screening_candidates",
-        headers={**_supabase_headers(), 'Prefer': 'resolution=ignore-duplicates,return=minimal'},
-        json=rows,
-        timeout=10,
-    )
-    resp.raise_for_status()
-    print(f"  → {len(rows)}개 저장 완료")
-    return len(rows)
+    updated = 0
+    for r in valid:
+        resp = requests.patch(
+            f"{_SUPABASE_URL}/rest/v1/screening_candidates"
+            f"?stock_code=eq.{r['code']}&user_id=is.null",
+            headers=_supabase_headers(),
+            json={'sector': r['sector'], 'ai_reason': r.get('reason', '')},
+            timeout=10,
+        )
+        if resp.ok:
+            updated += 1
+            print(f"  ✅ [{r['sector']}] {r['name']}({r['code']})")
+        else:
+            print(f"  ⚠️  업데이트 실패 {r['name']}({r['code']}): {resp.status_code}")
+    return updated
 
 
 def main():
@@ -181,13 +163,10 @@ def main():
         print(f"❌ Claude API 오류: {e}")
         return
 
-    # 3. 기존 AI 추천 종목 교체
-    print(f"\n기존 AI 추천 종목 초기화...")
-    _clear_old_ai_candidates()
-
-    # 4. 저장
-    total = _save_recommendations(recs, passed_codes)
-    print(f"\n✅ 완료 — {total}개 AI 추천 종목 저장")
+    # 3. 기존 system 레코드에 섹터 정보 업데이트
+    print(f"\nsupabase screening_candidates 섹터 업데이트 중...")
+    total = _update_sectors(recs, passed_codes)
+    print(f"\n✅ 완료 — {total}개 종목 섹터 업데이트")
 
 
 if __name__ == '__main__':
