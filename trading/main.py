@@ -176,8 +176,8 @@ def main():
 
         content = run_for_user(user_cfg)
 
-        # 매수 실행 또는 오류가 있을 때만 알림 발송
-        has_trade = '진입 확정' in content or '추가매수' in content
+        # 실제 매수 체결 또는 오류가 있을 때만 알림 발송
+        has_trade = '진입 확정' in content or '% 도달 →' in content
         has_error = '❌' in content
         if has_trade or has_error:
             any_trade = True
