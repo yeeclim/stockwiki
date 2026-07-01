@@ -148,9 +148,6 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
 # ── 메인 전략 실행 ─────────────────────────────────────────────────────────────
 def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
     sep = "=" * 55
-    print(f"\n{sep}")
-    print(f"  {stock_name} ({stock_code})")
-    print(sep)
 
     # 데이터 수집 (중복 API 호출 최소화)
     fund    = api.get_fundamentals(stock_code)   # price, PER, PBR, volume
@@ -183,12 +180,12 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
         score, max_score, log_lines = _score_entry(fund, ma_data, ratios)
 
         if score < BUY_THRESHOLD:
-            print(f"보유수량   : {shares:>10,}주")
-            print(f"예수금     : {cash:>10,}원")
-            print(f"⏸  {score}/{max_score}점 미달 → 대기")
-            return
+            return  # 점수 미달 — 출력 없이 종료
 
-        # 매수 확정 시에만 상세 출력
+        # 매수 확정 시에만 헤더 + 상세 출력
+        print(f"\n{sep}")
+        print(f"  {stock_name} ({stock_code})")
+        print(sep)
         print(f"현재가     : {price:>10,}원")
         print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
         print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
@@ -256,6 +253,9 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
         return
 
     # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)
+    print(f"\n{sep}")
+    print(f"  {stock_name} ({stock_code})")
+    print(sep)
     chg = (price - avg_price) / avg_price * 100
     print(f"보유수량   : {shares:>10,}주  (평단가 {avg_price:,.0f}원)")
     print(f"예수금     : {cash:>10,}원")
