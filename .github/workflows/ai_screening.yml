@@ -1,4 +1,4 @@
-name: AI 섹터 종목 추천
+name: AI 종목 추천
 
 on:
   schedule:
@@ -25,7 +25,7 @@ jobs:
       - name: 패키지 설치
         run: pip install -r trading/requirements.txt
 
-      - name: AI 섹터 종목 추천 실행
+      - name: AI 종목 추천 실행
         env:
           ANTHROPIC_API_KEY:         ${{ secrets.ANTHROPIC_API_KEY }}
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
