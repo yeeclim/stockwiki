@@ -26,7 +26,7 @@ async function db(path, options = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok && method === 'GET') {
-    console.error(`[board] DB ${res.status} ${path}: ${await res.text()}`);
+    console.error(`[board] DB ${res.status} ${path}`);
   }
   return res;
 }

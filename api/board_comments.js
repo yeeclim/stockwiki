@@ -24,6 +24,9 @@ async function db(path, options = {}) {
     method, headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (!res.ok) {
+    console.error(`[board_comments] DB ${res.status} ${path}`);
+  }
   return res;
 }
 
