@@ -40,7 +40,15 @@ class BaseBrokerApi(ABC):
         """시장가 매도. 반환: {shares, price, amount} or None"""
 
     def get_financial_ratios(self, code: str) -> dict | None:
-        """부채비율·유동비율·현금비율 (FnGuide 스크래핑 — 공통 구현)"""
+        """재무비율 4종 — DART API 우선, 실패 시 FnGuide 스크래핑 fallback"""
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+        import dart_api
+        result = dart_api.get_financial_ratios(code)
+        if result:
+            return result
+
+        # FnGuide fallback
         try:
             import requests
             from bs4 import BeautifulSoup
@@ -53,7 +61,12 @@ class BaseBrokerApi(ABC):
             )
             r.raise_for_status()
             soup = BeautifulSoup(r.content, 'lxml')
-            TARGETS = {'부채비율': 'debt_ratio', '유동비율': 'current_ratio', '현금비율': 'cash_ratio'}
+            TARGETS = {
+                '부채비율':    'debt_ratio',
+                '유동비율':    'current_ratio',
+                '현금비율':    'cash_ratio',
+                '이자보상배율': 'interest_coverage',
+            }
             result = {}
             for row in soup.select('tr'):
                 th = row.find('th')

@@ -255,7 +255,13 @@ class KISApi:
             raise RuntimeError(f"MA 데이터 조회 실패: {e}") from e
 
     def get_financial_ratios(self, code: str) -> dict | None:
-        """부채비율, 유동비율, 현금비율 — FnGuide 스크래핑 (실패 시 None)"""
+        """재무비율 4종 — DART API 우선, 실패 시 FnGuide 스크래핑 fallback"""
+        import dart_api
+        result = dart_api.get_financial_ratios(code)
+        if result:
+            return result
+
+        # FnGuide fallback
         try:
             from bs4 import BeautifulSoup
             r = self._session.get(
@@ -267,7 +273,6 @@ class KISApi:
             )
             r.raise_for_status()
             soup = BeautifulSoup(r.content, 'lxml')
-
             TARGETS = {
                 '부채비율':    'debt_ratio',
                 '유동비율':    'current_ratio',
@@ -290,8 +295,7 @@ class KISApi:
                             except ValueError:
                                 continue
                         break
-
-            return result if result else None
+            return result or None
         except Exception as e:
             print(f"⚠️  재무비율 조회 실패 ({code}): {e}")
             return None
