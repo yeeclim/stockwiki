@@ -35,21 +35,26 @@ def _fetch_passed_stocks() -> list[dict]:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ')
     r = requests.get(
         f"{_SUPABASE_URL}/rest/v1/screening_results"
-        f"?pass=eq.true&screened_at=gte.{cutoff}&order=score.desc,screened_at.desc",
+        f"?pass=eq.true&score=gte.6&screened_at=gte.{cutoff}&order=score.desc,screened_at.desc",
         headers=_supabase_headers(),
         timeout=10,
     )
     r.raise_for_status()
     rows = r.json()
 
-    # 동일 종목 중 최신 결과만 유지
+    # 동일 종목 중 최신 결과만 유지 + 시총 4천억 미만 제외
     seen = set()
     result = []
     for row in rows:
         code = row['stock_code']
-        if code not in seen:
-            seen.add(code)
-            result.append(row)
+        if code in seen:
+            continue
+        market_cap = row.get('market_cap', 0)
+        if market_cap and market_cap < 4000:
+            print(f"  ⛔ {row['stock_name']}({code}) 시총 {market_cap:,}억 — 제외")
+            continue
+        seen.add(code)
+        result.append(row)
     return result
 
 
