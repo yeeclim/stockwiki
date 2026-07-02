@@ -53,6 +53,7 @@ jobs:
           KAKAO_CLIENT_SECRET:      ${{ secrets.KAKAO_CLIENT_SECRET }}
           EMAIL_SENDER:             ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD:           ${{ secrets.EMAIL_PASSWORD }}
+          DART_API_KEY:             ${{ secrets.DART_API_KEY }}
         run: |
           cd trading
           python main.py
