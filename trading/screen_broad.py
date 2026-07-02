@@ -91,9 +91,12 @@ def _score_stock(stock: dict) -> dict | None:
         fund = _api.get_fundamentals(code)
 
         # 가격·거래량 기초 필터 (KIS 실데이터 기준)
-        price  = fund.get("price", 0)
-        volume = fund.get("volume", 0)
+        price      = fund.get("price", 0)
+        volume     = fund.get("volume", 0)
+        market_cap = fund.get("market_cap", 0)
         if price < 1_000 or price > 800_000 or volume < 50_000:
+            return None
+        if market_cap and market_cap < 4_000:
             return None
 
         ma_data = _api.get_ma_data(code)
@@ -229,7 +232,7 @@ def main():
     print(f"  🏆 광역 스캔 결과 — 상위 {len(top)}종목 ({MIN_THRESHOLD}점 이상)")
     print(f"{'='*55}")
     for r in top[:20]:
-        print(f"  [{r['score']}/10점] {r['name']}({r['code']})  {r['fund']['price']:,}원")
+        print(f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['fund']['price']:,}원")
 
     # 5. screening_candidates 갱신
     _upsert_candidates(top)
