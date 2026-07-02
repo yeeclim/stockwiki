@@ -2,16 +2,16 @@ import { createHash } from 'crypto';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
-const MAX_PER_DAY   = 10;
-const MAX_NICKNAME  = 30;
-const MAX_CONTENT   = 10000;
+const MAX_PER_DAY  = 10;
+const MAX_NICKNAME = 30;
+const MAX_TITLE    = 100;
+const MAX_CONTENT  = 10000;
 
-// ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 function sha256(str, salt) {
   return createHash('sha256').update(str + salt).digest('hex');
 }
-function ipHash(ip)  { return sha256(ip,  'sw_ip').substring(0, 16); }
-function pwHash(pw)  { return sha256(pw,  'sw_pw'); }
+function ipHash(ip) { return sha256(ip,  'sw_ip').substring(0, 16); }
+function pwHash(pw) { return sha256(pw,  'sw_pw'); }
 
 async function db(path, options = {}) {
   const { method = 'GET', body, prefer } = options;
@@ -21,39 +21,33 @@ async function db(path, options = {}) {
     'Content-Type': 'application/json',
     ...(prefer ? { Prefer: prefer } : {}),
   };
-  const url = `${SUPABASE_URL}/rest/v1${path}`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     method, headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok && method === 'GET') {
-    const text = await res.text();
-    console.error(`[board] DB error ${res.status} ${url}: ${text}`);
+    console.error(`[board] DB ${res.status} ${path}: ${await res.text()}`);
   }
   return res;
 }
 
-// ── HTML 새니타이저 (화이트리스트 방식) ───────────────────────────────────────
 function sanitize(html) {
   if (!html) return '';
   let s = html
-    // 위험한 태그 통째로 제거
     .replace(/<(script|style|iframe|frame|object|embed|link|meta|base|form|input|button|select|textarea|svg)[\s\S]*?>/gi, '')
     .replace(/<\/(script|style|iframe|frame|object|embed|form|select|textarea|svg)>/gi, '')
-    // 이벤트 핸들러 제거
     .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
     .replace(/\s+on\w+\s*=\s*[^\s>]+/gi, '')
-    // 위험한 프로토콜 제거
     .replace(/href\s*=\s*["']\s*(javascript|vbscript|data):[^"']*/gi, 'href="#"')
     .replace(/src\s*=\s*["']\s*(javascript|vbscript):[^"']*/gi, 'src=""')
-    // position:fixed/absolute → relative (레이아웃 탈출 방지)
     .replace(/position\s*:\s*(fixed|absolute|sticky)/gi, 'position:relative')
-    // 이미지 크기 제한
     .replace(/<img([^>]*)>/gi, (_, attrs) => {
-      const clean = attrs.replace(/style\s*=\s*["'][^"']*["']/gi, '').replace(/width\s*=\s*["']?[^"'\s>]+["']?/gi, '').replace(/height\s*=\s*["']?[^"'\s>]+["']?/gi, '');
+      const clean = attrs
+        .replace(/style\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/width\s*=\s*["']?[^"'\s>]+["']?/gi, '')
+        .replace(/height\s*=\s*["']?[^"'\s>]+["']?/gi, '');
       return `<img${clean} style="max-width:100%;max-height:400px;object-fit:contain;">`;
     })
-    // 외부 링크 안전 처리
     .replace(/<a([^>]*)>/gi, (_, attrs) => {
       const noTarget = attrs.replace(/target\s*=\s*["'][^"']*["']/gi, '');
       return `<a${noTarget} target="_blank" rel="noopener noreferrer">`;
@@ -65,7 +59,6 @@ function stripHtml(html) {
   return (html || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// ── 메인 핸들러 ────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -73,7 +66,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return res.status(500).json({ error: 'DB 미설정 (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)' });
+    return res.status(500).json({ error: 'DB 미설정' });
   }
 
   const rawIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
@@ -81,46 +74,84 @@ export default async function handler(req, res) {
   const ih = ipHash(rawIp);
 
   try {
-    // ── GET: 목록 / 단건 조회 ──────────────────────────────────────────────
+    // ── GET ──────────────────────────────────────────────────────────────────
     if (req.method === 'GET') {
       const { id, page = '1', limit = '20' } = req.query;
 
       if (id) {
-        const r = await db(`/board_posts?id=eq.${id}&select=id,nickname,content,created_at,updated_at`);
+        // 단건 조회 + 조회수 증가
+        const r = await db(
+          `/board_posts?id=eq.${id}&select=id,title,nickname,content,view_count,created_at,updated_at`
+        );
         const data = await r.json();
         if (!data?.length) return res.status(404).json({ error: '게시글 없음' });
-        return res.json({ success: true, post: data[0] });
+
+        await db(`/board_posts?id=eq.${id}`, {
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          body: { view_count: (data[0].view_count || 0) + 1 },
+        });
+
+        // 댓글 수
+        const cr = await db(`/board_comments?post_id=eq.${id}&select=id`, { prefer: 'count=exact' });
+        await cr.json();
+        const commentCount = parseInt(cr.headers.get('content-range')?.split('/')[1] ?? '0') || 0;
+
+        return res.json({ success: true, post: { ...data[0], comment_count: commentCount } });
       }
 
+      // 목록
       const lim = Math.min(parseInt(limit) || 20, 50);
       const off = (Math.max(parseInt(page) || 1, 1) - 1) * lim;
       const r = await db(
-        `/board_posts?select=id,nickname,content,created_at,updated_at&order=created_at.desc&limit=${lim}&offset=${off}`,
+        `/board_posts?select=id,title,nickname,content,view_count,created_at,updated_at&order=created_at.desc&limit=${lim}&offset=${off}`,
         { prefer: 'count=exact' }
       );
       const posts = await r.json();
       const total = parseInt(r.headers.get('content-range')?.split('/')[1] ?? '0') || 0;
-      // 목록에서는 HTML 제거한 preview 추가
+
+      // 댓글 수 일괄 조회
+      const ids = (Array.isArray(posts) ? posts : []).map(p => p.id);
+      let commentCounts = {};
+      if (ids.length > 0) {
+        const ccr = await db(
+          `/board_comments?post_id=in.(${ids.join(',')})&select=post_id`
+        );
+        const ccData = await ccr.json();
+        if (Array.isArray(ccData)) {
+          for (const row of ccData) {
+            commentCounts[row.post_id] = (commentCounts[row.post_id] || 0) + 1;
+          }
+        }
+      }
+
       const list = (Array.isArray(posts) ? posts : []).map(p => ({
-        ...p,
-        preview: stripHtml(p.content).substring(0, 120),
-        content: undefined, // 목록에선 전체 내용 미포함
+        id: p.id,
+        title: p.title,
+        nickname: p.nickname,
+        preview: stripHtml(p.content).substring(0, 100),
+        view_count: p.view_count || 0,
+        comment_count: commentCounts[p.id] || 0,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
       }));
+
       return res.json({ success: true, posts: list, total, page: parseInt(page), limit: lim });
     }
 
-    // ── POST: 작성 ─────────────────────────────────────────────────────────
+    // ── POST ─────────────────────────────────────────────────────────────────
     if (req.method === 'POST') {
-      const { nickname, content, password } = req.body ?? {};
+      const { title, nickname, content, password } = req.body ?? {};
 
-      if (!nickname?.trim() || !content?.trim() || !password?.trim())
-        return res.status(400).json({ error: '닉네임·내용·비밀번호를 모두 입력해주세요' });
+      if (!title?.trim() || !nickname?.trim() || !content?.trim() || !password?.trim())
+        return res.status(400).json({ error: '제목·닉네임·내용·비밀번호를 모두 입력해주세요' });
+      if (title.trim().length > MAX_TITLE)
+        return res.status(400).json({ error: `제목은 ${MAX_TITLE}자 이하` });
       if (nickname.trim().length > MAX_NICKNAME)
         return res.status(400).json({ error: `닉네임은 ${MAX_NICKNAME}자 이하` });
       if (password.trim().length < 4)
         return res.status(400).json({ error: '비밀번호는 4자 이상' });
 
-      // 오늘 작성 수 체크
       const today = new Date().toISOString().split('T')[0];
       const cr = await db(`/board_posts?ip_hash=eq.${ih}&created_at=gte.${today}T00:00:00Z&select=id`);
       const todayPosts = await cr.json();
@@ -131,20 +162,21 @@ export default async function handler(req, res) {
         method: 'POST',
         prefer: 'return=representation',
         body: {
-          nickname: nickname.trim().substring(0, MAX_NICKNAME),
-          content:  sanitize(content),
+          title:         title.trim().substring(0, MAX_TITLE),
+          nickname:      nickname.trim().substring(0, MAX_NICKNAME),
+          content:       sanitize(content),
           password_hash: pwHash(password.trim()),
-          ip_hash: ih,
+          ip_hash:       ih,
         },
       });
       const inserted = await ir.json();
       return res.status(201).json({ success: true, id: inserted?.[0]?.id });
     }
 
-    // ── PUT: 수정 ──────────────────────────────────────────────────────────
+    // ── PUT ──────────────────────────────────────────────────────────────────
     if (req.method === 'PUT') {
       const { id } = req.query;
-      const { content, password } = req.body ?? {};
+      const { title, content, password } = req.body ?? {};
       if (!id || !content?.trim() || !password?.trim())
         return res.status(400).json({ error: '필수 값 누락' });
 
@@ -154,15 +186,21 @@ export default async function handler(req, res) {
       if (rows[0].password_hash !== pwHash(password.trim()))
         return res.status(403).json({ error: '비밀번호가 틀렸습니다' });
 
+      const updateBody = {
+        content:    sanitize(content),
+        updated_at: new Date().toISOString(),
+      };
+      if (title?.trim()) updateBody.title = title.trim().substring(0, MAX_TITLE);
+
       await db(`/board_posts?id=eq.${id}`, {
         method: 'PATCH',
         prefer: 'return=minimal',
-        body: { content: sanitize(content), updated_at: new Date().toISOString() },
+        body: updateBody,
       });
       return res.json({ success: true });
     }
 
-    // ── DELETE: 삭제 ───────────────────────────────────────────────────────
+    // ── DELETE ───────────────────────────────────────────────────────────────
     if (req.method === 'DELETE') {
       const { id } = req.query;
       const { password } = req.body ?? {};
