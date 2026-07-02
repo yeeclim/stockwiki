@@ -20,9 +20,56 @@
 [ 매도 ]
   사용자 직접 판단 (자동 매도 미적용)
 """
+import os
+import json
+import requests
 import database as db
 
 BUY_THRESHOLD = 6   # 10점 만점 중 최소 매수 점수
+
+
+def _ask_sell_timing(stock_name: str, stock_code: str, buy_price: int, fund: dict, ma_data: dict, score: int) -> str:
+    """매수 직후 Claude에게 매도 타이밍 의견 요청"""
+    key = os.environ.get('ANTHROPIC_API_KEY', '').strip()
+    if not key:
+        return '(ANTHROPIC_API_KEY 미설정)'
+    try:
+        ma60 = ma_data.get('ma60') or 0
+        ma20 = ma_data.get('ma20') or 0
+        prompt = (
+            f"한국 주식 {stock_name}({stock_code})을 방금 {buy_price:,}원에 매수했습니다.\n"
+            f"현재가: {buy_price:,}원 / MA60: {ma60:,.0f}원 / MA20: {ma20:,.0f}원\n"
+            f"PER: {fund.get('per', 0):.1f} / PBR: {fund.get('pbr', 0):.2f} / 스크리닝 점수: {score}/11점\n\n"
+            "기술적 분석 관점에서 매도 타이밍을 간략히 제안해주세요.\n"
+            "아래 JSON 형식으로만 응답하세요:\n"
+            '{"target": "목표 매도가 또는 조건 (20자 이내)", "stop": "손절 기준 (20자 이내)", "comment": "한 줄 근거 (40자 이내)"}'
+        )
+        resp = requests.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'x-api-key':         key,
+                'anthropic-version': '2023-06-01',
+                'content-type':      'application/json',
+            },
+            json={
+                'model':      'claude-haiku-4-5-20251001',
+                'max_tokens': 150,
+                'messages':   [{'role': 'user', 'content': prompt}],
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        text = resp.json()['content'][0]['text'].strip()
+        if '```' in text:
+            text = text.split('```')[1].lstrip('json').strip()
+        d = json.loads(text)
+        return (
+            f"🎯 목표매도: {d.get('target', '?')}  "
+            f"🛑 손절기준: {d.get('stop', '?')}\n"
+            f"   💬 {d.get('comment', '')}"
+        )
+    except Exception as e:
+        return f'(분석 실패: {e})'
 
 
 # ── 진입 점수 계산 ─────────────────────────────────────────────────────────────
@@ -248,6 +295,9 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
                 db.log_trade(stock_code, stock_name, 'BUY',
                              result['price'], result['shares'], result['amount'],
                              f'복합조건 {score}/{max_score}점 진입', user_id)
+                sell_opinion = _ask_sell_timing(
+                    stock_name, stock_code, result['price'], fund, ma_data, score)
+                print(f"\n[ AI 매도 타이밍 의견 ]\n  {sell_opinion}")
         else:
             print(f"\n⏸  조건 미달 ({score}점 < {BUY_THRESHOLD}점) → 대기")
         return
