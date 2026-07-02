@@ -87,6 +87,7 @@ def _save_results(results: list[dict]):
             'sector':      r.get('sector', ''),
             'score':       r.get('score', 0),
             'price':       r.get('price'),
+            'market_cap':  r.get('market_cap', 0),
             'pass':        r.get('pass', False),
             'screened_at': now,
         }
