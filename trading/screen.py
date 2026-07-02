@@ -10,6 +10,7 @@ from kis_api import KISApi
 import kakao_notify
 import email_notify
 from strategy import _score_entry
+from news_sentiment import get_sentiment_line
 
 _SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
@@ -198,11 +199,13 @@ def screen():
             disc = f"  MA60대비 -{r['discount']:.1f}%" if r['discount'] else ""
             mcap = r.get('market_cap', 0)
             mcap_str = f"  시총 {mcap:,}억" if mcap else ""
+            sentiment = get_sentiment_line(r['code'], r['name'])
             lines.append(
                 f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
                 f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}"
                 f"  [{r['sector']}]"
+                f"\n  📰 뉴스: {sentiment}"
                 f"\n  📊 {chart_url(r['code'])}"
             )
     else:
