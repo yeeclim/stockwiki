@@ -284,13 +284,12 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
                 remaining = cap
 
             buy_amount = orig_buy if orig_buy <= remaining else remaining
-            if orig_buy > remaining:
-                print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
-            else:
-                print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
-
             result = api.buy(stock_code, buy_amount)
             if result:
+                if orig_buy > remaining:
+                    print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
+                else:
+                    print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
                 db.reset_position(stock_code, stock_name)
                 db.log_trade(stock_code, stock_name, 'BUY',
                              result['price'], result['shares'], result['amount'],
@@ -339,9 +338,9 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
                 return
             buy_amount = buy_amount if buy_amount <= remaining else remaining
 
-        print(f"\n✅ -10% 도달 → 예수금 10% ({buy_amount:,}원) 추가매수")
         result = api.buy(stock_code, buy_amount)
         if result:
+            print(f"\n✅ -10% 도달 → 예수금 10% ({buy_amount:,}원) 추가매수")
             db.upsert_position(stock_code, buy_minus10_done=True, user_id=user_id)
             db.log_trade(stock_code, stock_name, 'BUY',
                          result['price'], result['shares'], result['amount'],
@@ -368,9 +367,9 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
                 return
             buy_amount = buy_amount if buy_amount <= remaining else remaining
 
-        print(f"\n✅ -5% 도달 → 예수금 5% ({buy_amount:,}원) 추가매수")
         result = api.buy(stock_code, buy_amount)
         if result:
+            print(f"\n✅ -5% 도달 → 예수금 5% ({buy_amount:,}원) 추가매수")
             db.upsert_position(stock_code, buy_minus5_done=True, user_id=user_id)
             db.log_trade(stock_code, stock_name, 'BUY',
                          result['price'], result['shares'], result['amount'],

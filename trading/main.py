@@ -92,11 +92,7 @@ def is_market_open() -> bool:
     if now.weekday() >= 5:
         return False
     t = now.time()
-    return (
-        _time(8,  0)  <= t < _time(9,  0)   # 프리마켓
-        or _time(9,  0)  <= t <= _time(15, 30)  # 정규장
-        or _time(15, 40) <= t < _time(20, 0)    # 포스트마켓
-    )
+    return _time(9, 0) <= t <= _time(15, 20)  # 정규장 (마감 10분 전 컷)
 
 
 def run_for_user(user_cfg: dict) -> str:
