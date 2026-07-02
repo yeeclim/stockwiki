@@ -64,14 +64,12 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
     try {
       final origin = Uri.base.origin;
       final res = await http
-          .get(Uri.parse(
-              '$origin/api/board_comments?post_id=${widget.postId}'))
+          .get(Uri.parse('$origin/api/board_comments?post_id=${widget.postId}'))
           .timeout(const Duration(seconds: 10));
       final data = json.decode(res.body);
       if (data['success'] == true && mounted) {
         setState(() {
-          _comments =
-              List<Map<String, dynamic>>.from(data['comments'] ?? []);
+          _comments = List<Map<String, dynamic>>.from(data['comments'] ?? []);
         });
       }
     } catch (_) {}
@@ -133,14 +131,13 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
         actions: [
           if (_post != null) ...[
             IconButton(
-              icon: Icon(Icons.edit_outlined,
-                  color: theme.colorScheme.onSurface),
+              icon:
+                  Icon(Icons.edit_outlined, color: theme.colorScheme.onSurface),
               onPressed: () => _showEditDialog(context, theme),
               tooltip: '수정',
             ),
             IconButton(
-              icon:
-                  Icon(Icons.delete_outline, color: theme.colorScheme.error),
+              icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
               onPressed: () => _showDeleteDialog(context, theme),
               tooltip: '삭제',
             ),
@@ -149,11 +146,10 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
       ),
       body: _isLoading
           ? Center(
-              child: CircularProgressIndicator(
-                  color: theme.colorScheme.primary))
+              child:
+                  CircularProgressIndicator(color: theme.colorScheme.primary))
           : _error.isNotEmpty
-              ? Center(
-                  child: Text(_error, style: theme.textTheme.bodyMedium))
+              ? Center(child: Text(_error, style: theme.textTheme.bodyMedium))
               : Column(
                   children: [
                     // ── 게시글 본문 ───────────────────────────────────────
@@ -165,61 +161,51 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                           if ((_post!['title'] as String? ?? '').isNotEmpty)
                             Text(
                               _post!['title'] as String,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold),
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
                               Icon(Icons.person_outline,
                                   size: 14,
-                                  color:
-                                      theme.colorScheme.onSurfaceVariant),
+                                  color: theme.colorScheme.onSurfaceVariant),
                               const SizedBox(width: 4),
                               Text(_post!['nickname'] ?? '',
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme
-                                          .colorScheme.onSurfaceVariant,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600)),
                               const Spacer(),
                               if (_post!['updated_at'] != null &&
                                   _post!['updated_at'] !=
                                       _post!['created_at']) ...[
                                 Text('수정됨',
-                                    style: theme.textTheme.bodySmall
-                                        ?.copyWith(
-                                            color: theme.colorScheme
-                                                .onSurfaceVariant,
-                                            fontStyle: FontStyle.italic)),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                        fontStyle: FontStyle.italic)),
                                 const SizedBox(width: 8),
                               ],
                               Icon(Icons.access_time_outlined,
                                   size: 13,
-                                  color:
-                                      theme.colorScheme.onSurfaceVariant),
+                                  color: theme.colorScheme.onSurfaceVariant),
                               const SizedBox(width: 4),
-                              Text(
-                                  _formatDate(
-                                      _post!['created_at'] as String?),
+                              Text(_formatDate(_post!['created_at'] as String?),
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme
-                                          .colorScheme.onSurfaceVariant)),
+                                      color:
+                                          theme.colorScheme.onSurfaceVariant)),
                             ],
                           ),
                         ],
                       ),
                     ),
                     Divider(
-                        height: 16,
-                        thickness: 1,
-                        color: theme.dividerColor),
+                        height: 16, thickness: 1, color: theme.dividerColor),
                     // HTML 본문
                     Expanded(
                       child: _HtmlContentView(
-                        htmlContent:
-                            _post!['content'] as String? ?? '',
-                        viewId:
-                            'post_${widget.postId}_$_refreshKey',
+                        htmlContent: _post!['content'] as String? ?? '',
+                        viewId: 'post_${widget.postId}_$_refreshKey',
                         isDark: isDark,
                       ),
                     ),
@@ -232,8 +218,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                       onCommentAdded: _fetchComments,
                       onCommentDeleted: _fetchComments,
                       showDeleteDialog: (commentId) =>
-                          _showCommentDeleteDialog(
-                              context, theme, commentId),
+                          _showCommentDeleteDialog(context, theme, commentId),
                     ),
                   ],
                 ),
@@ -317,13 +302,11 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                             .put(
                               Uri.parse(
                                   '$origin/api/board?id=${widget.postId}'),
-                              headers: {
-                                'Content-Type': 'application/json'
-                              },
+                              headers: {'Content-Type': 'application/json'},
                               body: json.encode({
-                                'title':    titleCtrl.text.trim(),
+                                'title': titleCtrl.text.trim(),
                                 'password': passwordCtrl.text.trim(),
-                                'content':  contentCtrl.text.trim(),
+                                'content': contentCtrl.text.trim(),
                               }),
                             )
                             .timeout(const Duration(seconds: 10));
@@ -371,8 +354,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('삭제하면 복구할 수 없습니다.',
-                  style: theme.textTheme.bodyMedium),
+              Text('삭제하면 복구할 수 없습니다.', style: theme.textTheme.bodyMedium),
               const SizedBox(height: 12),
               TextField(
                 controller: passwordCtrl,
@@ -408,18 +390,15 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                       });
                       try {
                         final origin = Uri.base.origin;
-                        final req = http.Request(
-                            'DELETE',
-                            Uri.parse(
-                                '$origin/api/board?id=${widget.postId}'));
+                        final req = http.Request('DELETE',
+                            Uri.parse('$origin/api/board?id=${widget.postId}'));
                         req.headers['Content-Type'] = 'application/json';
-                        req.body = json
-                            .encode({'password': passwordCtrl.text.trim()});
+                        req.body =
+                            json.encode({'password': passwordCtrl.text.trim()});
                         final streamed = await req
                             .send()
                             .timeout(const Duration(seconds: 10));
-                        final res =
-                            await http.Response.fromStream(streamed);
+                        final res = await http.Response.fromStream(streamed);
                         final data = json.decode(res.body);
                         if (data['success'] == true) {
                           if (ctx.mounted) Navigator.of(ctx).pop();
@@ -443,8 +422,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                       height: 16,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : const Text('삭제',
-                      style: TextStyle(color: Colors.white)),
+                  : const Text('삭제', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -506,13 +484,12 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                             Uri.parse(
                                 '$origin/api/board_comments?id=$commentId'));
                         req.headers['Content-Type'] = 'application/json';
-                        req.body = json
-                            .encode({'password': passwordCtrl.text.trim()});
+                        req.body =
+                            json.encode({'password': passwordCtrl.text.trim()});
                         final streamed = await req
                             .send()
                             .timeout(const Duration(seconds: 10));
-                        final res =
-                            await http.Response.fromStream(streamed);
+                        final res = await http.Response.fromStream(streamed);
                         final data = json.decode(res.body);
                         if (data['success'] == true) {
                           if (ctx.mounted) Navigator.of(ctx).pop();
@@ -536,8 +513,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                       height: 16,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : const Text('삭제',
-                      style: TextStyle(color: Colors.white)),
+                  : const Text('삭제', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -573,9 +549,9 @@ class _CommentSection extends StatefulWidget {
 class _CommentSectionState extends State<_CommentSection> {
   final _nicknameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _contentCtrl  = TextEditingController();
+  final _contentCtrl = TextEditingController();
   bool _submitting = false;
-  bool _pwVisible  = false;
+  bool _pwVisible = false;
   String _error = '';
 
   @override
@@ -599,10 +575,10 @@ class _CommentSectionState extends State<_CommentSection> {
             Uri.parse('$origin/api/board_comments'),
             headers: {'Content-Type': 'application/json'},
             body: json.encode({
-              'post_id':  widget.postId,
+              'post_id': widget.postId,
               'nickname': _nicknameCtrl.text.trim(),
               'password': _passwordCtrl.text.trim(),
-              'content':  _contentCtrl.text.trim(),
+              'content': _contentCtrl.text.trim(),
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -634,8 +610,7 @@ class _CommentSectionState extends State<_CommentSection> {
         children: [
           // 댓글 헤더
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
                 Icon(Icons.chat_bubble_outline,
@@ -685,8 +660,8 @@ class _CommentSectionState extends State<_CommentSection> {
                                   children: [
                                     Icon(Icons.person_outline,
                                         size: 13,
-                                        color: theme
-                                            .colorScheme.onSurfaceVariant),
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant),
                                     const SizedBox(width: 4),
                                     Text(c['nickname'] ?? '',
                                         style: theme.textTheme.bodySmall
@@ -704,12 +679,12 @@ class _CommentSectionState extends State<_CommentSection> {
                                                     .onSurfaceVariant)),
                                     const Spacer(),
                                     GestureDetector(
-                                      onTap: () => widget.showDeleteDialog(
-                                          c['id'].toString()),
+                                      onTap: () => widget
+                                          .showDeleteDialog(c['id'].toString()),
                                       child: Icon(Icons.close,
                                           size: 16,
-                                          color: theme.colorScheme
-                                              .onSurfaceVariant),
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant),
                                     ),
                                   ],
                                 ),
@@ -778,8 +753,8 @@ class _CommentSectionState extends State<_CommentSection> {
                           hintStyle: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant),
                           filled: true,
-                          fillColor: theme.colorScheme.surfaceVariant
-                              .withOpacity(0.3),
+                          fillColor:
+                              theme.colorScheme.surfaceVariant.withOpacity(0.3),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide.none),
@@ -804,8 +779,7 @@ class _CommentSectionState extends State<_CommentSection> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.colorScheme.primary,
                           foregroundColor: theme.colorScheme.onPrimary,
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8)),
                         ),
@@ -816,8 +790,7 @@ class _CommentSectionState extends State<_CommentSection> {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: theme.colorScheme.onPrimary))
-                            : const Text('등록',
-                                style: TextStyle(fontSize: 13)),
+                            : const Text('등록', style: TextStyle(fontSize: 13)),
                       ),
                     ),
                   ],
@@ -862,8 +835,7 @@ class _SmallField extends StatelessWidget {
         hintStyle: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         filled: true,
-        fillColor:
-            theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide.none),
@@ -874,8 +846,7 @@ class _SmallField extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             borderSide:
                 BorderSide(color: theme.colorScheme.primary, width: 1.5)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         suffixIcon: suffix,
         isDense: true,
       ),
