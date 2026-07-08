@@ -18,10 +18,21 @@ _corp_list_loaded = False
 
 
 def _load_corp_list(dart_key: str) -> bool:
-    """DART 기업 코드 ZIP 다운로드 → stock_code→corp_code 매핑 구축"""
+    """기업코드 매핑 로드 — 번들 JSON 우선, 없으면 DART API 다운로드"""
     global _corp_list_loaded
     if _corp_list_loaded:
         return True
+
+    # 번들 JSON (repo에 커밋된 파일)
+    json_path = os.path.join(os.path.dirname(__file__), 'corp_codes.json')
+    if os.path.exists(json_path):
+        import json
+        with open(json_path, encoding='utf-8') as f:
+            _corp_list.update(json.load(f))
+        _corp_list_loaded = True
+        return True
+
+    # fallback: DART API 다운로드
     try:
         r = requests.get(
             f'{_BASE}/corpCode.xml',
