@@ -259,9 +259,7 @@ class KISApi:
         import dart_api
         result = dart_api.get_financial_ratios(code)
         if result:
-            print(f"  📊 DART 재무비율 ({code}): {result}")
             return result
-        print(f"  ⚠️  DART 재무비율 조회 실패 ({code}) → FnGuide fallback")
 
         # FnGuide fallback
         try:
