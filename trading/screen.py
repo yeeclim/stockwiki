@@ -170,6 +170,7 @@ def screen():
                 'prdy_ctrt':  prdy_ctrt,
                 'score':      score,
                 'discount':   discount,
+                'ratios':     ratios or {},
                 'pass':       score >= BUY_THRESHOLD,
             })
         except Exception as e:
@@ -201,10 +202,17 @@ def screen():
             mcap = r.get('market_cap', 0)
             mcap_str = f"  시총 {mcap:,}억" if mcap else ""
             sentiment = get_sentiment_line(r['code'], r['name'])
+            ratios = r.get('ratios') or {}
+            ratio_parts = []
+            if '부채비율'  in ratios: ratio_parts.append(f"부채{ratios['부채비율']:.0f}%")
+            if '유동비율'  in ratios: ratio_parts.append(f"유동{ratios['유동비율']:.0f}%")
+            if '현금비율'  in ratios: ratio_parts.append(f"현금{ratios['현금비율']:.0f}%")
+            if '이자보상배율' in ratios: ratio_parts.append(f"이자보상{ratios['이자보상배율']:.0f}%")
+            ratio_str = f"  {' '.join(ratio_parts)}" if ratio_parts else ""
             lines.append(
                 f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
-                f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}"
+                f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}{ratio_str}"
                 f"  [{r['sector']}]"
                 f"\n  📰 뉴스: {sentiment}"
                 f"\n  📊 {chart_url(r['code'])}"
