@@ -138,7 +138,7 @@ def get_financial_ratios(stock_code: str, dart_key: str | None = None) -> dict |
         result['현금비율'] = round(cash / curr_liab * 100, 1)
 
     op_profit    = acct.get('영업이익')
-    interest_exp = acct.get('이자비용')
+    interest_exp = acct.get('이자비용') or acct.get('금융비용')
     if op_profit is not None and interest_exp and interest_exp != 0:
         result['이자보상배율'] = round(op_profit / interest_exp * 100, 1)
 
