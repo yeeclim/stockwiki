@@ -24,11 +24,13 @@ def _corp_code(stock_code: str, dart_key: str) -> str | None:
         r.raise_for_status()
         d = r.json()
         if d.get('status') != '000':
+            print(f"  [DART] corp_code 실패 ({stock_code}): status={d.get('status')} msg={d.get('message')}")
             return None
         code = d['corp_code']
         _corp_cache[stock_code] = code
         return code
-    except Exception:
+    except Exception as e:
+        print(f"  [DART] corp_code 예외 ({stock_code}): {e}")
         return None
 
 
@@ -75,6 +77,7 @@ def get_financial_ratios(stock_code: str, dart_key: str | None = None) -> dict |
     """
     key = dart_key or os.environ.get('DART_API_KEY', '').strip()
     if not key:
+        print(f"  [DART] DART_API_KEY 미설정")
         return None
 
     corp = _corp_code(stock_code, key)
