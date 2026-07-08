@@ -126,20 +126,20 @@ def get_financial_ratios(stock_code: str, dart_key: str | None = None) -> dict |
     total_liab   = acct.get('부채총계')
     total_equity = acct.get('자본총계')
     if total_liab is not None and total_equity:
-        result['debt_ratio'] = round(total_liab / total_equity * 100, 1)
+        result['부채비율'] = round(total_liab / total_equity * 100, 1)
 
     curr_assets = acct.get('유동자산')
     curr_liab   = acct.get('유동부채')
     if curr_assets is not None and curr_liab:
-        result['current_ratio'] = round(curr_assets / curr_liab * 100, 1)
+        result['유동비율'] = round(curr_assets / curr_liab * 100, 1)
 
     cash = acct.get('현금및현금성자산')
     if cash is not None and curr_liab:
-        result['cash_ratio'] = round(cash / curr_liab * 100, 1)
+        result['현금비율'] = round(cash / curr_liab * 100, 1)
 
     op_profit    = acct.get('영업이익')
     interest_exp = acct.get('이자비용')
     if op_profit is not None and interest_exp and interest_exp != 0:
-        result['interest_coverage'] = round(op_profit / interest_exp * 100, 1)
+        result['이자보상배율'] = round(op_profit / interest_exp * 100, 1)
 
     return result or None

@@ -275,24 +275,19 @@ class KISApi:
             )
             r.raise_for_status()
             soup = BeautifulSoup(r.content, 'lxml')
-            TARGETS = {
-                '부채비율':    'debt_ratio',
-                '유동비율':    'current_ratio',
-                '현금비율':    'cash_ratio',
-                '이자보상배율': 'interest_coverage',
-            }
+            TARGETS = ('부채비율', '유동비율', '현금비율', '이자보상배율')
             result = {}
             for row in soup.select('tr'):
                 th = row.find('th')
                 if not th:
                     continue
                 label = th.get_text(strip=True)
-                for keyword, key in TARGETS.items():
+                for keyword in TARGETS:
                     if keyword in label:
                         for td in reversed(row.find_all('td')):
                             txt = td.get_text(strip=True).replace(',', '').replace('%', '')
                             try:
-                                result[key] = float(txt)
+                                result[keyword] = float(txt)
                                 break
                             except ValueError:
                                 continue
