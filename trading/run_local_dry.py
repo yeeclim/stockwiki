@@ -41,7 +41,7 @@ class FakeApi:
         return 3_000_000
 
     def get_financial_ratios(self, code: str) -> dict:
-        return {'debt_ratio': 100, 'current_ratio': 150, 'cash_ratio': 30}
+        return {'부채비율': 100, '유동비율': 150, '현금비율': 30}
 
     def get_price(self, code: str) -> int:
         return 5000

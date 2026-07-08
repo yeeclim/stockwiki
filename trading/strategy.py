@@ -146,9 +146,9 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
 
     # ❻ 재무비율: 부채비율 · 유동비율 · 현금비율  [각 +1점] ───────────────────
     if ratios:
-        debt    = ratios.get('debt_ratio')
-        current = ratios.get('current_ratio')
-        cash_r  = ratios.get('cash_ratio')
+        debt    = ratios.get('부채비율')
+        current = ratios.get('유동비율')
+        cash_r  = ratios.get('현금비율')
 
         if debt is not None:
             if debt < 200:
@@ -177,7 +177,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         else:
             log.append(f"  ⚠️  [+0] 현금비율 데이터 없음")
 
-        ic = ratios.get('interest_coverage')
+        ic = ratios.get('이자보상배율')
         if ic is not None:
             if ic >= 400:
                 score += 1
