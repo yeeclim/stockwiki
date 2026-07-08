@@ -108,10 +108,15 @@ export default async function handler(req, res) {
         { prefer: 'count=exact' }
       );
       const posts = await r.json();
+      if (!r.ok || !Array.isArray(posts)) {
+        const msg = posts?.message || posts?.error || `DB ${r.status}`;
+        console.error('[board] list fetch failed:', msg, posts);
+        return res.status(500).json({ error: '목록 조회 실패: ' + msg });
+      }
       const total = parseInt(r.headers.get('content-range')?.split('/')[1] ?? '0') || 0;
 
       // 댓글 수 일괄 조회
-      const ids = (Array.isArray(posts) ? posts : []).map(p => p.id);
+      const ids = posts.map(p => p.id);
       let commentCounts = {};
       if (ids.length > 0) {
         const ccr = await db(
@@ -170,6 +175,11 @@ export default async function handler(req, res) {
         },
       });
       const inserted = await ir.json();
+      if (!ir.ok) {
+        const msg = inserted?.message || inserted?.error || `DB ${ir.status}`;
+        console.error('[board] insert failed:', msg, inserted);
+        return res.status(500).json({ error: '저장 실패: ' + msg });
+      }
       return res.status(201).json({ success: true, id: inserted?.[0]?.id });
     }
 
