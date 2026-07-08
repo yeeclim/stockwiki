@@ -4,34 +4,59 @@ https://opendart.fss.or.kr 에서 API 키 무료 발급
 
 환경변수: DART_API_KEY
 """
+import io
 import os
+import zipfile
+import xml.etree.ElementTree as ET
 import requests
 from datetime import datetime
 
 _BASE = 'https://opendart.fss.or.kr/api'
-_corp_cache: dict[str, str] = {}  # stock_code → corp_code (세션 내 캐시)
+_corp_cache: dict[str, str] = {}   # stock_code → corp_code (세션 내 캐시)
+_corp_list: dict[str, str] = {}    # stock_code → corp_code (전체 목록)
+_corp_list_loaded = False
+
+
+def _load_corp_list(dart_key: str) -> bool:
+    """DART 기업 코드 ZIP 다운로드 → stock_code→corp_code 매핑 구축"""
+    global _corp_list_loaded
+    if _corp_list_loaded:
+        return True
+    try:
+        r = requests.get(
+            f'{_BASE}/corpCode.xml',
+            params={'crtfc_key': dart_key},
+            timeout=30,
+        )
+        r.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            name = next(n for n in z.namelist() if n.upper().endswith('.XML'))
+            with z.open(name) as f:
+                tree = ET.parse(f)
+        for item in tree.getroot().findall('list'):
+            stock = (item.findtext('stock_code') or '').strip()
+            corp  = (item.findtext('corp_code')  or '').strip()
+            if stock and corp:
+                _corp_list[stock] = corp
+        _corp_list_loaded = True
+        print(f"  [DART] 기업코드 목록 로드 완료: {len(_corp_list)}개")
+        return True
+    except Exception as e:
+        print(f"  [DART] 기업코드 목록 로드 실패: {e}")
+        return False
 
 
 def _corp_code(stock_code: str, dart_key: str) -> str | None:
     if stock_code in _corp_cache:
         return _corp_cache[stock_code]
-    try:
-        r = requests.get(
-            f'{_BASE}/company.json',
-            params={'crtfc_key': dart_key, 'stock_code': stock_code},
-            timeout=10,
-        )
-        r.raise_for_status()
-        d = r.json()
-        if d.get('status') != '000':
-            print(f"  [DART] corp_code 실패 ({stock_code}): status={d.get('status')} msg={d.get('message')}")
-            return None
-        code = d['corp_code']
-        _corp_cache[stock_code] = code
-        return code
-    except Exception as e:
-        print(f"  [DART] corp_code 예외 ({stock_code}): {e}")
+    if not _load_corp_list(dart_key):
         return None
+    corp = _corp_list.get(stock_code)
+    if not corp:
+        print(f"  [DART] corp_code 없음 ({stock_code})")
+        return None
+    _corp_cache[stock_code] = corp
+    return corp
 
 
 def _accounts(corp_code: str, dart_key: str, year: str) -> dict:
