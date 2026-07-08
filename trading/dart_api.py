@@ -82,7 +82,9 @@ def _accounts(corp_code: str, dart_key: str, year: str) -> dict:
             result = {}
             for item in d.get('list', []):
                 name = item.get('account_nm', '').strip()
-                val  = (item.get('thstrm_amount') or '').replace(',', '')
+                if name in result:
+                    continue  # 첫 번째(최상위) 값만 사용
+                val = (item.get('thstrm_amount') or '').replace(',', '')
                 try:
                     result[name] = float(val)
                 except ValueError:
