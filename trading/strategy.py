@@ -289,6 +289,23 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
             sell_opinion = _ask_sell_timing(
                 stock_name, stock_code, result['price'], fund, ma_data, score)
             print(f"\n[ AI 매도 타이밍 의견 ]\n  {sell_opinion}")
+
+            # 게시판 매수 기록 등록
+            try:
+                import board_post
+                from datetime import datetime
+                import pytz
+                date_str = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M')
+                bp_title = f"[매수] {date_str} {stock_name}({stock_code}) {result['price']:,}원"
+                bp_content = board_post.buy_content(
+                    stock_name, stock_code,
+                    result['price'], result['amount'], result['shares'],
+                    score, max_score, log_lines, sell_opinion,
+                    ratios or {},
+                )
+                board_post.post(bp_title, bp_content)
+            except Exception:
+                pass
         return
 
     # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)

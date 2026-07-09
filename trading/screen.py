@@ -169,6 +169,7 @@ def screen():
                 'market_cap': fund.get('market_cap', 0),
                 'prdy_ctrt':  prdy_ctrt,
                 'score':      score,
+                'max_score':  max_score,
                 'discount':   discount,
                 'ratios':     ratios or {},
                 'pass':       score >= BUY_THRESHOLD,
@@ -232,6 +233,20 @@ def screen():
 
     # 스크리닝 결과 Supabase 저장 (main.py watchlist 자동 연동용)
     _save_results(results)
+
+    # 게시판 히스토리 등록
+    import board_post
+    from datetime import datetime, timezone
+    import pytz
+    kst = pytz.timezone('Asia/Seoul')
+    date_str = datetime.now(kst).strftime('%Y-%m-%d %H:%M')
+    ok_count = sum(1 for r in results if r.get('pass'))
+    bp_title = f"[스크리닝] {date_str} — {ok_count}종목 통과"
+    bp_content = board_post.screening_content(results, date_str)
+    if board_post.post(bp_title, bp_content):
+        print("📋 게시판 스크리닝 기록 등록 완료")
+    else:
+        print("⚠️  게시판 스크리닝 기록 등록 실패")
 
     # 관리자: 카카오톡 (기존)
     kakao_notify.send(report)
