@@ -885,6 +885,7 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light only">
 <style>
   *{box-sizing:border-box}
   body{
@@ -903,7 +904,7 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
   hr{border:none;border-top:1px solid rgba(128,128,128,0.3);margin:16px 0}
   table{border-collapse:collapse;width:100%;margin:12px 0}
   th,td{border:1px solid rgba(128,128,128,0.3);padding:8px 12px;text-align:left}
-  th{background:$codeBg;font-weight:600}
+  th{background:$codeBg;color:$fg;font-weight:600}
   h1{font-size:22px;margin:20px 0 10px}
   h2{font-size:18px;margin:18px 0 8px}
   h3{font-size:16px;margin:14px 0 6px}
