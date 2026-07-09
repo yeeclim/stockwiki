@@ -52,6 +52,14 @@ jobs:
       with:
         node-version: '20'
 
+    - name: Commit updated public/ to git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add public/
+        git diff --staged --quiet || git commit -m "chore: update public/ with latest Flutter web build [skip ci]"
+        git push
+
     - name: Deploy to Vercel
       env:
         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
