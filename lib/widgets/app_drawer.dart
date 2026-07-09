@@ -211,10 +211,10 @@ class AppDrawer extends StatelessWidget {
                 ListTile(
                   leading:
                       const Icon(Icons.forum_outlined, color: Colors.orange),
-                  title: Text('자유게시판',
+                  title: Text('AI 매매일지',
                       style: theme.textTheme.bodyLarge ??
                           TextStyle(color: theme.colorScheme.onSurface)),
-                  subtitle: Text('익명 자유 토론',
+                  subtitle: Text('스크리닝·매수 기록',
                       style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant) ??
                           TextStyle(
