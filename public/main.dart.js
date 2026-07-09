@@ -29834,7 +29834,7 @@ var $async$aNm=A.r(function(a,b){if(a===1)return A.n(b,r)
 for(;;)switch(s){case 0:if($.a9==null)A.aQv()
 $.a9.toString
 s=2
-return A.l(A.at3("dummy",new A.Da(null,!0,!0,new A.aLd(),B.ey),!0,"https://xpiqctjidvrlmazslzyg.supabase.co"),$async$aNm)
+return A.l(A.at3("sb_publishable_rCE25FZnKVb4ULSsQ_4jBg_0Hd_vUw_",new A.Da(null,!0,!0,new A.aLd(),B.ey),!0,"https://xpiqctjidvrlmazslzyg.supabase.co"),$async$aNm)
 case 2:q=A.b6q(B.UZ,A.b([A.aTd(new A.aNp(),t.L6),A.aTd(new A.aNq(),t.W0)],t.Ds))
 if($.a9==null)A.aQv()
 p=$.a9
