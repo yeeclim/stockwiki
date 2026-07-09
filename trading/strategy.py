@@ -227,78 +227,68 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
         score, max_score, log_lines = _score_entry(fund, ma_data, ratios)
 
         if score < BUY_THRESHOLD:
-            return  # 점수 미달 — 출력 없이 종료
+            return
 
-        # 매수 확정 시에만 헤더 + 상세 출력
-        print(f"\n{sep}")
-        print(f"  {stock_name} ({stock_code})")
-        print(sep)
-        print(f"현재가     : {price:>10,}원")
-        print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
-        print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
-        if ma60:
-            print(f"60일 MA    : {ma60:>10,.0f}원")
-        if ma5 and ma20:
-            cross_tag = ' 🔺골든크로스' if ma_data.get('golden_cross') else ''
-            print(f"MA5/MA20   : {ma5:>10,.0f} / {ma20:,.0f}원{cross_tag}")
-        print(f"PER / PBR  : {fund['per']:>9.1f} / {fund['pbr']:.2f}")
-        print(f"거래량     : {fund['volume']:>10,}주")
-        print(f"보유수량   : {shares:>10,}주  (평단가 {avg_price:,.0f}원)")
-        print(f"예수금     : {cash:>10,}원")
-        print(f"\n[ 진입 조건 점수 ]")
-        for line in log_lines:
-            print(line)
-        bar = '█' * score + '░' * (max_score - score)
-        print(f"\n  📊 [{bar}] {score}/{max_score}점  (매수 기준: {BUY_THRESHOLD}점 이상)")
+        # 당일 급등 방지
+        DAILY_SURGE_LIMIT = 5.0
+        if daily_drop >= DAILY_SURGE_LIMIT:
+            return
 
-        if score >= BUY_THRESHOLD:
-            # 당일 급등 종목 고점 추격 매수 방지
-            DAILY_SURGE_LIMIT = 5.0
-            if daily_drop >= DAILY_SURGE_LIMIT:
-                print(f"\n⛔ 당일 급등 +{daily_drop:.2f}% (기준 +{DAILY_SURGE_LIMIT}%) → 고점 추격 매수 금지")
-                print("⏸  이미 많이 오른 종목 — 진입 보류")
+        orig_buy = int(cash * 0.25)
+        user_cap = None
+        if user_cfg:
+            try:
+                dm = user_cfg.get('daily_max_buy')
+                if dm is not None:
+                    user_cap = int(dm)
+            except Exception:
+                user_cap = None
+
+        GLOBAL_MAX_BUY = 500_000
+        cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
+
+        if user_id:
+            bought_today = db.get_today_buy_sum(user_id)
+            remaining = cap - bought_today if cap else cap
+            if remaining <= 0:
                 return
-
-            orig_buy = int(cash * 0.25)
-            # per-user cap (daily_max_buy) preferred; otherwise global cap
-            user_cap = None
-            if user_cfg:
-                try:
-                    dm = user_cfg.get('daily_max_buy')
-                    if dm is not None:
-                        user_cap = int(dm)
-                except Exception:
-                    user_cap = None
-
-            GLOBAL_MAX_BUY = 500_000
-            cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
-
-            # Respect today's already bought sum if available
-            if user_id:
-                bought_today = db.get_today_buy_sum(user_id)
-                remaining = cap - bought_today if cap else cap
-                if remaining <= 0:
-                    print(f"\n⏸  오늘 이미 일일 최대 매수금액({cap:,}원)을 소진했습니다. 매수 취소")
-                    return
-            else:
-                remaining = cap
-
-            buy_amount = orig_buy if orig_buy <= remaining else remaining
-            result = api.buy(stock_code, buy_amount)
-            if result:
-                if orig_buy > remaining:
-                    print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
-                else:
-                    print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
-                db.reset_position(stock_code, stock_name)
-                db.log_trade(stock_code, stock_name, 'BUY',
-                             result['price'], result['shares'], result['amount'],
-                             f'복합조건 {score}/{max_score}점 진입', user_id)
-                sell_opinion = _ask_sell_timing(
-                    stock_name, stock_code, result['price'], fund, ma_data, score)
-                print(f"\n[ AI 매도 타이밍 의견 ]\n  {sell_opinion}")
         else:
-            print(f"\n⏸  조건 미달 ({score}점 < {BUY_THRESHOLD}점) → 대기")
+            remaining = cap
+
+        buy_amount = orig_buy if orig_buy <= remaining else remaining
+        result = api.buy(stock_code, buy_amount)
+        if result:
+            # 매수 성공 시에만 상세 출력
+            print(f"\n{sep}")
+            print(f"  {stock_name} ({stock_code})")
+            print(sep)
+            print(f"현재가     : {price:>10,}원")
+            print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
+            print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
+            if ma60:
+                print(f"60일 MA    : {ma60:>10,.0f}원")
+            if ma5 and ma20:
+                cross_tag = ' 🔺골든크로스' if ma_data.get('golden_cross') else ''
+                print(f"MA5/MA20   : {ma5:>10,.0f} / {ma20:,.0f}원{cross_tag}")
+            print(f"PER / PBR  : {fund['per']:>9.1f} / {fund['pbr']:.2f}")
+            print(f"거래량     : {fund['volume']:>10,}주")
+            print(f"예수금     : {cash:>10,}원")
+            bar = '█' * score + '░' * (max_score - score)
+            print(f"\n[ 진입 조건 점수 ]")
+            for line in log_lines:
+                print(line)
+            print(f"\n  📊 [{bar}] {score}/{max_score}점")
+            if orig_buy > remaining:
+                print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
+            else:
+                print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
+            db.reset_position(stock_code, stock_name)
+            db.log_trade(stock_code, stock_name, 'BUY',
+                         result['price'], result['shares'], result['amount'],
+                         f'복합조건 {score}/{max_score}점 진입', user_id)
+            sell_opinion = _ask_sell_timing(
+                stock_name, stock_code, result['price'], fund, ma_data, score)
+            print(f"\n[ AI 매도 타이밍 의견 ]\n  {sell_opinion}")
         return
 
     # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)
