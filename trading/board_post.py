@@ -54,9 +54,8 @@ def screening_content(results: list, date_str: str) -> str:
         flag = '✅' if r.get('pass') else '▫️'
         disc = f"-{r['discount']:.1f}%" if r.get('discount') else '-'
         mcap = f"{r.get('market_cap', 0):,}억" if r.get('market_cap') else '-'
-        row_bg = "background:rgba(128,128,128,0.07)" if i % 2 == 0 else ""
         rows += (
-            f"<tr style='{row_bg}'>"
+            f"<tr>"
             f"<td>{flag} {r['name']}({r['code']})</td>"
             f"<td><b>{r['score']}/{r.get('max_score', 11)}점</b></td>"
             f"<td>{r['price']:,}원</td>"
@@ -66,11 +65,15 @@ def screening_content(results: list, date_str: str) -> str:
             f"<td style='font-size:0.9em'>{ratio_str}</td>"
             f"</tr>"
         )
+    th_style = "padding:6px;border-bottom:2px solid rgba(128,128,128,0.6);text-align:left"
     return (
         f"<p><b>스캔일:</b> {date_str} | <b>대상:</b> {len(results)}종목 | <b>통과:</b> {len(ok)}종목</p>"
-        f"<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%;border-color:rgba(128,128,128,0.4)'>"
-        f"<thead><tr style='background:rgba(128,128,128,0.15)'>"
-        f"<th>종목</th><th>점수</th><th>현재가</th><th>MA60</th><th>PER/PBR</th><th>시총</th><th>재무비율</th>"
+        f"<table cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%'>"
+        f"<thead><tr>"
+        f"<th style='{th_style}'>종목</th><th style='{th_style}'>점수</th>"
+        f"<th style='{th_style}'>현재가</th><th style='{th_style}'>MA60</th>"
+        f"<th style='{th_style}'>PER/PBR</th><th style='{th_style}'>시총</th>"
+        f"<th style='{th_style}'>재무비율</th>"
         f"</tr></thead>"
         f"<tbody>{rows}</tbody>"
         f"</table>"
