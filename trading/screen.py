@@ -239,9 +239,9 @@ def screen():
     from datetime import datetime, timezone
     import pytz
     kst = pytz.timezone('Asia/Seoul')
-    date_str = datetime.now(kst).strftime('%Y-%m-%d %H:%M')
+    date_str = datetime.now(kst).strftime('%Y년 %m월 %d일 %H시')
     ok_count = sum(1 for r in results if r.get('pass'))
-    bp_title = f"[스크리닝] {date_str} — {ok_count}종목 통과"
+    bp_title = f"{date_str} 스크리닝 종목"
     bp_content = board_post.screening_content(results, date_str)
     if board_post.post(bp_title, bp_content):
         print("📋 게시판 스크리닝 기록 등록 완료")
