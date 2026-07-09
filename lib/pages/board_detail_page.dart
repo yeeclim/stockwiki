@@ -881,6 +881,7 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
     final link = widget.isDark ? '#90CAF9' : '#1565C0';
     final codeBg =
         widget.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+    final thBg = widget.isDark ? '#2E2E3A' : '#E8E8F0';
     final srcdoc = '''<!DOCTYPE html>
 <html>
 <head>
@@ -904,7 +905,7 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
   hr{border:none;border-top:1px solid rgba(128,128,128,0.3);margin:16px 0}
   table{border-collapse:collapse;width:100%;margin:12px 0}
   th,td{border:1px solid rgba(128,128,128,0.3);padding:8px 12px;text-align:left}
-  th{background:$codeBg;color:$fg;font-weight:600}
+  th{background:$thBg;color:$fg;font-weight:600}
   h1{font-size:22px;margin:20px 0 10px}
   h2{font-size:18px;margin:18px 0 8px}
   h3{font-size:16px;margin:14px 0 6px}

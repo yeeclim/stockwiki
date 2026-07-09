@@ -29834,7 +29834,7 @@ var $async$aNm=A.r(function(a,b){if(a===1)return A.n(b,r)
 for(;;)switch(s){case 0:if($.a9==null)A.aQv()
 $.a9.toString
 s=2
-return A.l(A.at3("sb_publishable_rCE25FZnKVb4ULSsQ_4jBg_0Hd_vUw_",new A.Da(null,!0,!0,new A.aLd(),B.ey),!0,"https://xpiqctjidvrlmazslzyg.supabase.co"),$async$aNm)
+return A.l(A.at3("dummy",new A.Da(null,!0,!0,new A.aLd(),B.ey),!0,"https://xpiqctjidvrlmazslzyg.supabase.co"),$async$aNm)
 case 2:q=A.b6q(B.UZ,A.b([A.aTd(new A.aNp(),t.L6),A.aTd(new A.aNq(),t.W0)],t.Ds))
 if($.a9==null)A.aQv()
 p=$.a9
@@ -104217,20 +104217,21 @@ return A.f0(p,B.aJ,!1,p,!0,B.E,p,A.fl(),q.c,p,p,p,p,p,2,A.lr(p,new A.cV(4,A.ae(8
 A.JA.prototype={
 a6(){return new A.a_F()}}
 A.a_F.prototype={
-am(){var s,r,q,p,o,n,m,l,k,j=this
-j.aD()
-r=j.a
+am(){var s,r,q,p,o,n,m,l,k,j,i=this
+i.aD()
+r=i.a
 q="html_board_"+r.d
-j.d!==$&&A.ba()
-j.d=q
+i.d!==$&&A.ba()
+i.d=q
 p=r.e
 o=p?"#1A1A1A":"#FFFFFF"
 n=p?"#E0E0E0":"#212121"
 m=p?"#90CAF9":"#1565C0"
 l=p?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.05)"
-s='<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<meta name="color-scheme" content="light only">\n<style>\n  *{box-sizing:border-box}\n  body{\n    margin:0;padding:16px;\n    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;\n    font-size:14px;line-height:1.75;\n    background:'+o+";color:"+n+";\n    word-break:break-word;\n  }\n  img{max-width:100%;max-height:400px;object-fit:contain;display:block;margin:8px 0}\n  a{color:"+m+";text-decoration:none}\n  a:hover{text-decoration:underline}\n  pre{background:"+l+";padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;margin:12px 0}\n  code{background:"+l+";padding:1px 5px;border-radius:3px;font-size:13px}\n  blockquote{border-left:3px solid rgba(128,128,128,0.5);margin:12px 0;padding:8px 16px;opacity:0.85}\n  hr{border:none;border-top:1px solid rgba(128,128,128,0.3);margin:16px 0}\n  table{border-collapse:collapse;width:100%;margin:12px 0}\n  th,td{border:1px solid rgba(128,128,128,0.3);padding:8px 12px;text-align:left}\n  th{background:"+l+";color:"+n+";font-weight:600}\n  h1{font-size:22px;margin:20px 0 10px}\n  h2{font-size:18px;margin:18px 0 8px}\n  h3{font-size:16px;margin:14px 0 6px}\n  ul,ol{padding-left:24px;margin:8px 0}\n  li{margin:4px 0}\n</style>\n</head>\n<body>"+r.c+"</body>\n</html>"
+k=p?"#2E2E3A":"#E8E8F0"
+s='<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<meta name="color-scheme" content="light only">\n<style>\n  *{box-sizing:border-box}\n  body{\n    margin:0;padding:16px;\n    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;\n    font-size:14px;line-height:1.75;\n    background:'+o+";color:"+n+";\n    word-break:break-word;\n  }\n  img{max-width:100%;max-height:400px;object-fit:contain;display:block;margin:8px 0}\n  a{color:"+m+";text-decoration:none}\n  a:hover{text-decoration:underline}\n  pre{background:"+l+";padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;margin:12px 0}\n  code{background:"+l+";padding:1px 5px;border-radius:3px;font-size:13px}\n  blockquote{border-left:3px solid rgba(128,128,128,0.5);margin:12px 0;padding:8px 16px;opacity:0.85}\n  hr{border:none;border-top:1px solid rgba(128,128,128,0.3);margin:16px 0}\n  table{border-collapse:collapse;width:100%;margin:12px 0}\n  th,td{border:1px solid rgba(128,128,128,0.3);padding:8px 12px;text-align:left}\n  th{background:"+k+";color:"+n+";font-weight:600}\n  h1{font-size:22px;margin:20px 0 10px}\n  h2{font-size:18px;margin:18px 0 8px}\n  h3{font-size:16px;margin:14px 0 6px}\n  ul,ol{padding-left:24px;margin:8px 0}\n  li{margin:4px 0}\n</style>\n</head>\n<body>"+r.c+"</body>\n</html>"
 try{$.a7X()
-$.o8().um(q,new A.aBr(s),!0)}catch(k){}},
+$.o8().um(q,new A.aBr(s),!0)}catch(j){}},
 G(a){var s=this.d
 s===$&&A.a()
 return A.aP9(null,B.n8,s)}}
