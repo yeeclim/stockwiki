@@ -116,7 +116,7 @@ class _BoardPageState extends State<BoardPage> {
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         title: Text(
-          '자유게시판',
+          'AI 매매일지',
           style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
