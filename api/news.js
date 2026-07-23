@@ -128,71 +128,70 @@ async function handleDaumNews(req, res) {
   });
 }
 
+// 공시/계약/투자 관련 고우선순위 키워드
+const HIGH_PRIORITY_KEYWORDS = [
+  '공시', '수주', '계약', 'MOU', '협약', '상장', 'IPO',
+  '실적', '영업이익', '매출', '흑자', '적자', '어닝',
+  '투자', '유상증자', '자사주', '배당', '분할',
+  'FDA', '임상', '허가', '특허', '승인',
+  '목표주가', '매수', '매도', '투자의견', '증권사', '애널리스트',
+];
+
+function scoreNewsItem(title, description, pubDate) {
+  const text = (title + ' ' + description).toLowerCase();
+  let score = 0;
+
+  // 날짜 점수: 최근일수록 높음
+  const now = Date.now();
+  const age = now - new Date(pubDate).getTime();
+  const days = age / (1000 * 60 * 60 * 24);
+  if (days <= 1)       score += 10;
+  else if (days <= 3)  score += 7;
+  else if (days <= 7)  score += 5;
+  else if (days <= 14) score += 2;
+  else if (days <= 30) score += 1;
+
+  // 키워드 적합성 점수
+  for (const kw of HIGH_PRIORITY_KEYWORDS) {
+    if (text.includes(kw.toLowerCase())) score += 5;
+  }
+
+  return score;
+}
+
 async function handleNaverNews(req, res) {
   const raw = req.method === 'POST' ? req.body : req.query;
   const keyword = validateString(raw.keyword, { minLen: 1, maxLen: 100 });
-  const max_results = validateInt(raw.max_results, { min: 1, max: 50 }) ?? 20;
 
   if (!keyword) return fail(res, 400, '유효한 키워드가 필요합니다 (1~100자)');
 
-  // 네이버 뉴스 검색 스크래핑 — <mark> 태그가 붙은 항목이 키워드 매칭 기사
   const encodedKeyword = encodeURIComponent(keyword);
-  const searchUrl = `https://search.naver.com/search.naver?where=news&query=${encodedKeyword}&sort=1&nso=so:dd,p:all`;
+  const feedUrl = `https://news.google.com/rss/search?q=${encodedKeyword}&hl=ko&gl=KR&ceid=KR:ko`;
 
   try {
-    const response = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'ko-KR,ko;q=0.9',
-      },
-      signal: AbortSignal.timeout(8000),
+    const feed = await parser.parseURL(feedUrl);
+
+    const scored = feed.items.map(item => {
+      // Google 뉴스 타이틀 형식: "기사 제목 - 언론사명"
+      const fullTitle = item.title || '';
+      const lastDash = fullTitle.lastIndexOf(' - ');
+      const title = lastDash > 0 ? fullTitle.substring(0, lastDash) : fullTitle;
+      const source = lastDash > 0 ? fullTitle.substring(lastDash + 3) : '구글뉴스';
+      const pubDate = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
+
+      return {
+        title,
+        description: item.contentSnippet || '',
+        link: item.link || '',
+        source,
+        published_at: pubDate,
+        _score: scoreNewsItem(title, item.contentSnippet || '', pubDate),
+      };
     });
 
-    if (!response.ok) return res.status(200).json({ success: true, count: 0, results: [] });
-
-    const html = await response.text();
-
-    // 1. 키워드 매칭 기사 타이틀 (<mark> 포함된 것만 추출)
-    const allTitleMatches = [...html.matchAll(/"title":"([^"]{3,})"/g)];
-    const markedTitles = allTitleMatches
-      .map(m => m[1])
-      .filter(t => t.includes('<mark>') || t.includes('<strong>'));
-
-    // 2. 네이버 뉴스 기사 링크 (중복 제거)
-    const rawLinks = html.match(/https?:\/\/n\.news\.naver\.com\/mnews\/article\/[^\\"&]+/g) || [];
-    const uniqueLinks = [...new Set(rawLinks)];
-
-    // 3. 소스명: <mark> 타이틀 바로 앞의 짧은 타이틀
-    const results = [];
-    let linkIdx = 0;
-
-    for (let i = 0; i < allTitleMatches.length && results.length < max_results; i++) {
-      const raw = allTitleMatches[i][1];
-      if (!raw.includes('<mark>') && !raw.includes('<strong>')) continue;
-
-      const title = cleanNaverText(raw);
-      if (!title || title.length < 5) continue;
-
-      const prevRaw = i > 0 ? allTitleMatches[i - 1][1] : '';
-      const source = (prevRaw.length < 25 && !prevRaw.includes('<mark>'))
-        ? cleanNaverText(prevRaw)
-        : '네이버뉴스';
-
-      const link = uniqueLinks[linkIdx]
-        ? (uniqueLinks[linkIdx].startsWith('http') ? uniqueLinks[linkIdx] : 'https://' + uniqueLinks[linkIdx])
-        : `https://search.naver.com/search.naver?where=news&query=${encodedKeyword}`;
-      linkIdx++;
-
-      results.push({
-        title,
-        description: '',
-        link,
-        source,
-        published_at: new Date().toISOString(),
-        crawled_at: new Date().toISOString(),
-      });
-    }
+    // 점수 내림차순 정렬 후 상위 5개
+    scored.sort((a, b) => b._score - a._score);
+    const results = scored.slice(0, 5).map(({ _score, ...item }) => item);
 
     return res.status(200).json({
       success: true,
@@ -205,14 +204,6 @@ async function handleNaverNews(req, res) {
     console.error('handleNaverNews error:', e.message);
     return res.status(200).json({ success: true, count: 0, results: [] });
   }
-}
-
-function cleanNaverText(raw) {
-  return raw
-    .replace(/<\/?mark>/g, '').replace(/<\/?strong>/g, '')
-    .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ').trim();
 }
 
 function cleanText(text) {

@@ -1,31 +1,41 @@
 """
-뉴스 감성 분석 — Naver Finance 헤드라인 + Claude Haiku
+뉴스 감성 분석 — Google 뉴스 RSS 헤드라인 + Claude Haiku
 스크리닝 통과 종목의 최신 뉴스를 분석하여 긍정/부정/중립 판별
 """
 import os
 import json
+from urllib.parse import quote
+from xml.etree import ElementTree
+
 import requests
-from bs4 import BeautifulSoup
 
 _ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '').strip()
 _EMOJI = {'긍정': '🟢', '부정': '🔴', '중립': '🟡'}
 
 
-def get_headlines(stock_code: str, limit: int = 5) -> list[str]:
-    """Naver Finance 종목 뉴스 헤드라인 스크래핑"""
+def get_headlines(stock_name: str, limit: int = 5) -> list[str]:
+    """Google 뉴스 RSS에서 종목명 관련 헤드라인 조회"""
     try:
+        encoded = quote(stock_name)
+        url = f'https://news.google.com/rss/search?q={encoded}&hl=ko&gl=KR&ceid=KR:ko'
         r = requests.get(
-            f'https://finance.naver.com/item/news_news.naver?code={stock_code}&page=1',
+            url,
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'},
             timeout=8,
         )
         r.raise_for_status()
-        soup = BeautifulSoup(r.content, 'lxml')
-        titles = [
-            a.get_text(strip=True)
-            for a in soup.select('table.type5 td.title a')
-            if a.get_text(strip=True)
-        ]
+        root = ElementTree.fromstring(r.content)
+        titles = []
+        for item in root.iter('item'):
+            title_el = item.find('title')
+            if title_el is None or not title_el.text:
+                continue
+            full_title = title_el.text.strip()
+            # Google 뉴스 타이틀 형식: "기사 제목 - 언론사명"
+            last_dash = full_title.rfind(' - ')
+            title = full_title[:last_dash] if last_dash > 0 else full_title
+            if title:
+                titles.append(title)
         return titles[:limit]
     except Exception:
         return []
@@ -66,7 +76,7 @@ def _ask_claude(stock_name: str, headlines: list[str]) -> dict | None:
 
 def get_sentiment_line(stock_code: str, stock_name: str) -> str:
     """감성 분석 결과를 한 줄 문자열로 반환"""
-    headlines = get_headlines(stock_code)
+    headlines = get_headlines(stock_name)
     if not headlines:
         return '뉴스 없음'
     result = _ask_claude(stock_name, headlines)

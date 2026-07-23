@@ -194,7 +194,7 @@ def screen():
     others.sort(key=lambda x: x.get('score', 0), reverse=True)
 
     def chart_url(code):
-        return f"https://m.finance.naver.com/item/main.naver?code={code}"
+        return f"https://m.stock.naver.com/domestic/stock/{code}/total"
 
     if ok:
         lines.append(f"\n✅ 주목 종목 ({BUY_THRESHOLD}점 이상, {len(ok)}개)")
