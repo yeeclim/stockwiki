@@ -14,6 +14,7 @@ class GoldWidget extends StatefulWidget {
 class _GoldWidgetState extends State<GoldWidget> {
   double? _goldPrice;
   double? _usdKrwRate;
+  double? _changePercent;
   bool _isLoading = true;
   String? _error;
 
@@ -67,10 +68,16 @@ class _GoldWidgetState extends State<GoldWidget> {
           final data = res.data as Map<String, dynamic>;
           final meta = data['chart']?['result']?[0]?['meta'];
           final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+          final prevClose = meta?['previousClose'];
           if (price != null) {
             if (!mounted) return;
             setState(() {
               _goldPrice = (price as num).toDouble();
+              if (prevClose != null && (prevClose as num) > 0) {
+                _changePercent = (_goldPrice! - prevClose.toDouble()) /
+                    prevClose.toDouble() *
+                    100;
+              }
               _isLoading = false;
             });
             await _cachePrice(_goldPrice!);
@@ -106,6 +113,7 @@ class _GoldWidgetState extends State<GoldWidget> {
       valueText:
           _goldPrice != null ? '\$${_goldPrice!.toStringAsFixed(2)}' : 'N/A',
       subText: subText,
+      changePercent: _changePercent,
     );
   }
 }

@@ -12,6 +12,7 @@ class WtiWidget extends StatefulWidget {
 
 class _WtiWidgetState extends State<WtiWidget> {
   double? _wtiPrice;
+  double? _changePercent;
   bool _isLoading = true;
   String? _error;
 
@@ -59,10 +60,16 @@ class _WtiWidgetState extends State<WtiWidget> {
         final data = res.data as Map<String, dynamic>;
         final meta = data['chart']?['result']?[0]?['meta'];
         final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+        final prevClose = meta?['previousClose'];
         if (price != null && (price as num) > 0) {
           if (!mounted) return;
           setState(() {
             _wtiPrice = price.toDouble();
+            if (prevClose != null && (prevClose as num) > 0) {
+              _changePercent = (_wtiPrice! - prevClose.toDouble()) /
+                  prevClose.toDouble() *
+                  100;
+            }
             _isLoading = false;
           });
           await _cachePrice(_wtiPrice!);
@@ -88,5 +95,6 @@ class _WtiWidgetState extends State<WtiWidget> {
         error: _error,
         valueText:
             _wtiPrice != null ? '\$${_wtiPrice!.toStringAsFixed(2)}' : 'N/A',
+        changePercent: _changePercent,
       );
 }

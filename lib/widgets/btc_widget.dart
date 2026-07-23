@@ -13,6 +13,7 @@ class BtcWidget extends StatefulWidget {
 
 class _BtcWidgetState extends State<BtcWidget> {
   double? _btcPrice;
+  double? _changePercent;
   bool _isLoading = true;
   String? _error;
 
@@ -54,15 +55,17 @@ class _BtcWidgetState extends State<BtcWidget> {
       // CoinGecko — 무료 공개 API, CORS 지원, API 키 불필요
       final res = await http
           .get(Uri.parse(
-              'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'))
+              'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true'))
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final price = data['bitcoin']?['usd'];
+        final change = data['bitcoin']?['usd_24h_change'];
         if (price != null) {
           if (!mounted) return;
           setState(() {
             _btcPrice = (price as num).toDouble();
+            if (change != null) _changePercent = (change as num).toDouble();
             _isLoading = false;
           });
           await _cachePrice(_btcPrice!);
@@ -89,5 +92,6 @@ class _BtcWidgetState extends State<BtcWidget> {
         error: _error,
         valueText: '\$${_btcPrice?.toStringAsFixed(2) ?? 'N/A'}',
         subText: 'USD',
+        changePercent: _changePercent,
       );
 }

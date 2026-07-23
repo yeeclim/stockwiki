@@ -54,8 +54,9 @@ class _VixWidgetState extends State<VixWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Card(
-      color: Colors.deepPurple.shade400,
+      color: primary,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         height: 80,
