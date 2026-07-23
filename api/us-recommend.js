@@ -1,14 +1,11 @@
 // api/us-recommend.js
-// Yahoo Finance 비공식 API로 미국 주식 추천 (API 키 불필요)
+// 미국 주식 AI 추천 — 하드코딩 30종목 대신 전체 NASDAQ/NYSE/AMEX 스크리닝 결과 사용
+// trading/screen_us_broad.py가 매일 upsert하는 Supabase us_screening_results
+// (국내 strategy._score_entry와 동일 11점 기준, BUY_THRESHOLD=6)를 그대로 읽고,
+// 현재가/등락률만 Yahoo Finance에서 실시간으로 보강한다.
 
-const MAJOR_SYMBOLS = [
-  'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', 'AVGO',
-  'LLY',  'JPM',  'UNH',  'V',    'XOM',  'MA',   'JNJ',  'PG',
-  'HD',   'COST', 'MRK',  'ABBV', 'AMD',  'NFLX', 'CRM',  'BAC',
-  'CVX',  'PEP',  'TMO',  'WMT',  'ORCL', 'ACN',
-];
-
-const MIN_MARKET_CAP = 50_000_000_000; // $500억 이상 대형주
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
 
 let cache = null;
 let cacheTime = 0;
@@ -27,7 +24,47 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: cache, cached: true });
     }
 
-    // Step 1: 쿠키 + 크럼 획득
+    const recommendations = await buildFromScreening();
+
+    if (recommendations.length > 0) {
+      cache = recommendations;
+      cacheTime = now;
+    }
+
+    return res.status(200).json({ success: true, data: recommendations, cached: false });
+
+  } catch (error) {
+    console.error('US 추천 API 오류:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// ── 스크리닝 결과 조회 ───────────────────────────────────────────────────────
+async function fetchScreeningResults() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('us-recommend: Supabase 환경변수 없음');
+    return [];
+  }
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&order=score.desc&limit=20`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!res.ok) {
+      console.error(`us_screening_results 조회 실패: ${res.status}`);
+      return [];
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('us_screening_results 조회 오류:', e);
+    return [];
+  }
+}
+
+// ── Yahoo Finance 실시간 시세 (표시용 보강) ─────────────────────────────────
+async function fetchLiveQuotes(symbols) {
+  if (!symbols.length) return {};
+  try {
     const cookieRes = await fetch('https://fc.yahoo.com', {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36' }
     });
@@ -42,9 +79,7 @@ export default async function handler(req, res) {
     });
     const crumb = await crumbRes.text();
 
-    // Step 2: 시세 조회
-    const symbols = MAJOR_SYMBOLS.join(',');
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&crumb=${encodeURIComponent(crumb)}&fields=shortName,regularMarketPrice,regularMarketChangePercent,regularMarketVolume,marketCap,fiftyDayAverage,twoHundredDayAverage,fiftyTwoWeekHigh,fiftyTwoWeekLow`;
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}&crumb=${encodeURIComponent(crumb)}&fields=shortName,regularMarketPrice,regularMarketChangePercent,regularMarketVolume,marketCap,fiftyDayAverage,twoHundredDayAverage,fiftyTwoWeekHigh,fiftyTwoWeekLow`;
 
     const response = await fetch(url, {
       headers: {
@@ -53,120 +88,73 @@ export default async function handler(req, res) {
         'Cookie': cookie,
       }
     });
-
     if (!response.ok) throw new Error(`Yahoo Finance API 오류: ${response.status}`);
 
     const data = await response.json();
     const quotes = data?.quoteResponse?.result ?? [];
-
-    const recommendations = quotes
-      .filter(q => q.regularMarketPrice && q.marketCap >= MIN_MARKET_CAP)
-      .map(q => {
-        const price   = q.regularMarketPrice ?? 0;
-        const ma50    = q.fiftyDayAverage ?? 0;
-        const ma200   = q.twoHundredDayAverage ?? 0;
-        const chgPct  = q.regularMarketChangePercent ?? 0;
-        const vol     = q.regularMarketVolume ?? 0;
-        const hi52w   = q.fiftyTwoWeekHigh ?? 0;
-
-        const score = calcScore(price, ma50, ma200, chgPct, vol, hi52w);
-        const action = determineAction(price, ma50, ma200, score);
-        const reasons = buildReasons(price, ma50, ma200, chgPct, vol, hi52w);
-
-        return {
-          symbol: q.symbol,
-          name: q.shortName ?? q.symbol,
-          price,
-          changePercent: chgPct,
-          volume: vol,
-          marketCap: q.marketCap,
-          ma50,
-          ma200,
-          yearHigh: hi52w,
-          yearLow: q.fiftyTwoWeekLow ?? 0,
-          score,
-          action,
-          reasons,
-        };
-      })
-      .filter(s => s.action === 'Buy')
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
-
-    cache = recommendations;
-    cacheTime = now;
-
-    return res.status(200).json({ success: true, data: recommendations, cached: false });
-
-  } catch (error) {
-    console.error('US 추천 API 오류:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    const map = {};
+    for (const q of quotes) map[q.symbol] = q;
+    return map;
+  } catch (e) {
+    console.error('Yahoo 실시간 시세 조회 실패:', e);
+    return {};
   }
 }
 
-function calcScore(price, ma50, ma200, chgPct, vol, hi52w) {
-  let score = 30;
+// ── 스크리닝 결과 + 실시간 시세 결합 ─────────────────────────────────────────
+async function buildFromScreening() {
+  const rows = await fetchScreeningResults();
+  if (!rows.length) return [];
 
-  // 이평선 신호 (최대 50점)
-  if (ma50 > 0 && ma200 > 0) {
-    if (price > ma50 && price > ma200 && ma50 > ma200) score += 50; // 골든크로스
-    else if (price > ma50 && price > ma200)             score += 38;
-    else if (price > ma50 && ma50 > ma200)              score += 30;
-    else if (price > ma50)                              score += 20;
-    else if (price < ma50 && price < ma200)             score -= 15;
-  } else if (ma50 > 0) {
-    score += price > ma50 ? 20 : -10;
-  }
+  const quotes = await fetchLiveQuotes(rows.map(r => r.stock_code));
 
-  // 모멘텀 (최대 20점)
-  if      (chgPct >= 3)  score += 20;
-  else if (chgPct >= 1)  score += 12;
-  else if (chgPct >= 0)  score += 5;
-  else if (chgPct >= -2) score -= 5;
-  else                   score -= 15;
+  return rows
+    .map(row => {
+      const q = quotes[row.stock_code];
+      const price = q?.regularMarketPrice ?? row.price ?? 0;
+      if (!price) return null;
 
-  // 거래량 (최대 15점)
-  if      (vol > 10000000) score += 15;
-  else if (vol > 5000000)  score += 10;
-  else if (vol > 1000000)  score += 5;
-
-  // 52주 고가 근접 (최대 10점)
-  if (hi52w > 0 && price > 0) {
-    const ratio = price / hi52w;
-    if      (ratio >= 0.95) score += 10;
-    else if (ratio >= 0.85) score += 5;
-  }
-
-  return Math.min(100, Math.max(0, score));
+      return {
+        symbol: row.stock_code,
+        name: q?.shortName ?? row.stock_name,
+        price,
+        changePercent: q?.regularMarketChangePercent ?? 0,
+        volume: q?.regularMarketVolume ?? 0,
+        marketCap: q?.marketCap ?? row.market_cap_usd ?? 0,
+        ma50: q?.fiftyDayAverage ?? null,
+        ma200: q?.twoHundredDayAverage ?? null,
+        yearHigh: q?.fiftyTwoWeekHigh ?? 0,
+        yearLow: q?.fiftyTwoWeekLow ?? 0,
+        score: row.score,
+        action: scoreToAction(row.score),
+        reasons: buildReasons(row, q),
+        exchange: row.sector,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
 }
 
-function determineAction(price, ma50, ma200, score) {
-  if (ma50 > 0 && price < ma50) return 'Hold'; // 단기 이평선 아래면 제외
-  if (score >= 50) return 'Buy';
+// screen_us_broad.py 기준 — 11점 만점, BUY_THRESHOLD(6점) 이상만 us_screening_results.pass=true로 저장됨
+function scoreToAction(score) {
+  if (score >= 9) return 'Buy';
+  if (score >= 7) return 'Watch';
   return 'Hold';
 }
 
-function buildReasons(price, ma50, ma200, chgPct, vol, hi52w) {
+function buildReasons(row, q) {
   const reasons = [];
+  reasons.push(`전체 NASDAQ/NYSE/AMEX 스크리닝 점수 ${row.score}/11점 통과 — 재무비율·이동평균 진입 조건 충족`);
 
-  if (ma50 > 0 && ma200 > 0) {
-    if (price > ma50 && price > ma200 && ma50 > ma200)
-      reasons.push(`골든크로스 + 현재가 MA50·MA200 상회 — 강한 상승 추세`);
-    else if (price > ma50 && price > ma200)
-      reasons.push(`현재가 MA50(${ma50.toFixed(1)})·MA200(${ma200.toFixed(1)}) 상회 — 중장기 상승 구간`);
-    else if (price > ma50)
-      reasons.push(`현재가 MA50(${ma50.toFixed(1)}) 상회 — 단기 상승 모멘텀`);
+  const cp = q?.regularMarketChangePercent ?? 0;
+  if (cp >= 3) reasons.push(`오늘 +${cp.toFixed(2)}% 강한 상승 모멘텀`);
+  else if (cp >= 0) reasons.push(`오늘 +${cp.toFixed(2)}% 보합~상승`);
+  else reasons.push(`오늘 ${cp.toFixed(2)}% 하락 중 — 진입 타이밍 유의`);
+
+  if (row.sector) reasons.push(`${row.sector} 상장`);
+  if (row.screened_at) {
+    const d = new Date(row.screened_at);
+    reasons.push(`최근 스크리닝: ${d.toLocaleDateString('ko-KR')} 기준`);
   }
-
-  if      (chgPct >= 3) reasons.push(`오늘 +${chgPct.toFixed(2)}% 강한 상승 모멘텀`);
-  else if (chgPct >= 1) reasons.push(`오늘 +${chgPct.toFixed(2)}% 안정적 상승`);
-
-  if      (vol > 10000000) reasons.push(`거래량 ${(vol/1000000).toFixed(0)}M — 유동성 우수`);
-  else if (vol > 5000000)  reasons.push(`거래량 ${(vol/1000000).toFixed(0)}M — 활발한 매수세`);
-
-  if (hi52w > 0 && price / hi52w >= 0.95)
-    reasons.push(`52주 고가($${hi52w.toFixed(0)}) 근접 — 강한 상승 흐름`);
-
-  if (reasons.length === 0) reasons.push('시장 주도 대형주 — 이평선 기준 관심 종목');
   return reasons;
 }
