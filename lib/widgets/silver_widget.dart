@@ -14,6 +14,7 @@ class SilverWidget extends StatefulWidget {
 class _SilverWidgetState extends State<SilverWidget> {
   double? _silverPrice;
   double? _usdKrwRate;
+  double? _changePercent;
   bool _isLoading = true;
   String? _error;
 
@@ -68,10 +69,16 @@ class _SilverWidgetState extends State<SilverWidget> {
           final data = res.data as Map<String, dynamic>;
           final meta = data['chart']?['result']?[0]?['meta'];
           final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
+          final prevClose = meta?['previousClose'];
           if (price != null && (price as num) > 0) {
             if (!mounted) return;
             setState(() {
               _silverPrice = price.toDouble();
+              if (prevClose != null && (prevClose as num) > 0) {
+                _changePercent = (_silverPrice! - prevClose.toDouble()) /
+                    prevClose.toDouble() *
+                    100;
+              }
               _isLoading = false;
             });
             await _cachePrice(_silverPrice!);
@@ -110,6 +117,7 @@ class _SilverWidgetState extends State<SilverWidget> {
           ? '\$${_silverPrice!.toStringAsFixed(2)}'
           : 'N/A',
       subText: subText,
+      changePercent: _changePercent,
     );
   }
 }

@@ -174,8 +174,8 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.account_balance_wallet,
-                      color: Colors.deepPurple),
+                  leading: Icon(Icons.account_balance_wallet,
+                      color: theme.colorScheme.primary),
                   title: Text('내 포트폴리오',
                       style: theme.textTheme.bodyLarge ??
                           TextStyle(color: theme.colorScheme.onSurface)),

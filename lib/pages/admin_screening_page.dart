@@ -509,16 +509,17 @@ class _ApprovedTab extends StatelessWidget {
 class _AIBadge extends StatelessWidget {
   const _AIBadge();
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.deepPurple.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Text('AI',
-            style: TextStyle(
-                fontSize: 10,
-                color: Colors.deepPurple,
-                fontWeight: FontWeight.bold)),
-      );
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text('AI',
+          style: TextStyle(
+              fontSize: 10, color: primary, fontWeight: FontWeight.bold)),
+    );
+  }
 }

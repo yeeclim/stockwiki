@@ -14,6 +14,9 @@ import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
 import 'package:stockwiki/widgets/app_drawer.dart';
+import 'package:stockwiki/widgets/terminal_grid.dart';
+import 'package:stockwiki/widgets/hover_lift.dart';
+import 'package:stockwiki/widgets/btc_sparkline_widget.dart';
 
 // Global Theme Notifier
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
@@ -76,8 +79,25 @@ class StockSearchPage extends StatefulWidget {
   State<StockSearchPage> createState() => _StockSearchPageState();
 }
 
-class _StockSearchPageState extends State<StockSearchPage> {
+class _StockSearchPageState extends State<StockSearchPage>
+    with SingleTickerProviderStateMixin {
   bool _showWidgets = true;
+  late final AnimationController _liveDotController;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveDotController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _liveDotController.dispose();
+    super.dispose();
+  }
 
   void _refresh() {
     setState(() {
@@ -88,25 +108,50 @@ class _StockSearchPageState extends State<StockSearchPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final market = theme.extension<MarketColors>()!;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: market.bg,
       appBar: AppBar(
-        title: Text(
-          'StockWiki',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-            color: theme.colorScheme.onSurface,
-          ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FadeTransition(
+              opacity: Tween(begin: 1.0, end: 0.35).animate(_liveDotController),
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: market.up,
+                  boxShadow: [
+                    BoxShadow(
+                        color: market.up.withValues(alpha: 0.6), blurRadius: 6),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'STOCKWIKI',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                fontSize: 15,
+                color: market.ink,
+              ),
+            ),
+          ],
         ),
         centerTitle: false,
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: market.bg,
         elevation: 0,
         actions: [
           Builder(
             builder: (BuildContext innerContext) {
               return IconButton(
-                icon: Icon(Icons.menu, color: theme.colorScheme.onSurface),
+                icon: Icon(Icons.menu, color: market.muted),
                 onPressed: () {
                   Scaffold.of(innerContext).openEndDrawer();
                 },
@@ -126,81 +171,79 @@ class _StockSearchPageState extends State<StockSearchPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 헤더 섹션 (App Bar로 이동했으므로 제거하거나 환영 메시지로 변경)
-              const SizedBox(height: 30),
-
-              // 주요 기능 버튼 (디자인 개선)
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const ThemeRecommendationsPage()),
-                        );
-                      },
-                      icon: const Icon(Icons.trending_up),
-                      label: const Text(
-                        '테마별 추천 종목 확인하기',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+              // 주요 기능 CTA — 네온/에메랄드 테두리 글로우 버튼
+              HoverLift(
+                borderRadius: BorderRadius.circular(3),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const ThemeRecommendationsPage()),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: market.surface,
+                      border: Border.all(color: market.accent),
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: isDark
+                          ? [
+                              BoxShadow(
+                                  color: market.accentDim, blurRadius: 18),
+                            ]
+                          : const [],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '테마별 추천 종목 확인하기',
+                          style: TextStyle(
+                            color: market.ink,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            letterSpacing: .2,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        Text('→',
+                            style: TextStyle(
+                                color: market.accent,
+                                fontWeight: FontWeight.w800)),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
 
-              // 금융 상품 섹션
               if (_showWidgets) ...[
-                _buildSectionTitle(context, '금융 상품'),
-                const SizedBox(height: 16),
-                const Row(
-                  children: [
-                    Expanded(child: GoldWidget()),
-                    SizedBox(width: 16),
-                    Expanded(child: SilverWidget()),
-                  ],
-                ),
-                const SizedBox(height: 32),
-
-                // 시장 지표 섹션
-                _buildSectionTitle(context, '시장 지표'),
-                const SizedBox(height: 16),
-                const Row(
-                  children: [
-                    Expanded(child: UsdKrwWidget()),
-                    SizedBox(width: 16),
-                    Expanded(child: FearGreedWidget()),
-                  ],
-                ),
-                const SizedBox(height: 32),
-
-                // 에너지 섹션
-                _buildSectionTitle(context, '에너지'),
-                const SizedBox(height: 16),
-                const WtiWidget(),
-                const SizedBox(height: 32),
-
-                // 암호화폐 섹션
-                _buildSectionTitle(context, '암호화폐'),
-                const SizedBox(height: 16),
-                const BtcWidget(),
-                const SizedBox(height: 40),
+                _buildSectionTitle(market, '금융 상품'),
+                const SizedBox(height: 12),
+                const TerminalGrid(children: [GoldWidget(), SilverWidget()]),
+                const SizedBox(height: 28),
+                _buildSectionTitle(market, '시장 지표'),
+                const SizedBox(height: 12),
+                const TerminalGrid(children: [UsdKrwWidget()]),
+                const SizedBox(height: 10),
+                const FearGreedWidget(),
+                const SizedBox(height: 28),
+                _buildSectionTitle(market, '에너지'),
+                const SizedBox(height: 12),
+                const TerminalGrid(children: [WtiWidget()]),
+                const SizedBox(height: 28),
+                _buildSectionTitle(market, '암호화폐'),
+                const SizedBox(height: 12),
+                const TerminalGrid(
+                    children: [BtcWidget(), BtcSparklineWidget()]),
+                const SizedBox(height: 36),
               ],
 
               // 푸터
-              const Divider(),
+              Divider(color: market.line),
               const SizedBox(height: 12),
               Center(
                 child: Column(
@@ -209,7 +252,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       'Made by Bermont',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey,
+                        color: market.muted,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -219,7 +262,7 @@ class _StockSearchPageState extends State<StockSearchPage> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey,
+                        color: market.muted,
                         height: 1.5,
                       ),
                     ),
@@ -234,23 +277,26 @@ class _StockSearchPageState extends State<StockSearchPage> {
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
+  Widget _buildSectionTitle(MarketColors market, String title) {
     return Row(
       children: [
         Container(
-          width: 4,
-          height: 18,
+          width: 3,
+          height: 12,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
-            borderRadius: BorderRadius.circular(2),
+            color: market.accent,
+            borderRadius: BorderRadius.circular(1),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: TextStyle(
+            color: market.muted,
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+            letterSpacing: 1.2,
+          ),
         ),
       ],
     );

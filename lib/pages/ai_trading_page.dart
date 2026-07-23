@@ -158,11 +158,7 @@ class AiTradingPage extends StatelessWidget {
                   icon: const Icon(Icons.admin_panel_settings_outlined),
                   label: const Text('AI 추천 종목 검토 (관리자)'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.deepPurple,
-                    side: const BorderSide(color: Colors.deepPurple),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
