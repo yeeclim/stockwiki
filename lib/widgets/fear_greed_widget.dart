@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
-import 'hover_lift.dart';
+import 'gauge_card.dart';
 
+/// 암호화폐(비트코인) 시장 심리 — alternative.me Crypto Fear & Greed Index.
+/// 주의: CNN의 주식시장용 Fear & Greed Index와는 다른 별개의 지표다.
+/// 주식시장 심리는 [StockFearGreedWidget](VIX 기준)을 참고할 것.
 class FearGreedWidget extends StatefulWidget {
   const FearGreedWidget({super.key});
 
@@ -59,7 +60,7 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
 
   Future<void> _fetchIndex() async {
     try {
-      // api.alternative.me — 무료 공개 API, CORS 지원
+      // api.alternative.me — 암호화폐(비트코인) 전용 공포탐욕지수, 무료 공개 API
       final response = await http
           .get(Uri.parse('https://api.alternative.me/fng/?limit=1'))
           .timeout(const Duration(seconds: 10));
@@ -111,143 +112,12 @@ class _FearGreedWidgetState extends State<FearGreedWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final market = theme.extension<MarketColors>()!;
-
-    Widget content;
-    if (_isLoading) {
-      content =
-          Text('불러오는 중…', style: TextStyle(color: market.muted, fontSize: 12));
-    } else if (_error != null) {
-      content =
-          Text(_error!, style: TextStyle(color: market.muted, fontSize: 12));
-    } else {
-      final value = _indexValue ?? 0;
-      final reduceMotion = MediaQuery.of(context).disableAnimations;
-      content = Row(
-        children: [
-          SizedBox(
-            width: 64,
-            height: 64,
-            child: TweenAnimationBuilder<double>(
-              key: ValueKey(value),
-              tween: Tween(begin: 0.0, end: value.toDouble()),
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 1500),
-              curve: Curves.easeOutCubic,
-              builder: (context, animatedValue, _) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CustomPaint(
-                      size: const Size(64, 64),
-                      painter: _GaugePainter(
-                        value: animatedValue,
-                        track: market.track,
-                        accent: market.accent,
-                        glow: theme.brightness == Brightness.dark,
-                      ),
-                    ),
-                    Text(
-                      animatedValue.round().toString(),
-                      style: TextStyle(
-                        color: market.ink,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('공포탐욕지수 · ${_label ?? ''}',
-                    style: TextStyle(
-                        color: market.ink,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12.5)),
-                const SizedBox(height: 2),
-                Text('0(극도의 공포) ~ 100(극도의 탐욕)',
-                    style: TextStyle(color: market.muted, fontSize: 11)),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    return HoverLift(
-      borderRadius: BorderRadius.circular(3),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: market.surface,
-          border: Border.all(color: market.line),
-          borderRadius: BorderRadius.circular(3),
-        ),
-        child: content,
-      ),
+    return GaugeCard(
+      isLoading: _isLoading,
+      error: _error,
+      value: _indexValue ?? 0,
+      title: '암호화폐 공포탐욕지수 · ${_label ?? ''}',
+      subtitle: '비트코인 시장 심리 · 0(극도의 공포) ~ 100(극도의 탐욕)',
     );
   }
-}
-
-class _GaugePainter extends CustomPainter {
-  final double value; // 0~100
-  final Color track;
-  final Color accent;
-  final bool glow;
-
-  _GaugePainter({
-    required this.value,
-    required this.track,
-    required this.accent,
-    required this.glow,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = (size.shortestSide - 8) / 2;
-    const strokeWidth = 8.0;
-
-    final trackPaint = Paint()
-      ..color = track
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    final sweep = (value.clamp(0, 100) / 100) * 2 * math.pi;
-    final fillPaint = Paint()
-      ..color = accent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    if (glow) {
-      final glowPaint = Paint()
-        ..color = accent.withValues(alpha: 0.55)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-      canvas.drawArc(Rect.fromCircle(center: center, radius: radius),
-          -math.pi / 2, sweep, false, glowPaint);
-    }
-
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius),
-        -math.pi / 2, sweep, false, fillPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GaugePainter oldDelegate) =>
-      oldDelegate.value != value ||
-      oldDelegate.accent != accent ||
-      oldDelegate.track != track;
 }
