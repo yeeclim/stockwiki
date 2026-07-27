@@ -1,8 +1,8 @@
 """
 복합 조건 매수 전략 — 점수제 (Score-based)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ 진입 조건  —  11점 만점, 6점 이상 매수 ]
-  필수(+2) 현재가 < 60일 이평선           ← 미달 시 즉시 종료
+[ 진입 조건  —  13점 만점, 8점 이상 매수 ]
+  필수(+1) 현재가 < 60일 이평선           ← 미달 시 즉시 종료
   필수(+1) MA5 > MA20 (단기 반등 확인)    ← 미달 시(하락 지속 중) 즉시 종료
            +1 추가  골든크로스 (오늘 교차 발생)
   +1       저 PER  (0 < PER < 15)
@@ -12,14 +12,20 @@
   +1       유동비율 > 100%
   +1       현금비율 > 20%
   +1       이자보상배율 ≥ 400%
+  +1       RSI 과매도 반등 (RSI14가 최근 10일 내 30 밑으로 갔다가 30 위로 회복)
+  +1       바닥 다지기 (최근 60일 저점 대비 8% 이내 + 최근 10일간 신저가 갱신 없음)
+  +1       거래량 감소 추세 (최근 5일 평균 < 직전 20일 평균 — 투매 소진 정황)
 
   ※ MA5>MA20을 보너스가 아닌 필수 조건으로 둔 이유: 저PER·저PBR은 실제 저평가가
     아니라 급락 때문에 낮아진 값일 수 있고, 거래량도 패닉 매도로 커질 수 있어
     이 항목들만으로는 "싸 보이지만 계속 하락 중인 종목"을 걸러내지 못한다.
     단기 반등 신호가 없으면 나머지 점수가 높아도 매수하지 않는다.
+    RSI 과매도 반등·바닥 다지기·거래량 감소 추세 3개 지표는 "얼마나 빠졌고
+    얼마나 횡보했는지"를 직접 측정해 이 문제를 한 번 더 보강한다
+    (trading/technical_indicators.py, 국내·미국 공통 재사용).
 
 [ 뉴스 감성 게이트 ]
-  진입 점수 통과(6점 이상) 후에도, 최근 뉴스 감성분석 결과가 "부정"이면 매수하지 않는다.
+  진입 점수 통과(8점 이상) 후에도, 최근 뉴스 감성분석 결과가 "부정"이면 매수하지 않는다.
   (news_sentiment.get_sentiment 참고 — 뉴스 없음/분석 실패는 배제 사유로 보지 않음)
 
 [ 추가매수 ]
@@ -35,7 +41,7 @@ import requests
 import database as db
 import news_sentiment
 
-BUY_THRESHOLD = 6   # 10점 만점 중 최소 매수 점수
+BUY_THRESHOLD = 8   # 13점 만점 중 최소 매수 점수 (기존 6/10 비율 유지, 바닥지표 3개 추가로 13점 만점)
 
 
 def _ask_sell_timing(stock_name: str, stock_code: str, buy_price: int, fund: dict, ma_data: dict, score: int) -> str:
@@ -49,7 +55,7 @@ def _ask_sell_timing(stock_name: str, stock_code: str, buy_price: int, fund: dic
         prompt = (
             f"한국 주식 {stock_name}({stock_code})을 방금 {buy_price:,}원에 매수했습니다.\n"
             f"현재가: {buy_price:,}원 / MA60: {ma60:,.0f}원 / MA20: {ma20:,.0f}원\n"
-            f"PER: {fund.get('per', 0):.1f} / PBR: {fund.get('pbr', 0):.2f} / 스크리닝 점수: {score}/11점\n\n"
+            f"PER: {fund.get('per', 0):.1f} / PBR: {fund.get('pbr', 0):.2f} / 스크리닝 점수: {score}/13점\n\n"
             "기술적 분석 관점에서 매도 타이밍을 간략히 제안해주세요.\n"
             "아래 JSON 형식으로만 응답하세요:\n"
             '{"target": "목표 매도가 또는 조건 (20자 이내)", "stop": "손절 기준 (20자 이내)", "comment": "한 줄 근거 (40자 이내)"}'
@@ -91,7 +97,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
     반환    : (score, max_score, log_lines)
     """
     score     = 0
-    max_score = 11
+    max_score = 13
     log       = []
     price     = fund['price']
 
@@ -101,15 +107,15 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         log.append(f"  ⛔ 시총 {market_cap:,}억원 — 4천억 미만 제외")
         return 0, max_score, log
 
-    # ❷ 현재가 < 60일 이평선  [필수, +2점] ─────────────────────────────────────
+    # ❷ 현재가 < 60일 이평선  [필수, +1점] ─────────────────────────────────────
     ma60 = ma_data.get('ma60')
     if ma60 is None:
         log.append("  ⛔ 60일 이평선 데이터 부족 → 진입 불가")
         return 0, max_score, log
 
     if price < ma60:
-        score += 2
-        log.append(f"  ✅ [+2] 현재가({price:,}) < MA60({ma60:,.0f})")
+        score += 1
+        log.append(f"  ✅ [+1] 현재가({price:,}) < MA60({ma60:,.0f})")
     else:
         log.append(f"  ❌ [+0] 현재가({price:,}) ≥ MA60({ma60:,.0f}) — 필수 조건 미달")
         return score, max_score, log
@@ -202,6 +208,30 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
             log.append(f"  ⚠️  [+0] 이자보상배율 데이터 없음")
     else:
         log.append(f"  ⚠️  [+0] 재무비율 조회 실패 (부채·유동·현금·이자보상 4점 미반영)")
+
+    # ❼ RSI 과매도 반등  [+1점] — "얼마나 빠졌는지"를 직접 측정 ──────────────────
+    rsi = ma_data.get('rsi')
+    if ma_data.get('rsi_rebound'):
+        score += 1
+        log.append(f"  ✅ [+1] RSI 과매도 반등 (현재 {rsi:.0f}, 최근 30 밑에서 회복)")
+    elif rsi is not None:
+        log.append(f"  ❌ [+0] RSI {rsi:.0f} — 과매도 반등 아님")
+    else:
+        log.append(f"  ⚠️  [+0] RSI 데이터 부족")
+
+    # ❽ 바닥 다지기  [+1점] — 저점 근접 + 최근 신저가 갱신 없음 ─────────────────
+    if ma_data.get('basing'):
+        score += 1
+        log.append(f"  ✅ [+1] 저점 근접 + 최근 신저가 갱신 없음 — 바닥 다지는 중")
+    else:
+        log.append(f"  ❌ [+0] 바닥 다지기 신호 없음")
+
+    # ❾ 거래량 감소 추세  [+1점] — 투매(패닉 매도) 소진 신호 ────────────────────
+    if ma_data.get('volume_declining'):
+        score += 1
+        log.append(f"  ✅ [+1] 거래량 감소 추세 — 매도세 소진 정황")
+    else:
+        log.append(f"  ❌ [+0] 거래량 감소 추세 아님")
 
     return score, max_score, log
 

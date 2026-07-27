@@ -57,7 +57,7 @@ def screening_content(results: list, date_str: str) -> str:
         rows += (
             f"<tr>"
             f"<td>{flag} {r['name']}({r['code']})</td>"
-            f"<td><b>{r['score']}/{r.get('max_score', 11)}점</b></td>"
+            f"<td><b>{r['score']}/{r.get('max_score', 10)}점</b></td>"
             f"<td>{r['price']:,}원</td>"
             f"<td>MA60 {disc}</td>"
             f"<td>PER {r.get('per', 0):.1f} / PBR {r.get('pbr', 0):.2f}</td>"

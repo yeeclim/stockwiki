@@ -59,7 +59,7 @@ class AiTradingPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _bullet(theme, '복합 조건 점수제 (11점 만점, 6점 이상 매수)'),
+                  _bullet(theme, '복합 조건 점수제 (13점 만점, 8점 이상 매수)'),
                   _bullet(theme, '현재가 < 60일 이평선 → 필수 조건 (+2점)'),
                   _bullet(theme, '골든크로스(MA5↑MA20) → +2점 / MA5>MA20 → +1점'),
                   _bullet(theme, '저PER(< 15) → +1점  |  저PBR(< 1.5) → +1점'),

@@ -226,7 +226,7 @@ def screen():
             mcap = r.get('market_cap', 0)
             mcap_str = f"  시총 {mcap:,}억" if mcap else ""
             lines.append(
-                f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
+                f"  [{r['score']}/{r['max_score']}점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
                 f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}{_ratio_str(r)}"
                 f"  [{r['sector']}]"
@@ -240,7 +240,7 @@ def screen():
         lines.append(f"\n🔴 뉴스 부정으로 제외 ({len(excluded)}개) — 진입 점수는 통과했으나 최근 뉴스가 부정적")
         for r in excluded:
             lines.append(
-                f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
+                f"  [{r['score']}/{r['max_score']}점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"\n  📰 뉴스: {r['sentiment_line']}"
             )
 
