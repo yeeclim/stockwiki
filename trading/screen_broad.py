@@ -26,8 +26,8 @@ _api: KISApi | None = None
 
 MAX_WORKERS   = 5    # 병렬 스레드 수
 CALL_DELAY    = 0.15 # 스레드별 API 호출 간 최소 대기(초)
-PRE_THRESHOLD = 6    # 예비 점수 이상이면 재무비율 조회 (13점 만점 중 재무비율 4점 제외한 예비 최대 9점 기준)
-MIN_THRESHOLD = 8    # 최종 점수 이상이면 candidates에 등록 (strategy.BUY_THRESHOLD와 동일)
+PRE_THRESHOLD = 5    # 예비 점수 이상이면 재무비율 조회 (10점 만점 중 재무비율 4종(각 0.5점) 제외한 예비 최대 8점 기준)
+MIN_THRESHOLD = 6    # 최종 점수 이상이면 candidates에 등록 (strategy.BUY_THRESHOLD와 동일)
 TOP_N         = 60   # candidates에 저장할 최대 종목 수
 
 
@@ -232,7 +232,7 @@ def main():
     print(f"  🏆 광역 스캔 결과 — 상위 {len(top)}종목 ({MIN_THRESHOLD}점 이상)")
     print(f"{'='*55}")
     for r in top[:20]:
-        print(f"  [{r['score']}/13점] {r['name']}({r['code']})  {r['fund']['price']:,}원")
+        print(f"  [{r['score']}/10점] {r['name']}({r['code']})  {r['fund']['price']:,}원")
 
     # 5. screening_candidates 갱신
     _upsert_candidates(top)

@@ -61,7 +61,7 @@ def _fetch_passed_stocks() -> list[dict]:
 def _ask_claude(stocks: list[dict]) -> list[dict]:
     """스크리닝 통과 종목 목록을 주고 추천 이유 요청"""
     stock_list = "\n".join([
-        f"- {s['stock_name']}({s['stock_code']}): {s['score']}점/13점"
+        f"- {s['stock_name']}({s['stock_code']}): {s['score']}점/10점"
         f"  PER {s.get('per') or 'N/A'}  PBR {s.get('pbr') or 'N/A'}"
         f"  현재가 {s.get('price') or 'N/A'}원"
         for s in stocks

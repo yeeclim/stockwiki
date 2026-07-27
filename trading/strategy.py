@@ -1,31 +1,37 @@
 """
 복합 조건 매수 전략 — 점수제 (Score-based)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ 진입 조건  —  13점 만점, 8점 이상 매수 ]
-  필수(+1) 현재가 < 60일 이평선           ← 미달 시 즉시 종료
-  필수(+1) MA5 > MA20 (단기 반등 확인)    ← 미달 시(하락 지속 중) 즉시 종료
-           +1 추가  골든크로스 (오늘 교차 발생)
-  +1       저 PER  (0 < PER < 15)
-  +1       저 PBR  (0 < PBR < 1.5)
-  +1       거래량 충분  (≥ 100,000주)
-  +1       부채비율 < 200%
-  +1       유동비율 > 100%
-  +1       현금비율 > 20%
-  +1       이자보상배율 ≥ 400%
-  +1       RSI 과매도 반등 (RSI14가 최근 10일 내 30 밑으로 갔다가 30 위로 회복)
-  +1       바닥 다지기 (최근 60일 저점 대비 8% 이내 + 최근 10일간 신저가 갱신 없음)
-  +1       거래량 감소 추세 (최근 5일 평균 < 직전 20일 평균 — 투매 소진 정황)
+[ 진입 조건  —  10점 만점, 6점 이상 매수 ]
+  추세 전환 신호 (조건당 1점 — 가장 비중 있게 봄)
+    필수(+1) 현재가 < 60일 이평선           ← 미달 시 즉시 종료
+    필수(+1) MA5 > MA20 (단기 반등 확인)    ← 미달 시(하락 지속 중) 즉시 종료
+    +1       골든크로스 (오늘 교차 발생) — 하락 끝을 알리는 핵심 신호로 보고 1점 유지
+    +1       RSI 과매도 반등 (RSI14가 최근 10일 내 30 밑으로 갔다가 30~50 구간 회복)
+    +1       바닥 다지기 (최근 60일 저점 대비 8% 이내 + 최근 10일간 신저가 갱신 없음)
+    +1       거래량 감소 추세 (최근 5일 평균 < 직전 20일 평균 — 투매 소진 정황)
+
+  유동성 (+1)
+    +1       거래량 충분  (≥ 100,000주)
+
+  가치·재무 보조 지표 (조건당 0.5점 — 급락으로 왜곡될 수 있어 보조 취급)
+    +0.5     저 PER  (0 < PER < 15)
+    +0.5     저 PBR  (0 < PBR < 1.5)
+    +0.5     부채비율 < 200%
+    +0.5     유동비율 > 100%
+    +0.5     현금비율 > 20%
+    +0.5     이자보상배율 ≥ 400%
 
   ※ MA5>MA20을 보너스가 아닌 필수 조건으로 둔 이유: 저PER·저PBR은 실제 저평가가
     아니라 급락 때문에 낮아진 값일 수 있고, 거래량도 패닉 매도로 커질 수 있어
     이 항목들만으로는 "싸 보이지만 계속 하락 중인 종목"을 걸러내지 못한다.
     단기 반등 신호가 없으면 나머지 점수가 높아도 매수하지 않는다.
-    RSI 과매도 반등·바닥 다지기·거래량 감소 추세 3개 지표는 "얼마나 빠졌고
-    얼마나 횡보했는지"를 직접 측정해 이 문제를 한 번 더 보강한다
-    (trading/technical_indicators.py, 국내·미국 공통 재사용).
+    골든크로스·RSI 과매도 반등·바닥 다지기·거래량 감소 추세는 "얼마나 빠졌고
+    얼마나 횡보했는지"를 직접 측정하는 핵심 신호로 보고 각 1점을 그대로 두고,
+    대신 급락에 의해 왜곡되기 쉬운 PER·PBR·재무비율 4종의 비중을 0.5점으로
+    낮춰서 전체를 10점에 맞췄다 (trading/technical_indicators.py, 국내·미국 공통 재사용).
 
 [ 뉴스 감성 게이트 ]
-  진입 점수 통과(8점 이상) 후에도, 최근 뉴스 감성분석 결과가 "부정"이면 매수하지 않는다.
+  진입 점수 통과(6점 이상) 후에도, 최근 뉴스 감성분석 결과가 "부정"이면 매수하지 않는다.
   (news_sentiment.get_sentiment 참고 — 뉴스 없음/분석 실패는 배제 사유로 보지 않음)
 
 [ 추가매수 ]
@@ -41,7 +47,7 @@ import requests
 import database as db
 import news_sentiment
 
-BUY_THRESHOLD = 8   # 13점 만점 중 최소 매수 점수 (기존 6/10 비율 유지, 바닥지표 3개 추가로 13점 만점)
+BUY_THRESHOLD = 6   # 10점 만점 중 최소 매수 점수
 
 
 def _ask_sell_timing(stock_name: str, stock_code: str, buy_price: int, fund: dict, ma_data: dict, score: int) -> str:
@@ -55,7 +61,7 @@ def _ask_sell_timing(stock_name: str, stock_code: str, buy_price: int, fund: dic
         prompt = (
             f"한국 주식 {stock_name}({stock_code})을 방금 {buy_price:,}원에 매수했습니다.\n"
             f"현재가: {buy_price:,}원 / MA60: {ma60:,.0f}원 / MA20: {ma20:,.0f}원\n"
-            f"PER: {fund.get('per', 0):.1f} / PBR: {fund.get('pbr', 0):.2f} / 스크리닝 점수: {score}/13점\n\n"
+            f"PER: {fund.get('per', 0):.1f} / PBR: {fund.get('pbr', 0):.2f} / 스크리닝 점수: {score}/10점\n\n"
             "기술적 분석 관점에서 매도 타이밍을 간략히 제안해주세요.\n"
             "아래 JSON 형식으로만 응답하세요:\n"
             '{"target": "목표 매도가 또는 조건 (20자 이내)", "stop": "손절 기준 (20자 이내)", "comment": "한 줄 근거 (40자 이내)"}'
@@ -97,7 +103,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
     반환    : (score, max_score, log_lines)
     """
     score     = 0
-    max_score = 13
+    max_score = 10
     log       = []
     price     = fund['price']
 
@@ -136,21 +142,21 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         score += 1
         log.append(f"  ✅ [+1] 골든크로스 발생 (오늘 교차)")
 
-    # ❸ 저 PER  [+1점] ──────────────────────────────────────────────────────────
+    # ❸ 저 PER  [+0.5점] — 급락으로 낮아졌을 수도 있어 보조 지표로 취급 ─────────
     per = fund.get('per', 0)
     if 0 < per < 15:
-        score += 1
-        log.append(f"  ✅ [+1] 저PER {per:.1f} (기준 < 15)")
+        score += 0.5
+        log.append(f"  ✅ [+0.5] 저PER {per:.1f} (기준 < 15)")
     elif per == 0:
         log.append(f"  ⚠️  [+0] PER 데이터 없음")
     else:
         log.append(f"  ❌ [+0] PER {per:.1f} ≥ 15")
 
-    # ❹ 저 PBR  [+1점] ──────────────────────────────────────────────────────────
+    # ❹ 저 PBR  [+0.5점] ────────────────────────────────────────────────────────
     pbr = fund.get('pbr', 0)
     if 0 < pbr < 1.5:
-        score += 1
-        log.append(f"  ✅ [+1] 저PBR {pbr:.2f} (기준 < 1.5)")
+        score += 0.5
+        log.append(f"  ✅ [+0.5] 저PBR {pbr:.2f} (기준 < 1.5)")
     elif pbr == 0:
         log.append(f"  ⚠️  [+0] PBR 데이터 없음")
     else:
@@ -164,7 +170,7 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
     else:
         log.append(f"  ❌ [+0] 거래량 부족 {volume:,}주")
 
-    # ❻ 재무비율: 부채비율 · 유동비율 · 현금비율  [각 +1점] ───────────────────
+    # ❻ 재무비율: 부채비율 · 유동비율 · 현금비율 · 이자보상배율  [각 +0.5점] ──
     if ratios:
         debt    = ratios.get('부채비율')
         current = ratios.get('유동비율')
@@ -172,8 +178,8 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
 
         if debt is not None:
             if debt < 200:
-                score += 1
-                log.append(f"  ✅ [+1] 부채비율 {debt:.0f}% (기준 < 200%)")
+                score += 0.5
+                log.append(f"  ✅ [+0.5] 부채비율 {debt:.0f}% (기준 < 200%)")
             else:
                 log.append(f"  ❌ [+0] 부채비율 {debt:.0f}% — 과다")
         else:
@@ -181,8 +187,8 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
 
         if current is not None:
             if current > 100:
-                score += 1
-                log.append(f"  ✅ [+1] 유동비율 {current:.0f}% (기준 > 100%)")
+                score += 0.5
+                log.append(f"  ✅ [+0.5] 유동비율 {current:.0f}% (기준 > 100%)")
             else:
                 log.append(f"  ❌ [+0] 유동비율 {current:.0f}% — 부족")
         else:
@@ -190,8 +196,8 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
 
         if cash_r is not None:
             if cash_r > 20:
-                score += 1
-                log.append(f"  ✅ [+1] 현금비율 {cash_r:.0f}% (기준 > 20%)")
+                score += 0.5
+                log.append(f"  ✅ [+0.5] 현금비율 {cash_r:.0f}% (기준 > 20%)")
             else:
                 log.append(f"  ❌ [+0] 현금비율 {cash_r:.0f}% — 낮음")
         else:
@@ -200,14 +206,14 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         ic = ratios.get('이자보상배율')
         if ic is not None:
             if ic >= 400:
-                score += 1
-                log.append(f"  ✅ [+1] 이자보상배율 {ic:.0f}% (기준 ≥ 400%)")
+                score += 0.5
+                log.append(f"  ✅ [+0.5] 이자보상배율 {ic:.0f}% (기준 ≥ 400%)")
             else:
                 log.append(f"  ❌ [+0] 이자보상배율 {ic:.0f}% — 낮음")
         else:
             log.append(f"  ⚠️  [+0] 이자보상배율 데이터 없음")
     else:
-        log.append(f"  ⚠️  [+0] 재무비율 조회 실패 (부채·유동·현금·이자보상 4점 미반영)")
+        log.append(f"  ⚠️  [+0] 재무비율 조회 실패 (부채·유동·현금·이자보상 2점 미반영)")
 
     # ❼ RSI 과매도 반등  [+1점] — "얼마나 빠졌는지"를 직접 측정 ──────────────────
     rsi = ma_data.get('rsi')

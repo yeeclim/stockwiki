@@ -83,7 +83,7 @@ def screening_content(results: list, date_str: str) -> str:
 def buy_content(
     stock_name: str, stock_code: str,
     price: int, buy_amount: int, shares: int,
-    score: int, max_score: int,
+    score: float, max_score: int,
     log_lines: list,
     sell_opinion: str,
     ratios: dict,
