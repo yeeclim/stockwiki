@@ -17,6 +17,7 @@ export default async function handler(req, res) {
         if (type === 'chart')     return await handleChartProxy(req, res);
         if (type === 'commodity') return await handleCommodityPrice(req, res);
         if (type === 'fear-greed') return await handleFearGreed(req, res);
+        if (type === 'cnn-fear-greed') return await handleCnnFearGreed(req, res);
 
         return res.status(400).json({ error: 'Invalid utility type' });
     } catch (error) {
@@ -181,5 +182,57 @@ async function handleFearGreed(req, res) {
     } catch (e) {
         console.error('Fear & Greed Error:', e);
         return res.status(200).json({ value: 50, label: 'Neutral' });
+    }
+}
+
+// CNN Business의 실제 주식시장 Fear & Greed Index를 그대로 프록시한다.
+// CNN 웹페이지가 내부적으로 쓰는 비공식 데이터 엔드포인트라 CORS가 안 열려있어
+// 브라우저(Flutter web)에서 직접 호출이 안 되므로 서버에서 대신 받아온다.
+// (기존 handleFearGreed는 api.alternative.me — 암호화폐 전용 지수라 별개)
+let _cnnFgCache = null;
+let _cnnFgCacheTime = 0;
+const _CNN_FG_CACHE_TTL = 15 * 60 * 1000; // 15분
+
+async function handleCnnFearGreed(req, res) {
+    try {
+        const now = Date.now();
+        if (_cnnFgCache && now - _cnnFgCacheTime < _CNN_FG_CACHE_TTL) {
+            return res.status(200).json({ ..._cnnFgCache, cached: true });
+        }
+
+        const r = await fetchWithTimeout(
+            'https://production.dataviz.cnn.io/index/fearandgreed/graphdata',
+            {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': 'https://edition.cnn.com/',
+                },
+            },
+            10000
+        );
+        if (!r.ok) throw new Error(`CNN API 오류: ${r.status}`);
+
+        const data = await r.json();
+        const fg = data.fear_and_greed;
+        if (!fg) throw new Error('fear_and_greed 필드 없음');
+
+        const result = {
+            success: true,
+            score: Math.round(fg.score),
+            rating: fg.rating,
+            previousClose: Math.round(fg.previous_close),
+            previous1Week: Math.round(fg.previous_1_week),
+            previous1Month: Math.round(fg.previous_1_month),
+            previous1Year: Math.round(fg.previous_1_year),
+            timestamp: fg.timestamp,
+        };
+
+        _cnnFgCache = result;
+        _cnnFgCacheTime = now;
+
+        return res.status(200).json({ ...result, cached: false });
+    } catch (e) {
+        console.error('CNN Fear & Greed Error:', e);
+        return res.status(200).json({ success: false, error: e.message });
     }
 }
