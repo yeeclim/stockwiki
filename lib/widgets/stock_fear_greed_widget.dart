@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'gauge_card.dart';
 
 /// 주식시장 심리 — CNN Business의 실제 Fear & Greed Index.
-/// api/fear-greed.js가 CNN의 비공식 데이터 엔드포인트를 그대로 프록시하므로
+/// api/utils.js(type=cnn-fear-greed)가 CNN의 비공식 데이터 엔드포인트를 그대로 프록시하므로
 /// CNN 웹페이지에 나오는 수치와 동일하다(약식 근사치가 아님).
 class StockFearGreedWidget extends StatefulWidget {
   const StockFearGreedWidget({super.key});
@@ -62,7 +62,7 @@ class _StockFearGreedWidgetState extends State<StockFearGreedWidget> {
     try {
       final baseUrl = Uri.base.origin;
       final res = await http
-          .get(Uri.parse('$baseUrl/api/fear-greed'))
+          .get(Uri.parse('$baseUrl/api/utils?type=cnn-fear-greed'))
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
