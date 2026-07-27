@@ -106,10 +106,10 @@ async function buildFromScreening(limit) {
     .map(r => buildItem(r.value.row, r.value.data));
 }
 
-// screen.py 기준 — 13점 만점, BUY_THRESHOLD(8점) 이상만 screening_results.pass=true로 저장됨
+// screen.py 기준 — 10점 만점, BUY_THRESHOLD(6점) 이상만 screening_results.pass=true로 저장됨
 function scoreToAction(score) {
-  if (score >= 11) return 'Buy';
-  if (score >= 8) return 'Watch';
+  if (score >= 8) return 'Buy';
+  if (score >= 6) return 'Watch';
   return 'Hold';
 }
 
@@ -152,7 +152,7 @@ function buildReasons(row, data) {
   const cp = data.changePercent ?? 0;
   const reasons = [];
 
-  reasons.push(`전종목 스크리닝 점수 ${row.score}/13점 통과 — 재무비율·이동평균·바닥지표 진입 조건 충족`);
+  reasons.push(`전종목 스크리닝 점수 ${row.score}/10점 통과 — 재무비율·이동평균·바닥지표 진입 조건 충족`);
 
   if (cp >= 3) {
     reasons.push(`오늘 +${cp.toFixed(2)}% 강한 상승 모멘텀`);
