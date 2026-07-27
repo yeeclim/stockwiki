@@ -7,6 +7,7 @@ import 'utils/pkce_storage.dart'
 import 'package:stockwiki/providers/bookmark_provider.dart';
 import 'package:stockwiki/theme/app_theme.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
+import 'package:stockwiki/widgets/stock_fear_greed_widget.dart';
 import 'package:stockwiki/widgets/usdkrw_widget.dart';
 import 'package:stockwiki/widgets/gold_widget.dart';
 import 'package:stockwiki/widgets/silver_widget.dart';
@@ -229,7 +230,7 @@ class _StockSearchPageState extends State<StockSearchPage>
                 const SizedBox(height: 12),
                 const TerminalGrid(children: [UsdKrwWidget()]),
                 const SizedBox(height: 10),
-                const FearGreedWidget(),
+                const StockFearGreedWidget(),
                 const SizedBox(height: 28),
                 _buildSectionTitle(market, '에너지'),
                 const SizedBox(height: 12),
@@ -239,6 +240,8 @@ class _StockSearchPageState extends State<StockSearchPage>
                 const SizedBox(height: 12),
                 const TerminalGrid(
                     children: [BtcWidget(), BtcSparklineWidget()]),
+                const SizedBox(height: 10),
+                const FearGreedWidget(),
                 const SizedBox(height: 36),
               ],
 
