@@ -74,15 +74,23 @@ def _ask_claude(stock_name: str, headlines: list[str]) -> dict | None:
         return None
 
 
-def get_sentiment_line(stock_code: str, stock_name: str) -> str:
-    """감성 분석 결과를 한 줄 문자열로 반환"""
+def get_sentiment(stock_code: str, stock_name: str) -> tuple[str | None, str]:
+    """(sentiment, display_line) 반환.
+    sentiment: '긍정' | '부정' | '중립' | None (뉴스 없음 또는 분석 실패 — 매수 배제 사유로 쓰지 않음)
+    """
     headlines = get_headlines(stock_name)
     if not headlines:
-        return '뉴스 없음'
+        return None, '뉴스 없음'
     result = _ask_claude(stock_name, headlines)
     if not result:
-        return '분석 실패'
+        return None, '분석 실패'
     sentiment = result.get('sentiment', '?')
     summary   = result.get('summary', '')
     emoji     = _EMOJI.get(sentiment, '⚪')
-    return f"{emoji} {sentiment} — {summary}"
+    return sentiment, f"{emoji} {sentiment} — {summary}"
+
+
+def get_sentiment_line(stock_code: str, stock_name: str) -> str:
+    """감성 분석 결과를 한 줄 문자열로 반환 (하위호환용)"""
+    _, line = get_sentiment(stock_code, stock_name)
+    return line

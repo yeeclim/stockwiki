@@ -10,7 +10,7 @@ from kis_api import KISApi
 import kakao_notify
 import email_notify
 from strategy import _score_entry
-from news_sentiment import get_sentiment_line
+from news_sentiment import get_sentiment
 
 _SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
@@ -181,45 +181,68 @@ def screen():
                 'error': str(e)
             })
 
+    # ── 뉴스 감성 게이트 ──────────────────────────────────────────────────────
+    # 점수 통과 종목이라도 최근 뉴스 감성이 "부정"이면 최종 탈락시킨다.
+    # (뉴스 없음/분석 실패는 배제 사유로 보지 않음)
+    for r in results:
+        if r.get('pass') and not r.get('error'):
+            sentiment, sentiment_line = get_sentiment(r['code'], r['name'])
+            r['sentiment'] = sentiment
+            r['sentiment_line'] = sentiment_line
+            if sentiment == '부정':
+                r['pass'] = False
+                r['sentiment_excluded'] = True
+
     # ── 결과 출력 ──────────────────────────────────────────────────────────────
     sep = "=" * 55
     lines = [f"\n{sep}", "  📊 종목 스크리닝 결과", sep]
 
     # 점수 높은 순 정렬
-    ok     = [r for r in results if r.get('pass') and not r.get('error')]
-    others = [r for r in results if not r.get('pass') and not r.get('error')]
-    errors = [r for r in results if r.get('error')]
+    ok       = [r for r in results if r.get('pass') and not r.get('error')]
+    excluded = [r for r in results if r.get('sentiment_excluded')]
+    others   = [r for r in results if not r.get('pass') and not r.get('error') and not r.get('sentiment_excluded')]
+    errors   = [r for r in results if r.get('error')]
 
     ok.sort(key=lambda x: x['score'], reverse=True)
+    excluded.sort(key=lambda x: x['score'], reverse=True)
     others.sort(key=lambda x: x.get('score', 0), reverse=True)
 
     def chart_url(code):
         return f"https://m.stock.naver.com/domestic/stock/{code}/total"
 
+    def _ratio_str(r):
+        ratios = r.get('ratios') or {}
+        parts = []
+        if '부채비율'  in ratios: parts.append(f"부채{ratios['부채비율']:.0f}%")
+        if '유동비율'  in ratios: parts.append(f"유동{ratios['유동비율']:.0f}%")
+        if '현금비율'  in ratios: parts.append(f"현금{ratios['현금비율']:.0f}%")
+        if '이자보상배율' in ratios: parts.append(f"이자보상{ratios['이자보상배율']:.0f}%")
+        return f"  {' '.join(parts)}" if parts else ""
+
     if ok:
-        lines.append(f"\n✅ 주목 종목 ({BUY_THRESHOLD}점 이상, {len(ok)}개)")
+        lines.append(f"\n✅ 주목 종목 ({BUY_THRESHOLD}점 이상 + 뉴스 감성 양호, {len(ok)}개)")
         for r in ok:
             disc = f"  MA60대비 -{r['discount']:.1f}%" if r['discount'] else ""
             mcap = r.get('market_cap', 0)
             mcap_str = f"  시총 {mcap:,}억" if mcap else ""
-            sentiment = get_sentiment_line(r['code'], r['name'])
-            ratios = r.get('ratios') or {}
-            ratio_parts = []
-            if '부채비율'  in ratios: ratio_parts.append(f"부채{ratios['부채비율']:.0f}%")
-            if '유동비율'  in ratios: ratio_parts.append(f"유동{ratios['유동비율']:.0f}%")
-            if '현금비율'  in ratios: ratio_parts.append(f"현금{ratios['현금비율']:.0f}%")
-            if '이자보상배율' in ratios: ratio_parts.append(f"이자보상{ratios['이자보상배율']:.0f}%")
-            ratio_str = f"  {' '.join(ratio_parts)}" if ratio_parts else ""
             lines.append(
                 f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"  PER {r['per']:.1f} PBR {r['pbr']:.2f}"
-                f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}{ratio_str}"
+                f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}{_ratio_str(r)}"
                 f"  [{r['sector']}]"
-                f"\n  📰 뉴스: {sentiment}"
+                f"\n  📰 뉴스: {r['sentiment_line']}"
                 f"\n  📊 {chart_url(r['code'])}"
             )
     else:
-        lines.append(f"\n⏸  {BUY_THRESHOLD}점 이상 종목 없음")
+        lines.append(f"\n⏸  {BUY_THRESHOLD}점 이상 + 뉴스 감성 양호 종목 없음")
+
+    if excluded:
+        lines.append(f"\n🔴 뉴스 부정으로 제외 ({len(excluded)}개) — 진입 점수는 통과했으나 최근 뉴스가 부정적")
+        for r in excluded:
+            lines.append(
+                f"  [{r['score']}/11점] {r['name']}({r['code']})  {r['price']:,}원"
+                f"\n  📰 뉴스: {r['sentiment_line']}"
+            )
 
     if errors:
         lines.append(f"\n❌ 조회 실패")
