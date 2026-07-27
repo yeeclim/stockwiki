@@ -3,8 +3,8 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [ 진입 조건  —  11점 만점, 6점 이상 매수 ]
   필수(+2) 현재가 < 60일 이평선           ← 미달 시 즉시 종료
-  +2       골든크로스  (MA5 > MA20 크로스 발생)
-           or +1  MA5 > MA20 (크로스 미발생, 유지 중)
+  필수(+1) MA5 > MA20 (단기 반등 확인)    ← 미달 시(하락 지속 중) 즉시 종료
+           +1 추가  골든크로스 (오늘 교차 발생)
   +1       저 PER  (0 < PER < 15)
   +1       저 PBR  (0 < PBR < 1.5)
   +1       거래량 충분  (≥ 100,000주)
@@ -12,6 +12,15 @@
   +1       유동비율 > 100%
   +1       현금비율 > 20%
   +1       이자보상배율 ≥ 400%
+
+  ※ MA5>MA20을 보너스가 아닌 필수 조건으로 둔 이유: 저PER·저PBR은 실제 저평가가
+    아니라 급락 때문에 낮아진 값일 수 있고, 거래량도 패닉 매도로 커질 수 있어
+    이 항목들만으로는 "싸 보이지만 계속 하락 중인 종목"을 걸러내지 못한다.
+    단기 반등 신호가 없으면 나머지 점수가 높아도 매수하지 않는다.
+
+[ 뉴스 감성 게이트 ]
+  진입 점수 통과(6점 이상) 후에도, 최근 뉴스 감성분석 결과가 "부정"이면 매수하지 않는다.
+  (news_sentiment.get_sentiment 참고 — 뉴스 없음/분석 실패는 배제 사유로 보지 않음)
 
 [ 추가매수 ]
   -5%  → 예수금  5% 추가매수
@@ -24,6 +33,7 @@ import os
 import json
 import requests
 import database as db
+import news_sentiment
 
 BUY_THRESHOLD = 6   # 10점 만점 중 최소 매수 점수
 
@@ -104,17 +114,21 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         log.append(f"  ❌ [+0] 현재가({price:,}) ≥ MA60({ma60:,.0f}) — 필수 조건 미달")
         return score, max_score, log
 
-    # ❷ 골든크로스 / MA5 > MA20  [+2 or +1점] ─────────────────────────────────
+    # ❷ MA5 > MA20  [필수, +1점] — 미달 시 "하락 지속 중"으로 보고 즉시 종료 ─────
+    # 저PER·저PBR·거래량만으로는 급락 중인 종목과 진짜 저평가 종목을 구분 못 하므로,
+    # 단기 반등(MA5>MA20)이 확인되지 않으면 나머지 항목 점수와 무관하게 탈락시킨다.
     ma5  = ma_data.get('ma5')
     ma20 = ma_data.get('ma20')
+    if not (ma5 and ma20 and ma5 > ma20):
+        log.append(f"  ❌ [+0] MA5({ma5 or 0:,.0f}) ≤ MA20({ma20 or 0:,.0f}) — 하락 지속 중, 필수 조건 미달")
+        return score, max_score, log
+
+    score += 1
+    log.append(f"  ✅ [+1] MA5({ma5:,.0f}) > MA20({ma20:,.0f}) — 단기 반등 확인")
+
     if ma_data.get('golden_cross'):
-        score += 2
-        log.append(f"  ✅ [+2] 골든크로스 발생 (MA5 {ma5:,.0f} ↑ MA20 {ma20:,.0f})")
-    elif ma_data.get('above_ma20'):
         score += 1
-        log.append(f"  🔶 [+1] MA5({ma5:,.0f}) > MA20({ma20:,.0f}) 유지 중")
-    else:
-        log.append(f"  ❌ [+0] MA5({ma5 or 0:,.0f}) < MA20 — 하락 추세")
+        log.append(f"  ✅ [+1] 골든크로스 발생 (오늘 교차)")
 
     # ❸ 저 PER  [+1점] ──────────────────────────────────────────────────────────
     per = fund.get('per', 0)
@@ -227,6 +241,12 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
         score, max_score, log_lines = _score_entry(fund, ma_data, ratios)
 
         if score < BUY_THRESHOLD:
+            return
+
+        sentiment, sentiment_line = news_sentiment.get_sentiment(stock_code, stock_name)
+        if sentiment == '부정':
+            print(f"⏸  {stock_name}({stock_code}): 진입 조건 {score}점 통과했으나 "
+                  f"뉴스 감성 부정적이라 매수 보류 — {sentiment_line}")
             return
 
         # 당일 급등 방지
