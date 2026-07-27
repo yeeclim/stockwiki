@@ -1,7 +1,7 @@
 // api/us-recommend.js
 // 미국 주식 AI 추천 — 하드코딩 30종목 대신 전체 NASDAQ/NYSE/AMEX 스크리닝 결과 사용
 // trading/screen_us_broad.py가 매일 upsert하는 Supabase us_screening_results
-// (국내 strategy._score_entry와 동일 11점 기준, BUY_THRESHOLD=6)를 그대로 읽고,
+// (국내 strategy._score_entry와 동일 13점 기준, BUY_THRESHOLD=8)를 그대로 읽고,
 // 현재가/등락률만 Yahoo Finance에서 실시간으로 보강한다.
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
@@ -135,16 +135,16 @@ async function buildFromScreening() {
     .sort((a, b) => b.score - a.score);
 }
 
-// screen_us_broad.py 기준 — 11점 만점, BUY_THRESHOLD(6점) 이상만 us_screening_results.pass=true로 저장됨
+// screen_us_broad.py 기준 — 13점 만점, BUY_THRESHOLD(8점) 이상만 us_screening_results.pass=true로 저장됨
 function scoreToAction(score) {
-  if (score >= 9) return 'Buy';
-  if (score >= 7) return 'Watch';
+  if (score >= 11) return 'Buy';
+  if (score >= 8) return 'Watch';
   return 'Hold';
 }
 
 function buildReasons(row, q) {
   const reasons = [];
-  reasons.push(`전체 NASDAQ/NYSE/AMEX 스크리닝 점수 ${row.score}/11점 통과 — 재무비율·이동평균 진입 조건 충족`);
+  reasons.push(`전체 NASDAQ/NYSE/AMEX 스크리닝 점수 ${row.score}/13점 통과 — 재무비율·이동평균·바닥지표 진입 조건 충족`);
 
   const cp = q?.regularMarketChangePercent ?? 0;
   if (cp >= 3) reasons.push(`오늘 +${cp.toFixed(2)}% 강한 상승 모멘텀`);

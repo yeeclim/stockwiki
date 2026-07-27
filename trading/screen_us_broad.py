@@ -1,7 +1,7 @@
 """
 미국 주식 광역 스캔 — 전체 NASDAQ/NYSE/AMEX 보통주 스캔으로 us_screening_results 갱신
 GitHub Actions 매일 실행. 국내 screen_broad.py와 동일하게 strategy._score_entry를
-그대로 재사용해 "동일 조건"으로 채점한다 (11점 만점, 6점 이상 통과).
+그대로 재사용해 "동일 조건"으로 채점한다 (13점 만점, 8점 이상 통과).
 
 흐름:
   1. NASDAQ/NYSE/AMEX 전체 상장 보통주 코드+이름 수집 (ETF·워런트·우선주 제외)
@@ -25,8 +25,8 @@ _SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 MAX_WORKERS   = 8
 CALL_DELAY    = 0.1
-PRE_THRESHOLD = 4    # 국내 screen_broad.py와 동일
-MIN_THRESHOLD = 6    # BUY_THRESHOLD (strategy.py와 동일)
+PRE_THRESHOLD = 6    # 국내 screen_broad.py와 동일
+MIN_THRESHOLD = 8    # BUY_THRESHOLD (strategy.py와 동일)
 TOP_N         = 60
 
 MIN_PRICE          = 1
@@ -192,7 +192,7 @@ def main():
     print(f"  🏆 미국 광역 스캔 결과 — 상위 {len(top)}종목 ({MIN_THRESHOLD}점 이상)")
     print(f"{'=' * 55}")
     for r in top[:20]:
-        print(f"  [{r['score']}/11점] {r['name']}({r['code']})  ${r['fund']['price']:,.2f}")
+        print(f"  [{r['score']}/13점] {r['name']}({r['code']})  ${r['fund']['price']:,.2f}")
 
     _upsert_results(top)
 

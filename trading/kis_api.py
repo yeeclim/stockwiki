@@ -7,6 +7,7 @@ import requests
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import technical_indicators as ti
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
 
@@ -236,8 +237,9 @@ class KISApi:
             if d.get('rt_cd') != '0':
                 raise RuntimeError(f"차트 오류: {d.get('msg1')}")
 
-            prices = [int(x['stck_clpr']) for x in d.get('output2', [])
-                      if x.get('stck_clpr', '0') not in ('0', '', None)]
+            rows = [x for x in d.get('output2', [])
+                    if x.get('stck_clpr', '0') not in ('0', '', None)]
+            prices = [int(x['stck_clpr']) for x in rows]
 
             def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
             def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
@@ -245,11 +247,23 @@ class KISApi:
             ma5, ma20, ma60, ma120 = ma(5), ma(20), ma(60), ma(120)
             p5, p20 = ma_prev(5), ma_prev(20)
 
+            # rows/prices는 최신→과거 순서 — 지표 함수는 과거→최신(오름차순)을 기대하므로 뒤집는다
+            closes_asc = list(reversed(prices))
+            volumes_asc = [int(x.get('acml_vol', 0) or 0) for x in reversed(rows)]
+
+            rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes_asc)
+            basing = ti.basing_near_low(closes_asc)
+            vol_declining = ti.volume_declining(volumes_asc)
+
             return {
                 'ma5':   ma5,  'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
                 'golden_cross': bool(ma5 and ma20 and p5 and p20
                                      and ma5 > ma20 and p5 <= p20),
                 'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
+                'rsi':               rsi_now,
+                'rsi_rebound':       rsi_rebound,
+                'basing':            basing,
+                'volume_declining':  vol_declining,
             }
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"MA 데이터 조회 실패: {e}") from e

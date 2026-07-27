@@ -10,6 +10,7 @@ strategy._score_entry는 ratios 항목이 None이면 해당 배점을 0점 처�
 """
 import time
 import requests
+import technical_indicators as ti
 
 _UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
@@ -156,7 +157,12 @@ def get_ma_data(symbol: str) -> dict:
         )
         r.raise_for_status()
         result = r.json()['chart']['result'][0]
-        closes = [c for c in result['indicators']['quote'][0]['close'] if c is not None]
+        quote = result['indicators']['quote'][0]
+        raw_closes = quote['close']
+        raw_volumes = quote.get('volume') or [0] * len(raw_closes)
+        pairs = [(c, v) for c, v in zip(raw_closes, raw_volumes) if c is not None]
+        closes = [c for c, _ in pairs]
+        volumes = [(v or 0) for _, v in pairs]
         if len(closes) < 20:
             return {}
 
@@ -169,10 +175,19 @@ def get_ma_data(symbol: str) -> dict:
         ma5, ma20, ma60 = ma(5), ma(20), ma(60)
         p5, p20 = ma_prev(5), ma_prev(20)
 
+        # closes/volumes는 이미 과거→최신(오름차순) 순서 (Yahoo 차트 API 기본 응답 순서)
+        rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes)
+        basing = ti.basing_near_low(closes)
+        vol_declining = ti.volume_declining(volumes)
+
         return {
             'ma5': ma5, 'ma20': ma20, 'ma60': ma60,
             'golden_cross': bool(ma5 and ma20 and p5 and p20 and ma5 > ma20 and p5 <= p20),
             'above_ma20': bool(ma5 and ma20 and ma5 > ma20),
+            'rsi': rsi_now,
+            'rsi_rebound': rsi_rebound,
+            'basing': basing,
+            'volume_declining': vol_declining,
         }
     except Exception:
         return {}
