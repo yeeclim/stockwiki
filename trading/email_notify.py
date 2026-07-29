@@ -26,17 +26,27 @@ def send_to(text: str, recipients: list[str]) -> bool:
         return False
     if not recipients:
         return False
-    return _send(text, recipients)
+    return _send(_build_message(recipients, plain_text=text), recipients)
 
 
 def send(text: str) -> bool:
     if not (_SENDER and _PASSWORD):
         print('⚠️  이메일 발송 실패 (EMAIL_SENDER / EMAIL_PASSWORD 미설정)')
         return False
-    return _send(text, [_SENDER])
+    return _send(_build_message([_SENDER], plain_text=text), [_SENDER])
 
 
-def _send(text: str, recipients: list[str]) -> bool:
+def send_html_to(html: str, plain_text: str, recipients: list[str]) -> bool:
+    """HTML 본문(+ 텍스트 폴백)을 multipart/alternative 로 발송."""
+    if not (_SENDER and _PASSWORD):
+        print('⚠️  이메일 발송 실패 (EMAIL_SENDER / EMAIL_PASSWORD 미설정)')
+        return False
+    if not recipients:
+        return False
+    return _send(_build_message(recipients, plain_text=plain_text, html=html), recipients)
+
+
+def _build_message(recipients: list[str], plain_text: str, html: str | None = None) -> EmailMessage:
     kst     = pytz.timezone('Asia/Seoul')
     now_str = datetime.now(kst).strftime('%Y-%m-%d %H:%M KST')
 
@@ -49,8 +59,13 @@ def _send(text: str, recipients: list[str]) -> bool:
     else:
         msg['To'] = f'Undisclosed recipients <{_SENDER}>'
         msg['Bcc'] = ', '.join(recipients)
-    msg.set_content(text, charset='utf-8')
+    msg.set_content(plain_text, charset='utf-8')
+    if html:
+        msg.add_alternative(html, subtype='html', charset='utf-8')
+    return msg
 
+
+def _send(msg: EmailMessage, recipients: list[str]) -> bool:
     try:
         with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=15) as smtp:
             smtp.ehlo()

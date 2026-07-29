@@ -23,7 +23,8 @@ _EXCLUDE_NAME_PATTERNS = (
     'preferred', ' pfd', 'depositary', 'trust preferred',
 )
 
-_QUOTE_FIELDS = 'shortName,regularMarketPrice,regularMarketVolume,marketCap,trailingPE,priceToBook'
+_QUOTE_FIELDS = ('shortName,regularMarketPrice,regularMarketChangePercent,'
+                  'regularMarketVolume,marketCap,trailingPE,priceToBook')
 _BATCH_SIZE = 100
 
 _session = requests.Session()

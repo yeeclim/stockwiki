@@ -9,6 +9,7 @@ import requests
 from kis_api import KISApi
 import kakao_notify
 import email_notify
+import us_market_brief
 from strategy import _score_entry
 from news_sentiment import get_sentiment
 
@@ -301,10 +302,24 @@ def screen():
     else:
         print("⚠️  카카오톡 수신자 없음")
 
-    # 가입 유저 전체: 이메일 (기존 동작)
+    # 가입 유저 전체: 이메일 (간밤 미국시장 브리핑을 상단에 포함한 HTML)
+    try:
+        brief = us_market_brief.get_brief()
+        print(f"🌙 미국시장 브리핑: 지수 {len(brief['indices'])}개, "
+              f"섹터 {len(brief['sectors'])}개, 요약 {'있음' if brief['summary'] else '없음'}")
+    except Exception as e:
+        print(f"⚠️  미국시장 브리핑 생성 실패: {e}")
+        brief = None
+
     recipients = _fetch_user_emails()
     if recipients:
-        ok = email_notify.send_to(report, recipients)
+        if brief:
+            html = us_market_brief.render_email_html(brief, report)
+            brief_text = us_market_brief.render_text(brief)
+            plain = f"{brief_text}\n\n{report}" if brief_text else report
+            ok = email_notify.send_html_to(html, plain, recipients)
+        else:
+            ok = email_notify.send_to(report, recipients)
         if ok:
             print(f"📧 이메일 발송 완료 → {len(recipients)}명")
         else:
