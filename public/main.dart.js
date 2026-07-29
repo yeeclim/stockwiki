@@ -113456,7 +113456,7 @@ s=p}for(;;)switch(s){case 0:p=4
 h=A.dj()
 m=h.gdm(h)
 s=7
-return A.l(A.en(A.bE(A.i(m)+"/api/fear-greed",0,null),null).d6(0,B.b2),$async$x4)
+return A.l(A.en(A.bE(A.i(m)+"/api/utils?type=cnn-fear-greed",0,null),null).d6(0,B.b2),$async$x4)
 case 7:l=b
 s=l.b===200?8:9
 break
