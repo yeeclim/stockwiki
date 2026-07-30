@@ -233,7 +233,7 @@ def screen():
     others.sort(key=lambda x: x.get('score', 0), reverse=True)
 
     def chart_url(code, name):
-        return f"https://stockwiki.vercel.app/?code={code}&name={quote(name)}"
+        return f"https://stockwiki.vercel.app/?stock={code}&name={quote(name)}"
 
     def _ratio_str(r):
         ratios = r.get('ratios') or {}
