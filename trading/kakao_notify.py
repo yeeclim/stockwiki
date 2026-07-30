@@ -11,6 +11,8 @@ _REST_KEY       = os.environ.get('KAKAO_REST_API_KEY', '').strip()
 _REFRESH_TOKEN  = os.environ.get('KAKAO_REFRESH_TOKEN', '').strip()
 _CLIENT_SECRET  = os.environ.get('KAKAO_CLIENT_SECRET', '').strip()
 
+_DEFAULT_LINK = 'https://stockwiki.vercel.app'
+
 
 def _get_access_token() -> str | None:
     """리프레시 토큰 → 액세스 토큰 발급"""
@@ -40,13 +42,14 @@ def _get_access_token_from_refresh(refresh_token: str) -> str | None:
     return None
 
 
-def send(text: str) -> bool:
+def send(text: str, link_url: str | None = None) -> bool:
     """카카오톡 나에게 텍스트 메시지 전송 (최대 1000자)"""
     access_token = _get_access_token()
     if not access_token:
         print('⚠️  카카오 알림 비활성 (토큰 없음)')
         return False
 
+    link = link_url or _DEFAULT_LINK
     r = requests.post(
         'https://kapi.kakao.com/v2/api/talk/memo/default/send',
         headers={'Authorization': f'Bearer {access_token}'},
@@ -55,8 +58,8 @@ def send(text: str) -> bool:
                 'object_type': 'text',
                 'text': text[:1000],
                 'link': {
-                    'web_url':        'https://stockwiki.vercel.app',
-                    'mobile_web_url': 'https://stockwiki.vercel.app',
+                    'web_url':        link,
+                    'mobile_web_url': link,
                 },
             }, ensure_ascii=False),
         },
@@ -70,13 +73,14 @@ def send(text: str) -> bool:
     return ok
 
 
-def send_to_refresh(refresh_token: str, text: str) -> bool:
+def send_to_refresh(refresh_token: str, text: str, link_url: str | None = None) -> bool:
     """Given a user's refresh token, obtain an access token and send text to that user's KakaoTalk."""
     access_token = _get_access_token_from_refresh(refresh_token)
     if not access_token:
         print('⚠️  카카오 전송 불가 (리프레시 토큰으로 액세스 토큰 발급 실패)')
         return False
 
+    link = link_url or _DEFAULT_LINK
     r = requests.post(
         'https://kapi.kakao.com/v2/api/talk/memo/default/send',
         headers={'Authorization': f'Bearer {access_token}'},
@@ -85,8 +89,8 @@ def send_to_refresh(refresh_token: str, text: str) -> bool:
                 'object_type': 'text',
                 'text': text[:1000],
                 'link': {
-                    'web_url':        'https://stockwiki.vercel.app',
-                    'mobile_web_url': 'https://stockwiki.vercel.app',
+                    'web_url':        link,
+                    'mobile_web_url': link,
                 },
             }, ensure_ascii=False),
         },
@@ -100,14 +104,14 @@ def send_to_refresh(refresh_token: str, text: str) -> bool:
     return ok
 
 
-def send_to_users(text: str, refresh_tokens: list[str]) -> int:
+def send_to_users(text: str, refresh_tokens: list[str], link_url: str | None = None) -> int:
     """Send `text` to multiple users identified by their refresh tokens. Returns number of successful sends."""
     success = 0
     for t in refresh_tokens:
         try:
             if not t:
                 continue
-            if send_to_refresh(t, text):
+            if send_to_refresh(t, text, link_url=link_url):
                 success += 1
         except Exception as e:
             print(f'⚠️  카카오톡 전송 중 오류: {e}')

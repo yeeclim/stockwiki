@@ -291,13 +291,17 @@ def screen():
     ok_count = sum(1 for r in results if r.get('pass'))
     bp_title = f"{date_str} 스크리닝 종목"
     bp_content = board_post.screening_content(results, date_str)
-    if board_post.post(bp_title, bp_content):
+    bp_id = board_post.post(bp_title, bp_content)
+    if bp_id:
         print("📋 게시판 스크리닝 기록 등록 완료")
     else:
         print("⚠️  게시판 스크리닝 기록 등록 실패")
 
+    # 카카오톡 "자세히 보기" 링크 — 게시글이 등록됐으면 해당 글로, 아니면 홈으로
+    kakao_link = board_post.post_url(bp_id) if bp_id else None
+
     # 관리자: 카카오톡 (기존)
-    kakao_notify.send(report)
+    kakao_notify.send(report, link_url=kakao_link)
 
     # 가입 유저: 카카오톡 (등록된 리프레시 토큰을 가진 사용자에 한해)
     def _fetch_user_kakao_tokens() -> list[str]:
@@ -321,7 +325,7 @@ def screen():
 
     kakao_tokens = _fetch_user_kakao_tokens()
     if kakao_tokens:
-        sent = kakao_notify.send_to_users(report, kakao_tokens)
+        sent = kakao_notify.send_to_users(report, kakao_tokens, link_url=kakao_link)
         print(f"📱 카카오톡 발송 완료 → {sent}명 (시도 {len(kakao_tokens)}명)")
     else:
         print("⚠️  카카오톡 수신자 없음")

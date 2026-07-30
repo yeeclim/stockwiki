@@ -12,9 +12,10 @@ _PW_HASH = hashlib.sha256(('stockwiki_auto' + 'sw_pw').encode()).hexdigest()
 _IP_HASH = hashlib.sha256(('github_actions' + 'sw_ip').encode()).hexdigest()[:16]
 
 
-def post(title: str, content: str) -> bool:
+def post(title: str, content: str) -> str | None:
+    """게시글 등록. 성공하면 새 글의 id를, 실패하면 None을 반환한다."""
     if not _SUPABASE_URL or not _SUPABASE_KEY:
-        return False
+        return None
     try:
         r = requests.post(
             f'{_SUPABASE_URL}/rest/v1/board_posts',
@@ -22,7 +23,7 @@ def post(title: str, content: str) -> bool:
                 'apikey':        _SUPABASE_KEY,
                 'Authorization': f'Bearer {_SUPABASE_KEY}',
                 'Content-Type':  'application/json',
-                'Prefer':        'return=minimal',
+                'Prefer':        'return=representation',
             },
             json={
                 'title':         title,
@@ -33,10 +34,17 @@ def post(title: str, content: str) -> bool:
             },
             timeout=10,
         )
-        return r.ok
+        if not r.ok:
+            return None
+        rows = r.json()
+        return rows[0]['id'] if rows else None
     except Exception as e:
         print(f'⚠️  게시판 등록 실패: {e}')
-        return False
+        return None
+
+
+def post_url(post_id: str) -> str:
+    return f'https://stockwiki.vercel.app/?board={post_id}'
 
 
 def screening_content(results: list, date_str: str) -> str:
