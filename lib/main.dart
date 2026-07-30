@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +7,7 @@ import 'utils/pkce_storage.dart'
     if (dart.library.js_interop) 'utils/pkce_storage_web.dart';
 import 'package:stockwiki/providers/bookmark_provider.dart';
 import 'package:stockwiki/theme/app_theme.dart';
+import 'package:stockwiki/utils/tradingview_helper.dart';
 import 'package:stockwiki/widgets/fear_greed_widget.dart';
 import 'package:stockwiki/widgets/stock_fear_greed_widget.dart';
 import 'package:stockwiki/widgets/usdkrw_widget.dart';
@@ -83,6 +85,7 @@ class StockSearchPage extends StatefulWidget {
 class _StockSearchPageState extends State<StockSearchPage>
     with SingleTickerProviderStateMixin {
   bool _showWidgets = true;
+  bool _deepLinkChecked = false;
   late final AnimationController _liveDotController;
 
   @override
@@ -92,6 +95,25 @@ class _StockSearchPageState extends State<StockSearchPage>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _openDeepLinkedStockIfAny());
+  }
+
+  /// 메일/카카오톡 링크(예: ?code=005930&name=삼성전자)로 들어온 경우
+  /// 홈 화면 위에 바로 해당 종목 차트 바텀시트를 띄운다.
+  void _openDeepLinkedStockIfAny() {
+    if (_deepLinkChecked || !kIsWeb) return;
+    _deepLinkChecked = true;
+    final params = Uri.base.queryParameters;
+    final code = params['code'];
+    if (code == null || code.isEmpty) return;
+    final name = params['name'];
+    showChart(
+      context,
+      tvSymbol: krxSymbol(code),
+      stockName: (name != null && name.isNotEmpty) ? name : code,
+      naverCode: code,
+    );
   }
 
   @override
