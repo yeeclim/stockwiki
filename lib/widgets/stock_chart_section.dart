@@ -25,13 +25,16 @@ class _StockChartSectionState extends State<StockChartSection> {
   // ─── URL helpers ─────────────────────────────────────────────────────────
 
   String _getChartUrl(String symbol) {
-    final secondsSinceEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final cacheKey = '${symbol}_$secondsSinceEpoch';
+    final now = DateTime.now();
+    // 일봉 차트이므로 같은 날짜 안에서는 캐시를 재사용하고, 날짜가 바뀌면 갱신한다.
+    final dateBucket = '${now.year}-${now.month}-${now.day}';
+    final cacheKey = '${symbol}_$dateBucket';
 
     if (_chartCache.containsKey(cacheKey)) {
       return _chartCache[cacheKey]!;
     }
 
+    final secondsSinceEpoch = now.millisecondsSinceEpoch ~/ 1000;
     final chartUrl =
         'https://images.weserv.nl/?url=ssl.pstatic.net/imgfinance/chart/item/candle/day/$symbol.png&t=$secondsSinceEpoch&cache=false';
     _chartCache[cacheKey] = chartUrl;
