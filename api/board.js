@@ -36,10 +36,17 @@ function sanitize(html) {
   let s = html
     .replace(/<(script|style|iframe|frame|object|embed|link|meta|base|form|input|button|select|textarea|svg)[\s\S]*?>/gi, '')
     .replace(/<\/(script|style|iframe|frame|object|embed|form|select|textarea|svg)>/gi, '')
-    .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
-    .replace(/\s+on\w+\s*=\s*[^\s>]+/gi, '')
-    .replace(/href\s*=\s*["']\s*(javascript|vbscript|data):[^"']*/gi, 'href="#"')
-    .replace(/src\s*=\s*["']\s*(javascript|vbscript):[^"']*/gi, 'src=""')
+    .replace(/[\s/]+on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/[\s/]+on\w+\s*=\s*[^\s>]+/gi, '')
+    // href/src의 javascript: 등 위험 스킴은 탭·개행 등 제어문자를 끼워 넣어
+    // 정규식을 우회할 수 있으므로, 속성값에서 제어문자를 제거한 뒤 스킴을 검사한다.
+    .replace(/(href|src)\s*=\s*(["'])([^"']*)\2/gi, (match, attr, quote, value) => {
+      const normalized = value.replace(/[\s\x00-\x1F]/g, '').toLowerCase();
+      if (/^(javascript|vbscript|data):/.test(normalized)) {
+        return attr.toLowerCase() === 'href' ? 'href="#"' : 'src=""';
+      }
+      return match;
+    })
     .replace(/position\s*:\s*(fixed|absolute|sticky)/gi, 'position:relative')
     .replace(/<img([^>]*)>/gi, (_, attrs) => {
       const clean = attrs
@@ -53,6 +60,15 @@ function sanitize(html) {
       return `<a${noTarget} target="_blank" rel="noopener noreferrer">`;
     });
   return s.substring(0, MAX_CONTENT);
+}
+
+// board_posts.id는 bigserial이므로 양의 정수만 허용한다.
+// 검증 없이 쿼리 문자열에 그대로 넣으면 &로 추가 PostgREST 파라미터(select= 등)를
+// 주입할 수 있어 반드시 여기서 막는다.
+function toPositiveIntId(value) {
+  if (Array.isArray(value)) return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 function stripHtml(html) {
@@ -80,9 +96,12 @@ export default async function handler(req, res) {
   try {
     // ── GET ──────────────────────────────────────────────────────────────────
     if (req.method === 'GET') {
-      const { id, page = '1', limit = '20' } = req.query;
+      const { id: rawId, page = '1', limit = '20' } = req.query;
 
-      if (id) {
+      if (rawId) {
+        const id = toPositiveIntId(rawId);
+        if (id === null) return res.status(400).json({ error: '잘못된 id' });
+
         // 단건 조회 + 조회수 증가
         const r = await db(
           `/board_posts?id=eq.${id}&select=id,title,nickname,content,view_count,created_at,updated_at`
@@ -189,9 +208,9 @@ export default async function handler(req, res) {
 
     // ── PUT ──────────────────────────────────────────────────────────────────
     if (req.method === 'PUT') {
-      const { id } = req.query;
       const { title, content, password } = req.body ?? {};
-      if (!id || !content?.trim() || !password?.trim())
+      const id = toPositiveIntId(req.query.id);
+      if (id === null || !content?.trim() || !password?.trim())
         return res.status(400).json({ error: '필수 값 누락' });
 
       const gr = await db(`/board_posts?id=eq.${id}&select=password_hash`);
@@ -216,9 +235,9 @@ export default async function handler(req, res) {
 
     // ── DELETE ───────────────────────────────────────────────────────────────
     if (req.method === 'DELETE') {
-      const { id } = req.query;
       const { password } = req.body ?? {};
-      if (!id || !password?.trim())
+      const id = toPositiveIntId(req.query.id);
+      if (id === null || !password?.trim())
         return res.status(400).json({ error: '필수 값 누락' });
 
       const gr = await db(`/board_posts?id=eq.${id}&select=password_hash`);
@@ -233,7 +252,7 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
-    console.error('board error:', e.message);
-    return res.status(500).json({ error: '서버 오류: ' + e.message });
+    console.error('board error:', e);
+    return res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 }

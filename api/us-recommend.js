@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('US 추천 API 오류:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: '서버 오류가 발생했습니다' });
   }
 }
 

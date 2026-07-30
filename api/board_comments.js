@@ -12,6 +12,14 @@ function sha256(str, salt) {
 function ipHash(ip) { return sha256(ip,  'sw_ip').substring(0, 16); }
 function pwHash(pw) { return sha256(pw,  'sw_pw'); }
 
+// board_posts.id / board_comments.id는 bigserial이므로 양의 정수만 허용한다.
+// 검증 없이 쿼리 문자열에 그대로 넣으면 &로 추가 PostgREST 파라미터를 주입할 수 있다.
+function toPositiveIntId(value) {
+  if (Array.isArray(value)) return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 async function db(path, options = {}) {
   const { method = 'GET', body, prefer } = options;
   const headers = {
@@ -47,8 +55,8 @@ export default async function handler(req, res) {
   try {
     // ── GET: 댓글 목록 ───────────────────────────────────────────────────────
     if (req.method === 'GET') {
-      const { post_id } = req.query;
-      if (!post_id) return res.status(400).json({ error: 'post_id 필요' });
+      const post_id = toPositiveIntId(req.query.post_id);
+      if (post_id === null) return res.status(400).json({ error: 'post_id 필요' });
 
       const r = await db(
         `/board_comments?post_id=eq.${post_id}&select=id,nickname,content,created_at&order=created_at.asc`
@@ -59,9 +67,10 @@ export default async function handler(req, res) {
 
     // ── POST: 댓글 작성 ──────────────────────────────────────────────────────
     if (req.method === 'POST') {
-      const { post_id, nickname, content, password } = req.body ?? {};
+      const { nickname, content, password } = req.body ?? {};
+      const post_id = toPositiveIntId(req.body?.post_id);
 
-      if (!post_id || !nickname?.trim() || !content?.trim() || !password?.trim())
+      if (post_id === null || !nickname?.trim() || !content?.trim() || !password?.trim())
         return res.status(400).json({ error: '닉네임·내용·비밀번호를 모두 입력해주세요' });
       if (nickname.trim().length > MAX_NICKNAME)
         return res.status(400).json({ error: `닉네임은 ${MAX_NICKNAME}자 이하` });
@@ -99,9 +108,9 @@ export default async function handler(req, res) {
 
     // ── DELETE: 댓글 삭제 ────────────────────────────────────────────────────
     if (req.method === 'DELETE') {
-      const { id } = req.query;
       const { password } = req.body ?? {};
-      if (!id || !password?.trim())
+      const id = toPositiveIntId(req.query.id);
+      if (id === null || !password?.trim())
         return res.status(400).json({ error: '필수 값 누락' });
 
       const gr = await db(`/board_comments?id=eq.${id}&select=password_hash`);
@@ -116,7 +125,7 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
-    console.error('board_comments error:', e.message);
-    return res.status(500).json({ error: '서버 오류: ' + e.message });
+    console.error('board_comments error:', e);
+    return res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 }
