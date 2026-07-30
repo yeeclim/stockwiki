@@ -88,8 +88,7 @@ export default async function handler(req, res) {
     console.error('❌ 종목 검색 실패:', error);
     return res.status(500).json({
       success: false,
-      error: '서버 오류가 발생했습니다',
-      details: error.message
+      error: '서버 오류가 발생했습니다'
     });
   }
 }

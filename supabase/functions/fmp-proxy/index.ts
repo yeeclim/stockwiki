@@ -27,6 +27,22 @@ interface ProxyRequest {
   params?: Record<string, string>;
 }
 
+// 클라이언트(lib/services/*.dart)가 실제로 사용하는 경로만 허용한다.
+// 이 프록시는 인증 없이 anon key만으로 호출 가능하므로, 화이트리스트가 없으면
+// 누구나 서버가 보관한 FMP/Finnhub 키로 임의의 유료 엔드포인트를 호출할 수 있다.
+const ALLOWED_PATH_PATTERNS: RegExp[] = [
+  /^\/search$/,
+  /^\/quote(\/[^/]+)?$/,
+  /^\/stock_news$/,
+  /^\/historical-price-full\/[^/]+$/,
+  /^\/stock\/profile2$/,
+  /^\/stock\/candle$/,
+];
+
+function isAllowedPath(path: string): boolean {
+  return ALLOWED_PATH_PATTERNS.some((pattern) => pattern.test(path));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -51,7 +67,7 @@ Deno.serve(async (req: Request) => {
 
   const { service, path, params = {} } = body;
 
-  if (!path || !path.startsWith('/')) {
+  if (!path || !path.startsWith('/') || !isAllowedPath(path)) {
     return new Response(JSON.stringify({ error: 'Invalid path' }), {
       status: 400,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

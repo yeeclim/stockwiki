@@ -13,6 +13,38 @@ const GITHUB_OWNER = Deno.env.get("GITHUB_OWNER") ?? "";
 const GITHUB_REPO  = Deno.env.get("GITHUB_REPO")  ?? "";
 const ADMIN_API_KEY = Deno.env.get("ADMIN_API_KEY") ?? "";
 
+// 실계좌 API 키를 다루는 엔드포인트이므로 단순 문자열 비교 대신 타이밍 공격에
+// 안전한 비교와, 같은 인스턴스 내에서의 무차별 대입 시도를 늦추는 rate limit을 둔다.
+async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b)),
+  ]);
+  const bytesA = new Uint8Array(digestA);
+  const bytesB = new Uint8Array(digestB);
+  let diff = 0;
+  for (let i = 0; i < bytesA.length; i++) {
+    diff |= bytesA[i] ^ bytesB[i];
+  }
+  return diff === 0;
+}
+
+const AUTH_ATTEMPTS = new Map<string, { count: number; resetAt: number }>();
+const AUTH_WINDOW_MS = 60_000;
+const AUTH_MAX_ATTEMPTS = 5;
+
+function isRateLimited(clientKey: string): boolean {
+  const now = Date.now();
+  const entry = AUTH_ATTEMPTS.get(clientKey);
+  if (!entry || now > entry.resetAt) {
+    AUTH_ATTEMPTS.set(clientKey, { count: 1, resetAt: now + AUTH_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > AUTH_MAX_ATTEMPTS;
+}
+
 interface RequestBody {
   user_id: string;
   broker_type?: string;
@@ -36,8 +68,13 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const clientKey = req.headers.get('x-forwarded-for') ?? 'unknown';
+  if (isRateLimited(clientKey)) {
+    return json({ error: 'too many attempts, try again later' }, 429);
+  }
+
   const adminHeader = req.headers.get('x-admin-secret') ?? '';
-  if (!ADMIN_API_KEY || adminHeader !== ADMIN_API_KEY) {
+  if (!ADMIN_API_KEY || !(await timingSafeEqual(adminHeader, ADMIN_API_KEY))) {
     return json({ error: 'unauthorized' }, 401);
   }
 
