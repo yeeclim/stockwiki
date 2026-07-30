@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class KakaoGuideContent extends StatelessWidget {
   const KakaoGuideContent({super.key});
@@ -10,110 +9,65 @@ class KakaoGuideContent extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('개요',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text(
-          '카카오톡 알림을 받으려면 카카오 개발자 사이트에서 앱을 등록하고 REST API Key와 리다이렉트 URL을 설정한 뒤, 사용자 인증을 통해 얻은 refresh_token을 등록해야 합니다.',
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: 16),
-        Text('1) 앱 등록',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text('developers.kakao.com에 접속 → "내 애플리케이션" → 새 앱 등록',
-            style: theme.textTheme.bodySmall),
-        const SizedBox(height: 12),
-        Text('2) 플랫폼·리다이렉트 URI 설정',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text(
-            '앱 설정 → 플랫폼에 웹(혹은 로컬) 리다이렉트 URI를 추가하세요. 예: https://stockwiki.vercel.app/_kakao_callback 또는 http://localhost:3000/auth/kakao',
-            style: theme.textTheme.bodySmall),
-        const SizedBox(height: 12),
-        Text('3) REST API Key 복사',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text(
-            '앱 키에서 "REST API Key"를 복사합니다. 이 키는 서버(Functions 또는 Actions)의 환경변수로만 보관하세요.',
-            style: theme.textTheme.bodySmall),
-        const SizedBox(height: 12),
-        Text('4) 사용자 토큰 발급 (권한: talk_message)',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text(
-            '아래 인증 URL을 브라우저에 붙여넣어 로그인하면 리다이렉트된 주소의 code를 얻을 수 있습니다. 요청 시 scope에 talk_message를 포함해야 메시지 권한이 부여됩니다.',
-            style: theme.textTheme.bodySmall),
-        const SizedBox(height: 8),
-        SelectableText(
-          'https://kauth.kakao.com/oauth/authorize?client_id={REST_API_KEY}&redirect_uri={REDIRECT_URI}&response_type=code&scope=talk_message,profile',
-          style: TextStyle(
-              fontFamily: 'monospace', color: theme.colorScheme.onSurface),
-        ),
-        const SizedBox(height: 12),
-        Text('5) code → 토큰 교환',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        SelectableText(
-          'POST https://kauth.kakao.com/oauth/token',
-          style: TextStyle(
-              fontFamily: 'monospace', color: theme.colorScheme.onSurface),
-        ),
-        const SizedBox(height: 6),
-        SelectableText(
-          'grant_type=authorization_code&client_id={REST_API_KEY}&redirect_uri={REDIRECT_URI}&code={AUTH_CODE}',
-          style: TextStyle(
-              fontFamily: 'monospace', color: theme.colorScheme.onSurface),
-        ),
-        const SizedBox(height: 12),
-        Text(
-            '응답에서 access_token과 refresh_token이 반환됩니다. 앱 사용자(본인)에게 메시지를 보내려면 refresh_token을 저장해 주세요. (refresh_token은 기본 60일 유효)',
-            style: theme.textTheme.bodySmall),
-        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withValues(alpha: 0.06),
+            color: theme.colorScheme.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-                color: theme.colorScheme.primary.withValues(alpha: 0.18)),
+                color: theme.colorScheme.primary.withValues(alpha: 0.2)),
           ),
-          child: Text(
-              '주의: refresh_token은 민감정보입니다. 앱에서는 refresh_token만 서버에 저장하고 REST API Key는 서버 환경변수로 보관하세요.',
-              style: theme.textTheme.bodySmall),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline,
+                  size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '대부분의 경우 이 페이지는 필요 없습니다. 설정 화면의 "카카오 알림 연동하기" 버튼을 누르고 카카오 로그인만 하면 자동으로 연동됩니다. 개발자 앱을 직접 만들거나 API를 직접 호출할 필요가 없어요.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () =>
-                launchUrl(Uri.parse('https://developers.kakao.com')),
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Kakao Developers 열기'),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text('앱에 등록하기',
+        Text('원클릭 연동은 어떻게 동작하나요?',
             style: theme.textTheme.titleSmall
                 ?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text(
-            '발급받은 refresh_token을 앱의 "API 키 등록" 화면의 카카오 리프레시 토큰 필드에 붙여넣고 저장하세요.',
-            style: theme.textTheme.bodySmall),
+          '"카카오 알림 연동하기" 버튼을 누르면 StockWiki가 이미 등록해 둔 카카오 앱으로 로그인 화면이 열립니다. 회원님 본인 카카오 계정으로 로그인·동의하면, 그 결과(인가 코드)를 StockWiki 서버가 받아 토큰 교환까지 자동으로 처리하고 저장합니다. 서비스마다 새 앱을 만드는 게 아니라, 앱은 하나를 공유하고 로그인한 계정별로 다른 알림 토큰이 발급되는 방식입니다.',
+          style: theme.textTheme.bodySmall,
+        ),
         const SizedBox(height: 20),
-        Text('테스트',
+        Text('버튼이 비활성화되어 있어요',
             style: theme.textTheme.titleSmall
                 ?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text(
-            '서버에 REST API Key와 refresh_token이 정상 등록되면 스크리닝 실행 시 등록된 사용자에게 카카오 메시지가 전송됩니다. 토큰 만료 시 재발급 후 재등록하세요.',
-            style: theme.textTheme.bodySmall),
+          '증권사(KIS) API 정보를 먼저 저장해야 연동 버튼이 활성화됩니다. 위쪽 증권사 설정을 먼저 저장한 뒤 다시 시도해주세요.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 20),
+        Text('아래 "리프레시 토큰 직접 입력" 칸은 언제 쓰나요?',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(
+          '이미 유효한 카카오 refresh_token을 다른 경로로 가지고 있는 경우(예: 관리자가 직접 발급한 토큰)에만 붙여넣는 용도입니다. 일반적으로 직접 발급할 필요는 없고, 위 원클릭 버튼을 이용해주세요. refresh_token은 보통 60일간 유효하며, 만료되면 다시 연동하면 됩니다.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 20),
+        Text('그래도 연동이 안 될 때',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(
+          '스낵바에 표시되는 실패 메시지를 캡처해서 관리자에게 문의해주세요.',
+          style: theme.textTheme.bodySmall,
+        ),
       ]),
     );
   }
