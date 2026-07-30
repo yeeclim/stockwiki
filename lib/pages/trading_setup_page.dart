@@ -1,9 +1,14 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/trading_config_service.dart';
 import 'kis_guide_page.dart';
 import 'kakao_guide_page.dart';
+
+const _kakaoRestApiKey = String.fromEnvironment('KAKAO_REST_API_KEY');
 
 class TradingSetupPage extends StatefulWidget {
   final String initialBroker;
@@ -164,6 +169,29 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     _kakaoCtrl.dispose();
     _dailyMaxCtrl.dispose();
     super.dispose();
+  }
+
+  /// 카카오 로그인 페이지로 이동(같은 탭) — 돌아오면 main.dart의
+  /// _completeKakaoLink()가 인가 코드를 받아 서버에서 토큰 교환을 처리한다.
+  Future<void> _connectKakao() async {
+    if (_kakaoRestApiKey.isEmpty) {
+      _showResult('카카오 연동 설정이 아직 배포되지 않았습니다.', isError: true);
+      return;
+    }
+    final state = List.generate(24, (_) => Random.secure().nextInt(36))
+        .map((n) => n.toRadixString(36))
+        .join();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('kakao_link_state', state);
+
+    final uri = Uri.https('kauth.kakao.com', '/oauth/authorize', {
+      'client_id': _kakaoRestApiKey,
+      'redirect_uri': 'https://stockwiki.vercel.app',
+      'response_type': 'code',
+      'scope': 'talk_message openid',
+      'state': state,
+    });
+    await launchUrl(uri, webOnlyWindowName: '_self');
   }
 
   @override
@@ -334,33 +362,62 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                             style: theme.textTheme.titleSmall
                                 ?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        _Field(
-                          controller: _kakaoCtrl,
-                          label: '카카오 리프레시 토큰',
-                          hint: '카카오 앱에서 발급된 리프레시 토큰',
-                          icon: Icons.chat_bubble_outline,
-                          validator: (v) => null,
-                        ),
-                        const SizedBox(height: 8),
                         Text(
-                          '입력하면 종목 스크리닝 결과를 카카오톡으로 수신합니다. 토큰은 안전하게 저장됩니다.',
+                          _kakaoCtrl.text.trim().isEmpty
+                              ? '카카오 로그인 한 번으로 스크리닝 결과를 카카오톡으로 받아보세요.'
+                              : '✅ 카카오톡 알림이 연동되어 있습니다.',
                           style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const KakaoGuidePage()),
-                            ),
-                            icon: Icon(Icons.help_outline,
-                                size: 16, color: theme.colorScheme.primary),
-                            label: Text('카카오 발급 가이드 보기',
-                                style: TextStyle(
-                                    color: theme.colorScheme.primary)),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _existing == null ? null : _connectKakao,
+                            icon: const Icon(Icons.chat_bubble_outline),
+                            label: Text(_kakaoCtrl.text.trim().isEmpty
+                                ? '카카오 알림 연동하기'
+                                : '카카오 알림 다시 연동하기'),
                           ),
+                        ),
+                        if (_existing == null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              '증권사 정보를 먼저 저장해야 연동할 수 있어요.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: Text('고급: 리프레시 토큰 직접 입력',
+                              style: theme.textTheme.bodySmall),
+                          children: [
+                            _Field(
+                              controller: _kakaoCtrl,
+                              label: '카카오 리프레시 토큰',
+                              hint: '카카오 앱에서 발급된 리프레시 토큰',
+                              icon: Icons.chat_bubble_outline,
+                              validator: (v) => null,
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) => const KakaoGuidePage()),
+                                ),
+                                icon: Icon(Icons.help_outline,
+                                    size: 16, color: theme.colorScheme.primary),
+                                label: Text('카카오 발급 가이드 보기',
+                                    style: TextStyle(
+                                        color: theme.colorScheme.primary)),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
 

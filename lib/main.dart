@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:stockwiki/providers/auth_provider.dart';
 import 'utils/pkce_storage.dart'
@@ -96,18 +97,23 @@ class _StockSearchPageState extends State<StockSearchPage>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _openDeepLinkedStockIfAny());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleIncomingLink());
   }
 
-  /// 메일/카카오톡 링크(예: ?stock=005930&name=삼성전자 또는 ?board=<id>)로 들어온 경우
-  /// 홈 화면 위에 바로 해당 종목 차트 또는 게시글을 띄운다.
-  /// 파라미터명은 'stock'/'board' — 카카오/구글 등 OAuth 리다이렉트가 'code'를 쓰기 때문에
-  /// 겹치면 로그인 인가 코드를 종목코드로 오인해 차트를 띄우는 버그가 생긴다.
-  void _openDeepLinkedStockIfAny() {
+  /// 메일/카카오톡 링크(?stock=005930&name=삼성전자, ?board=<id>) 또는 카카오
+  /// 로그인 콜백(?code=...&state=...)으로 들어온 경우 각각 처리한다.
+  /// 'code'는 OAuth 리다이렉트 표준 파라미터라 종목코드 파라미터명과는
+  /// 반드시 분리해야 한다 (겹치면 인가 코드를 종목코드로 오인하는 버그가 생김).
+  void _handleIncomingLink() {
     if (_deepLinkChecked || !kIsWeb) return;
     _deepLinkChecked = true;
     final params = Uri.base.queryParameters;
+
+    final oauthCode = params['code'];
+    if (oauthCode != null && oauthCode.isNotEmpty) {
+      _completeKakaoLink(oauthCode, params['state']);
+      return;
+    }
 
     final boardId = params['board'];
     if (boardId != null && boardId.isNotEmpty) {
@@ -126,6 +132,32 @@ class _StockSearchPageState extends State<StockSearchPage>
       stockName: (name != null && name.isNotEmpty) ? name : code,
       naverCode: code,
     );
+  }
+
+  /// "카카오 알림 연동하기" 버튼(trading_setup_page.dart)에서 카카오 로그인으로
+  /// 갔다가 돌아온 경우: state를 검증하고, 서버(Edge Function)에 인가 코드를
+  /// 넘겨 refresh_token 교환 + trading_configs 저장까지 맡긴다.
+  Future<void> _completeKakaoLink(String code, String? state) async {
+    if (Supabase.instance.client.auth.currentUser == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedState = prefs.getString('kakao_link_state');
+    await prefs.remove('kakao_link_state');
+    if (savedState == null || state == null || savedState != state) return;
+
+    String message;
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('kakao-oauth-exchange', body: {'code': code});
+      message = res.status < 400
+          ? '카카오 알림 연동 완료!'
+          : '카카오 연동 실패: ${(res.data as Map?)?['error'] ?? '알 수 없는 오류'}';
+    } catch (e) {
+      message = '카카오 연동 실패: $e';
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
