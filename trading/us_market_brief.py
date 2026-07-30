@@ -6,9 +6,11 @@ news_sentiment.py 와 동일한 패턴(Google News RSS + Claude Haiku)을 재사
 import os
 import re
 import html as html_lib
+from datetime import datetime
 from urllib.parse import quote
 from xml.etree import ElementTree
 
+import pytz
 import requests
 
 import us_market_data as umd
@@ -155,81 +157,214 @@ def render_text(brief: dict) -> str:
     return '\n'.join(lines)
 
 
-# ── HTML 렌더링 ────────────────────────────────────────────────────────────────
+# ── HTML 렌더링 — StockWiki 앱과 동일한 블랙+네온 테마 (lib/theme/app_theme.dart 참고) ──
 
-_UP_COLOR = '#d6392a'    # 상승 = 빨강 (국내 관행)
-_DOWN_COLOR = '#2a5cd6'  # 하락 = 파랑
+_BG           = '#050706'
+_SURFACE      = '#0B0F0C'
+_SURFACE_SOFT = '#0F1C15'
+_LINE         = '#182620'
+_INK          = '#EEF4EF'
+_MUTED        = '#6C7A71'
+_ACCENT       = '#39FF8C'   # 네온 그린
+_UP           = '#FF4550'   # 상승 = 빨강 (국내 관행)
+_DOWN         = '#3B82F6'   # 하락 = 파랑
+_AMBER        = '#FFC94D'   # 중립/주의
 
 
-def _pct_span(pct: float) -> str:
-    color = _UP_COLOR if pct >= 0 else _DOWN_COLOR
-    return f'<span style="color:{color};font-weight:600;">{pct:+.2f}%</span>'
+def _chunk(seq: list, n: int) -> list[list]:
+    return [seq[i:i + n] for i in range(0, len(seq), n)]
 
 
-def _rows_table_html(title: str, rows: list[dict]) -> str:
+def _pct_color(pct: float) -> str:
+    return _UP if pct >= 0 else _DOWN
+
+
+def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
+    """지수/섹터 등락률을 네온 카드 그리드로 렌더링."""
     if not rows:
         return ''
-    cells = []
-    for r in rows:
-        cells.append(
-            '<td style="padding:8px 12px;border:1px solid #e2e2e2;text-align:center;">'
-            f'<div style="font-size:12px;color:#666;">{html_lib.escape(r["label"])}</div>'
-            f'<div style="font-size:14px;">{r["price"]:,.2f}</div>'
-            f'<div style="font-size:13px;">{_pct_span(r["pct"])}</div>'
-            '</td>'
-        )
+    cell_w = f'{100 // cols}%'
+    body = []
+    for chunk in _chunk(rows, cols):
+        cells = []
+        for r in chunk:
+            color = _pct_color(r['pct'])
+            cells.append(
+                f'<td width="{cell_w}" style="padding:5px;">'
+                f'<div style="background:{_SURFACE_SOFT};border:1px solid {_LINE};'
+                f'border-radius:10px;padding:10px 6px;text-align:center;">'
+                f'<div style="color:{_MUTED};font-size:11px;letter-spacing:.2px;">{html_lib.escape(r["label"])}</div>'
+                f'<div style="color:{_INK};font-size:14px;font-weight:700;margin-top:3px;font-family:Consolas,Menlo,monospace;">{r["price"]:,.2f}</div>'
+                f'<div style="color:{color};font-size:12px;font-weight:700;margin-top:2px;font-family:Consolas,Menlo,monospace;">{r["pct"]:+.2f}%</div>'
+                '</div></td>'
+            )
+        # 마지막 줄 셀 개수가 모자라면 빈 셀로 채워 정렬 유지
+        while len(cells) < cols:
+            cells.append(f'<td width="{cell_w}"></td>')
+        body.append(f'<tr>{"".join(cells)}</tr>')
     return (
-        f'<div style="margin:12px 0 4px;font-weight:600;font-size:14px;">{html_lib.escape(title)}</div>'
-        '<table style="border-collapse:collapse;width:100%;">'
-        f'<tr>{"".join(cells)}</tr>'
-        '</table>'
+        f'<div style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;'
+        f'text-transform:uppercase;margin:14px 0 6px;">{html_lib.escape(title)}</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{"".join(body)}</table>'
     )
 
 
-def _report_to_html_pre(report_text: str) -> str:
-    """기존 텍스트 리포트를 이스케이프 후 URL만 링크로 바꿔 <pre>로 감싼다."""
-    escaped = html_lib.escape(report_text)
+# ── 스크리닝 리포트 텍스트 하이라이팅 (터미널 스타일 <pre> 안에서 사용할 인라인 span만 삽입) ──
 
-    def _linkify(m: re.Match) -> str:
-        url = m.group(0)
-        return f'<a href="{url}">{url}</a>'
+_SECTION_RE    = re.compile(r'^(✅|🔴|❌|⏸).*$', re.MULTILINE)
+_SCORE_RE      = re.compile(r'\[(\d+(?:\.\d+)?)/(\d+)점\]')
+_STOCK_RE      = re.compile(r'([^\s(]+)\(([\d*]{4,8})\)')
+_CHANGE_RE     = re.compile(r'전일([+-]\d+\.\d+)%')
+_SENTIMENT_RE  = re.compile(r'(📰 뉴스: )(🟢|🔴|🟡) (긍정|부정|중립)')
 
-    linked = _URL_RE.sub(_linkify, escaped)
-    return (
-        '<pre style="white-space:pre-wrap;word-break:break-word;'
-        'font-family:Consolas,Menlo,monospace;font-size:13px;'
-        'background:#f7f7f7;border-radius:8px;padding:16px;">'
-        f'{linked}</pre>'
-    )
+
+def _style_section_header(m: re.Match) -> str:
+    line = m.group(0)
+    color = {'✅': _ACCENT, '🔴': _UP, '❌': _MUTED, '⏸': _AMBER}.get(line[0], _INK)
+    return f'<span style="color:{color};font-weight:700;">{line}</span>'
+
+
+def _score_badge(m: re.Match) -> str:
+    return (f'<span style="color:{_BG};background:{_ACCENT};font-weight:700;'
+            f'padding:1px 6px;border-radius:4px;">{m.group(0)}</span>')
+
+
+def _stock_name_code(m: re.Match) -> str:
+    return (f'<b style="color:{_INK};">{m.group(1)}</b>'
+            f'<span style="color:{_MUTED};">({m.group(2)})</span>')
+
+
+def _change_pct(m: re.Match) -> str:
+    val = m.group(1)
+    color = _UP if val.startswith('+') else _DOWN
+    return f'전일<span style="color:{color};font-weight:700;">{val}%</span>'
+
+
+def _sentiment_word(m: re.Match) -> str:
+    prefix, emoji, word = m.group(1), m.group(2), m.group(3)
+    color = {'긍정': _ACCENT, '부정': _UP, '중립': _AMBER}.get(word, _INK)
+    return f'{prefix}{emoji} <span style="color:{color};font-weight:700;">{word}</span>'
+
+
+def _linkify(m: re.Match) -> str:
+    url = m.group(0)
+    return f'<a href="{url}" style="color:{_ACCENT};">{url}</a>'
+
+
+def _highlight_report(report_text: str) -> str:
+    """플레인 텍스트 리포트를 이스케이프 후, 알려진 패턴만 골라 인라인 색상을 입힌다."""
+    text = html_lib.escape(report_text)
+    text = _SECTION_RE.sub(_style_section_header, text)
+    text = _SCORE_RE.sub(_score_badge, text)
+    text = _STOCK_RE.sub(_stock_name_code, text)
+    text = _CHANGE_RE.sub(_change_pct, text)
+    text = _SENTIMENT_RE.sub(_sentiment_word, text)
+    text = _URL_RE.sub(_linkify, text)
+    return text
+
+
+_STYLE_BLOCK = f"""
+<style>
+  @keyframes swkPulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: .35; }} }}
+  @keyframes swkGlow {{
+    0%, 100% {{ text-shadow: 0 0 8px rgba(57,255,140,.55), 0 0 18px rgba(57,255,140,.25); }}
+    50%      {{ text-shadow: 0 0 14px rgba(57,255,140,.85), 0 0 28px rgba(57,255,140,.4); }}
+  }}
+  .swk-dot  {{ animation: swkPulse 1.6s ease-in-out infinite; }}
+  .swk-logo {{ animation: swkGlow 3s ease-in-out infinite; }}
+  a {{ text-decoration: none; }}
+  @media (max-width: 480px) {{
+    .swk-container {{ width: 100% !important; }}
+  }}
+</style>
+"""
 
 
 def render_email_html(brief: dict, report_text: str) -> str:
-    """브리핑 + 기존 텍스트 리포트를 합친 완성된 HTML 문서를 반환한다."""
-    summary_html = ''
-    if brief.get('summary'):
-        summary_html = (
-            '<div style="margin:12px 0;padding:12px 16px;background:#eef2ff;'
-            'border-radius:8px;line-height:1.6;font-size:14px;white-space:pre-wrap;">'
-            f'{html_lib.escape(brief["summary"])}</div>'
-        )
+    """브리핑 + 기존 텍스트 리포트를 StockWiki 블랙+네온 테마의 완성된 HTML 문서로 반환한다."""
+    kst = pytz.timezone('Asia/Seoul')
+    now_str = datetime.now(kst).strftime('%Y.%m.%d (%a) %H:%M KST')
 
-    indices_html = _rows_table_html('주요 지수', brief.get('indices') or [])
-    sectors_html = _rows_table_html('섹터 ETF', brief.get('sectors') or [])
+    indices_html = _chip_grid_html('주요 지수', brief.get('indices') or [], cols=2)
+    sectors_html = _chip_grid_html('섹터 ETF', brief.get('sectors') or [], cols=3)
+    summary = (brief.get('summary') or '').strip()
+    summary_html = ''
+    if summary:
+        summary_html = (
+            f'<div style="margin-top:14px;padding:12px 14px;background:{_SURFACE_SOFT};'
+            f'border-left:3px solid {_ACCENT};border-radius:6px;color:{_INK};'
+            f'font-size:13px;line-height:1.75;white-space:pre-wrap;">{html_lib.escape(summary)}</div>'
+        )
 
     brief_section = ''
-    if summary_html or indices_html or sectors_html:
-        brief_section = (
-            '<div style="margin-bottom:20px;">'
-            '<h2 style="font-size:16px;margin:0 0 8px;">🌙 간밤 미국시장 브리핑</h2>'
-            f'{indices_html}{sectors_html}{summary_html}'
-            '</div>'
-            '<hr style="border:none;border-top:1px solid #e2e2e2;margin:16px 0;">'
-        )
+    if indices_html or sectors_html or summary_html:
+        brief_section = f"""
+<tr><td style="padding-bottom:16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
+    <tr><td style="padding:18px 20px;">
+      <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
+            background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
+      <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
+        간밤 미국시장 브리핑
+      </span>
+      {indices_html}
+      {sectors_html}
+      {summary_html}
+    </td></tr>
+  </table>
+</td></tr>"""
 
-    return (
-        '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;'
-        'color:#222;max-width:640px;margin:0 auto;">'
-        f'{brief_section}'
-        f'{_report_to_html_pre(report_text)}'
-        '</div>'
-    )
+    report_html = f"""
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
+    <tr><td style="background:{_SURFACE_SOFT};border-bottom:1px solid {_LINE};
+                   border-radius:12px 12px 0 0;padding:10px 16px;">
+      <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF5F56;margin-right:5px;"></span>
+      <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FFBD2E;margin-right:5px;"></span>
+      <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#27C93F;margin-right:8px;"></span>
+      <span style="color:{_MUTED};font-size:11px;font-family:Consolas,Menlo,monospace;">screening_result.log</span>
+    </td></tr>
+    <tr><td style="padding:16px;">
+      <pre style="margin:0;white-space:pre-wrap;word-break:break-word;
+                  font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.6;
+                  color:{_INK};">{_highlight_report(report_text)}</pre>
+    </td></tr>
+  </table>
+</td></tr>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>StockWiki</title>
+{_STYLE_BLOCK}
+</head>
+<body style="margin:0;padding:0;background-color:{_BG};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+  오늘의 종목 스크리닝 결과와 간밤 미국시장 브리핑
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:{_BG};">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="640" class="swk-container" cellpadding="0" cellspacing="0" style="width:640px;max-width:100%;">
+  <tr><td style="text-align:center;padding-bottom:22px;">
+    <span class="swk-logo" style="font-family:Consolas,Menlo,monospace;font-size:22px;
+          font-weight:800;color:{_ACCENT};letter-spacing:3px;">STOCKWIKI</span>
+    <div style="color:{_MUTED};font-size:12px;margin-top:6px;font-family:Consolas,Menlo,monospace;">
+      {now_str} · 종목 스크리닝
+    </div>
+  </td></tr>
+  {brief_section}
+  {report_html}
+  <tr><td style="text-align:center;padding-top:22px;color:{_MUTED};font-size:11px;">
+    이 메일은 StockWiki 자동 스크리닝 시스템이 발송했습니다.
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
