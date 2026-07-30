@@ -106734,7 +106734,7 @@ apZ(){var s,r,q,p,o=this.e
 if(o)return
 o=this.e=!0
 s=A.dc().ghy()
-r=s.h(0,"code")
+r=s.h(0,"stock")
 if(r!=null?r.length===0:o)return
 q=s.h(0,"name")
 o=this.c
