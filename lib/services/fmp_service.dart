@@ -95,14 +95,13 @@ class FMPService {
           .map((item) => item['symbol'] as String)
           .toList();
 
-      List<Stock> stocks = [];
-      for (final symbol in symbols) {
-        final detail = await _fetchStockDetailFinnhub(symbol);
-        if (detail != null) {
-          stocks.add(Stock.fromJson(detail));
-        }
-      }
-      return stocks;
+      final details = await Future.wait(
+        symbols.map((symbol) => _fetchStockDetailFinnhub(symbol)),
+      );
+      return details
+          .whereType<Map<String, dynamic>>()
+          .map((detail) => Stock.fromJson(detail))
+          .toList();
     } catch (e) {
       debugPrint('💥 [Finnhub] 검색 오류: $e');
       return [];
@@ -268,17 +267,15 @@ class FMPService {
         return stocks;
       }
 
-      // Fallback: Finnhub (개별 조회)
+      // Fallback: Finnhub (개별 조회, 상위 5개만)
       debugPrint('⚠️ [FMP] Sector 조회 실패, Finnhub Fallback 시도');
-      List<Stock> stocks = [];
-      for (final symbol in symbols.take(5)) {
-        // 상위 5개만
-        final detail = await _fetchStockDetailFinnhub(symbol);
-        if (detail != null) {
-          stocks.add(Stock.fromJson(detail));
-        }
-      }
-      return stocks;
+      final details = await Future.wait(
+        symbols.take(5).map((symbol) => _fetchStockDetailFinnhub(symbol)),
+      );
+      return details
+          .whereType<Map<String, dynamic>>()
+          .map((detail) => Stock.fromJson(detail))
+          .toList();
     } catch (e) {
       return [];
     }

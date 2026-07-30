@@ -6,6 +6,7 @@ class KrxLoader {
   // 캐시 처리를 위한 변수
   static List<String>? _cachedThemes;
   static final Map<String, List<Map<String, dynamic>>> _cachedThemeStocks = {};
+  static final Map<String, DateTime> _themeStocksUpdatedAt = {};
   static DateTime? _lastThemeUpdate;
 
   // API 호출을 위한 베이스 URL 가져오기
@@ -58,8 +59,11 @@ class KrxLoader {
   // 특정 테마의 추천 종목 가져오기 (비동기)
   static Future<List<Map<String, dynamic>>> getThemeStocks(String theme) async {
     // 5분 캐시 적용 (종목 데이터는 더 자주 갱신)
-    if (_cachedThemeStocks.containsKey(theme)) {
-      // 실제 운영 환경에서는 시간 체크 로직 추가 가능
+    final updatedAt = _themeStocksUpdatedAt[theme];
+    if (_cachedThemeStocks.containsKey(theme) &&
+        updatedAt != null &&
+        DateTime.now().difference(updatedAt).inMinutes < 5) {
+      return _cachedThemeStocks[theme]!;
     }
 
     try {
@@ -103,6 +107,7 @@ class KrxLoader {
           }).toList();
 
           _cachedThemeStocks[theme] = processedStocks;
+          _themeStocksUpdatedAt[theme] = DateTime.now();
           return processedStocks;
         }
       }
