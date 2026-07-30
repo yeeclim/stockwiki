@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exchange_rate_service.dart';
 import 'market_data_card.dart';
+import 'price_cache_mixin.dart';
 
 class SilverWidget extends StatefulWidget {
   const SilverWidget({super.key});
@@ -11,7 +11,7 @@ class SilverWidget extends StatefulWidget {
   State<SilverWidget> createState() => _SilverWidgetState();
 }
 
-class _SilverWidgetState extends State<SilverWidget> {
+class _SilverWidgetState extends State<SilverWidget> with PriceCacheMixin {
   double? _silverPrice;
   double? _usdKrwRate;
   double? _changePercent;
@@ -32,30 +32,13 @@ class _SilverWidgetState extends State<SilverWidget> {
   }
 
   Future<void> _loadCachedPrice() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedPrice = prefs.getDouble('silver_price');
-      final cacheTime = prefs.getInt('silver_cache_time');
-      if (cachedPrice != null && cacheTime != null) {
-        if (DateTime.now().millisecondsSinceEpoch - cacheTime <
-            10 * 60 * 1000) {
-          if (mounted)
-            setState(() {
-              _silverPrice = cachedPrice;
-              _isLoading = false;
-            });
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _cachePrice(double price) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('silver_price', price);
-      await prefs.setInt(
-          'silver_cache_time', DateTime.now().millisecondsSinceEpoch);
-    } catch (_) {}
+    final cached = await loadCachedPrice('silver', const Duration(minutes: 10));
+    if (cached != null && mounted) {
+      setState(() {
+        _silverPrice = cached;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchSilverPrice() async {
@@ -81,7 +64,7 @@ class _SilverWidgetState extends State<SilverWidget> {
               }
               _isLoading = false;
             });
-            await _cachePrice(_silverPrice!);
+            await cachePrice('silver', _silverPrice!);
             return;
           }
         }

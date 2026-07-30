@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'market_data_card.dart';
+import 'price_cache_mixin.dart';
 
 class WtiWidget extends StatefulWidget {
   const WtiWidget({super.key});
@@ -10,7 +10,7 @@ class WtiWidget extends StatefulWidget {
   State<WtiWidget> createState() => _WtiWidgetState();
 }
 
-class _WtiWidgetState extends State<WtiWidget> {
+class _WtiWidgetState extends State<WtiWidget> with PriceCacheMixin {
   double? _wtiPrice;
   double? _changePercent;
   bool _isLoading = true;
@@ -24,30 +24,13 @@ class _WtiWidgetState extends State<WtiWidget> {
   }
 
   Future<void> _loadCachedPrice() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedPrice = prefs.getDouble('wti_price');
-      final cacheTime = prefs.getInt('wti_cache_time');
-      if (cachedPrice != null && cacheTime != null) {
-        if (DateTime.now().millisecondsSinceEpoch - cacheTime <
-            10 * 60 * 1000) {
-          if (mounted)
-            setState(() {
-              _wtiPrice = cachedPrice;
-              _isLoading = false;
-            });
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _cachePrice(double price) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('wti_price', price);
-      await prefs.setInt(
-          'wti_cache_time', DateTime.now().millisecondsSinceEpoch);
-    } catch (_) {}
+    final cached = await loadCachedPrice('wti', const Duration(minutes: 10));
+    if (cached != null && mounted) {
+      setState(() {
+        _wtiPrice = cached;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchWtiPrice() async {
@@ -72,7 +55,7 @@ class _WtiWidgetState extends State<WtiWidget> {
             }
             _isLoading = false;
           });
-          await _cachePrice(_wtiPrice!);
+          await cachePrice('wti', _wtiPrice!);
           return;
         }
       }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exchange_rate_service.dart';
 import 'market_data_card.dart';
+import 'price_cache_mixin.dart';
 
 class GoldWidget extends StatefulWidget {
   const GoldWidget({super.key});
@@ -11,7 +11,7 @@ class GoldWidget extends StatefulWidget {
   State<GoldWidget> createState() => _GoldWidgetState();
 }
 
-class _GoldWidgetState extends State<GoldWidget> {
+class _GoldWidgetState extends State<GoldWidget> with PriceCacheMixin {
   double? _goldPrice;
   double? _usdKrwRate;
   double? _changePercent;
@@ -32,29 +32,13 @@ class _GoldWidgetState extends State<GoldWidget> {
   }
 
   Future<void> _loadCachedPrice() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedPrice = prefs.getDouble('gold_price');
-      final cacheTime = prefs.getInt('gold_cache_time');
-      if (cachedPrice != null && cacheTime != null) {
-        if (DateTime.now().millisecondsSinceEpoch - cacheTime < 5 * 60 * 1000) {
-          if (mounted)
-            setState(() {
-              _goldPrice = cachedPrice;
-              _isLoading = false;
-            });
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _cachePrice(double price) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('gold_price', price);
-      await prefs.setInt(
-          'gold_cache_time', DateTime.now().millisecondsSinceEpoch);
-    } catch (_) {}
+    final cached = await loadCachedPrice('gold', const Duration(minutes: 5));
+    if (cached != null && mounted) {
+      setState(() {
+        _goldPrice = cached;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchGoldPrice() async {
@@ -69,10 +53,10 @@ class _GoldWidgetState extends State<GoldWidget> {
           final meta = data['chart']?['result']?[0]?['meta'];
           final price = meta?['regularMarketPrice'] ?? meta?['previousClose'];
           final prevClose = meta?['previousClose'];
-          if (price != null) {
+          if (price != null && (price as num) > 0) {
             if (!mounted) return;
             setState(() {
-              _goldPrice = (price as num).toDouble();
+              _goldPrice = price.toDouble();
               if (prevClose != null && (prevClose as num) > 0) {
                 _changePercent = (_goldPrice! - prevClose.toDouble()) /
                     prevClose.toDouble() *
@@ -80,7 +64,7 @@ class _GoldWidgetState extends State<GoldWidget> {
               }
               _isLoading = false;
             });
-            await _cachePrice(_goldPrice!);
+            await cachePrice('gold', _goldPrice!);
             return;
           }
         }
