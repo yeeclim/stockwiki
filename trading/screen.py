@@ -5,6 +5,7 @@ GitHub Actions 매일 장 시작 전(08:50 KST) 자동 실행
 """
 import os
 import sys
+import time
 from urllib.parse import quote
 import requests
 from kis_api import KISApi
@@ -39,6 +40,12 @@ def _fetch_user_emails() -> list[str]:
         return []
 
 BUY_THRESHOLD = 6
+
+# KIS API·뉴스 감성 분석이 느려질 때(응답은 오지만 지연) 워크플로 타임아웃 전에
+# 나머지 단계(게시판/카카오/브리핑/이메일 발송)를 위한 여유 시간을 확보하기 위한 예산.
+# 각 단계는 예산을 넘기면 남은 종목을 건너뛰고 지금까지의 결과로 계속 진행한다.
+_FETCH_BUDGET_SEC = 360       # KIS 종목별 조회 루프
+_SENTIMENT_BUDGET_SEC = 240   # 뉴스 감성 분석 루프
 
 
 def _fetch_candidates() -> list[dict]:
@@ -137,7 +144,12 @@ def screen():
 
     results = []
 
-    for stock in candidates:
+    fetch_start = time.monotonic()
+    for i, stock in enumerate(candidates):
+        if time.monotonic() - fetch_start > _FETCH_BUDGET_SEC:
+            print(f"⏱️  종목 조회 시간 예산({_FETCH_BUDGET_SEC}s) 초과 — "
+                  f"나머지 {len(candidates) - i}종목은 이번 실행에서 건너뜀")
+            break
         code = stock['code']
         name = stock['name']
         sector = stock['sector']
@@ -186,8 +198,19 @@ def screen():
     # ── 뉴스 감성 게이트 ──────────────────────────────────────────────────────
     # 점수 통과 종목이라도 최근 뉴스 감성이 "부정"이면 최종 탈락시킨다.
     # (뉴스 없음/분석 실패는 배제 사유로 보지 않음)
+    sentiment_start = time.monotonic()
+    sentiment_budget_exceeded = False
     for r in results:
         if r.get('pass') and not r.get('error'):
+            if not sentiment_budget_exceeded and \
+                    time.monotonic() - sentiment_start > _SENTIMENT_BUDGET_SEC:
+                sentiment_budget_exceeded = True
+                print(f"⏱️  뉴스 감성 분석 시간 예산({_SENTIMENT_BUDGET_SEC}s) 초과 — "
+                      "나머지 종목은 감성 분석 없이 통과 처리")
+            if sentiment_budget_exceeded:
+                r['sentiment'] = None
+                r['sentiment_line'] = '시간 초과로 미분석'
+                continue
             sentiment, sentiment_line = get_sentiment(r['code'], r['name'])
             r['sentiment'] = sentiment
             r['sentiment_line'] = sentiment_line
