@@ -5,6 +5,7 @@ GitHub Actions 매일 장 시작 전(08:50 KST) 자동 실행
 """
 import os
 import sys
+from urllib.parse import quote
 import requests
 from kis_api import KISApi
 import kakao_notify
@@ -208,8 +209,8 @@ def screen():
     excluded.sort(key=lambda x: x['score'], reverse=True)
     others.sort(key=lambda x: x.get('score', 0), reverse=True)
 
-    def chart_url(code):
-        return f"https://m.stock.naver.com/domestic/stock/{code}/total"
+    def chart_url(code, name):
+        return f"https://stockwiki.vercel.app/?code={code}&name={quote(name)}"
 
     def _ratio_str(r):
         ratios = r.get('ratios') or {}
@@ -232,7 +233,7 @@ def screen():
                 f"  전일{r['prdy_ctrt']:+.1f}%{disc}{mcap_str}{_ratio_str(r)}"
                 f"  [{r['sector']}]"
                 f"\n  📰 뉴스: {r['sentiment_line']}"
-                f"\n  📊 {chart_url(r['code'])}"
+                f"\n  📊 {chart_url(r['code'], r['name'])}"
             )
     else:
         lines.append(f"\n⏸  {BUY_THRESHOLD}점 이상 + 뉴스 감성 양호 종목 없음")
