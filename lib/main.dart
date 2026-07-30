@@ -15,6 +15,7 @@ import 'package:stockwiki/widgets/gold_widget.dart';
 import 'package:stockwiki/widgets/silver_widget.dart';
 import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
+import 'package:stockwiki/pages/board_detail_page.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
 import 'package:stockwiki/widgets/app_drawer.dart';
 import 'package:stockwiki/widgets/terminal_grid.dart';
@@ -99,14 +100,23 @@ class _StockSearchPageState extends State<StockSearchPage>
         .addPostFrameCallback((_) => _openDeepLinkedStockIfAny());
   }
 
-  /// 메일/카카오톡 링크(예: ?stock=005930&name=삼성전자)로 들어온 경우
-  /// 홈 화면 위에 바로 해당 종목 차트 바텀시트를 띄운다.
-  /// 파라미터명은 'stock' — 카카오/구글 등 OAuth 리다이렉트가 'code'를 쓰기 때문에
+  /// 메일/카카오톡 링크(예: ?stock=005930&name=삼성전자 또는 ?board=<id>)로 들어온 경우
+  /// 홈 화면 위에 바로 해당 종목 차트 또는 게시글을 띄운다.
+  /// 파라미터명은 'stock'/'board' — 카카오/구글 등 OAuth 리다이렉트가 'code'를 쓰기 때문에
   /// 겹치면 로그인 인가 코드를 종목코드로 오인해 차트를 띄우는 버그가 생긴다.
   void _openDeepLinkedStockIfAny() {
     if (_deepLinkChecked || !kIsWeb) return;
     _deepLinkChecked = true;
     final params = Uri.base.queryParameters;
+
+    final boardId = params['board'];
+    if (boardId != null && boardId.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => BoardDetailPage(postId: boardId)),
+      );
+      return;
+    }
+
     final code = params['stock'];
     if (code == null || code.isEmpty) return;
     final name = params['name'];
