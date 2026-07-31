@@ -111,10 +111,9 @@ class _GoldWidgetState extends State<GoldWidget> {
       title: 'Gold',
       isLoading: _isLoading,
       error: _error,
-      valueText:
-          _goldPrice != null
-              ? '\$${formatWithCommas(_goldPrice!, decimals: 2)}'
-              : 'N/A',
+      valueText: _goldPrice != null
+          ? '\$${formatWithCommas(_goldPrice!, decimals: 2)}'
+          : 'N/A',
       subText: subText,
       changePercent: _changePercent,
     );
