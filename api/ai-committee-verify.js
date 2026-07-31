@@ -357,8 +357,9 @@ async function askDeepSeek(question, model, displayName) {
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
 
-// Groq 추론 모델 (Qwen 등) — reasoning_format: hidden으로 추론 내용을 응답에서 제외시켜
-// 결론 문장이 토큰 예산 안에서 항상 나오도록 함. <think> 제거는 구형 응답 대비 안전망으로 유지.
+// Groq 추론 모델 (Qwen 등) — reasoning_effort: none으로 추론 자체를 꺼서, 좁은
+// max_tokens 예산을 추론이 아니라 최종 답변에만 쓰게 함. reasoning_format: hidden은
+// (추론을 껐어도) 혹시 모델이 추론 텍스트를 반환하는 경우를 대비한 이중 안전장치.
 async function askGroqThink(question, model, displayName) {
   const apiKey = getEnv('GROQ_API_KEY');
   if (!apiKey) throw new Error('GROQ_API_KEY 미설정');
@@ -376,6 +377,7 @@ async function askGroqThink(question, model, displayName) {
         { role: 'user', content: question + PROMPT_SUFFIX },
       ],
       max_tokens: 2000,
+      reasoning_effort: 'none',
       reasoning_format: 'hidden',
     }),
   });
