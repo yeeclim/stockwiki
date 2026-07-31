@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/fmp_service.dart';
 import '../utils/tradingview_helper.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/portfolio_add_sheet.dart';
 
 class UsStockAiRecommendPage extends StatefulWidget {
@@ -262,7 +263,7 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                         children: [
                           if (stock.price != null) ...[
                             Text(
-                              '\$${stock.price!.toStringAsFixed(2)}',
+                              '\$${formatWithCommas(stock.price!, decimals: 2)}',
                               style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: theme.colorScheme.onSurface,

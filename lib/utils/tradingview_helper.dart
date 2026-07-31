@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/bookmark_service.dart';
 import '../widgets/tradingview_chart.dart';
 
 /// 한국 종목 코드 → TradingView KRX 심볼
@@ -101,7 +102,7 @@ void showChart(
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            // 타이틀 + 외부 링크
+            // 타이틀 + 관심종목 + 외부 링크
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
               child: Row(
@@ -118,6 +119,11 @@ void showChart(
                                 color: th.colorScheme.onSurfaceVariant)),
                       ],
                     ),
+                  ),
+                  _ChartBookmarkButton(
+                    stockCode: code,
+                    stockName: stockName,
+                    market: isKrx ? 'kr' : 'us',
                   ),
                   if (naverCode != null)
                     TextButton.icon(
@@ -164,6 +170,73 @@ void showChart(
       );
     },
   );
+}
+
+// ── 관심종목 등록 버튼 (차트 바텀시트) ────────────────────────────────────────
+class _ChartBookmarkButton extends StatefulWidget {
+  final String stockCode;
+  final String stockName;
+  final String market; // 'kr' | 'us'
+
+  const _ChartBookmarkButton({
+    required this.stockCode,
+    required this.stockName,
+    required this.market,
+  });
+
+  @override
+  State<_ChartBookmarkButton> createState() => _ChartBookmarkButtonState();
+}
+
+class _ChartBookmarkButtonState extends State<_ChartBookmarkButton> {
+  bool _isBookmarked = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBookmark();
+  }
+
+  Future<void> _checkBookmark() async {
+    final result = await BookmarkService.isBookmarked(widget.stockCode);
+    if (mounted) setState(() {
+      _isBookmarked = result;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarked) {
+      await BookmarkService.removeBookmark(widget.stockCode);
+    } else {
+      await BookmarkService.addBookmark(widget.stockCode, {
+        'stockName': widget.stockName,
+        'symbol': widget.stockCode,
+        'type': widget.market,
+      });
+    }
+    await _checkBookmark();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_isBookmarked ? '관심종목에 추가되었습니다' : '관심종목에서 제거되었습니다'),
+        duration: const Duration(seconds: 1),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const SizedBox(width: 40, height: 40);
+    return IconButton(
+      icon: Icon(
+        _isBookmarked ? Icons.star : Icons.star_border,
+        color: _isBookmarked ? Colors.amber.shade600 : null,
+      ),
+      onPressed: _toggleBookmark,
+      tooltip: _isBookmarked ? '관심종목 제거' : '관심종목 추가',
+    );
+  }
 }
 
 // ── 네이버 차트 이미지 위젯 ────────────────────────────────────────────────────

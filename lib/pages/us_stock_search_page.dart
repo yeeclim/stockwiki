@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/stock.dart';
+import '../utils/number_format_utils.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockSearchPage extends StatefulWidget {
@@ -313,7 +314,9 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '\$${stock.price?.toStringAsFixed(2) ?? '-'}',
+                                      stock.price != null
+                                          ? '\$${formatWithCommas(stock.price!, decimals: 2)}'
+                                          : '-',
                                       style:
                                           theme.textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
