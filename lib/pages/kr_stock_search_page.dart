@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../utils/tradingview_helper.dart';
+import '../models/stock.dart';
 import '../widgets/portfolio_add_sheet.dart';
+import 'us_stock_detail_page.dart';
 
 class KrStockSearchPage extends StatefulWidget {
   const KrStockSearchPage({super.key});
@@ -242,11 +243,19 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
           side: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
         child: InkWell(
-          onTap: () => showChart(
+          onTap: () => Navigator.push(
             context,
-            tvSymbol: krxSymbol(code),
-            stockName: name,
-            naverCode: code,
+            MaterialPageRoute(
+              builder: (_) => UsStockDetailPage(
+                stock: Stock(
+                  symbol: code,
+                  name: name,
+                  price: price?.toDouble(),
+                  changePercent: changePct?.toDouble(),
+                ),
+                isKorean: true,
+              ),
+            ),
           ),
           borderRadius: BorderRadius.circular(14),
           child: Padding(

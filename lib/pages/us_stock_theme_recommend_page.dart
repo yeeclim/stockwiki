@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/stock.dart';
 import '../services/us_sector_loader.dart';
-import '../utils/tradingview_helper.dart';
 import '../widgets/app_drawer.dart';
+import 'us_stock_detail_page.dart';
 
 class UsStockThemeRecommendPage extends StatefulWidget {
   const UsStockThemeRecommendPage({super.key});
@@ -144,11 +145,13 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
   }
 
   void _navigateToStockDetail(String symbol, String name) {
-    showChart(
+    Navigator.push(
       context,
-      tvSymbol: usSymbol(symbol),
-      stockName: name,
-      yahooTicker: symbol,
+      MaterialPageRoute(
+        builder: (_) => UsStockDetailPage(
+          stock: Stock(symbol: symbol, name: name),
+        ),
+      ),
     );
   }
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/fmp_service.dart';
-import '../utils/tradingview_helper.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/portfolio_add_sheet.dart';
+import 'us_stock_detail_page.dart';
 
 class UsStockAiRecommendPage extends StatefulWidget {
   const UsStockAiRecommendPage({super.key});
@@ -179,11 +179,11 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
               color: theme.cardTheme.color,
               shape: theme.cardTheme.shape,
               child: InkWell(
-                onTap: () => showChart(
+                onTap: () => Navigator.push(
                   context,
-                  tvSymbol: usSymbol(stock.symbol),
-                  stockName: stock.name,
-                  yahooTicker: stock.symbol,
+                  MaterialPageRoute(
+                    builder: (_) => UsStockDetailPage(stock: stock),
+                  ),
                 ),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
