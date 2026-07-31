@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'market_data_card.dart';
+import '../utils/number_format_utils.dart';
 
 class BtcWidget extends StatefulWidget {
   const BtcWidget({super.key});
@@ -90,7 +91,9 @@ class _BtcWidgetState extends State<BtcWidget> {
         title: 'Bitcoin',
         isLoading: _isLoading,
         error: _error,
-        valueText: '\$${_btcPrice?.toStringAsFixed(2) ?? 'N/A'}',
+        valueText: _btcPrice != null
+            ? '\$${formatWithCommas(_btcPrice!, decimals: 2)}'
+            : 'N/A',
         subText: 'USD',
         changePercent: _changePercent,
       );

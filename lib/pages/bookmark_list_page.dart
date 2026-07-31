@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/bookmark_service.dart';
 import '../models/stock.dart';
+import '../utils/number_format_utils.dart';
 import 'us_stock_detail_page.dart';
 
 class BookmarkListPage extends StatefulWidget {
@@ -203,7 +204,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                     Text(
                       isKorean
                           ? '₩${price.toInt().toLocaleString()}'
-                          : '\$${price.toStringAsFixed(2)}',
+                          : '\$${formatWithCommas(price, decimals: 2)}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,

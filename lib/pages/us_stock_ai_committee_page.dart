@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'us_stock_detail_page.dart';
 import '../models/committee_recommendation.dart';
+import '../utils/number_format_utils.dart';
 
 class UsStockAiCommitteePage extends StatefulWidget {
   const UsStockAiCommitteePage({super.key});
@@ -393,11 +394,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
     if (isKorean) {
       // 원화 표시
-      final price = stock.price!.toInt();
-      return '₩${price.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+      return '₩${formatWithCommas(stock.price!)}';
     } else {
       // 달러 표시
-      return '\$${stock.price!.toStringAsFixed(2)}';
+      return '\$${formatWithCommas(stock.price!, decimals: 2)}';
     }
   }
 

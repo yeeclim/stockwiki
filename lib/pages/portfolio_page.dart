@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/portfolio_service.dart';
 import '../utils/tradingview_helper.dart';
+import '../utils/number_format_utils.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -128,9 +129,9 @@ class _PortfolioPageState extends State<PortfolioPage> {
 
   String _fmtPrice(double price, String market) {
     if (market == 'kr') {
-      return '₩${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+      return '₩${formatWithCommas(price)}';
     }
-    return '\$${price.toStringAsFixed(2)}';
+    return '\$${formatWithCommas(price, decimals: 2)}';
   }
 
   @override
@@ -265,8 +266,8 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           color: theme.colorScheme.onSurfaceVariant)),
                   Text(
                     totalBuy < 10000
-                        ? '\$${totalBuy.toStringAsFixed(2)}'
-                        : '₩${totalBuy.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+                        ? '\$${formatWithCommas(totalBuy, decimals: 2)}'
+                        : '₩${formatWithCommas(totalBuy)}',
                     style: theme.textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),

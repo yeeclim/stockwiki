@@ -6,6 +6,7 @@ import '../services/fmp_service.dart';
 import '../services/us_stock_news_service.dart';
 import '../services/news_service.dart';
 import '../services/bookmark_service.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/us_stock_chart_widget.dart';
 
 class UsStockDetailPage extends StatefulWidget {
@@ -339,9 +340,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         RegExp(r'[가-힣]').hasMatch(stock.name);
 
     if (isKorean) {
-      return '₩${price.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+      return '₩${formatWithCommas(price)}';
     } else {
-      return '\$${price.toStringAsFixed(2)}';
+      return '\$${formatWithCommas(price, decimals: 2)}';
     }
   }
 
@@ -352,9 +353,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         RegExp(r'[가-힣]').hasMatch(stock.name);
 
     if (isKorean) {
-      return '₩${change.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+      return '₩${formatWithCommas(change)}';
     } else {
-      return '\$${change.toStringAsFixed(2)}';
+      return '\$${formatWithCommas(change, decimals: 2)}';
     }
   }
 

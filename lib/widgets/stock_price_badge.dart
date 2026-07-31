@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/date_utils.dart';
+import '../utils/number_format_utils.dart';
 
 /// Renders the price column (current price + "전일 종가" label) shown on the
 /// right side of the stock card header row, and the secondary row containing
@@ -61,7 +62,7 @@ class StockPriceBadge extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
-          '₩${price!.toStringAsFixed(0)}',
+          '₩${formatWithCommas(price!)}',
           style: TextStyle(
             color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
