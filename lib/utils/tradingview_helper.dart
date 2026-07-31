@@ -200,10 +200,11 @@ class _ChartBookmarkButtonState extends State<_ChartBookmarkButton> {
 
   Future<void> _checkBookmark() async {
     final result = await BookmarkService.isBookmarked(widget.stockCode);
-    if (mounted) setState(() {
-      _isBookmarked = result;
-      _isLoading = false;
-    });
+    if (mounted)
+      setState(() {
+        _isBookmarked = result;
+        _isLoading = false;
+      });
   }
 
   Future<void> _toggleBookmark() async {
