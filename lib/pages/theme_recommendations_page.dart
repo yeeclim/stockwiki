@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/stock.dart';
 import '../services/krx_loader.dart';
 import '../services/screening_service.dart';
-import '../utils/tradingview_helper.dart';
 import '../widgets/app_drawer.dart';
+import 'us_stock_detail_page.dart';
 
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
@@ -214,12 +215,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     );
   }
 
-  void _navigateToStockDetail(String symbol, String name) {
-    showChart(
+  void _navigateToStockDetail(String symbol, String name, {double? price}) {
+    Navigator.push(
       context,
-      tvSymbol: krxSymbol(symbol),
-      stockName: name,
-      naverCode: symbol,
+      MaterialPageRoute(
+        builder: (_) => UsStockDetailPage(
+          stock: Stock(symbol: symbol, name: name, price: price),
+          isKorean: true,
+        ),
+      ),
     );
   }
 
@@ -366,7 +370,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         side: BorderSide(color: themeData.colorScheme.outlineVariant),
       ),
       child: InkWell(
-        onTap: () => _navigateToStockDetail(symbol, name),
+        onTap: () => _navigateToStockDetail(symbol, name, price: price),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),

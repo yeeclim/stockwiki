@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../models/stock.dart';
 import '../services/portfolio_service.dart';
-import '../utils/tradingview_helper.dart';
 import '../utils/number_format_utils.dart';
+import 'us_stock_detail_page.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -328,13 +329,18 @@ class _PortfolioPageState extends State<PortfolioPage> {
         side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: InkWell(
-        onTap: () => showChart(
+        onTap: () => Navigator.push(
           context,
-          tvSymbol:
-              h.market == 'kr' ? krxSymbol(h.stockCode) : usSymbol(h.stockCode),
-          stockName: h.stockName,
-          naverCode: h.market == 'kr' ? h.stockCode : null,
-          yahooTicker: h.market == 'us' ? h.stockCode : null,
+          MaterialPageRoute(
+            builder: (_) => UsStockDetailPage(
+              stock: Stock(
+                symbol: h.stockCode,
+                name: h.stockName,
+                price: curPrice ?? h.buyPrice,
+              ),
+              isKorean: h.market == 'kr',
+            ),
+          ),
         ),
         borderRadius: BorderRadius.circular(14),
         child: Padding(
