@@ -31,11 +31,12 @@ class _WtiWidgetState extends State<WtiWidget> {
       if (cachedPrice != null && cacheTime != null) {
         if (DateTime.now().millisecondsSinceEpoch - cacheTime <
             10 * 60 * 1000) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _wtiPrice = cachedPrice;
               _isLoading = false;
             });
+          }
         }
       }
     } catch (_) {}

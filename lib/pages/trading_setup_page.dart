@@ -70,8 +70,9 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
           _prodCodeCtrl.text = cfg.kisAccountProdCode;
           _emailCtrl.text = cfg.notifyEmail;
           _kakaoCtrl.text = cfg.notifyKakaoRefreshToken;
-          if (cfg.dailyMaxBuy != null)
+          if (cfg.dailyMaxBuy != null) {
             _dailyMaxCtrl.text = cfg.dailyMaxBuy.toString();
+          }
         } else {
           final email = context.read<AuthProvider>().currentUser?.email ?? '';
           _emailCtrl.text = email;
@@ -321,8 +322,9 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                           icon: Icons.account_balance_outlined,
                           keyboardType: TextInputType.number,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty)
+                            if (v == null || v.trim().isEmpty) {
                               return '계좌번호를 입력하세요.';
+                            }
                             if (v.trim().length != 8) return '계좌번호는 8자리입니다.';
                             return null;
                           },
@@ -351,8 +353,9 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty)
+                            if (v == null || v.trim().isEmpty) {
                               return '이메일을 입력하세요.';
+                            }
                             if (!v.contains('@')) return '올바른 이메일 형식이 아닙니다.';
                             return null;
                           },

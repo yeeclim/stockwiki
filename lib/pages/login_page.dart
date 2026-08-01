@@ -75,12 +75,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _translateAuthError(String msg) {
-    if (msg.contains('Invalid login credentials'))
+    if (msg.contains('Invalid login credentials')) {
       return '이메일 또는 비밀번호가 올바르지 않습니다.';
+    }
     if (msg.contains('Email not confirmed')) return '이메일 인증이 완료되지 않았습니다.';
     if (msg.contains('User already registered')) return '이미 가입된 이메일입니다.';
-    if (msg.contains('Password should be at least'))
+    if (msg.contains('Password should be at least')) {
       return '비밀번호는 최소 6자리 이상이어야 합니다.';
+    }
     return msg;
   }
 

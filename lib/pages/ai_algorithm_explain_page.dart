@@ -60,8 +60,8 @@ class AiAlgorithmExplainPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color:
-                    theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
@@ -96,7 +96,8 @@ class AiAlgorithmExplainPage extends StatelessWidget {
               margin: const EdgeInsets.symmetric(vertical: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
+                color:
+                    theme.colorScheme.secondaryContainer.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(

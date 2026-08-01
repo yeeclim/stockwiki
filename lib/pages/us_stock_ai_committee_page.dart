@@ -58,11 +58,12 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
         news = await UsStockNewsService.fetchStockNews(stock.symbol,
             stockName: stock.name);
       }
-      if (mounted)
+      if (mounted) {
         setState(() {
           _stockNews = news;
           _isLoadingNews = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _isLoadingNews = false);
     }
@@ -297,8 +298,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
           '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n'
                   '현재 가격: $priceFormat\n'
                   '$changeInfo\n\n'
-                  '다음 관점에서 종합적으로 분석해주세요:\n' +
-              '1. 재무 건전성 및 수익성\n' +
+                  '다음 관점에서 종합적으로 분석해주세요:\n'
+                  '1. 재무 건전성 및 수익성\n' +
               '2. 성장 가능성 및 시장 전망\n' +
               '3. 기술적 분석 (가격 추세, 거래량 등)\n' +
               '4. 리스크 요인\n' +
@@ -472,8 +473,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
-                        fillColor:
-                            theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        fillColor: theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -512,10 +513,10 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       ),
                       minimumSize: const Size(100, 56),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
+                      children: [
                         Icon(Icons.search, size: 20),
                         SizedBox(width: 8),
                         Text(
@@ -567,7 +568,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             Text(
               '다수의 최신 AI 모델이 동시에 동시 검증하고 있습니다',
               style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  color:
+                      theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                   fontSize: 12),
             ),
           ],
@@ -633,7 +635,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -682,7 +684,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
-                Icon(Icons.star, color: Colors.amber, size: 20),
+                const Icon(Icons.star, color: Colors.amber, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   '추천 종목',
@@ -832,7 +834,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                                     color: (stock.changePercent! >= 0
                                             ? Colors.green
                                             : Colors.red)
-                                        .withOpacity(0.1),
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -917,9 +919,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        border:
-                            Border.all(color: Colors.orange.withOpacity(0.4)),
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        border: Border.all(
+                            color: Colors.orange.withValues(alpha: 0.4)),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -966,7 +968,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest
-                        .withOpacity(0.3),
+                        .withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1053,9 +1055,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.05),
+          color: Colors.grey.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -1102,9 +1104,9 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: signalColor.withOpacity(0.05),
+        color: signalColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: signalColor.withOpacity(0.4)),
+        border: Border.all(color: signalColor.withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
@@ -1137,7 +1139,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               if (positiveCount == 0 && negativeCount == 0)
                 Expanded(
                     child: Container(
-                        height: 3, color: Colors.grey.withOpacity(0.3))),
+                        height: 3, color: Colors.grey.withValues(alpha: 0.3))),
             ],
           ),
           const SizedBox(height: 6),
@@ -1160,16 +1162,18 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
     return GestureDetector(
       onTap: () async {
         final uri = Uri.tryParse(news.link);
-        if (uri != null && await canLaunchUrl(uri))
+        if (uri != null && await canLaunchUrl(uri)) {
           launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.2),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1204,21 +1208,26 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
   String _resolveDisplayName(String modelName) {
     final lowerName = modelName.toLowerCase();
     if (lowerName.contains('gemini')) return 'Gemini';
-    if (lowerName.contains('llama 3.3') || lowerName.contains('llama-3.3'))
+    if (lowerName.contains('llama 3.3') || lowerName.contains('llama-3.3')) {
       return 'Llama 3.3';
+    }
     if (lowerName.contains('llama 3.1') ||
         lowerName.contains('llama-3.1') ||
-        lowerName.contains('llama-3.1-8b')) return 'Llama 3.1';
+        lowerName.contains('llama-3.1-8b')) {
+      return 'Llama 3.1';
+    }
     if (lowerName.contains('llama')) return 'Llama';
     if (lowerName.contains('qwen')) return 'Qwen';
     if (lowerName.contains('nemotron')) return 'Nemotron';
     if (lowerName.contains('gemma')) return 'Gemma 2';
     if (lowerName.contains('mixtral')) return 'Mixtral';
     if (lowerName.contains('mistral')) return 'Mistral';
-    if (lowerName.contains('gpt') || lowerName.contains('openai'))
+    if (lowerName.contains('gpt') || lowerName.contains('openai')) {
       return 'ChatGPT';
-    if (lowerName.contains('claude') || lowerName.contains('anthropic'))
+    }
+    if (lowerName.contains('claude') || lowerName.contains('anthropic')) {
       return 'Claude';
+    }
     if (lowerName.contains('deepseek')) return 'DeepSeek';
     return modelName;
   }
@@ -1274,7 +1283,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
+                        color: color.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                         border: Border.all(color: color, width: 2),
                       ),
@@ -1344,7 +1353,7 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                     border: Border.all(color: color, width: 2),
                   ),
@@ -1465,11 +1474,11 @@ class GaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height);
     final radius = size.width / 2;
-    final strokeWidth = 10.0;
+    const strokeWidth = 10.0;
 
     // 배경 아크
     final bgPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = Colors.grey.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;

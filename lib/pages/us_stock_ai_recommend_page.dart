@@ -223,7 +223,8 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _getScoreColor(rec.score).withOpacity(0.1),
+                              color: _getScoreColor(rec.score)
+                                  .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: _getScoreColor(rec.score),
