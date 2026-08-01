@@ -7,7 +7,7 @@ import 'package:k_chart_plus/k_chart_plus.dart';
 class KrChartService {
   static Future<List<KLineEntity>> fetchDailyCandles(String code) async {
     final origin = kIsWeb ? Uri.base.origin : 'https://stockwiki.vercel.app';
-    final url = '$origin/api/kr-chart?code=$code';
+    final url = '$origin/api/utils?type=kr-candles&code=$code';
 
     final res =
         await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
