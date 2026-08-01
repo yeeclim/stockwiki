@@ -10,12 +10,14 @@ class KrVolumeProfileWidget extends StatelessWidget {
   final List<KLineEntity> candles;
   final int lookbackDays;
   final int binCount;
+  final String periodLabel;
 
   const KrVolumeProfileWidget({
     super.key,
     required this.candles,
     this.lookbackDays = 120,
     this.binCount = 24,
+    this.periodLabel = '거래일',
   });
 
   List<_VolumeBin> _computeBins() {
@@ -99,7 +101,7 @@ class KrVolumeProfileWidget extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('매물대 (최근 $lookbackDays거래일, 근사치)',
+                Text('매물대 (최근 $lookbackDays$periodLabel, 근사치)',
                     style: theme.textTheme.titleSmall
                         ?.copyWith(fontWeight: FontWeight.bold)),
                 Text('최다거래가 ${pocBin.priceMid.toStringAsFixed(0)}',

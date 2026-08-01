@@ -3,11 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:k_chart_plus/k_chart_plus.dart';
 
-/// 국내주식 일봉 데이터 조회 (KIS Open API를 백엔드에서 프록시하는 /api/kr-chart)
+/// 국내주식 일/주/월봉 데이터 조회 (KIS Open API를 백엔드에서 프록시하는 /api/utils)
 class KrChartService {
-  static Future<List<KLineEntity>> fetchDailyCandles(String code) async {
+  /// [period]: 'D'(일봉) | 'W'(주봉) | 'M'(월봉)
+  static Future<List<KLineEntity>> fetchCandles(String code,
+      {String period = 'D'}) async {
     final origin = kIsWeb ? Uri.base.origin : 'https://stockwiki.vercel.app';
-    final url = '$origin/api/utils?type=kr-candles&code=$code';
+    final url = '$origin/api/utils?type=kr-candles&code=$code&period=$period';
 
     final res =
         await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));

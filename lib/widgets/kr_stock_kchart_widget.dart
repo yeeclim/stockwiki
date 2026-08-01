@@ -17,6 +17,7 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
   List<KLineEntity>? _candles;
   bool _isLoading = true;
   String? _error;
+  String _period = 'D'; // 'D'(일봉) | 'W'(주봉) | 'M'(월봉)
 
   // 메인 차트 위 오버레이 지표
   final MAIndicator _maIndicator =
@@ -45,7 +46,8 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
       _error = null;
     });
     try {
-      final candles = await KrChartService.fetchDailyCandles(widget.symbol);
+      final candles =
+          await KrChartService.fetchCandles(widget.symbol, period: _period);
       if (candles.isEmpty) {
         throw Exception('차트 데이터가 없습니다');
       }
@@ -88,6 +90,12 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
     });
   }
 
+  void _changePeriod(String period) {
+    if (period == _period) return;
+    setState(() => _period = period);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -118,6 +126,22 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              for (final pair in [('일봉', 'D'), ('주봉', 'W'), ('월봉', 'M')])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(pair.$1),
+                    selected: _period == pair.$2,
+                    onSelected: (_) => _changePeriod(pair.$2),
+                  ),
+                ),
+            ],
+          ),
+        ),
         SizedBox(
           height: 360 +
               (_activeSecondary.isEmpty ? 0 : 90.0 * _activeSecondary.length),
@@ -159,7 +183,17 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
           ),
         ),
         const SizedBox(height: 12),
-        KrVolumeProfileWidget(candles: _candles!),
+        KrVolumeProfileWidget(
+          candles: _candles!,
+          lookbackDays: _period == 'D'
+              ? (120 < _candles!.length ? 120 : _candles!.length)
+              : _candles!.length,
+          periodLabel: switch (_period) {
+            'W' => '주',
+            'M' => '개월',
+            _ => '거래일',
+          },
+        ),
       ],
     );
   }
