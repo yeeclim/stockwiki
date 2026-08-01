@@ -22,7 +22,8 @@ dependencies:
   supabase_flutter: ^2.8.0
   gotrue: any
   web: ^1.1.1
-  k_chart_plus: ^1.0.4
+  k_chart_plus:
+    path: lib/vendor/k_chart_plus
 
 dev_dependencies:
   flutter_test:

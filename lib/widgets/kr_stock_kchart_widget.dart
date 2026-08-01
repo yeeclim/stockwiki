@@ -13,11 +13,15 @@ class KrStockKChartWidget extends StatefulWidget {
   State<KrStockKChartWidget> createState() => _KrStockKChartWidgetState();
 }
 
+enum _DrawTool { none, trendLine, fibonacci }
+
 class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
   List<KLineEntity>? _candles;
   bool _isLoading = true;
   String? _error;
   String _period = 'D'; // 'D'(일봉) | 'W'(주봉) | 'M'(월봉)
+  _DrawTool _drawTool = _DrawTool.none;
+  final TrendLineController _drawController = TrendLineController();
 
   // 메인 차트 위 오버레이 지표
   final MAIndicator _maIndicator =
@@ -96,6 +100,10 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
     _load();
   }
 
+  void _selectDrawTool(_DrawTool tool) {
+    setState(() => _drawTool = _drawTool == tool ? _DrawTool.none : tool);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -149,7 +157,9 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
             _candles,
             const KChartStyle(),
             const KChartColors(),
-            isTrendLine: false,
+            isTrendLine: _drawTool == _DrawTool.trendLine,
+            isFiboLine: _drawTool == _DrawTool.fibonacci,
+            trendLineController: _drawController,
             mainIndicators: _activeMain,
             secondaryIndicators: _activeSecondary,
             mBaseHeight: 300,
@@ -159,7 +169,33 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
             detailBuilder: (entity) => _DetailPopup(entity: entity),
           ),
         ),
+        if (_drawTool != _DrawTool.none)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Text(
+              '길게 눌러서 지점 이동 → 손 떼고 탭으로 확정 (2개 지점 필요)',
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
         const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              _chip(context, '추세선', _drawTool == _DrawTool.trendLine,
+                  () => _selectDrawTool(_DrawTool.trendLine)),
+              _chip(context, '피보나치', _drawTool == _DrawTool.fibonacci,
+                  () => _selectDrawTool(_DrawTool.fibonacci)),
+              ActionChip(
+                label: const Text('지우기'),
+                onPressed: _drawController.clear,
+              ),
+            ],
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Wrap(
