@@ -88,14 +88,14 @@ function formatYmd(date) {
     return `${y}${m}${d}`;
 }
 
-async function fetchKrDailyPage(code, token, dateFrom, dateTo) {
+async function fetchKrDailyPage(code, token, dateFrom, dateTo, periodDiv) {
     const url = new URL(`${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice`);
     url.search = new URLSearchParams({
         FID_COND_MRKT_DIV_CODE: 'J',
         FID_INPUT_ISCD: code,
         FID_INPUT_DATE_1: dateFrom,
         FID_INPUT_DATE_2: dateTo,
-        FID_PERIOD_DIV_CODE: 'D',
+        FID_PERIOD_DIV_CODE: periodDiv,
         FID_ORG_ADJ_PRC: '0',
     }).toString();
 
@@ -111,22 +111,29 @@ async function fetchKrDailyPage(code, token, dateFrom, dateTo) {
     return data.output2 || [];
 }
 
+// 일/주/월봉별 페이지당 조회 구간(달력일)과 목표 건수 — KIS는 FID_PERIOD_DIV_CODE로
+// 이미 주/월 단위로 집계된 봉을 내려주므로 프론트에서 따로 집계할 필요가 없다.
+const PERIOD_CONFIG = {
+    D: { pageSpanDays: 140, target: 450, maxPages: 6 }, // ~90~100 거래일/페이지
+    W: { pageSpanDays: 800, target: 300, maxPages: 6 }, // ~100주/페이지
+    M: { pageSpanDays: 3200, target: 200, maxPages: 5 }, // ~100개월/페이지
+};
+
 // 1회 호출당 최대 100건 제한을 우회하기 위해 조회 구간을 뒤로 밀어가며 반복 호출
-async function fetchKrDailyCandles(code, minDays = 450) {
+async function fetchKrDailyCandles(code, periodDiv = 'D') {
+    const config = PERIOD_CONFIG[periodDiv] || PERIOD_CONFIG.D;
     const token = await getKisToken();
     const collected = new Map(); // date(yyyymmdd) -> row, 중복 제거용
 
     let cursorEnd = new Date();
-    const MAX_PAGES = 6;
-    const PAGE_SPAN_DAYS = 140; // 달력일 기준 — 거래일로는 대략 90~100일 정도 확보됨
 
-    for (let page = 0; page < MAX_PAGES && collected.size < minDays; page++) {
+    for (let page = 0; page < config.maxPages && collected.size < config.target; page++) {
         const dateTo = formatYmd(cursorEnd);
         const cursorStart = new Date(cursorEnd);
-        cursorStart.setDate(cursorStart.getDate() - PAGE_SPAN_DAYS);
+        cursorStart.setDate(cursorStart.getDate() - config.pageSpanDays);
         const dateFrom = formatYmd(cursorStart);
 
-        const rows = await fetchKrDailyPage(code, token, dateFrom, dateTo);
+        const rows = await fetchKrDailyPage(code, token, dateFrom, dateTo, periodDiv);
         if (rows.length === 0) break; // 상장일 이전 구간 도달
 
         for (const row of rows) {
@@ -162,18 +169,21 @@ async function handleKrCandles(req, res) {
     if (!/^\d{6}$/.test(code)) {
         return res.status(400).json({ success: false, error: '유효하지 않은 종목코드입니다' });
     }
+    const periodRaw = (req.query.period || 'D').toString().toUpperCase();
+    const period = ['D', 'W', 'M'].includes(periodRaw) ? periodRaw : 'D';
 
-    const cached = _krCandleCache.get(code);
+    const cacheKey = `${code}:${period}`;
+    const cached = _krCandleCache.get(cacheKey);
     if (cached && Date.now() - cached.time < KR_CANDLE_CACHE_TTL) {
         return res.status(200).json({ success: true, data: cached.data, cached: true });
     }
 
     try {
-        const data = await fetchKrDailyCandles(code, 450);
-        _krCandleCache.set(code, { data, time: Date.now() });
+        const data = await fetchKrDailyCandles(code, period);
+        _krCandleCache.set(cacheKey, { data, time: Date.now() });
         return res.status(200).json({ success: true, data });
     } catch (error) {
-        console.error(`❌ 국내주식 차트 조회 실패 (${code}):`, error.message);
+        console.error(`❌ 국내주식 차트 조회 실패 (${code}, ${period}):`, error.message);
         return res.status(500).json({ success: false, error: error.message || '차트 조회 중 오류 발생' });
     }
 }
