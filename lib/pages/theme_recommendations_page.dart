@@ -69,10 +69,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
             });
           }
         });
-        if (extraKrx.isNotEmpty)
+        if (extraKrx.isNotEmpty) {
           _loadData(themesToLoad: extraKrx);
-        else
+        } else {
           setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
       debugPrint('테마 초기화 오류: $e');
@@ -99,10 +100,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         targets.map((theme) async {
           if (_themeStocks.containsKey(theme)) return; // 이미 있으면 스킵
           final stocks = await KrxLoader.getThemeStocks(theme);
-          if (mounted)
+          if (mounted) {
             setState(() {
               _themeStocks[theme] = stocks;
             });
+          }
         }),
       );
 
@@ -172,7 +174,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                     itemCount: _themes.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
-                      color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+                      color: theme.colorScheme.outlineVariant
+                          .withValues(alpha: 0.4),
                     ),
                     itemBuilder: (_, index) {
                       final isSelected = _tabController.index == index;

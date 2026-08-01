@@ -39,11 +39,12 @@ class _GoldWidgetState extends State<GoldWidget> {
       final cacheTime = prefs.getInt('gold_cache_time');
       if (cachedPrice != null && cacheTime != null) {
         if (DateTime.now().millisecondsSinceEpoch - cacheTime < 5 * 60 * 1000) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _goldPrice = cachedPrice;
               _isLoading = false;
             });
+          }
         }
       }
     } catch (_) {}

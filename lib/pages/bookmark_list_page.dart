@@ -217,7 +217,7 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: (isPositive ? Colors.green : Colors.red)
-                            .withOpacity(0.1),
+                            .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

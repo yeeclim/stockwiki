@@ -200,11 +200,12 @@ class _ChartBookmarkButtonState extends State<_ChartBookmarkButton> {
 
   Future<void> _checkBookmark() async {
     final result = await BookmarkService.isBookmarked(widget.stockCode);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _isBookmarked = result;
         _isLoading = false;
       });
+    }
   }
 
   Future<void> _toggleBookmark() async {
@@ -295,8 +296,8 @@ class _NaverChartWidgetState extends State<_NaverChartWidget> {
                     children: [
                       Icon(Icons.image_not_supported_outlined,
                           size: 40,
-                          color:
-                              th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                          color: th.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.4)),
                       const SizedBox(height: 12),
                       Text('차트를 불러올 수 없습니다.',
                           style: th.textTheme.bodyMedium?.copyWith(
@@ -355,7 +356,7 @@ Widget _buildNewListingPanel(BuildContext ctx, String code) {
         children: [
           Icon(Icons.bar_chart_outlined,
               size: 56,
-              color: th.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+              color: th.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
           const SizedBox(height: 20),
           Text('차트 데이터 준비 중',
               style: th.textTheme.titleMedium
@@ -401,7 +402,7 @@ Widget _linkButton(
       label: Text(label,
           style: TextStyle(color: color, fontWeight: FontWeight.w600)),
       style: OutlinedButton.styleFrom(
-        side: BorderSide(color: color.withOpacity(0.4)),
+        side: BorderSide(color: color.withValues(alpha: 0.4)),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

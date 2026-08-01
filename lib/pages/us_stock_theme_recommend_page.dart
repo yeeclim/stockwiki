@@ -105,8 +105,8 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                     itemCount: _sectors.length,
                     separatorBuilder: (_, __) => Divider(
                         height: 1,
-                        color:
-                            theme.colorScheme.outlineVariant.withOpacity(0.4)),
+                        color: theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.4)),
                     itemBuilder: (_, index) {
                       final isSelected = _tabController.index == index;
                       return ListTile(
@@ -318,11 +318,12 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color:
-                      themeData.colorScheme.primaryContainer.withOpacity(0.3),
+                  color: themeData.colorScheme.primaryContainer
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: themeData.colorScheme.primary.withOpacity(0.2)),
+                      color:
+                          themeData.colorScheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

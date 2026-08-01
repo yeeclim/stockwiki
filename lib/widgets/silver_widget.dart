@@ -40,11 +40,12 @@ class _SilverWidgetState extends State<SilverWidget> {
       if (cachedPrice != null && cacheTime != null) {
         if (DateTime.now().millisecondsSinceEpoch - cacheTime <
             10 * 60 * 1000) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _silverPrice = cachedPrice;
               _isLoading = false;
             });
+          }
         }
       }
     } catch (_) {}

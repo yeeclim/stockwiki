@@ -32,11 +32,12 @@ class _BtcWidgetState extends State<BtcWidget> {
       final cacheTime = prefs.getInt('btc_cache_time');
       if (cachedPrice != null && cacheTime != null) {
         if (DateTime.now().millisecondsSinceEpoch - cacheTime < 5 * 60 * 1000) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _btcPrice = cachedPrice;
               _isLoading = false;
             });
+          }
         }
       }
     } catch (_) {}
