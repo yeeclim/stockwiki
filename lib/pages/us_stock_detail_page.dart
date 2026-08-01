@@ -7,6 +7,7 @@ import '../services/us_stock_news_service.dart';
 import '../services/news_service.dart';
 import '../services/bookmark_service.dart';
 import '../utils/number_format_utils.dart';
+import '../widgets/kr_stock_kchart_widget.dart';
 import '../widgets/us_stock_chart_widget.dart';
 
 class UsStockDetailPage extends StatefulWidget {
@@ -187,7 +188,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             const SizedBox(height: 16),
 
             // 차트 섹션
-            UsStockChartWidget(symbol: widget.stock.symbol),
+            _isKoreanStock
+                ? KrStockKChartWidget(symbol: widget.stock.symbol)
+                : UsStockChartWidget(symbol: widget.stock.symbol),
             const SizedBox(height: 16),
 
             // 뉴스 섹션
