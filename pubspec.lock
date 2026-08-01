@@ -283,10 +283,9 @@ packages:
   k_chart_plus:
     dependency: "direct main"
     description:
-      name: k_chart_plus
-      sha256: b3cf7fa6da8a185f7c2f9f750df51deb0d735cef2b7ab8aac6efe5012ab5cdf5
-      url: "https://pub.dev"
-    source: hosted
+      path: "lib/vendor/k_chart_plus"
+      relative: true
+    source: path
     version: "1.0.4"
   leak_tracker:
     dependency: transitive
