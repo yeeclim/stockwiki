@@ -32789,7 +32789,7 @@ am9(a){var s=0,r=A.r(t.PH),q,p,o,n,m
 var $async$am9=A.t(function(b,c){if(b===1)return A.o(c,r)
 for(;;)switch(s){case 0:n=A.d8()
 s=3
-return A.l(A.ei(A.bI(n.gdq(n)+"/api/kr-chart?code="+a,0,null),null).d3(0,B.Mm),$async$am9)
+return A.l(A.ei(A.bI(n.gdq(n)+"/api/utils?type=kr-candles&code="+a,0,null),null).d3(0,B.Mm),$async$am9)
 case 3:m=c
 n=m.b
 if(n!==200)throw A.f(A.ct("\ucc28\ud2b8 \ub370\uc774\ud130 \uc870\ud68c \uc2e4\ud328 ("+n+")"))
