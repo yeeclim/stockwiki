@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/stock.dart';
 import '../services/us_sector_loader.dart';
-import '../utils/tradingview_helper.dart';
 import '../widgets/app_drawer.dart';
+import 'us_stock_detail_page.dart';
 
 class UsStockThemeRecommendPage extends StatefulWidget {
   const UsStockThemeRecommendPage({super.key});
@@ -104,8 +105,8 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                     itemCount: _sectors.length,
                     separatorBuilder: (_, __) => Divider(
                         height: 1,
-                        color:
-                            theme.colorScheme.outlineVariant.withOpacity(0.4)),
+                        color: theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.4)),
                     itemBuilder: (_, index) {
                       final isSelected = _tabController.index == index;
                       return ListTile(
@@ -144,11 +145,13 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
   }
 
   void _navigateToStockDetail(String symbol, String name) {
-    showChart(
+    Navigator.push(
       context,
-      tvSymbol: usSymbol(symbol),
-      stockName: name,
-      yahooTicker: symbol,
+      MaterialPageRoute(
+        builder: (_) => UsStockDetailPage(
+          stock: Stock(symbol: symbol, name: name),
+        ),
+      ),
     );
   }
 
@@ -315,11 +318,12 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color:
-                      themeData.colorScheme.primaryContainer.withOpacity(0.3),
+                  color: themeData.colorScheme.primaryContainer
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: themeData.colorScheme.primary.withOpacity(0.2)),
+                      color:
+                          themeData.colorScheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

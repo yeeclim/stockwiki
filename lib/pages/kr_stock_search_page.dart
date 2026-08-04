@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../utils/tradingview_helper.dart';
+import '../models/stock.dart';
 import '../widgets/portfolio_add_sheet.dart';
+import 'us_stock_detail_page.dart';
 
 class KrStockSearchPage extends StatefulWidget {
   const KrStockSearchPage({super.key});
@@ -98,7 +99,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
                 hintStyle: theme.textTheme.bodyMedium
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
-                fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                fillColor: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none),
@@ -170,7 +172,7 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
         setState(() => _type = value);
         if (_controller.text.isNotEmpty) _search();
       },
-      selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+      selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
       checkmarkColor: theme.colorScheme.primary,
       labelStyle: theme.textTheme.labelMedium?.copyWith(
           color: selected
@@ -210,7 +212,8 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
           children: [
             Icon(Icons.search_off,
                 size: 48,
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
             const SizedBox(height: 12),
             Text('검색 결과가 없습니다',
                 style: theme.textTheme.bodyLarge
@@ -242,11 +245,19 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
           side: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
         child: InkWell(
-          onTap: () => showChart(
+          onTap: () => Navigator.push(
             context,
-            tvSymbol: krxSymbol(code),
-            stockName: name,
-            naverCode: code,
+            MaterialPageRoute(
+              builder: (_) => UsStockDetailPage(
+                stock: Stock(
+                  symbol: code,
+                  name: name,
+                  price: price?.toDouble(),
+                  changePercent: changePct?.toDouble(),
+                ),
+                isKorean: true,
+              ),
+            ),
           ),
           borderRadius: BorderRadius.circular(14),
           child: Padding(

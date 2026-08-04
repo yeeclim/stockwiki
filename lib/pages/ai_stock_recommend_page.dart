@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import '../models/stock.dart';
 import '../services/bookmark_service.dart';
-import '../utils/tradingview_helper.dart';
 import '../widgets/ai_recommend_header.dart';
 import '../widgets/ai_recommend_card.dart';
 import '../widgets/ai_recommend_empty_state.dart';
 import '../widgets/portfolio_add_sheet.dart';
+import 'us_stock_detail_page.dart';
 
 class AiStockRecommendPage extends StatefulWidget {
   const AiStockRecommendPage({super.key});
@@ -295,11 +296,21 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
           final rec = _recommendations[index];
           return AiRecommendCard(
             rec: rec,
-            onChartTap: () => showChart(
+            onChartTap: () => Navigator.push(
               context,
-              tvSymbol: krxSymbol(rec.stockCode),
-              stockName: rec.stockName,
-              naverCode: rec.stockCode,
+              MaterialPageRoute(
+                builder: (_) => UsStockDetailPage(
+                  stock: Stock(
+                    symbol: rec.stockCode,
+                    name: rec.stockName,
+                    price: rec.currentPrice > 0
+                        ? rec.currentPrice.toDouble()
+                        : null,
+                    changePercent: rec.changePercent,
+                  ),
+                  isKorean: true,
+                ),
+              ),
             ),
             onPortfolioTap: () => showPortfolioAddSheet(
               context,

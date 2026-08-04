@@ -148,7 +148,7 @@ class _KisGuidePageState extends State<KisGuidePage>
         children: [
           ..._brokers.map((b) => _BrokerGuideTab(broker: b, theme: theme)),
           // Kakao guide as its own tab
-          Padding(padding: const EdgeInsets.all(0), child: KakaoGuideContent()),
+          const Padding(padding: EdgeInsets.all(0), child: KakaoGuideContent()),
         ],
       ),
     );

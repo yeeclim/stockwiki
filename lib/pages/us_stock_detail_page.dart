@@ -6,6 +6,8 @@ import '../services/fmp_service.dart';
 import '../services/us_stock_news_service.dart';
 import '../services/news_service.dart';
 import '../services/bookmark_service.dart';
+import '../utils/number_format_utils.dart';
+import '../widgets/kr_stock_kchart_widget.dart';
 import '../widgets/us_stock_chart_widget.dart';
 
 class UsStockDetailPage extends StatefulWidget {
@@ -186,7 +188,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
             const SizedBox(height: 16),
 
             // 차트 섹션
-            UsStockChartWidget(symbol: widget.stock.symbol),
+            _isKoreanStock
+                ? KrStockKChartWidget(symbol: widget.stock.symbol)
+                : UsStockChartWidget(symbol: widget.stock.symbol),
             const SizedBox(height: 16),
 
             // 뉴스 섹션
@@ -339,9 +343,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         RegExp(r'[가-힣]').hasMatch(stock.name);
 
     if (isKorean) {
-      return '₩${price.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+      return '₩${formatWithCommas(price)}';
     } else {
-      return '\$${price.toStringAsFixed(2)}';
+      return '\$${formatWithCommas(price, decimals: 2)}';
     }
   }
 
@@ -352,9 +356,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
         RegExp(r'[가-힣]').hasMatch(stock.name);
 
     if (isKorean) {
-      return '₩${change.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}';
+      return '₩${formatWithCommas(change)}';
     } else {
-      return '\$${change.toStringAsFixed(2)}';
+      return '\$${formatWithCommas(change, decimals: 2)}';
     }
   }
 
@@ -464,7 +468,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
       ),
       child: InkWell(
@@ -483,7 +487,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
                       color: (news.sentiment == 'Positive'
                               ? Colors.green
                               : Colors.red)
-                          .withOpacity(0.1),
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
                           color: (news.sentiment == 'Positive'
@@ -579,9 +583,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.05),
+          color: Colors.grey.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -632,9 +636,9 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: signalColor.withOpacity(0.05),
+        color: signalColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: signalColor.withOpacity(0.5), width: 1),
+        border: Border.all(color: signalColor.withValues(alpha: 0.5), width: 1),
       ),
       child: Column(
         children: [

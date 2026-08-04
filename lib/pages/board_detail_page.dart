@@ -753,8 +753,8 @@ class _CommentSectionState extends State<_CommentSection> {
                           hintStyle: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant),
                           filled: true,
-                          fillColor:
-                              theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide.none),
@@ -835,7 +835,8 @@ class _SmallField extends StatelessWidget {
         hintStyle: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         filled: true,
-        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        fillColor:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide.none),
