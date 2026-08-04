@@ -53,7 +53,7 @@ class NewsService {
 
       // 병렬로 실행 (타임아웃 5초로 단축)
       final results = await Future.wait(futures, eagerError: false)
-          .timeout(Duration(seconds: 5), onTimeout: () {
+          .timeout(const Duration(seconds: 5), onTimeout: () {
         debugPrint('뉴스 로딩 타임아웃 (5초)');
         return <List<News>>[];
       });

@@ -36,11 +36,12 @@ class _BtcSparklineWidgetState extends State<BtcSparklineWidget> {
           final list = (jsonDecode(cached) as List)
               .map((e) => (e as num).toDouble())
               .toList();
-          if (mounted)
+          if (mounted) {
             setState(() {
               _prices = list;
               _isLoading = false;
             });
+          }
         }
       }
     } catch (_) {}

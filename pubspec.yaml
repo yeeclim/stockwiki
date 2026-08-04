@@ -15,10 +15,13 @@ dependencies:
   url_launcher: ^6.3.0
   shared_preferences: ^2.3.0
   fl_chart: 1.1.0
+  intl: ^0.20.2
   provider: ^6.1.2
   supabase_flutter: ^2.8.0
   gotrue: any
   web: ^1.1.1
+  k_chart_plus:
+    path: lib/vendor/k_chart_plus
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exchange_rate_service.dart';
+import '../utils/number_format_utils.dart';
 import 'market_data_card.dart';
 import 'price_cache_mixin.dart';
 
@@ -83,7 +84,7 @@ class _GoldWidgetState extends State<GoldWidget> with PriceCacheMixin {
     String? subText;
     if (_goldPrice != null && _usdKrwRate != null && _usdKrwRate! > 0) {
       final krwPerDon = _goldPrice! * _usdKrwRate! * ozToDon;
-      subText = '약 ${krwPerDon.toStringAsFixed(0)}원 / 돈';
+      subText = '약 ${formatWithCommas(krwPerDon)}원 / 돈';
     }
 
     return MarketDataCard(
@@ -94,8 +95,9 @@ class _GoldWidgetState extends State<GoldWidget> with PriceCacheMixin {
       title: 'Gold',
       isLoading: _isLoading,
       error: _error,
-      valueText:
-          _goldPrice != null ? '\$${_goldPrice!.toStringAsFixed(2)}' : 'N/A',
+      valueText: _goldPrice != null
+          ? '\$${formatWithCommas(_goldPrice!, decimals: 2)}'
+          : 'N/A',
       subText: subText,
       changePercent: _changePercent,
     );

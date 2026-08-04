@@ -203,7 +203,7 @@ class _BoardPageState extends State<BoardPage> {
         children: [
           Icon(Icons.forum_outlined,
               size: 56,
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text('아직 게시글이 없습니다',
               style: theme.textTheme.bodyLarge
@@ -400,7 +400,8 @@ class _WriteSheetState extends State<_WriteSheet> {
         hintStyle: theme.textTheme.bodyMedium
             ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         filled: true,
-        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        fillColor:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none),

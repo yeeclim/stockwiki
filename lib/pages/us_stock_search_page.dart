@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/stock.dart';
+import '../utils/number_format_utils.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockSearchPage extends StatefulWidget {
@@ -71,7 +72,7 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
         setState(() => _type = value);
         if (_controller.text.isNotEmpty) _search();
       },
-      selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+      selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
       checkmarkColor: theme.colorScheme.primary,
       labelStyle: theme.textTheme.labelMedium?.copyWith(
           color: selected
@@ -144,8 +145,8 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                       filled: true,
-                      fillColor:
-                          theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      fillColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.3),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -224,7 +225,7 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                     Icon(Icons.search_off,
                         size: 48,
                         color: theme.colorScheme.onSurfaceVariant
-                            .withOpacity(0.5)),
+                            .withValues(alpha: 0.5)),
                     const SizedBox(height: 16),
                     Text(
                       '검색 결과가 없습니다.',
@@ -313,7 +314,9 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '\$${stock.price?.toStringAsFixed(2) ?? '-'}',
+                                      stock.price != null
+                                          ? '\$${formatWithCommas(stock.price!, decimals: 2)}'
+                                          : '-',
                                       style:
                                           theme.textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
@@ -329,7 +332,7 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
                                           color: (stock.changePercent! >= 0
                                                   ? Colors.green
                                                   : Colors.red)
-                                              .withOpacity(0.1),
+                                              .withValues(alpha: 0.1),
                                           borderRadius:
                                               BorderRadius.circular(4),
                                         ),

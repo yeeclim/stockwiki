@@ -35,11 +35,12 @@ export default async function handler(req, res) {
     }
 
     // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
+    // Qwen3 32B, Llama 4 Scout는 Groq가 모델을 폐기(retire)해서 항상 404였음 (2026-07-31 확인) → 현재 유효 모델로 교체
     const MODEL_POOL = [
-      { name: 'Qwen3 32B',    fn: () => askGroqThink(question, 'qwen/qwen3-32b', 'Qwen3 32B') },
+      { name: 'Qwen3.6 27B',  fn: () => askGroqThink(question, 'qwen/qwen3.6-27b', 'Qwen3.6 27B') },
       { name: 'Llama 3.3',    fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
-      { name: 'Llama 4 Scout',fn: () => askGroq(question, 'meta-llama/llama-4-scout-17b-16e-instruct', 'Llama 4 Scout') },
-      { name: 'GPT-OSS 20B',  fn: () => askGroq(question, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
+      { name: 'GPT-OSS 120B', fn: () => askGroqOss(question, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
+      { name: 'GPT-OSS 20B',  fn: () => askGroqOss(question, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
       { name: 'Llama 3.1',    fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
     ];
 
@@ -356,7 +357,9 @@ async function askDeepSeek(question, model, displayName) {
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
 
-// Groq 추론 모델 — <think> 블록 제거 (QwQ, DeepSeek R1 distill 등)
+// Groq 추론 모델 (Qwen 등) — reasoning_effort: none으로 추론 자체를 꺼서, 좁은
+// max_tokens 예산을 추론이 아니라 최종 답변에만 쓰게 함. reasoning_format: hidden은
+// (추론을 껐어도) 혹시 모델이 추론 텍스트를 반환하는 경우를 대비한 이중 안전장치.
 async function askGroqThink(question, model, displayName) {
   const apiKey = getEnv('GROQ_API_KEY');
   if (!apiKey) throw new Error('GROQ_API_KEY 미설정');
@@ -374,6 +377,8 @@ async function askGroqThink(question, model, displayName) {
         { role: 'user', content: question + PROMPT_SUFFIX },
       ],
       max_tokens: 2000,
+      reasoning_effort: 'none',
+      reasoning_format: 'hidden',
     }),
   });
 
@@ -385,6 +390,39 @@ async function askGroqThink(question, model, displayName) {
   let content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
   content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
+}
+
+// GPT-OSS 계열 (Groq) — reasoning_effort: low로 추론 비중을 낮춰, 좁은 max_tokens 안에서도
+// 결론 문장이 잘리지 않고 나오도록 함 (기존엔 GPT-OSS 20B가 매번 결론 누락으로 실패했음).
+async function askGroqOss(question, model, displayName) {
+  const apiKey = getEnv('GROQ_API_KEY');
+  if (!apiKey) throw new Error('GROQ_API_KEY 미설정');
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_INSTRUCTION },
+        { role: 'user', content: question + PROMPT_SUFFIX },
+      ],
+      max_tokens: 2000,
+      reasoning_effort: 'low',
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
+  }
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
 

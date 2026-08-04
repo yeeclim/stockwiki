@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exchange_rate_service.dart';
+import '../utils/number_format_utils.dart';
 import 'market_data_card.dart';
 import 'price_cache_mixin.dart';
 
@@ -83,7 +84,7 @@ class _SilverWidgetState extends State<SilverWidget> with PriceCacheMixin {
     String? subText;
     if (_silverPrice != null && _usdKrwRate != null && _usdKrwRate! > 0) {
       final krwPerDon = _silverPrice! * _usdKrwRate! * ozToDon;
-      subText = '약 ${krwPerDon.toStringAsFixed(0)}원 / 돈';
+      subText = '약 ${formatWithCommas(krwPerDon)}원 / 돈';
     }
 
     return MarketDataCard(
@@ -97,7 +98,7 @@ class _SilverWidgetState extends State<SilverWidget> with PriceCacheMixin {
       isLoading: _isLoading,
       error: _error,
       valueText: _silverPrice != null
-          ? '\$${_silverPrice!.toStringAsFixed(2)}'
+          ? '\$${formatWithCommas(_silverPrice!, decimals: 2)}'
           : 'N/A',
       subText: subText,
       changePercent: _changePercent,

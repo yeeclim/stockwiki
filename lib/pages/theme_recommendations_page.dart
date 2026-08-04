@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/stock.dart';
 import '../services/krx_loader.dart';
 import '../services/screening_service.dart';
-import '../utils/tradingview_helper.dart';
 import '../widgets/app_drawer.dart';
+import 'us_stock_detail_page.dart';
 
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
@@ -68,10 +69,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
             });
           }
         });
-        if (extraKrx.isNotEmpty)
+        if (extraKrx.isNotEmpty) {
           _loadData(themesToLoad: extraKrx);
-        else
+        } else {
           setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
       debugPrint('테마 초기화 오류: $e');
@@ -98,10 +100,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         targets.map((theme) async {
           if (_themeStocks.containsKey(theme)) return; // 이미 있으면 스킵
           final stocks = await KrxLoader.getThemeStocks(theme);
-          if (mounted)
+          if (mounted) {
             setState(() {
               _themeStocks[theme] = stocks;
             });
+          }
         }),
       );
 
@@ -171,7 +174,8 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                     itemCount: _themes.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
-                      color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+                      color: theme.colorScheme.outlineVariant
+                          .withValues(alpha: 0.4),
                     ),
                     itemBuilder: (_, index) {
                       final isSelected = _tabController.index == index;
@@ -214,12 +218,15 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     );
   }
 
-  void _navigateToStockDetail(String symbol, String name) {
-    showChart(
+  void _navigateToStockDetail(String symbol, String name, {double? price}) {
+    Navigator.push(
       context,
-      tvSymbol: krxSymbol(symbol),
-      stockName: name,
-      naverCode: symbol,
+      MaterialPageRoute(
+        builder: (_) => UsStockDetailPage(
+          stock: Stock(symbol: symbol, name: name, price: price),
+          isKorean: true,
+        ),
+      ),
     );
   }
 
@@ -366,7 +373,7 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         side: BorderSide(color: themeData.colorScheme.outlineVariant),
       ),
       child: InkWell(
-        onTap: () => _navigateToStockDetail(symbol, name),
+        onTap: () => _navigateToStockDetail(symbol, name, price: price),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),

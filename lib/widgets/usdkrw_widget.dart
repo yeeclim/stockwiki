@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/exchange_rate_service.dart';
+import '../utils/number_format_utils.dart';
 import 'market_data_card.dart';
 
 class UsdKrwWidget extends StatefulWidget {
@@ -46,7 +47,9 @@ class _UsdKrwWidgetState extends State<UsdKrwWidget> {
         title: 'USD/KRW',
         isLoading: _isLoading,
         error: _error,
-        valueText: _usdKrw != null ? '₩${_usdKrw!.toStringAsFixed(2)}' : 'N/A',
+        valueText: _usdKrw != null
+            ? '₩${formatWithCommas(_usdKrw!, decimals: 2)}'
+            : 'N/A',
         subText: '원',
       );
 }
