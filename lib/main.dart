@@ -26,6 +26,24 @@ import 'package:stockwiki/widgets/btc_sparkline_widget.dart';
 // Global Theme Notifier
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
+const double _desktopWidthBreakpoint = 900;
+
+class _DesktopTextScaler extends TextScaler {
+  const _DesktopTextScaler();
+
+  @override
+  double scale(double fontSize) => fontSize + 1.5;
+
+  @override
+  double get textScaleFactor => 1.0;
+
+  @override
+  bool operator ==(Object other) => other is _DesktopTextScaler;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
+
 // Supabase 설정 (--dart-define 으로 주입)
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL',
     defaultValue: 'https://xpiqctjidvrlmazslzyg.supabase.co');
@@ -70,6 +88,17 @@ class MyApp extends StatelessWidget {
           darkTheme: AppTheme.dark,
           themeMode: currentMode,
           debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            if (child == null) return const SizedBox.shrink();
+            final isDesktop =
+                MediaQuery.sizeOf(context).width >= _desktopWidthBreakpoint;
+            if (!isDesktop) return child;
+            return MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const _DesktopTextScaler()),
+              child: child,
+            );
+          },
           home: const StockSearchPage(),
         );
       },
