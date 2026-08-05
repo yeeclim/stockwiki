@@ -31,7 +31,7 @@ class UsSectorLoader {
 
     try {
       final response = await http
-          .get(Uri.parse('$_baseUrl/api/us-sector-recommend'))
+          .get(Uri.parse('$_baseUrl/api/us-recommend?view=sector'))
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
