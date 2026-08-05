@@ -11,6 +11,10 @@ let cache = null;
 let cacheTime = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10분
 
+// AI 미국주식 추천 화면 전용 시총 하한선 — screen_us_broad.py의 스크리닝 통과 기준(4천억원, 약 $3억)보다
+// 높게 잡아 대형주 위주로만 노출 (스크리닝 자체 기준은 건드리지 않음)
+const MIN_DISPLAY_MARKET_CAP_USD = 1_000_000_000; // $10억(1B)
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -47,7 +51,7 @@ async function fetchScreeningResults() {
   }
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&order=score.desc&limit=20`,
+      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&market_cap_usd=gte.${MIN_DISPLAY_MARKET_CAP_USD}&order=score.desc&limit=20`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
     if (!res.ok) {
