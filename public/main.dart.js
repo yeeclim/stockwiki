@@ -33503,7 +33503,7 @@ q=g
 s=1
 break}p=4
 s=7
-return A.l(A.e9(A.bL(A.bin()+"/api/us-sector-recommend",0,null),null).cY(0,B.f2),$async$aAh)
+return A.l(A.e9(A.bL(A.bin()+"/api/us-recommend?view=sector",0,null),null).cY(0,B.f2),$async$aAh)
 case 7:n=b
 if(n.b===200){g=n
 m=B.y.ak(0,A.c_(A.bZ(g.e)).ak(0,g.w))
