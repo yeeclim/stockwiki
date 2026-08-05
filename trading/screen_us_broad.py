@@ -15,7 +15,7 @@ import os
 import time
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import us_market_data as us
 from strategy import _score_entry
@@ -28,6 +28,7 @@ CALL_DELAY    = 0.1
 PRE_THRESHOLD = 5    # 국내 screen_broad.py와 동일
 MIN_THRESHOLD = 6    # BUY_THRESHOLD (strategy.py와 동일)
 TOP_N         = 60
+STALE_DAYS    = 3    # 이보다 오래 갱신 안 된 결과는 정리 (그날 top-N 밖으로 밀려 방치된 종목)
 
 MIN_PRICE          = 1
 MAX_PRICE          = 5000
@@ -137,10 +138,31 @@ def _upsert_results(candidates: list[dict]):
         )
         if resp.ok:
             print(f"💾 us_screening_results {len(rows)}개 저장 완료")
+            _prune_stale_rows()
         else:
             print(f"⚠️  저장 실패: {resp.status_code} {resp.text[:200]}")
     except Exception as e:
         print(f"⚠️  저장 오류: {e}")
+
+
+# 그날 top-N 밖으로 밀려 갱신되지 않는 종목이 pass=true 상태로 영원히 남는 것을 방지
+def _prune_stale_rows():
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=STALE_DAYS)).isoformat()
+    try:
+        resp = requests.delete(
+            f"{_SUPABASE_URL}/rest/v1/us_screening_results?screened_at=lt.{cutoff}",
+            headers={
+                'apikey':        _SUPABASE_KEY,
+                'Authorization': f'Bearer {_SUPABASE_KEY}',
+            },
+            timeout=30,
+        )
+        if resp.ok:
+            print(f"🗑️  {STALE_DAYS}일 초과 미갱신 결과 정리 완료")
+        else:
+            print(f"⚠️  오래된 결과 정리 실패: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        print(f"⚠️  오래된 결과 정리 오류: {e}")
 
 
 # ── 메인 ─────────────────────────────────────────────────────────────────────

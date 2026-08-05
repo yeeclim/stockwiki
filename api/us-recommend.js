@@ -19,6 +19,10 @@ const MIN_DISPLAY_MARKET_CAP_USD = 1_000_000_000; // $10억(1B)
 // 상위권 종목만 노출 (스크리닝 자체 통과 기준은 건드리지 않음)
 const MIN_DISPLAY_SCORE = 8; // 10점 만점
 
+// screen_us_broad.py는 그날의 상위 60개만 upsert하고 순위 밖으로 밀린 종목은
+// 갱신/삭제하지 않으므로, 표시 단계에서 오래된(3일 초과) 결과는 걸러낸다
+const MAX_SCREENED_AGE_DAYS = 3;
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -54,8 +58,9 @@ async function fetchScreeningResults() {
     return [];
   }
   try {
+    const cutoff = new Date(Date.now() - MAX_SCREENED_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&market_cap_usd=gte.${MIN_DISPLAY_MARKET_CAP_USD}&score=gte.${MIN_DISPLAY_SCORE}&order=score.desc&limit=20`,
+      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&market_cap_usd=gte.${MIN_DISPLAY_MARKET_CAP_USD}&score=gte.${MIN_DISPLAY_SCORE}&screened_at=gte.${cutoff}&order=score.desc&limit=20`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
     if (!res.ok) {
