@@ -125,20 +125,6 @@ void showChart(
                     stockName: stockName,
                     market: isKrx ? 'kr' : 'us',
                   ),
-                  if (naverCode != null)
-                    TextButton.icon(
-                      onPressed: () => launchUrl(
-                        Uri.parse(
-                            'https://finance.naver.com/item/main.naver?code=$naverCode'),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                      icon: const Icon(Icons.open_in_new, size: 13),
-                      label: const Text('네이버'),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
                   if (yahooTicker != null)
                     TextButton.icon(
                       onPressed: () => launchUrl(

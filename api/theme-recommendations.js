@@ -531,6 +531,10 @@ function scoreToRecommendation(score, cp) {
   return '대기';
 }
 
+// 테마 추천에 노출할 최소 점수 — 스크리닝처럼 '관망/대기' 등급은 숨기고
+// '분할 매수 검토' 이상만 노출
+const MIN_THEME_SCORE = 55;
+
 function buildThemeReasons(stock, score) {
   const cp    = stock.changePercent ?? 0;
   const vol   = stock.volume ?? 0;
@@ -746,6 +750,12 @@ async function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') 
     }
 
     const analysis = getComprehensiveAnalysis(stock);
+
+    // 점수가 낮으면 (관망/대기 등급) 추천 목록에서 제외
+    if (analysis.totalScore < MIN_THEME_SCORE) {
+      console.log(`[점수 미달 제외] ${stock.name}(${stock.symbol}) score=${analysis.totalScore}`);
+      continue;
+    }
 
     // MA 정보 reasons에 추가
     if (tech?.ma20) {
