@@ -391,9 +391,10 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
     );
   }
 
+  // score는 10점 만점 (BUY_THRESHOLD=6 이상만 API가 반환)
   Color _getScoreColor(double score) {
-    if (score >= 70) return Colors.green;
-    if (score >= 50) return Colors.blue;
+    if (score >= 8) return Colors.green;
+    if (score >= 6) return Colors.blue;
     return Colors.orange;
   }
 

@@ -53,15 +53,14 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
         _themeStocks[entry.key] = entry.value;
       }
 
-      // 스크리닝 섹터 먼저, 그 다음 KRX 테마 (중복 제거)
+      // 스크리닝 섹터는 이미 종목이 확정돼 있으므로 바로 탭으로 노출
       final screeningSectors = sectorMap.keys.toList();
       final extraKrx =
           krxThemes.where((t) => !screeningSectors.contains(t)).toList();
-      final allThemes = [...screeningSectors, ...extraKrx];
 
       if (mounted) {
         setState(() {
-          _themes = allThemes;
+          _themes = screeningSectors;
           if (_themes.isNotEmpty) {
             _tabController = TabController(length: _themes.length, vsync: this);
             _tabController.addListener(() {
@@ -69,67 +68,49 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
             });
           }
         });
-        if (extraKrx.isNotEmpty) {
-          _loadData(themesToLoad: extraKrx);
-        } else {
-          setState(() => _isLoading = false);
-        }
+      }
+
+      // KRX 테마는 종목/점수 필터링이 끝난 것만 탭에 추가 (빈 탭이 잠깐
+      // 보였다가 사라지는 깜빡임 방지)
+      if (extraKrx.isNotEmpty) {
+        await _loadExtraThemes(extraKrx);
       }
     } catch (e) {
       debugPrint('테마 초기화 오류: $e');
+    } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadExtraThemes(List<String> themes) async {
+    final entries = await Future.wait(themes.map((theme) async {
+      final stocks = await KrxLoader.getThemeStocks(theme);
+      return MapEntry(theme, stocks);
+    }));
+
+    final nonEmpty = {
+      for (final e in entries)
+        if (e.value.isNotEmpty) e.key: e.value,
+    };
+
+    if (!mounted || nonEmpty.isEmpty) return;
+
+    setState(() {
+      _themeStocks.addAll(nonEmpty);
+      final oldController = _themes.isNotEmpty ? _tabController : null;
+      _themes = [..._themes, ...nonEmpty.keys];
+      _tabController = TabController(length: _themes.length, vsync: this);
+      _tabController.addListener(() {
+        if (mounted) setState(() {});
+      });
+      oldController?.dispose();
+    });
   }
 
   @override
   void dispose() {
     if (_themes.isNotEmpty) _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadData({List<String>? themesToLoad}) async {
-    if (_themes.isEmpty) return;
-
-    setState(() => _isLoading = true);
-
-    // 스크리닝 섹터는 이미 로드됐으므로 KRX 테마만 로드
-    final targets = themesToLoad ?? _themes;
-
-    try {
-      await Future.wait(
-        targets.map((theme) async {
-          if (_themeStocks.containsKey(theme)) return; // 이미 있으면 스킵
-          final stocks = await KrxLoader.getThemeStocks(theme);
-          if (mounted) {
-            setState(() {
-              _themeStocks[theme] = stocks;
-            });
-          }
-        }),
-      );
-
-      // 종목이 0개인 테마 숨기기
-      if (mounted) {
-        final visible =
-            _themes.where((t) => (_themeStocks[t] ?? []).isNotEmpty).toList();
-        if (visible.length != _themes.length) {
-          final old = _tabController;
-          final newCtrl = TabController(length: visible.length, vsync: this);
-          newCtrl.addListener(() {
-            if (mounted) setState(() {});
-          });
-          setState(() {
-            _themes = visible;
-            _tabController = newCtrl;
-          });
-          old.dispose();
-        }
-      }
-    } catch (e) {
-      debugPrint('데이터 로드 오류: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   void _showThemePickerSheet() {
