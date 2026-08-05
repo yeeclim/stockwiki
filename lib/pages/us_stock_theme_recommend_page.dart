@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/stock.dart';
 import '../services/us_sector_loader.dart';
+import '../utils/number_format_utils.dart';
 import '../widgets/app_drawer.dart';
 import 'us_stock_detail_page.dart';
 
@@ -15,51 +15,91 @@ class UsStockThemeRecommendPage extends StatefulWidget {
 
 class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     with TickerProviderStateMixin {
-  late TabController _tabController;
+  TabController? _tabController;
   List<String> _sectors = [];
   final Map<String, List<Map<String, dynamic>>> _sectorStocks = {};
+  bool _isLoading = true;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
-    _sectors = UsSectorLoader.getSectors();
-    _tabController = TabController(length: _sectors.length, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
-    _loadAllSectors();
+    _loadData();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
-  Future<void> _loadAllSectors() async {
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
-      for (String sector in _sectors) {
-        _sectorStocks[sector] = UsSectorLoader.getSectorStocks(sector);
+      final grouped = await UsSectorLoader.loadAll();
+      // 종목이 있는 섹터만 탭으로 노출
+      final nonEmpty = grouped.entries.where((e) => e.value.isNotEmpty);
+
+      _sectorStocks.clear();
+      for (final entry in nonEmpty) {
+        _sectorStocks[entry.key] = entry.value;
+      }
+
+      final oldController = _tabController;
+      final sectors = _sectorStocks.keys.toList();
+
+      if (mounted) {
+        setState(() {
+          _sectors = sectors;
+          _tabController = sectors.isNotEmpty
+              ? TabController(length: sectors.length, vsync: this)
+              : null;
+          _tabController?.addListener(() {
+            if (mounted) setState(() {});
+          });
+          _isLoading = false;
+        });
+        oldController?.dispose();
       }
     } catch (e) {
-      debugPrint('Sector별 주식 로드 오류: $e');
+      debugPrint('Sector별 추천 종목 로드 오류: $e');
+      if (mounted) {
+        setState(() {
+          _error = '섹터별 추천 종목을 불러올 수 없습니다: $e';
+          _isLoading = false;
+        });
+      }
     }
-    if (mounted) setState(() {});
   }
 
   String _getSectorIcon(String sector) {
     switch (sector) {
       case 'Technology':
         return '💻';
-      case 'Finance':
-        return '💰';
       case 'Healthcare':
         return '🏥';
-      case 'Consumer':
+      case 'Financial Services':
+        return '💰';
+      case 'Consumer Cyclical':
+        return '🛍️';
+      case 'Consumer Defensive':
         return '🛒';
       case 'Energy':
         return '⚡';
-      case 'Industrial':
+      case 'Industrials':
         return '🏭';
+      case 'Basic Materials':
+        return '⛏️';
+      case 'Utilities':
+        return '🔌';
+      case 'Real Estate':
+        return '🏢';
+      case 'Communication Services':
+        return '📡';
       default:
         return '📊';
     }
@@ -67,6 +107,8 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
 
   void _showSectorPickerSheet() {
     final theme = Theme.of(context);
+    final tabController = _tabController;
+    if (tabController == null) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -108,7 +150,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                         color: theme.colorScheme.outlineVariant
                             .withValues(alpha: 0.4)),
                     itemBuilder: (_, index) {
-                      final isSelected = _tabController.index == index;
+                      final isSelected = tabController.index == index;
                       return ListTile(
                         dense: true,
                         leading: Text(_getSectorIcon(_sectors[index]),
@@ -130,7 +172,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                             : null,
                         onTap: () {
                           Navigator.pop(ctx);
-                          _tabController.animateTo(index);
+                          tabController.animateTo(index);
                         },
                       );
                     },
@@ -144,54 +186,45 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
     );
   }
 
-  void _navigateToStockDetail(String symbol, String name) {
+  void _navigateToStockDetail(String symbol, String name, {double? price}) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => UsStockDetailPage(
-          stock: Stock(symbol: symbol, name: name),
+          stock: Stock(symbol: symbol, name: name, price: price),
         ),
       ),
     );
   }
 
-  void _launchURL(String url) async {
-    try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        debugPrint('URL을 열 수 없습니다: $url');
-      }
-    } catch (e) {
-      debugPrint('URL 실행 오류: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tabController = _tabController;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: theme.appBarTheme.backgroundColor,
         title: GestureDetector(
-          onTap: _showSectorPickerSheet,
+          onTap: tabController != null ? _showSectorPickerSheet : null,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _sectors.isNotEmpty
-                    ? '${_getSectorIcon(_sectors[_tabController.index])} ${_sectors[_tabController.index]}'
+                _sectors.isNotEmpty && tabController != null
+                    ? '${_getSectorIcon(_sectors[tabController.index])} ${_sectors[tabController.index]}'
                     : '📊 Sector별 추천 종목',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down,
-                  color: theme.colorScheme.onSurface, size: 20),
+              if (tabController != null) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down,
+                    color: theme.colorScheme.onSurface, size: 20),
+              ],
             ],
           ),
         ),
@@ -211,60 +244,117 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
             },
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          labelColor: theme.colorScheme.primary,
-          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-          indicatorColor: theme.colorScheme.primary,
-          tabs: _sectors.map((sector) {
-            return Tab(
-              text: '${_getSectorIcon(sector)} $sector',
-            );
-          }).toList(),
-        ),
+        bottom: tabController == null
+            ? null
+            : TabBar(
+                controller: tabController,
+                isScrollable: true,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                indicatorColor: theme.colorScheme.primary,
+                tabs: _sectors.map((sector) {
+                  return Tab(
+                    text: '${_getSectorIcon(sector)} $sector',
+                  );
+                }).toList(),
+              ),
       ),
       endDrawer: const AppDrawer(),
-      body: TabBarView(
-        controller: _tabController,
-        children: _sectors.map((sector) {
-          return _buildSectorContent(sector);
-        }).toList(),
-      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    final theme = Theme.of(context);
+
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.colorScheme.primary),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurface),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+              ),
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final tabController = _tabController;
+    if (_sectors.isEmpty || tabController == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.refresh, color: theme.colorScheme.primary, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              '섹터별 추천 종목이 없습니다',
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadData,
+              child: const Text('새로고침'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return TabBarView(
+      controller: tabController,
+      children: _sectors.map((sector) => _buildSectorContent(sector)).toList(),
     );
   }
 
   Widget _buildSectorContent(String sector) {
     final stocks = _sectorStocks[sector] ?? [];
 
-    return Column(
-      children: [
-        Expanded(
-          child: stocks.isEmpty
-              ? const Center(child: Text('해당 Sector의 추천 종목이 없습니다.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  itemCount: stocks.length,
-                  itemBuilder: (context, index) {
-                    final stock = stocks[index];
-                    return _buildRecommendationCard(stock, sector);
-                  },
-                ),
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        itemCount: stocks.length,
+        itemBuilder: (context, index) {
+          final stock = stocks[index];
+          return _buildRecommendationCard(stock);
+        },
+      ),
     );
   }
 
-  Widget _buildRecommendationCard(Map<String, dynamic> stock, String sector) {
+  Widget _buildRecommendationCard(Map<String, dynamic> stock) {
     final themeData = Theme.of(context);
     final symbol = stock['symbol'] as String;
     final name = stock['name'] as String;
-    final reason = stock['reason'] as String? ??
-        'Key sector leader with strong fundamentals.';
-
-    // 뉴스 데이터 타입 변경 대응 (List<Map<String, String>>)
-    final newsList =
-        (stock['news'] as List<dynamic>? ?? []).cast<Map<String, String>>();
+    final exchange = stock['exchange'] as String? ?? '';
+    final price = (stock['price'] as num?)?.toDouble();
+    final changePercent = (stock['changePercent'] as num?)?.toDouble() ?? 0;
+    final score = (stock['score'] as num?)?.toDouble() ?? 0;
+    final action = stock['action'] as String? ?? 'Hold';
+    final reasons = (stock['reasons'] as List<dynamic>? ?? []).cast<String>();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -275,7 +365,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
         side: BorderSide(color: themeData.colorScheme.outlineVariant),
       ),
       child: InkWell(
-        onTap: () => _navigateToStockDetail(symbol, name),
+        onTap: () => _navigateToStockDetail(symbol, name, price: price),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -298,7 +388,7 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$symbol • $sector',
+                          '$symbol${exchange.isNotEmpty ? ' • $exchange' : ''}',
                           style: themeData.textTheme.bodySmall?.copyWith(
                             color: themeData.colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
@@ -307,102 +397,128 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios,
-                      size: 16, color: themeData.colorScheme.onSurfaceVariant),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // 추천 사유 박스
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: themeData.colorScheme.primaryContainer
-                      .withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color:
-                          themeData.colorScheme.primary.withValues(alpha: 0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  // 점수 배지
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getScoreColor(score).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _getScoreColor(score)),
+                    ),
+                    child: Column(
                       children: [
-                        Icon(Icons.lightbulb,
-                            size: 16, color: themeData.colorScheme.primary),
-                        const SizedBox(width: 8),
                         Text(
-                          '투자 포인트',
-                          style: themeData.textTheme.labelSmall?.copyWith(
+                          score.toStringAsFixed(1),
+                          style: TextStyle(
+                            color: _getScoreColor(score),
                             fontWeight: FontWeight.bold,
-                            color: themeData.colorScheme.primary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          action,
+                          style: TextStyle(
+                            color: _getActionColor(action),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      reason,
-                      style: themeData.textTheme.bodySmall?.copyWith(
-                        color: themeData.colorScheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
 
-              if (newsList.isNotEmpty) ...[
-                const SizedBox(height: 12),
+              // 가격 정보
+              if (price != null)
                 Row(
                   children: [
-                    Icon(Icons.article_outlined,
-                        size: 16, color: themeData.colorScheme.secondary),
-                    const SizedBox(width: 8),
                     Text(
-                      '관련 뉴스',
-                      style: themeData.textTheme.labelSmall?.copyWith(
+                      '\$${formatWithCommas(price, decimals: 2)}',
+                      style: themeData.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: themeData.colorScheme.secondary,
+                        color: themeData.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      changePercent >= 0
+                          ? Icons.trending_up
+                          : Icons.trending_down,
+                      color: changePercent >= 0 ? Colors.green : Colors.red,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+                      style: themeData.textTheme.titleSmall?.copyWith(
+                        color: changePercent >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                ...newsList.map((news) {
-                  final title = news['title'] ?? '';
-                  final url = news['url'] ?? '';
 
-                  return InkWell(
-                    onTap: () => _launchURL(url),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              if (reasons.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: themeData.colorScheme.primaryContainer
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: themeData.colorScheme.primary
+                            .withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text('• ',
-                              style: TextStyle(
-                                  color:
-                                      themeData.colorScheme.onSurfaceVariant)),
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: themeData.textTheme.bodySmall?.copyWith(
-                                color: Colors.blueAccent, // 링크임을 강조
-                                height: 1.3,
-                                decoration: TextDecoration.underline,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Icon(Icons.lightbulb,
+                              size: 16, color: themeData.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            '추천 이유',
+                            style: themeData.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: themeData.colorScheme.primary,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                }),
+                      const SizedBox(height: 6),
+                      ...reasons.map((reason) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('• ',
+                                    style: TextStyle(
+                                        color: themeData
+                                            .colorScheme.onSurfaceVariant)),
+                                Expanded(
+                                  child: Text(
+                                    reason,
+                                    style:
+                                        themeData.textTheme.bodySmall?.copyWith(
+                                      color: themeData
+                                          .colorScheme.onSurfaceVariant,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
               ],
 
               const SizedBox(height: 12),
@@ -428,5 +544,25 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
         ),
       ),
     );
+  }
+
+  // score는 10점 만점 (BUY_THRESHOLD=6 이상만 API가 반환)
+  Color _getScoreColor(double score) {
+    if (score >= 8) return Colors.green;
+    if (score >= 6) return Colors.blue;
+    return Colors.orange;
+  }
+
+  Color _getActionColor(String action) {
+    switch (action) {
+      case 'Buy':
+        return Colors.green;
+      case 'Watch':
+        return Colors.orange;
+      case 'Hold':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
   }
 }

@@ -221,6 +221,26 @@ def get_ratios(symbol: str) -> dict | None:
         return None
 
 
+def get_sector(symbol: str) -> dict | None:
+    """assetProfile 모듈에서 GICS 대분류 sector/industry 조회. 실패/결측 시 None."""
+    _ensure_auth()
+    try:
+        r = _session.get(
+            f'https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}',
+            params={'modules': 'assetProfile', 'crumb': _crumb},
+            timeout=15,
+        )
+        r.raise_for_status()
+        result = r.json().get('quoteSummary', {}).get('result')
+        if not result:
+            return None
+        profile = result[0].get('assetProfile') or {}
+        sector = profile.get('sector')
+        return {'sector': sector, 'industry': profile.get('industry')} if sector else None
+    except Exception:
+        return None
+
+
 # ── 환율 ──────────────────────────────────────────────────────────────────────
 
 def get_usd_krw_rate() -> float:

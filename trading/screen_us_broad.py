@@ -100,6 +100,18 @@ def _stage3_score_with_ratios(stock: dict) -> dict:
         return stock
 
 
+# ── 4차: 상위 종목 GICS 섹터 조회 (Sector별 추천 종목 화면용) ───────────────────
+
+def _stage4_fetch_gics_sector(top: list[dict]) -> list[dict]:
+    """상위 TOP_N 종목만 GICS sector 조회 (Yahoo API 호출량을 하루 60건으로 제한).
+    quoteSummary 계열은 stage3와 동일하게 순차 호출 + sleep으로 레이트리밋 회피."""
+    for stock in top:
+        profile = us.get_sector(stock['code'])
+        stock['gics_sector'] = profile['sector'] if profile else None
+        time.sleep(0.15)
+    return top
+
+
 # ── Supabase 저장 ────────────────────────────────────────────────────────────
 
 def _upsert_results(candidates: list[dict]):
@@ -116,6 +128,7 @@ def _upsert_results(candidates: list[dict]):
             'stock_code':     c['code'],
             'stock_name':     c['name'],
             'sector':         c.get('sector', ''),
+            'gics_sector':    c.get('gics_sector'),
             'score':          c['score'],
             'price':          c['fund']['price'],
             'market_cap_usd': c.get('market_cap_usd', 0),
@@ -211,6 +224,7 @@ def main():
 
     final_results.sort(key=lambda x: x['score'], reverse=True)
     top = final_results[:TOP_N]
+    top = _stage4_fetch_gics_sector(top)
 
     print(f"\n{'=' * 55}")
     print(f"  🏆 미국 광역 스캔 결과 — 상위 {len(top)}종목 ({MIN_THRESHOLD}점 이상)")
