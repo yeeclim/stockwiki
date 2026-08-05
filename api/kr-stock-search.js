@@ -39,9 +39,21 @@ export default async function handler(req, res) {
       }
     }
 
+    // 라틴 약자 접두어 + 한글 (공백 없이 붙은 경우) → 한글 발음 변환 쿼리 추가
+    // KRX 정식 종목명은 라틴 약자를 한글 발음으로 등록하는 경우가 흔함
+    // 예: "DN오토모티브" → "디엔오토모티브" (실제 등록명), "CJ대한통운" → "씨제이대한통운"
+    // 원본 쿼리엔 라틴 문자가 남아있어 한글 결과와 관련성 필터가 안 맞으므로,
+    // 이 쿼리에 한해서는 TradingView 필터링 기준을 자기 자신으로 별도 지정
+    const filterQueryOverride = new Map();
+    const phonetic = phoneticizeLatinPrefix(q);
+    if (phonetic && phonetic !== q && !queries.includes(phonetic)) {
+      queries.push(phonetic);
+      filterQueryOverride.set(phonetic, phonetic);
+    }
+
     // 1차: TradingView + KRX 병렬 (sin1 리전에서 KRX 접근 시도)
     await Promise.all([
-      ...queries.map(qry => tradingviewQuery(qry, type, seen, q)),
+      ...queries.map(qry => tradingviewQuery(qry, type, seen, filterQueryOverride.get(qry) ?? q)),
       ...queries.map(qry => krxQuery(qry, type, seen)),
     ]);
     console.log(`[primary] ${seen.size} results for "${q}"`);
@@ -388,6 +400,25 @@ function korenizeName(name) {
   n = n.replace(/\s+(?=[가-힣])/g, '');
 
   return n.trim() || name;
+}
+
+// 라틴 알파벳 → 한글 발음 (KRX 정식 종목명에 흔히 쓰이는 표기)
+const LETTER_KO = {
+  A: '에이', B: '비', C: '씨', D: '디', E: '이', F: '에프', G: '지', H: '에이치',
+  I: '아이', J: '제이', K: '케이', L: '엘', M: '엠', N: '엔', O: '오', P: '피',
+  Q: '큐', R: '알', S: '에스', T: '티', U: '유', V: '브이', W: '더블유', X: '엑스',
+  Y: '와이', Z: '지',
+};
+
+// "DN오토모티브" → "디엔오토모티브" / "CJ대한통운" → "씨제이대한통운"
+// 라틴 문자 1~4개가 공백 없이 한글 바로 앞에 붙은 경우에만 적용 (일반 영단어 오탐 방지 위해 짧은 접두어로 제한)
+function phoneticizeLatinPrefix(q) {
+  const m = q.match(/^([A-Za-z]{1,4})([가-힣].*)$/);
+  if (!m) return null;
+  const [, prefix, rest] = m;
+  const phonetic = prefix.toUpperCase().split('').map(c => LETTER_KO[c] ?? '').join('');
+  if (!phonetic) return null;
+  return phonetic + rest;
 }
 
 function translateForTv(q) {
