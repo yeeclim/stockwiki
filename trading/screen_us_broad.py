@@ -147,7 +147,9 @@ def _upsert_results(candidates: list[dict]):
 
 # 그날 top-N 밖으로 밀려 갱신되지 않는 종목이 pass=true 상태로 영원히 남는 것을 방지
 def _prune_stale_rows():
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=STALE_DAYS)).isoformat()
+    # isoformat()의 '+00:00' 타임존 표기가 URL 쿼리에서 '+'가 공백으로 깨져
+    # PostgREST가 파싱 실패하므로 'Z' 표기로 치환
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=STALE_DAYS)).isoformat().replace('+00:00', 'Z')
     try:
         resp = requests.delete(
             f"{_SUPABASE_URL}/rest/v1/us_screening_results?screened_at=lt.{cutoff}",

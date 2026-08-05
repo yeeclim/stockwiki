@@ -17,7 +17,8 @@ const MIN_DISPLAY_MARKET_CAP_USD = 1_000_000_000; // $10억(1B)
 
 // AI 미국주식 추천 화면 전용 점수 하한선 — strategy.py BUY_THRESHOLD(6점)보다 높게 잡아
 // 상위권 종목만 노출 (스크리닝 자체 통과 기준은 건드리지 않음)
-const MIN_DISPLAY_SCORE = 8; // 10점 만점
+// 8점 이상은 실제 일별 스캔에서 거의 나오지 않는 수준이라(대부분 6.5~7.5점대) 7점으로 설정
+const MIN_DISPLAY_SCORE = 7; // 10점 만점
 
 // screen_us_broad.py는 그날의 상위 60개만 upsert하고 순위 밖으로 밀린 종목은
 // 갱신/삭제하지 않으므로, 표시 단계에서 오래된(3일 초과) 결과는 걸러낸다
