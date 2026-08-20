@@ -330,16 +330,29 @@ class KISApi:
                 print(f"⚠️  선물 미결제약정 조회 오류 (code={code}): "
                       f"rt_cd={d.get('rt_cd')} msg1={d.get('msg1')}")
                 return None
-            # 일부 KIS 응답은 output 대신 output1/output2로 나뉘어 오므로 순서대로 시도
-            out = d.get('output') or d.get('output1') or {}
-            oi = out.get('hts_otst_stpl_qty')
-            if oi in (None, ''):
-                print(f"⚠️  선물 미결제약정 필드 없음 (code={code}) — 응답 키: "
-                      f"{list(d.keys())}, output 키: {list(out.keys())}")
+
+            # KIS 응답은 output/output1/output2/output3 중 어디에 시세 필드가 들어있는지
+            # 종목·조건에 따라 달라질 수 있어, 존재하는 섹션을 모두 합쳐서 찾는다.
+            merged: dict = {}
+            for key in ('output', 'output1', 'output2', 'output3'):
+                section = d.get(key)
+                if isinstance(section, dict):
+                    merged.update(section)
+                elif isinstance(section, list) and section and isinstance(section[0], dict):
+                    merged.update(section[0])
+
+            oi_key = next((k for k in merged if 'otst' in k or 'stpl_qty' in k), None)
+            if not oi_key:
+                import json
+                print(f"⚠️  선물 미결제약정 필드 없음 (code={code}) — 원본 응답: "
+                      f"{json.dumps(d, ensure_ascii=False)[:1500]}")
                 return None
+
+            chg_key = next((k for k in merged
+                             if ('otst' in k or 'stpl' in k) and ('icdc' in k or 'chg' in k)), None)
             return {
-                'open_interest':        int(oi),
-                'open_interest_change': int(out.get('otst_stpl_qty_icdc') or 0),
+                'open_interest':        int(merged[oi_key]),
+                'open_interest_change': int(merged.get(chg_key) or 0),
             }
         except Exception as e:
             print(f"⚠️  선물 미결제약정 조회 실패 (code={code}): {e}")
