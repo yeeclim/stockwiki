@@ -5,10 +5,9 @@
 import json
 from kis_api import KISApi, BASE_URL
 
-# "101" + F(선물) + MM(만기월, 분기월물) + "000"(옵션 행사가 자리, 선물은 000)
+# KIS 공식 GitHub 예제(examples_llm/domestic_futureoption/inquire_price)의 실제 예시: "101W09"
 CANDIDATES = [
-    "101F09000", "101F12000", "101F06000", "101F03000",
-    "101F0900", "101F1200",
+    "101W09", "101W12", "101W06", "101W03",
 ]
 
 
