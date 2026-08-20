@@ -142,15 +142,24 @@ def get_brief(kis_api=None) -> dict:
     kr_indices = [kr_quotes[c] for c in ('KOSPI', 'KOSDAQ', 'FUT') if c in kr_quotes]
 
     kr_open_interest = None
+    kr_investors: list[dict] = []
     if kis_api is not None:
         try:
             kr_open_interest = kis_api.get_futures_open_interest(kmd.kospi200_futures_code())
         except Exception as e:
             print(f"⚠️  선물 미결제약정 조회 실패: {e}")
+        for label, code, mkt in (('코스피', '0001', 'KSP'), ('코스닥', '1001', 'KSQ')):
+            try:
+                trend = kis_api.get_investor_trend(code, mkt)
+                if trend:
+                    kr_investors.append({'label': label, **trend})
+            except Exception as e:
+                print(f"⚠️  {label} 투자자매매동향 조회 실패: {e}")
 
     return {
         'indices': index_rows, 'sectors': sector_rows, 'summary': summary,
         'kr_indices': kr_indices, 'kr_open_interest': kr_open_interest,
+        'kr_investors': kr_investors,
     }
 
 
@@ -162,7 +171,8 @@ def render_text(brief: dict) -> str:
     summary = (brief.get('summary') or '').strip()
     kr_indices = brief.get('kr_indices') or []
     kr_oi = brief.get('kr_open_interest')
-    if not (indices or sectors or summary or kr_indices or kr_oi):
+    kr_investors = brief.get('kr_investors') or []
+    if not (indices or sectors or summary or kr_indices or kr_oi or kr_investors):
         return ''
 
     lines = ['🌙 간밤 미국시장 브리핑', '-' * 55]
@@ -186,6 +196,11 @@ def render_text(brief: dict) -> str:
             arrow = '▲' if chg > 0 else ('▼' if chg < 0 else '－')
             lines.append(f"  코스피200 선물 미결제약정 {kr_oi['open_interest']:,}계약"
                           f" (전일대비 {arrow}{abs(chg):,})")
+        for inv in kr_investors:
+            def _s(v):
+                return f"{'+' if v > 0 else ''}{v:,}"
+            lines.append(f"  {inv['label']} 외국인 {_s(inv['frgn_net'])}  "
+                         f"기관 {_s(inv['orgn_net'])}  개인 {_s(inv['prsn_net'])}")
     lines.append('=' * 55)
     return '\n'.join(lines)
 
@@ -363,8 +378,34 @@ def render_email_html(brief: dict, report_text: str) -> str:
             f'</div>'
         )
 
+    kr_investors = brief.get('kr_investors') or []
+    kr_investors_html = ''
+    if kr_investors:
+        def _inv_cell(v: int) -> str:
+            color = _UP if v > 0 else (_DOWN if v < 0 else _MUTED)
+            sign = '+' if v > 0 else ''
+            return f'<span style="color:{color};font-weight:700;">{sign}{v:,}</span>'
+
+        inv_rows = []
+        for inv in kr_investors:
+            inv_rows.append(
+                '<tr>'
+                f'<td style="padding:3px 10px 3px 0;color:{_MUTED};white-space:nowrap;">{html_lib.escape(inv["label"])}</td>'
+                f'<td style="padding:3px 10px;white-space:nowrap;">외국인 {_inv_cell(inv["frgn_net"])}</td>'
+                f'<td style="padding:3px 10px;white-space:nowrap;">기관 {_inv_cell(inv["orgn_net"])}</td>'
+                f'<td style="padding:3px 0;white-space:nowrap;">개인 {_inv_cell(inv["prsn_net"])}</td>'
+                '</tr>'
+            )
+        kr_investors_html = (
+            f'<div style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;'
+            f'text-transform:uppercase;margin:14px 0 6px;">외국인·기관·개인 순매수(현물)</div>'
+            '<table role="presentation" cellpadding="0" cellspacing="0" '
+            f'style="font-size:12px;font-family:Consolas,Menlo,monospace;color:{_INK};">'
+            + ''.join(inv_rows) + '</table>'
+        )
+
     kr_section = ''
-    if kr_indices_html or kr_oi_html:
+    if kr_indices_html or kr_oi_html or kr_investors_html:
         kr_section = f"""
 <tr><td style="padding-bottom:16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
@@ -377,6 +418,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       </span>
       {kr_indices_html}
       {kr_oi_html}
+      {kr_investors_html}
     </td></tr>
   </table>
 </td></tr>"""

@@ -309,6 +309,49 @@ class KISApi:
             print(f"⚠️  재무비율 조회 실패 ({code}): {e}")
             return None
 
+    # ── 투자자매매동향 ────────────────────────────────────────────────────────
+    def get_investor_trend(self, index_code: str, market_code: str) -> dict | None:
+        """시장별 투자자매매동향(일별) — 외국인/기관/개인 순매수 수량(최신 영업일).
+        index_code: '0001'(코스피)/'1001'(코스닥), market_code: 'KSP'/'KSQ'.
+        선물이 아닌 코스피/코스닥 현물시장 기준 투자자 동향이다(선물 투자자별
+        매매동향은 KIS REST API에 없어 대체 지표로 사용). 실계좌로 검증됨
+        (2026-08-20). 실패 시 예외를 전파하지 않고 None을 반환한다.
+        """
+        from datetime import datetime as _dt
+        today = _dt.now().strftime('%Y%m%d')
+        try:
+            r = self._session.get(
+                f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-investor-daily-by-market",
+                headers=self._h("FHPTJ04040000"),
+                params={
+                    "FID_COND_MRKT_DIV_CODE": "U",
+                    "FID_INPUT_ISCD":         index_code,
+                    "FID_INPUT_DATE_1":       today,
+                    "FID_INPUT_ISCD_1":       market_code,
+                    "FID_INPUT_DATE_2":       today,
+                    "FID_INPUT_ISCD_2":       index_code,
+                },
+                timeout=self._timeout,
+            )
+            r.raise_for_status()
+            d = r.json()
+            if d.get('rt_cd') != '0':
+                print(f"⚠️  투자자매매동향 조회 오류 ({index_code}): "
+                      f"rt_cd={d.get('rt_cd')} msg1={d.get('msg1')}")
+                return None
+            rows = d.get('output') or []
+            if not rows:
+                return None
+            latest = rows[0]
+            return {
+                'frgn_net': int(latest.get('frgn_ntby_qty') or 0),
+                'orgn_net': int(latest.get('orgn_ntby_qty') or 0),
+                'prsn_net': int(latest.get('prsn_ntby_qty') or 0),
+            }
+        except Exception as e:
+            print(f"⚠️  투자자매매동향 조회 실패 ({index_code}): {e}")
+            return None
+
     # ── 선물 시세 ──────────────────────────────────────────────────────────────
     def get_futures_open_interest(self, code: str) -> dict | None:
         """국내선물옵션 시세 조회 — 미결제약정수량(hts_otst_stpl_qty) 및
