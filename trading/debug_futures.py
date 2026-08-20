@@ -5,9 +5,10 @@
 import json
 from kis_api import KISApi, BASE_URL
 
-# KIS 공식 GitHub 예제(examples_llm/domestic_futureoption/inquire_price)의 실제 예시: "101W09"
+# KIS 공식 마스터파일(fo_idx_code_mts.mst)에서 확인한 실제 단축코드 형식:
+# "A" + (연도-2010, 3자리) + (월, 2자리) — 예: 2026년 9월물 = A01609
 CANDIDATES = [
-    "101W09", "101W12", "101W06", "101W03",
+    "A01609", "A01612",
 ]
 
 
@@ -29,6 +30,8 @@ def main():
                   f"output1 keys={list(out1.keys())} ===")
             if out1:
                 print(json.dumps(out1, ensure_ascii=False)[:1200])
+            else:
+                print(json.dumps(d, ensure_ascii=False)[:1200])
         except Exception as e:
             print(f"=== code={code!r} 오류: {e} ===")
 
