@@ -156,11 +156,63 @@ def get_brief(kis_api=None) -> dict:
             except Exception as e:
                 print(f"⚠️  {label} 투자자매매동향 조회 실패: {e}")
 
-    return {
+    brief = {
         'indices': index_rows, 'sectors': sector_rows, 'summary': summary,
         'kr_indices': kr_indices, 'kr_open_interest': kr_open_interest,
         'kr_investors': kr_investors,
     }
+    brief['signals'] = _compute_signals(brief)
+    return brief
+
+
+# ── 강세/약세 신호 스코어 ────────────────────────────────────────────────────
+# 통계적으로 검증된 확률이 아니라, 이미 수집한 지표들을 단순히 방향(상승/하락)
+# 으로 환산해 개수를 세는 규칙 기반 요약이다. "N% 확률" 같은 정밀한 수치로
+# 표현하면 실제 검증된 예측 모델처럼 오해될 수 있어 신호 개수로만 보여준다.
+def _dir(value: float) -> int:
+    if value > 0:
+        return 1
+    if value < 0:
+        return -1
+    return 0
+
+
+def _compute_signals(brief: dict) -> list[dict]:
+    signals = []
+    us_by_symbol = {r['symbol']: r for r in (brief.get('indices') or [])}
+
+    us_core_pct = [us_by_symbol[s]['pct'] for s in ('^GSPC', '^IXIC', '^DJI') if s in us_by_symbol]
+    if us_core_pct:
+        signals.append({'label': '미국 증시', 'direction': _dir(sum(us_core_pct) / len(us_core_pct))})
+    if '^VIX' in us_by_symbol:
+        # VIX 상승 = 시장 불안 심화(약세 신호)이므로 부호를 반대로 해석한다.
+        signals.append({'label': 'VIX(변동성)', 'direction': _dir(-us_by_symbol['^VIX']['pct'])})
+
+    kr_by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
+    fut = kr_by_label.get('코스피200 선물')
+    if fut:
+        signals.append({'label': '코스피200 선물', 'direction': _dir(fut['pct'])})
+
+    kr_oi = brief.get('kr_open_interest')
+    if fut and kr_oi:
+        price_up = fut['pct'] > 0
+        oi_up = kr_oi['open_interest_change'] > 0
+        # 가격↑+OI↑=신규매수 유입(강세), 가격↓+OI↑=신규매도 유입(약세),
+        # OI가 줄었으면(청산 위주) 방향성이 약하므로 중립 처리.
+        d = 1 if (price_up and oi_up) else (-1 if (not price_up and oi_up) else 0)
+        signals.append({'label': '선물 미결제약정', 'direction': d})
+
+    for inv in brief.get('kr_investors') or []:
+        net = inv['frgn_net'] + inv['orgn_net']
+        signals.append({'label': f"{inv['label']} 수급(외국인+기관)", 'direction': _dir(net)})
+
+    return signals
+
+
+def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
+    bull = sum(1 for s in signals if s['direction'] > 0)
+    bear = sum(1 for s in signals if s['direction'] < 0)
+    return bull, bear, len(signals) - bull - bear
 
 
 def render_text(brief: dict) -> str:
@@ -172,10 +224,22 @@ def render_text(brief: dict) -> str:
     kr_indices = brief.get('kr_indices') or []
     kr_oi = brief.get('kr_open_interest')
     kr_investors = brief.get('kr_investors') or []
+    signals = brief.get('signals') or []
     if not (indices or sectors or summary or kr_indices or kr_oi or kr_investors):
         return ''
 
-    lines = ['🌙 간밤 미국시장 브리핑', '-' * 55]
+    lines = []
+    if signals:
+        bull, bear, neutral = _signal_counts(signals)
+        verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
+        lines.append(f"📍 내일 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
+        arrow_of = {1: '▲', -1: '▼', 0: '－'}
+        lines.append('   ' + '  '.join(f"[{s['label']} {arrow_of[s['direction']]}]" for s in signals))
+        lines.append('   ※ 통계적 확률이 아닌 단순 신호 조합입니다')
+        lines.append('')
+
+    lines.append('🌙 간밤 미국시장 브리핑')
+    lines.append('-' * 55)
     if indices:
         lines.append('[주요 지수] ' + '  '.join(
             f"{r['label']} {r['price']:,.2f} ({r['pct']:+.2f}%)" for r in indices))
@@ -333,6 +397,45 @@ def render_email_html(brief: dict, report_text: str) -> str:
     kst = pytz.timezone('Asia/Seoul')
     now_str = datetime.now(kst).strftime('%Y.%m.%d (%a) %H:%M KST')
 
+    signals = brief.get('signals') or []
+    signal_html = ''
+    if signals:
+        bull, bear, neutral = _signal_counts(signals)
+        verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
+        verdict_color = _UP if bull > bear else (_DOWN if bear > bull else _AMBER)
+        chip_color = {1: _UP, -1: _DOWN, 0: _MUTED}
+        chip_arrow = {1: '▲', -1: '▼', 0: '－'}
+        chips = ''.join(
+            f'<span style="display:inline-block;margin:3px 6px 3px 0;padding:3px 9px;'
+            f'border-radius:999px;background:{_SURFACE_SOFT};border:1px solid {_LINE};'
+            f'font-size:11px;color:{_INK};white-space:nowrap;">{html_lib.escape(s["label"])} '
+            f'<span style="color:{chip_color[s["direction"]]};font-weight:700;">{chip_arrow[s["direction"]]}</span></span>'
+            for s in signals
+        )
+        signal_html = f"""
+<tr><td style="padding-bottom:16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
+    <tr><td style="padding:16px 20px;">
+      <span style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">
+        내일 시장 신호
+      </span>
+      <div style="margin-top:6px;">
+        <span style="color:{_INK};font-weight:800;font-size:18px;">강세 {bull}</span>
+        <span style="color:{_MUTED};font-size:14px;"> · </span>
+        <span style="color:{_INK};font-weight:800;font-size:18px;">약세 {bear}</span>
+        <span style="color:{_MUTED};font-size:14px;"> · </span>
+        <span style="color:{_INK};font-weight:800;font-size:18px;">중립 {neutral}</span>
+        <span style="color:{verdict_color};font-weight:700;font-size:13px;margin-left:8px;">({verdict})</span>
+      </div>
+      <div style="margin-top:10px;">{chips}</div>
+      <div style="margin-top:8px;color:{_MUTED};font-size:10.5px;">
+        ※ 통계적으로 검증된 확률이 아니라, 이미 수집한 지표들을 방향(상승/하락)으로만 환산해 개수를 센 단순 신호 조합입니다.
+      </div>
+    </td></tr>
+  </table>
+</td></tr>"""
+
     indices_html = _chip_grid_html('주요 지수', brief.get('indices') or [], cols=2)
     sectors_html = _chip_grid_html('섹터 ETF', brief.get('sectors') or [], cols=3)
     summary = (brief.get('summary') or '').strip()
@@ -454,7 +557,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
 </head>
 <body style="margin:0;padding:0;background-color:{_BG};">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-  오늘의 종목 스크리닝 결과, 국내 마감 시황, 간밤 미국시장 브리핑
+  오늘의 종목 스크리닝 결과, 내일 시장 신호, 국내 마감 시황, 간밤 미국시장 브리핑
 </div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:{_BG};">
 <tr><td align="center" style="padding:28px 12px;">
@@ -466,6 +569,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       {now_str} · 종목 스크리닝
     </div>
   </td></tr>
+  {signal_html}
   {kr_section}
   {brief_section}
   {report_html}
