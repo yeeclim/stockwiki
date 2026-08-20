@@ -312,9 +312,10 @@ class KISApi:
     # ── 선물 시세 ──────────────────────────────────────────────────────────────
     def get_futures_open_interest(self, code: str) -> dict | None:
         """국내선물옵션 시세 조회 — 미결제약정수량 및 전일대비 증감.
-        계정에 '국내선물옵션' 서비스 권한이 승인되어 있어야 동작하며, tr_id·응답
-        필드명·종목코드 형식은 실계좌로 검증되지 않았다. 실패 시 예외를 전파하지
-        않고 None을 반환한다(권한 미승인/코드 오류 시에도 메일 발송은 계속됨).
+        tr_id·응답 필드명·종목코드 형식은 실계좌로 검증되지 않았다. 실패 시 예외를
+        전파하지 않고 None을 반환한다(조회 실패해도 메일 발송은 계속됨).
+        첫 실패 시 응답 구조를 그대로 로그에 남겨, 다음 실행 로그로 원인
+        (필드명 불일치/응답 형식 차이 등)을 바로 확인할 수 있게 한다.
         """
         try:
             r = self._session.get(
@@ -326,18 +327,22 @@ class KISApi:
             r.raise_for_status()
             d = r.json()
             if d.get('rt_cd') != '0':
-                print(f"⚠️  선물 미결제약정 조회 오류: {d.get('msg1')}")
+                print(f"⚠️  선물 미결제약정 조회 오류 (code={code}): "
+                      f"rt_cd={d.get('rt_cd')} msg1={d.get('msg1')}")
                 return None
-            out = d['output']
+            # 일부 KIS 응답은 output 대신 output1/output2로 나뉘어 오므로 순서대로 시도
+            out = d.get('output') or d.get('output1') or {}
             oi = out.get('hts_otst_stpl_qty')
             if oi in (None, ''):
+                print(f"⚠️  선물 미결제약정 필드 없음 (code={code}) — 응답 키: "
+                      f"{list(d.keys())}, output 키: {list(out.keys())}")
                 return None
             return {
                 'open_interest':        int(oi),
                 'open_interest_change': int(out.get('otst_stpl_qty_icdc') or 0),
             }
         except Exception as e:
-            print(f"⚠️  선물 미결제약정 조회 실패: {e}")
+            print(f"⚠️  선물 미결제약정 조회 실패 (code={code}): {e}")
             return None
 
     # ── 주문 ──────────────────────────────────────────────────────────────────
