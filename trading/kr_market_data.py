@@ -48,11 +48,10 @@ def get_quotes() -> dict[str, dict]:
 
 
 # ── 코스피200 선물 종목코드 ───────────────────────────────────────────────────
-# 분기월물(3·6·9·12월)만 사용하는 근사치 — KIS 종목코드 형식이 실계좌로 검증되지
-# 않았으므로 필요 시 KIS_KOSPI200_FUTURES_CODE 환경변수로 직접 지정할 수 있다.
-_FUT_MONTH_CODE = {3: 'H', 6: 'M', 9: 'U', 12: 'Z'}
-
-
+# KIS 공식 지수선물옵션 마스터파일(fo_idx_code_mts.mst, 상품종류=1)로 검증된 형식:
+# "A" + (연도-2010, 3자리) + (월, 2자리) — 예: 2026년 9월물 = A01609.
+# 분기월물(3·6·9·12월)만 사용하는 근사치이며, 필요 시 KIS_KOSPI200_FUTURES_CODE
+# 환경변수로 직접 지정해 덮어쓸 수 있다.
 def kospi200_futures_code(today: datetime | None = None) -> str:
     override = os.environ.get('KIS_KOSPI200_FUTURES_CODE', '').strip()
     if override:
@@ -60,5 +59,5 @@ def kospi200_futures_code(today: datetime | None = None) -> str:
     today = today or datetime.now()
     for m in (3, 6, 9, 12):
         if m >= today.month:
-            return f"101{_FUT_MONTH_CODE[m]}{str(today.year)[-1]}"
-    return f"101{_FUT_MONTH_CODE[3]}{str(today.year + 1)[-1]}"
+            return f"A{today.year - 2010:03d}{m:02d}"
+    return f"A{today.year + 1 - 2010:03d}03"
