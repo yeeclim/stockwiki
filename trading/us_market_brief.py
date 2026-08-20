@@ -14,6 +14,7 @@ import pytz
 import requests
 
 import us_market_data as umd
+import kr_market_data as kmd
 
 _ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '').strip()
 
@@ -115,9 +116,10 @@ def _summarize_issues(headlines: list[str], index_rows: list[dict], sector_rows:
         return ''
 
 
-def get_brief() -> dict:
-    """반환: {'indices': [...], 'sectors': [...], 'summary': str}
+def get_brief(kis_api=None) -> dict:
+    """반환: {'indices', 'sectors', 'summary', 'kr_indices', 'kr_open_interest'}
     개별 단계가 실패해도 예외를 전파하지 않고 빈 값으로 안전하게 대체한다.
+    kis_api(인증된 KISApi 인스턴스)를 넘기면 코스피200 선물 미결제약정도 함께 조회한다.
     """
     try:
         index_rows = _fetch_rows(_INDICES)
@@ -131,7 +133,25 @@ def get_brief() -> dict:
         sector_rows = []
     headlines = _get_market_headlines()
     summary = _summarize_issues(headlines, index_rows, sector_rows)
-    return {'indices': index_rows, 'sectors': sector_rows, 'summary': summary}
+
+    try:
+        kr_quotes = kmd.get_quotes()
+    except Exception as e:
+        print(f"⚠️  국내 지수 조회 실패: {e}")
+        kr_quotes = {}
+    kr_indices = [kr_quotes[c] for c in ('KOSPI', 'KOSDAQ', 'FUT') if c in kr_quotes]
+
+    kr_open_interest = None
+    if kis_api is not None:
+        try:
+            kr_open_interest = kis_api.get_futures_open_interest(kmd.kospi200_futures_code())
+        except Exception as e:
+            print(f"⚠️  선물 미결제약정 조회 실패: {e}")
+
+    return {
+        'indices': index_rows, 'sectors': sector_rows, 'summary': summary,
+        'kr_indices': kr_indices, 'kr_open_interest': kr_open_interest,
+    }
 
 
 def render_text(brief: dict) -> str:
@@ -140,7 +160,9 @@ def render_text(brief: dict) -> str:
     indices = brief.get('indices') or []
     sectors = brief.get('sectors') or []
     summary = (brief.get('summary') or '').strip()
-    if not (indices or sectors or summary):
+    kr_indices = brief.get('kr_indices') or []
+    kr_oi = brief.get('kr_open_interest')
+    if not (indices or sectors or summary or kr_indices or kr_oi):
         return ''
 
     lines = ['🌙 간밤 미국시장 브리핑', '-' * 55]
@@ -153,6 +175,17 @@ def render_text(brief: dict) -> str:
     if summary:
         lines.append('')
         lines.append(summary)
+    if kr_indices or kr_oi:
+        lines.append('')
+        lines.append('[국내 마감 시황]')
+        if kr_indices:
+            lines.append('  ' + '  '.join(
+                f"{r['label']} {r['price']:,.2f} ({r['pct']:+.2f}%)" for r in kr_indices))
+        if kr_oi:
+            chg = kr_oi['open_interest_change']
+            arrow = '▲' if chg > 0 else ('▼' if chg < 0 else '－')
+            lines.append(f"  코스피200 선물 미결제약정 {kr_oi['open_interest']:,}계약"
+                          f" (전일대비 {arrow}{abs(chg):,})")
     lines.append('=' * 55)
     return '\n'.join(lines)
 
@@ -315,6 +348,39 @@ def render_email_html(brief: dict, report_text: str) -> str:
   </table>
 </td></tr>"""
 
+    kr_indices_html = _chip_grid_html('지수 · 선물', brief.get('kr_indices') or [], cols=3)
+    kr_oi = brief.get('kr_open_interest')
+    kr_oi_html = ''
+    if kr_oi:
+        chg = kr_oi['open_interest_change']
+        oi_color = _UP if chg > 0 else (_DOWN if chg < 0 else _MUTED)
+        arrow = '▲' if chg > 0 else ('▼' if chg < 0 else '－')
+        kr_oi_html = (
+            f'<div style="margin-top:10px;color:{_MUTED};font-size:12px;">'
+            f'코스피200 선물 미결제약정 '
+            f'<span style="color:{_INK};font-weight:700;font-family:Consolas,Menlo,monospace;">{kr_oi["open_interest"]:,}</span>계약'
+            f'&nbsp; <span style="color:{oi_color};font-weight:700;font-family:Consolas,Menlo,monospace;">{arrow}{abs(chg):,}</span>'
+            f'</div>'
+        )
+
+    kr_section = ''
+    if kr_indices_html or kr_oi_html:
+        kr_section = f"""
+<tr><td style="padding-bottom:16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
+    <tr><td style="padding:18px 20px;">
+      <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
+            background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
+      <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
+        국내 마감 시황
+      </span>
+      {kr_indices_html}
+      {kr_oi_html}
+    </td></tr>
+  </table>
+</td></tr>"""
+
     report_html = f"""
 <tr><td>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
@@ -346,7 +412,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
 </head>
 <body style="margin:0;padding:0;background-color:{_BG};">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-  오늘의 종목 스크리닝 결과와 간밤 미국시장 브리핑
+  오늘의 종목 스크리닝 결과, 국내 마감 시황, 간밤 미국시장 브리핑
 </div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:{_BG};">
 <tr><td align="center" style="padding:28px 12px;">
@@ -358,6 +424,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       {now_str} · 종목 스크리닝
     </div>
   </td></tr>
+  {kr_section}
   {brief_section}
   {report_html}
   <tr><td style="text-align:center;padding-top:22px;color:{_MUTED};font-size:11px;">

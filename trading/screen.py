@@ -332,9 +332,11 @@ def screen():
 
     # 가입 유저 전체: 이메일 (간밤 미국시장 브리핑을 상단에 포함한 HTML)
     try:
-        brief = us_market_brief.get_brief()
+        brief = us_market_brief.get_brief(api)
         print(f"🌙 미국시장 브리핑: 지수 {len(brief['indices'])}개, "
               f"섹터 {len(brief['sectors'])}개, 요약 {'있음' if brief['summary'] else '없음'}")
+        print(f"🇰🇷 국내 마감 시황: 지수 {len(brief['kr_indices'])}개, "
+              f"선물 미결제약정 {'있음' if brief['kr_open_interest'] else '없음'}")
     except Exception as e:
         print(f"⚠️  미국시장 브리핑 생성 실패: {e}")
         brief = None

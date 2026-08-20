@@ -309,6 +309,37 @@ class KISApi:
             print(f"⚠️  재무비율 조회 실패 ({code}): {e}")
             return None
 
+    # ── 선물 시세 ──────────────────────────────────────────────────────────────
+    def get_futures_open_interest(self, code: str) -> dict | None:
+        """국내선물옵션 시세 조회 — 미결제약정수량 및 전일대비 증감.
+        계정에 '국내선물옵션' 서비스 권한이 승인되어 있어야 동작하며, tr_id·응답
+        필드명·종목코드 형식은 실계좌로 검증되지 않았다. 실패 시 예외를 전파하지
+        않고 None을 반환한다(권한 미승인/코드 오류 시에도 메일 발송은 계속됨).
+        """
+        try:
+            r = self._session.get(
+                f"{BASE_URL}/uapi/domestic-futureoption/v1/quotations/inquire-price",
+                headers=self._h("FHMIF10000000"),
+                params={"FID_COND_MRKT_DIV_CODE": "F", "FID_INPUT_ISCD": code},
+                timeout=self._timeout,
+            )
+            r.raise_for_status()
+            d = r.json()
+            if d.get('rt_cd') != '0':
+                print(f"⚠️  선물 미결제약정 조회 오류: {d.get('msg1')}")
+                return None
+            out = d['output']
+            oi = out.get('hts_otst_stpl_qty')
+            if oi in (None, ''):
+                return None
+            return {
+                'open_interest':        int(oi),
+                'open_interest_change': int(out.get('otst_stpl_qty_icdc') or 0),
+            }
+        except Exception as e:
+            print(f"⚠️  선물 미결제약정 조회 실패: {e}")
+            return None
+
     # ── 주문 ──────────────────────────────────────────────────────────────────
     def _ord_dvsn(self) -> str:
         """시간대에 따른 주문구분: 정규장 시장가(01) / NXT 시간외 최유리지정가(03)"""
