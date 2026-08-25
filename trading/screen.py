@@ -282,6 +282,19 @@ def screen():
     # 스크리닝 결과 Supabase 저장 (main.py watchlist 자동 연동용)
     _save_results(results)
 
+    # 이메일에 들어가는 시장 신호/브리핑을 게시판 기록에도 동일하게 남기기 위해
+    # 게시판 등록보다 먼저 계산해둔다.
+    try:
+        brief = us_market_brief.get_brief(api)
+        print(f"🌙 미국시장 브리핑: 지수 {len(brief['indices'])}개, "
+              f"섹터 {len(brief['sectors'])}개, 요약 {'있음' if brief['summary'] else '없음'}")
+        print(f"🇰🇷 국내 마감 시황: 지수 {len(brief['kr_indices'])}개, "
+              f"선물 미결제약정 {'있음' if brief['kr_open_interest'] else '없음'}, "
+              f"투자자매매동향 {len(brief['kr_investors'])}개")
+    except Exception as e:
+        print(f"⚠️  미국시장 브리핑 생성 실패: {e}")
+        brief = None
+
     # 게시판 히스토리 등록
     import board_post
     from datetime import datetime, timezone
@@ -290,7 +303,11 @@ def screen():
     date_str = datetime.now(kst).strftime('%Y년 %m월 %d일 %H시')
     ok_count = sum(1 for r in results if r.get('pass'))
     bp_title = f"{date_str} 스크리닝 종목"
-    bp_content = board_post.screening_content(results, date_str)
+    bp_content = board_post.screening_content(
+        results, date_str,
+        signals=(brief.get('signals') if brief else None),
+        excluded=excluded,
+    )
     bp_id = board_post.post(bp_title, bp_content)
     if bp_id:
         print("📋 게시판 스크리닝 기록 등록 완료")
@@ -331,17 +348,6 @@ def screen():
         print("⚠️  카카오톡 수신자 없음")
 
     # 가입 유저 전체: 이메일 (간밤 미국시장 브리핑을 상단에 포함한 HTML)
-    try:
-        brief = us_market_brief.get_brief(api)
-        print(f"🌙 미국시장 브리핑: 지수 {len(brief['indices'])}개, "
-              f"섹터 {len(brief['sectors'])}개, 요약 {'있음' if brief['summary'] else '없음'}")
-        print(f"🇰🇷 국내 마감 시황: 지수 {len(brief['kr_indices'])}개, "
-              f"선물 미결제약정 {'있음' if brief['kr_open_interest'] else '없음'}, "
-              f"투자자매매동향 {len(brief['kr_investors'])}개")
-    except Exception as e:
-        print(f"⚠️  미국시장 브리핑 생성 실패: {e}")
-        brief = None
-
     recipients = _fetch_user_emails()
     if recipients:
         if brief:
