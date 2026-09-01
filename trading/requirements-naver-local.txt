@@ -1,0 +1,4 @@
+# naver_blog_local.py 전용 — 로컬 Windows에서만 설치 (GitHub Actions에는 절대 넣지 말 것,
+# pywin32는 Windows 전용이라 Linux 러너에서 설치가 깨짐)
+selenium>=4.20.0
+pywin32>=306
