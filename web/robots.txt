@@ -1,0 +1,47 @@
+# StockWiki (https://stockwiki.vercel.app)
+# AI 에이전트를 위한 무료 REST API 문서: https://stockwiki.vercel.app/llms.txt
+
+User-agent: *
+Allow: /
+
+# 주요 AI 검색/크롤러 명시적 허용
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://stockwiki.vercel.app/sitemap.xml
