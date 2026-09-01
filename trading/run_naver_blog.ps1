@@ -5,6 +5,9 @@
 #      (supabase.com 프로젝트 > Project Settings > API > anon public 키)
 #   2. PowerShell에서:  .\run_naver_blog.ps1
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $ANON_KEY = ""
 
 if ($ANON_KEY -eq "") {

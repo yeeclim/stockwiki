@@ -35,6 +35,7 @@
   가지고 다시 요청하면 셀렉터를 갱신할 수 있습니다.
 """
 import os
+import sys
 import time
 import requests
 
@@ -147,6 +148,15 @@ def _to_blog_friendly_html(html: str) -> str:
         return '<table border="1" cellpadding="8" cellspacing="0" width="100%">'
 
     html = re.sub(r'<table[^>]*>', _table_repl, html)
+
+    # font-weight:700/800 인 <span>은 색상과 함께 style이 통째로 지워지기 전에
+    # <b> 태그로 바꿔서 "굵은 글씨"만이라도 살린다 (중첩 <span>이 있는 복잡한 요소는 건드리지 않음)
+    html = re.sub(
+        r'<span[^>]*style="[^"]*font-weight:\s*(?:700|800)[^"]*"[^>]*>((?:(?!</?span)[\s\S])*?)</span>',
+        r'<b>\1</b>',
+        html,
+    )
+
     html = re.sub(r"\s*style='[^']*'", '', html)
     html = re.sub(r'\s*style="[^"]*"', '', html)
     html = re.sub(r'<th(?=[ >])([^>]*)>', r'<th\1 bgcolor="#f0f0f0">', html)
@@ -170,9 +180,38 @@ def _launch_driver():
     return webdriver.Chrome(options=options)
 
 
-def post_to_naver_blog(title: str, html_content: str, publish: bool = False) -> bool:
+def _find_in_any_frame(driver, by, selector, timeout=10):
+    """최상위 문서 + 모든 iframe(중첩 포함, 1단계)을 순서대로 뒤져서 보이는 요소를 찾는다.
+    네이버 에디터는 팝업/버튼이 어느 프레임에 있는지 예측하기 어려워, 위치를 가정하지 않고
+    직접 찾아다니는 방식으로 안정성을 높인다."""
+    end = time.time() + timeout
+    while time.time() < end:
+        driver.switch_to.default_content()
+        try:
+            el = driver.find_element(by, selector)
+            if el.is_displayed():
+                return el
+        except Exception:
+            pass
+        for frame in driver.find_elements('tag name', 'iframe'):
+            try:
+                driver.switch_to.default_content()
+                driver.switch_to.frame(frame)
+                el = driver.find_element(by, selector)
+                if el.is_displayed():
+                    return el
+            except Exception:
+                continue
+        time.sleep(0.3)
+    driver.switch_to.default_content()
+    return None
+
+
+def post_to_naver_blog(title: str, html_content: str, publish: bool = True) -> bool:
     """네이버 블로그 글쓰기 화면에 제목+본문을 채워 넣는다.
-    publish=False(기본)면 임시저장 상태로 두고 사람이 최종 확인 후 직접 발행하도록 멈춘다.
+    publish=True(기본)면 발행 버튼까지 자동으로 누른다.
+    publish=False로 부르면 임시저장 상태로 두고 사람이 화면에서 직접 확인 후 발행하도록 멈춘다
+    (터미널이 있는 상태로 수동 테스트할 때만 사용 — 무인 실행에서는 의미 없음).
     """
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.action_chains import ActionChains
@@ -187,15 +226,31 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = False) -> 
         driver.get('https://blog.naver.com/GoBlogWrite.naver')
         time.sleep(2)
         if 'nidlogin' in driver.current_url or 'login' in driver.current_url.lower():
-            print('🔐 로그인이 안 되어 있습니다. 방금 뜬 크롬 창에서 네이버에 직접 로그인해주세요.')
-            print('   (이 자동화 전용 프로필에 처음 한 번만 로그인하면, 이후엔 계속 로그인 상태가 유지됩니다)')
-            input('로그인 완료 후 Enter를 누르면 계속 진행합니다... ')
-            driver.get('https://blog.naver.com/GoBlogWrite.naver')
+            if sys.stdin.isatty():
+                print('🔐 로그인이 안 되어 있습니다. 방금 뜬 크롬 창에서 네이버에 직접 로그인해주세요.')
+                print('   (이 자동화 전용 프로필에 처음 한 번만 로그인하면, 이후엔 계속 로그인 상태가 유지됩니다)')
+                input('로그인 완료 후 Enter를 누르면 계속 진행합니다... ')
+                driver.get('https://blog.naver.com/GoBlogWrite.naver')
+            else:
+                # 작업 스케줄러 등 무인 실행 중엔 기다려줄 사람이 없으므로 곧바로 포기한다
+                print('⚠️  네이버 로그인 세션이 끊겼습니다. 무인 실행이라 대기하지 않고 중단합니다 — '
+                      '터미널에서 한 번 python naver_blog_local.py를 직접 실행해 재로그인해주세요.')
+                return False
 
         wait = WebDriverWait(driver, 20)
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, 'mainFrame')))
 
-        for selector in ['.se-popup-button-cancel', '.se-help-panel-close-button']:
+        # "작성 중인 글이 있습니다" 팝업 — 뜨는 데 약간 시간이 걸리므로 짧게 기다렸다가 "취소"(새 글로 시작)를 누른다
+        try:
+            cancel_btn = WebDriverWait(driver, 4).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, '.se-popup-button-cancel'))
+            )
+            cancel_btn.click()
+            time.sleep(0.5)
+        except Exception:
+            pass
+
+        for selector in ['.se-help-panel-close-button']:
             try:
                 driver.find_element(By.CSS_SELECTOR, selector).click()
                 time.sleep(0.3)
@@ -217,10 +272,20 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = False) -> 
         print('📋 본문 붙여넣기 완료 (표 서식이 살아있는지 화면에서 확인하세요)')
 
         if publish:
-            driver.find_element(By.CSS_SELECTOR, '.save_btn__bzc5B').click()
+            # 1단계: 상단 "발행" 버튼(#mainFrame 안, data-click-area로 식별) → 공개설정 팝업이 뜬다
+            driver.find_element(By.CSS_SELECTOR, 'button[data-click-area="tpb.publish"]').click()
+            time.sleep(1)
+            # 2단계: 팝업 안의 최종 "발행" 확인 버튼 — data-testid는 CSS 해시 클래스보다 안정적이다.
+            # 프레임 위치도 가정하지 않고 찾는다 (직전에 겪은 취소/임시저장 버튼 오클릭 방지)
+            confirm_btn = _find_in_any_frame(
+                driver, By.CSS_SELECTOR, 'button[data-testid="seOnePublishBtn"]', timeout=10
+            )
+            if not confirm_btn:
+                raise Exception('발행 확인 버튼(seOnePublishBtn)을 어느 프레임에서도 찾지 못했습니다')
+            confirm_btn.click()
             time.sleep(2)
             print('📝 네이버 블로그 발행 완료')
-        else:
+        elif sys.stdin.isatty():
             print('💾 자동 발행은 꺼져 있습니다 — 브라우저 창에서 표/내용을 확인한 뒤 직접 발행 버튼을 눌러주세요.')
             input('확인 후 Enter를 누르면 이 창을 닫습니다 (발행 전이면 먼저 발행부터) ... ')
         return True
@@ -229,7 +294,7 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = False) -> 
         print('   → 어느 단계에서 멈췄는지(제목 입력 전/후, 본문 클릭 전/후 등) 알려주시면 셀렉터를 다시 맞춰드릴 수 있습니다.')
         return False
     finally:
-        if publish:
+        if publish or not sys.stdin.isatty():
             driver.quit()
 
 
@@ -238,4 +303,5 @@ if __name__ == '__main__':
     if not post:
         raise SystemExit('가져올 게시글이 없습니다.')
     content = screening_blog_content(post['content'])
-    post_to_naver_blog(post['title'], content, publish=False)
+    ok = post_to_naver_blog(post['title'], content, publish=True)
+    sys.exit(0 if ok else 1)
