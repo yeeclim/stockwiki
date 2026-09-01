@@ -58,3 +58,5 @@ app.*.map.json
 # Documentation (keep README.md only)
 *.md
 !README.md
+# 로컬 전용 — anon key가 채워진 실행 스크립트 (커밋 금지)
+trading/run_naver_blog.ps1
