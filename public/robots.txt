@@ -45,3 +45,5 @@ User-agent: CCBot
 Allow: /
 
 Sitemap: https://stockwiki.vercel.app/sitemap.xml
+
+#DaumWebMasterTool:9afdb70f5bcea60cb9ba2ec6e91514489851c8fa1d482d7624a1bf742eeaddaa:hQm4jsh/DU2xT0xEsL0zjw==
