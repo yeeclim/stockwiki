@@ -135,6 +135,7 @@ def _to_blog_friendly_html(html: str) -> str:
         (지수/섹터 카드 그리드도 포함 — 색 카드 대신 격자 표로)
       - 스크리닝 리포트의 "=====" 구분선은 고정폭 문자라 좁은 포스팅 폭에서 줄이 밀리므로
         포스팅 폭에 맞춰 늘어나는 <hr>로 바꾼다
+      - <pre> 안의 개행은 태그가 풀리면 같이 사라지므로 <br>로 미리 바꿔 줄바꿈을 보존한다
       - 상승/하락 화살표(▲▼)는 색은 없어도 글자라 그대로 남는다
     """
     import re
@@ -155,6 +156,14 @@ def _to_blog_friendly_html(html: str) -> str:
 
     # 고정폭 "=====" 구분선은 포스팅 폭에서 줄이 안 맞으므로, 폭에 맞춰 늘어나는 가로선으로 교체
     html = re.sub(r'={10,}', '<hr>', html)
+
+    # <pre>의 줄바꿈은 원래 브라우저 기본 white-space:pre로 유지되지만, 네이버 에디터가
+    # 붙여넣기 시 <pre>를 풀어헤치면서 줄바꿈이 같이 사라져 한 줄로 붙어버린다.
+    # 그 안의 개행을 <br>로 미리 바꿔, 태그가 풀려도 줄바꿈만은 남게 한다.
+    def _pre_repl(m):
+        return f'<pre>{m.group(1).replace(chr(10), "<br>")}</pre>'
+
+    html = re.sub(r'<pre[^>]*>(.*?)</pre>', _pre_repl, html, flags=re.DOTALL)
 
     def _table_repl(m):
         # 지수/섹터 카드 그리드(role="presentation")도 포함해 전부 테두리 있는 표로 통일 —
