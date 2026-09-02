@@ -53,6 +53,10 @@ _DISCLAIMER = (
     '최종 투자 결정과 그 책임은 본인에게 있습니다.</p>'
 )
 _OUTRO = '<p>더 많은 정보: <a href="https://stockwiki.vercel.app">https://stockwiki.vercel.app</a></p>'
+_HASHTAGS = (
+    '<p>#스톡위키 #주식스크리닝 #국내증시 #미국증시 #주식정보 '
+    '#투자정보 #코스피 #코스닥 #AI주식추천 #오늘의증시</p>'
+)
 
 
 def fetch_latest_screening_post() -> dict | None:
@@ -146,6 +150,13 @@ def _to_blog_friendly_html(html: str) -> str:
     # <style>...</style> 블록(애니메이션 등)은 본문에 그대로 보이면 안 되므로 제거
     html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
 
+    # 메일 받은편지함 미리보기용 숨김 텍스트(display:none) 제거 — style이 지워지면서
+    # 숨겨져 있던 게 그대로 드러나 버리는데, 애초에 사람이 보라고 만든 문장이 아니다.
+    html = re.sub(
+        r'<div[^>]*display:\s*none[^>]*>.*?</div>',
+        '', html, flags=re.DOTALL | re.IGNORECASE,
+    )
+
     # 제목(STOCKWIKI 로고) + 바로 다음 날짜 줄을 진짜 제목 태그로 승격 — style 없이도 크고 굵게 보임
     html = re.sub(
         r'<span class="swk-logo"[^>]*>(.*?)</span>\s*<div[^>]*>\s*(.*?)\s*</div>',
@@ -187,7 +198,7 @@ def _to_blog_friendly_html(html: str) -> str:
 
 
 def screening_blog_content(email_html: str) -> str:
-    return _DISCLAIMER + _to_blog_friendly_html(email_html) + _OUTRO
+    return _to_blog_friendly_html(email_html) + _DISCLAIMER + _OUTRO + _HASHTAGS
 
 
 def _launch_driver():
