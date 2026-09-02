@@ -126,12 +126,16 @@ def set_clipboard_html(html: str):
 def _to_blog_friendly_html(html: str) -> str:
     """네이버 에디터는 붙여넣기 시 style="..." 를 전부 지워버려, 이 메일의 다크 네온 카드
     디자인(배경색·둥근 모서리·글자색)은 애초에 살릴 방법이 없다 (네이버 에디터 자체의 한계).
+    이 함수는 블로그 포스팅 전용 가공이며 메일 자체(us_market_brief.py)는 건드리지 않는다.
     대신 구조는 최대한 보기 좋게 남긴다:
       - 메일 전체를 감싸는 <html>/<head>/<body>는 벗겨내고 본문만 취한다
-      - 실제 데이터 표(헤더 <th>가 있는 표: 스크리닝 결과표)에는 옛날 방식 속성(border/bgcolor)을
-        입혀 표 모양을 살린다
-      - 카드 그리드용 레이아웃 표(role="presentation")는 구조만 남기고 손대지 않는다
-        (문단처럼 쭉 나열되지만, 상승/하락 화살표(▲▼)는 색이 아니라 글자라 그대로 남는다)
+      - 제목(STOCKWIKI)·날짜 줄은 <h2>/<h4>로 바꿔 글자 크기·굵기를 키운다
+        (style이 지워져도 브라우저 기본 스타일로 큼직하게 유지됨)
+      - 표는 전부 테두리·헤더 배경(border/bgcolor)을 입혀 실제 표 모양으로 보이게 한다
+        (지수/섹터 카드 그리드도 포함 — 색 카드 대신 격자 표로)
+      - 스크리닝 리포트의 "=====" 구분선은 고정폭 문자라 좁은 포스팅 폭에서 줄이 밀리므로
+        포스팅 폭에 맞춰 늘어나는 <hr>로 바꾼다
+      - 상승/하락 화살표(▲▼)는 색은 없어도 글자라 그대로 남는다
     """
     import re
 
@@ -141,10 +145,20 @@ def _to_blog_friendly_html(html: str) -> str:
     # <style>...</style> 블록(애니메이션 등)은 본문에 그대로 보이면 안 되므로 제거
     html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
 
+    # 제목(STOCKWIKI 로고) + 바로 다음 날짜 줄을 진짜 제목 태그로 승격 — style 없이도 크고 굵게 보임
+    html = re.sub(
+        r'<span class="swk-logo"[^>]*>(.*?)</span>\s*<div[^>]*>\s*(.*?)\s*</div>',
+        r'<h2>\1</h2><h4>\2</h4>',
+        html,
+        flags=re.DOTALL,
+    )
+
+    # 고정폭 "=====" 구분선은 포스팅 폭에서 줄이 안 맞으므로, 폭에 맞춰 늘어나는 가로선으로 교체
+    html = re.sub(r'={10,}', '<hr>', html)
+
     def _table_repl(m):
-        tag = m.group(0)
-        if 'role="presentation"' in tag or "role='presentation'" in tag:
-            return '<table cellpadding="6" cellspacing="0">'
+        # 지수/섹터 카드 그리드(role="presentation")도 포함해 전부 테두리 있는 표로 통일 —
+        # 카드 배경색이 사라지는 대신 격자 표로라도 구조가 보이게 한다
         return '<table border="1" cellpadding="8" cellspacing="0" width="100%">'
 
     html = re.sub(r'<table[^>]*>', _table_repl, html)
