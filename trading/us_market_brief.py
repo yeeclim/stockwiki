@@ -418,7 +418,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
          style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
     <tr><td style="padding:16px 20px;">
       <span style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">
-        내일 시장 신호
+        📍 내일 시장 신호
       </span>
       <div style="margin-top:6px;">
         <span style="color:{_INK};font-weight:800;font-size:18px;">강세 {bull}</span>
@@ -457,7 +457,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
       <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
-        간밤 미국시장 브리핑
+        🌙 간밤 미국시장 브리핑
       </span>
       {indices_html}
       {sectors_html}
@@ -517,7 +517,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
       <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
-        국내 마감 시황
+        🇰🇷 국내 마감 시황
       </span>
       {kr_indices_html}
       {kr_oi_html}
