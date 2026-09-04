@@ -2,3 +2,4 @@
 # pywin32는 Windows 전용이라 Linux 러너에서 설치가 깨짐)
 selenium>=4.20.0
 pywin32>=306
+pillow>=10.0.0        # 요약 카드/차트 PNG를 클립보드 비트맵으로 변환해 에디터에 붙여넣기

@@ -145,6 +145,39 @@ def set_clipboard_html(html: str):
         win32clipboard.CloseClipboard()
 
 
+def set_clipboard_image(png_path: str) -> bool:
+    """PNG 파일을 클립보드에 비트맵(CF_DIB)으로 심는다 — 에디터에 Ctrl+V 하면
+    사람이 스크린샷 붙여넣기 한 것과 동일하게 이미지가 업로드된다.
+    SmartEditor는 input[type=file]을 DOM에 상시 두지 않아, 이 방식이 가장 안정적이다.
+    Pillow가 없으면 False를 반환한다 (이미지 없이 발행 계속)."""
+    try:
+        import io
+
+        import win32clipboard
+        from PIL import Image
+    except Exception as e:
+        print(f'⚠️  이미지 클립보드 변환 불가 (pip install pillow 필요): {e}')
+        return False
+
+    try:
+        with Image.open(png_path) as im:
+            im = im.convert('RGB')
+            buf = io.BytesIO()
+            im.save(buf, 'BMP')
+        dib = buf.getvalue()[14:]  # BMP 파일 헤더(14바이트)를 떼면 DIB
+
+        win32clipboard.OpenClipboard()
+        try:
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32clipboard.CF_DIB, dib)
+        finally:
+            win32clipboard.CloseClipboard()
+        return True
+    except Exception as e:
+        print(f'⚠️  이미지 클립보드 심기 실패 ({os.path.basename(png_path)}): {e}')
+        return False
+
+
 def _to_blog_friendly_html(html: str) -> str:
     """네이버 에디터는 붙여넣기 시 style="..." 를 전부 지워버려, 이 메일의 다크 네온 카드
     디자인(배경색·둥근 모서리·글자색)은 애초에 살릴 방법이 없다 (네이버 에디터 자체의 한계).
@@ -259,39 +292,56 @@ def _find_in_any_frame(driver, by, selector, timeout=10):
     return None
 
 
-def _upload_images(driver, image_paths: list[str]) -> int:
-    """SmartEditor의 숨은 파일 입력(input[type=file])에 이미지 경로를 넣어 본문에 삽입한다.
-
-    ※ 무인 실행 안전 원칙: 툴바 '사진' 버튼은 누르지 않는다 — 그 버튼은 OS 파일 열기
-       대화상자를 띄우고, 기다려줄 사람이 없으면 스크립트가 멈춰버린다. 이미 DOM에 있는
-       파일 입력에 send_keys 하는 방식만 쓴다. 셀렉터가 없으면 이미지 없이 넘어간다.
-    절대 예외를 던지지 않고 0(삽입 실패)을 반환한다."""
+def _focus_body(driver):
+    """본문 편집영역에 포커스를 준다. 다른 요소가 클릭을 가로채면 JS 클릭으로 우회한다.
+    포커스한 요소를 반환(없으면 None)."""
     from selenium.webdriver.common.by import By
 
-    existing = [os.path.abspath(p) for p in image_paths if p and os.path.exists(p)]
+    els = (driver.find_elements(By.CSS_SELECTOR, '.se-section-text .se-text-paragraph')
+           or driver.find_elements(By.CSS_SELECTOR, '.se-section-text')
+           or driver.find_elements(By.CSS_SELECTOR, '.se-content'))
+    if not els:
+        return None
+    el = els[0]
+    try:
+        el.click()
+    except Exception:
+        try:
+            driver.execute_script('arguments[0].scrollIntoView({block:"center"});'
+                                  'arguments[0].click(); arguments[0].focus();', el)
+        except Exception:
+            return None
+    return el
+
+
+def _paste_images(driver, image_paths: list[str]) -> int:
+    """이미지를 클립보드(비트맵)로 하나씩 심어 본문에 Ctrl+V로 붙여넣는다.
+
+    ※ SmartEditor ONE은 input[type=file]을 DOM에 상시 두지 않고 '사진' 버튼이 OS 파일
+       대화상자를 띄우는 구조라(무인 실행에서 멈춤), 사람이 스크린샷 붙여넣듯 하는 이 방식이
+       가장 안정적이다. 절대 예외를 던지지 않고 붙여넣은 장수를 반환한다."""
+    from selenium.webdriver.common.action_chains import ActionChains
+    from selenium.webdriver.common.keys import Keys
+
+    existing = [p for p in image_paths if p and os.path.exists(p)]
     if not existing:
         return 0
 
-    try:
-        inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-        for inp in inputs:
-            try:
-                accept = (inp.get_attribute('accept') or '').lower()
-                if accept and 'image' not in accept and '*' not in accept:
-                    continue
-                inp.send_keys('\n'.join(existing))
-                time.sleep(3.0 + 1.5 * len(existing))
-                print(f'🖼️  이미지 {len(existing)}장 업로드 시도 완료')
-                return len(existing)
-            except Exception:
+    done = 0
+    for path in existing:
+        try:
+            if not set_clipboard_image(path):
                 continue
-
-        print(f'⚠️  에디터에서 이미지 파일 입력을 찾지 못했습니다 (input[type=file] {len(inputs)}개) '
-              '— 이미지 없이 텍스트만 발행합니다.')
-        return 0
-    except Exception as e:
-        print(f'⚠️  이미지 삽입 중 오류(무시하고 발행 계속): {e}')
-        return 0
+            if _focus_body(driver) is None:
+                print('⚠️  본문 편집영역을 찾지 못해 이미지 붙여넣기를 건너뜁니다.')
+                break
+            ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+            time.sleep(5.0)  # 네이버 이미지 서버 업로드 완료 대기
+            done += 1
+            print(f'🖼️  이미지 붙여넣기 {done}/{len(existing)} — {os.path.basename(path)}')
+        except Exception as e:
+            print(f'⚠️  이미지 붙여넣기 실패 ({os.path.basename(path)}): {e}')
+    return done
 
 
 def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
@@ -307,8 +357,6 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-
-    set_clipboard_html(html_content)
 
     driver = _launch_driver()
     try:
@@ -353,27 +401,26 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
         ActionChains(driver).send_keys(title).perform()
         print('✏️  제목 입력 완료')
 
-        body_el = driver.find_element(By.CSS_SELECTOR, '.se-section-text')
-        body_el.click()
+        # 본문 편집영역 포커스 (에디터가 비어 있는 지금이 오버레이 간섭 없이 가장 안전)
+        _focus_body(driver)
         time.sleep(0.3)
+
+        # 1) 이미지 먼저 — 비어 있는 본문 맨 위에 [요약 카드][차트] 순서로 들어간다.
+        #    이미지 단계에서 무슨 일이 있어도 발행까지는 반드시 진행되도록 방어한다.
+        if image_paths:
+            try:
+                _paste_images(driver, image_paths)
+            except Exception as e:
+                print(f'⚠️  이미지 삽입 건너뜀(발행은 계속): {e}')
+
+        # 2) HTML 본문 붙여넣기 — 이미지 뒤에 이어 붙는다
+        set_clipboard_html(html_content)
+        _focus_body(driver)
+        time.sleep(0.3)
+        ActionChains(driver).key_down(Keys.CONTROL).send_keys(Keys.END).key_up(Keys.CONTROL).perform()
         ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
         time.sleep(1.5)
         print('📋 본문 붙여넣기 완료 (표 서식이 살아있는지 화면에서 확인하세요)')
-
-        if image_paths:
-            # [요약 카드][차트]를 글 최상단에 삽입. 이미지 단계에서 무슨 일이 있어도
-            # 발행까지는 반드시 진행되도록 통째로 방어한다.
-            try:
-                fresh_body = driver.find_elements(By.CSS_SELECTOR, '.se-section-text')
-                if fresh_body:
-                    fresh_body[0].click()
-                    time.sleep(0.2)
-                    ActionChains(driver).key_down(Keys.CONTROL).send_keys(Keys.HOME) \
-                        .key_up(Keys.CONTROL).perform()
-                    time.sleep(0.2)
-                _upload_images(driver, image_paths)
-            except Exception as e:
-                print(f'⚠️  이미지 삽입 건너뜀(발행은 계속): {e}')
 
         if publish:
             # 1단계: 상단 "발행" 버튼(#mainFrame 안, data-click-area로 식별) → 공개설정 팝업이 뜬다
