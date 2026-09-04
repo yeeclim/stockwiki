@@ -69,22 +69,36 @@ def verdict_line(brief: dict) -> str:
     if pre:
         return pre
 
-    kr_by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
+    kr = {r['label']: r for r in (brief.get('kr_indices') or [])}
+    kospi, kosdaq = kr.get('코스피'), kr.get('코스닥')
     parts: list[str] = []
 
-    kospi = kr_by_label.get('코스피')
-    if kospi:
-        p = kospi['pct']
+    def _word(p: float) -> str:
         if p >= 1.0:
-            parts.append(f'코스피가 +{p:.2f}% 강세로 마감')
-        elif p > 0:
-            parts.append(f'코스피가 +{p:.2f}% 강보합 마감')
-        elif p == 0:
-            parts.append('코스피가 보합 마감')
-        elif p > -1.0:
-            parts.append(f'코스피가 {p:.2f}% 약보합 마감')
+            return '강세'
+        if p > 0.2:
+            return '상승'
+        if p >= -0.2:
+            return '보합'
+        if p > -1.0:
+            return '약세'
+        return '급락' if p <= -2.0 else '하락'
+
+    if kospi and kosdaq:
+        kp, kq = kospi['pct'], kosdaq['pct']
+        nums = f'코스피 {kp:+.2f}%·코스닥 {kq:+.2f}%'
+        if (kp > 0) == (kq > 0) and min(abs(kp), abs(kq)) > 0.2:
+            parts.append(f'{nums} ' + ('동반 상승' if kp > 0 else '동반 하락') + ' 마감')
+        elif kp > 0 >= kq:
+            parts.append(f'{nums} — 대형주 강세·중소형주 약세로 엇갈림')
+        elif kq > 0 >= kp:
+            parts.append(f'{nums} — 중소형주 강세·대형주 약세로 엇갈림')
         else:
-            parts.append(f'코스피가 {p:.2f}% 약세로 마감')
+            parts.append(f'{nums} 혼조 마감')
+    elif kospi:
+        parts.append(f'코스피 {kospi["pct"]:+.2f}% {_word(kospi["pct"])} 마감')
+    elif kosdaq:
+        parts.append(f'코스닥 {kosdaq["pct"]:+.2f}% {_word(kosdaq["pct"])} 마감')
 
     kospi_inv = next(
         (i for i in (brief.get('kr_investors') or []) if i.get('label') == '코스피'), None
@@ -94,24 +108,24 @@ def verdict_line(brief: dict) -> str:
         if f > 0 and o > 0:
             parts.append('외국인·기관 동반 순매수')
         elif f < 0 and o < 0:
-            parts.append('외국인·기관 동반 순매도')
+            parts.append('외국인·기관 순매도')
         elif f > 0:
-            parts.append('외국인 순매수·기관 순매도')
+            parts.append('외국인 순매수')
         elif o > 0:
-            parts.append('기관 순매수·외국인 순매도')
+            parts.append('기관 순매수')
 
     signals = brief.get('signals') or []
     if signals:
         bull, bear, _ = _signal_counts(signals)
         if bull > bear:
-            parts.append(f'내일은 강세 신호가 우세({bull}:{bear})')
+            parts.append(f'내일 강세 신호 우세({bull}:{bear})')
         elif bear > bull:
-            parts.append(f'내일은 약세 신호가 우세({bear}:{bull})')
+            parts.append(f'내일 약세 신호 우세({bear}:{bull})')
         else:
-            parts.append('내일 신호는 팽팽')
+            parts.append('내일 신호 팽팽')
 
     if not parts:
-        return '오늘 시장 데이터를 충분히 불러오지 못했습니다.'
+        return ''
     return ', '.join(parts) + '.'
 
 
@@ -182,11 +196,13 @@ def build_card_html(brief: dict) -> str:
         )
 
     verdict_txt = verdict_line(brief)
-    verdict_block = (
-        f'<div style="margin-top:14px;padding:16px 18px;background:{_SURFACE};'
-        f'border-left:4px solid {_ACCENT};border-radius:8px;color:{_INK};'
-        f'font-size:16px;font-weight:600;line-height:1.7;">💬 {html_lib.escape(verdict_txt)}</div>'
-    )
+    verdict_block = ''
+    if verdict_txt:
+        verdict_block = (
+            f'<div style="margin-top:14px;padding:16px 18px;background:{_SURFACE};'
+            f'border-left:4px solid {_ACCENT};border-radius:8px;color:{_INK};'
+            f'font-size:16px;font-weight:600;line-height:1.7;">💬 {html_lib.escape(verdict_txt)}</div>'
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><style>
@@ -211,10 +227,6 @@ def build_card_html(brief: dict) -> str:
   {quote_grid}
   {signal_block}
   {verdict_block}
-  <div style="margin-top:14px;color:{_MUTED};font-size:11.5px;line-height:1.6;">
-    ※ 통계적으로 검증된 예측이 아니라, 수집한 지표를 방향(상승/하락)으로만 환산해 개수를 센 요약입니다.
-    투자 판단과 책임은 본인에게 있습니다.
-  </div>
 </div>
 </body></html>"""
 
@@ -286,14 +298,14 @@ def _chart_flow_hint(pct) -> str:
     except (TypeError, ValueError):
         return ''
     if p >= 1.0:
-        return '상승 마감 — 매수세 우위'
-    if p > 0:
-        return '강보합 — 관망 속 소폭 상승'
-    if p == 0:
-        return '보합 — 방향성 뚜렷하지 않음'
+        return '강세 마감'
+    if p > 0.2:
+        return '소폭 상승'
+    if p >= -0.2:
+        return '보합'
     if p > -1.0:
-        return '약보합 — 매물 소화 중'
-    return '하락 마감 — 매도세 우위'
+        return '소폭 하락'
+    return '약세 마감'
 
 
 def build_chart_panel_html(chart_items: list[dict], brief: dict) -> str:
@@ -336,15 +348,6 @@ def build_chart_panel_html(chart_items: list[dict], brief: dict) -> str:
     if not blocks:
         return ''
 
-    outlook = verdict_line(brief)
-    outlook_html = ''
-    if outlook and not outlook.startswith('오늘 시장 데이터'):
-        outlook_html = (
-            f'<div style="margin-top:16px;padding:14px 16px;background:#0B0F0C;'
-            f'border-left:4px solid {_ACCENT};border-radius:8px;color:{_INK};'
-            f'font-size:14.5px;font-weight:600;line-height:1.7;">💬 오늘 관전포인트 · {html_lib.escape(outlook)}</div>'
-        )
-
     now_str = (brief.get('generated_at') or '').strip()
     return f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><style>
@@ -365,7 +368,6 @@ def build_chart_panel_html(chart_items: list[dict], brief: dict) -> str:
   </tr></table>
   <div style="color:{_INK};font-size:21px;font-weight:800;margin-top:14px;">📈 지수 흐름</div>
   {''.join(blocks)}
-  {outlook_html}
 </div>
 </body></html>"""
 
