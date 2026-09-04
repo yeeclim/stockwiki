@@ -19,9 +19,18 @@ _LABELS = {'KOSPI': '코스피', 'KOSDAQ': '코스닥', 'FUT': '코스피200 선
 _FALL_CODES = {'4', '5'}
 
 
+def _to_float(*values) -> float | None:
+    for v in values:
+        try:
+            return float(str(v).replace(',', ''))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def get_quotes() -> dict[str, dict]:
     """{'KOSPI': {...}, 'KOSDAQ': {...}, 'FUT': {...}} 반환.
-    각 값은 {'label', 'price', 'pct'}. 조회 실패 시 빈 dict."""
+    각 값은 {'label', 'price', 'pct', 'volume'}. volume은 없으면 None. 조회 실패 시 빈 dict."""
     try:
         r = requests.get(_URL, headers={'User-Agent': _UA}, timeout=8)
         r.raise_for_status()
@@ -40,7 +49,12 @@ def get_quotes() -> dict[str, dict]:
                 pct = -abs(pct)
             else:
                 pct = abs(pct)
-            out[code] = {'label': _LABELS[code], 'price': price, 'pct': pct}
+            volume = _to_float(
+                item.get('accumulatedTradingVolume'),
+                item.get('accumulatedTradingVolumeRaw'),
+                item.get('quant'),
+            )
+            out[code] = {'label': _LABELS[code], 'price': price, 'pct': pct, 'volume': volume}
         return out
     except Exception as e:
         print(f"⚠️  국내 지수 조회 실패: {e}")

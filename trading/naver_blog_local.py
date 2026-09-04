@@ -24,6 +24,15 @@
    그 크롬 창에서 직접 로그인 → 터미널에서 Enter → 이후로는 계속 로그인 상태 유지.
 
 ────────────────────────────────────────────────────────────────────────────
+미리보기 (네이버에 올리지 않고 블로그에 실릴 모양만 확인)
+────────────────────────────────────────────────────────────────────────────
+  python naver_blog_local.py --preview                # 최신 메일 기준, _preview/index.html 생성
+  python naver_blog_local.py --preview --sample       # 실데이터 없이 샘플 카드로 디자인만
+  python naver_blog_local.py --preview --from-file mail.html   # 특정 메일 HTML을 입력으로
+- _preview/index.html : 이미지(요약 카드·차트) + 본문이 합쳐진 전체 미리보기
+- _preview/card.html  : 요약 카드 단독 (색상·레이아웃 확인용, selenium 없이도 열림)
+
+────────────────────────────────────────────────────────────────────────────
 동작 방식
 ────────────────────────────────────────────────────────────────────────────
 - 이 스크립트를 실행하는 동안에는 해당 크롬 프로필이 다른 창에서 열려 있으면 안 됩니다
@@ -37,7 +46,6 @@
 import os
 import sys
 import time
-import requests
 
 _SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY = (
@@ -61,7 +69,12 @@ _HASHTAGS = (
 
 def fetch_latest_screening_post() -> dict | None:
     """Supabase email_archive에서 실제로 발송된 최신 스크리닝 메일 원본(HTML)을 가져온다.
-    (board_posts는 게시판용으로 따로 단순화한 버전이라 메일과 내용이 다르다 — 쓰지 않는다)"""
+    (board_posts는 게시판용으로 따로 단순화한 버전이라 메일과 내용이 다르다 — 쓰지 않는다)
+
+    반환: {'title', 'content'(HTML), 'brief'(요약 지표 dict 또는 None)}
+    """
+    import requests
+
     if not (_SUPABASE_URL and _SUPABASE_KEY):
         print('❌ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY(또는 ANON) 환경변수가 필요합니다.')
         return None
@@ -73,6 +86,7 @@ def fetch_latest_screening_post() -> dict | None:
                 'Authorization': f'Bearer {_SUPABASE_KEY}',
             },
             params={
+                'select': '*',
                 'order': 'created_at.desc',
                 'limit': 1,
             },
@@ -83,7 +97,11 @@ def fetch_latest_screening_post() -> dict | None:
         if not rows:
             return None
         row = rows[0]
-        return {'title': row['subject'], 'content': row['html']}
+        return {
+            'title': row['subject'],
+            'content': row['html'],
+            'brief': row.get('brief_json'),
+        }
     except Exception as e:
         print(f'⚠️  메일 원본 조회 실패: {e}')
         return None
@@ -241,11 +259,41 @@ def _find_in_any_frame(driver, by, selector, timeout=10):
     return None
 
 
-def post_to_naver_blog(title: str, html_content: str, publish: bool = True) -> bool:
+def _upload_images(driver, image_paths: list[str]) -> int:
+    """SmartEditor의 파일 입력(input[type=file])에 이미지 경로를 넣어 본문에 삽입한다.
+    현재 캐럿 위치(본문 맨 위로 옮겨둔 상태)에 삽입된다. 셀렉터가 깨져도 글 발행은 계속되도록
+    실패는 예외를 던지지 않고 0을 반환한다."""
+    from selenium.webdriver.common.by import By
+
+    existing = [p for p in image_paths if p and os.path.exists(p)]
+    if not existing:
+        return 0
+    try:
+        driver.switch_to.default_content()
+        driver.switch_to.frame('mainFrame')
+    except Exception:
+        pass
+
+    inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+    for inp in inputs:
+        try:
+            inp.send_keys('\n'.join(os.path.abspath(p) for p in existing))
+            time.sleep(2.5 + 1.5 * len(existing))
+            print(f'🖼️  이미지 {len(existing)}장 업로드 시도 완료')
+            return len(existing)
+        except Exception:
+            continue
+    print('⚠️  에디터에서 이미지 파일 입력(input[type=file])을 찾지 못했습니다 — 텍스트만 발행합니다.')
+    return 0
+
+
+def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
+                       image_paths: list[str] | None = None) -> bool:
     """네이버 블로그 글쓰기 화면에 제목+본문을 채워 넣는다.
     publish=True(기본)면 발행 버튼까지 자동으로 누른다.
     publish=False로 부르면 임시저장 상태로 두고 사람이 화면에서 직접 확인 후 발행하도록 멈춘다
     (터미널이 있는 상태로 수동 테스트할 때만 사용 — 무인 실행에서는 의미 없음).
+    image_paths를 주면 본문 맨 위에 그 이미지들을 먼저 삽입한다 (요약 카드/차트 스냅샷).
     """
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.action_chains import ActionChains
@@ -305,6 +353,13 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True) -> b
         time.sleep(1.5)
         print('📋 본문 붙여넣기 완료 (표 서식이 살아있는지 화면에서 확인하세요)')
 
+        if image_paths:
+            # 캐럿을 본문 맨 위로 옮긴 뒤 이미지를 삽입 → [요약 카드][차트]가 글 최상단에 온다
+            body_el.click()
+            ActionChains(driver).key_down(Keys.CONTROL).send_keys(Keys.HOME).key_up(Keys.CONTROL).perform()
+            time.sleep(0.3)
+            _upload_images(driver, image_paths)
+
         if publish:
             # 1단계: 상단 "발행" 버튼(#mainFrame 안, data-click-area로 식별) → 공개설정 팝업이 뜬다
             driver.find_element(By.CSS_SELECTOR, 'button[data-click-area="tpb.publish"]').click()
@@ -332,10 +387,132 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True) -> b
             driver.quit()
 
 
+def _prepare_images(brief: dict | None, work_dir: str) -> list[dict]:
+    """요약 카드 PNG + 네이버 지수 차트 PNG를 만들어 [{'label','path'}, ...] 로 반환.
+    개별 실패는 건너뛴다 (이미지 없이도 글은 발행)."""
+    os.makedirs(work_dir, exist_ok=True)
+    images: list[dict] = []
+
+    if brief:
+        try:
+            import blog_card_render
+            card = blog_card_render.make_market_card(brief, os.path.join(work_dir, 'card.png'))
+            if card:
+                images.append({'label': '오늘의 국내 증시 요약', 'path': card})
+        except Exception as e:
+            print(f'⚠️  요약 카드 생성 건너뜀: {e}')
+
+    try:
+        import naver_finance_chart
+        images.extend(naver_finance_chart.download_index_charts(work_dir))
+    except Exception as e:
+        print(f'⚠️  지수 차트 이미지 건너뜀: {e}')
+
+    return images
+
+
+def _write_preview(work_dir: str, title: str, body_html: str,
+                   images: list[dict], brief: dict | None):
+    """네이버에 올리지 않고, 블로그에 실릴 모양을 로컬 HTML로 확인할 수 있게 저장한다."""
+    os.makedirs(work_dir, exist_ok=True)
+
+    if brief:
+        try:
+            import blog_card_render
+            with open(os.path.join(work_dir, 'card.html'), 'w', encoding='utf-8') as fh:
+                fh.write(blog_card_render.build_card_html(brief))
+        except Exception as e:
+            print(f'ℹ️  card.html 생략: {e}')
+
+    img_tags = '\n'.join(
+        f'<figure><img src="{os.path.basename(i["path"])}" alt="{i["label"]}">'
+        f'<figcaption>{i["label"]}</figcaption></figure>'
+        for i in images if os.path.exists(i['path'])
+    )
+    placeholder = ''
+    if not img_tags:
+        placeholder = (
+            '<div class="note">※ 이미지(요약 카드·차트)는 selenium/Chrome/requests가 있는 '
+            '환경(회사 노트북)에서 생성됩니다. 여기서는 아래 card.html 을 직접 열어 디자인만 확인하세요.</div>'
+        )
+
+    doc = f"""<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<title>블로그 미리보기 — {title}</title>
+<style>
+  body {{ background:#e9ecef; margin:0; padding:32px 12px;
+         font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; }}
+  .post {{ max-width:760px; margin:0 auto; background:#fff; border-radius:12px;
+          padding:36px 40px; box-shadow:0 4px 24px rgba(0,0,0,.12); }}
+  h1 {{ font-size:24px; margin:0 0 24px; }}
+  figure {{ margin:0 0 20px; }}
+  figure img {{ width:100%; border-radius:10px; display:block; }}
+  figcaption {{ color:#868e96; font-size:13px; margin-top:6px; text-align:center; }}
+  .note {{ background:#fff3bf; border:1px solid #ffe066; border-radius:8px;
+          padding:12px 14px; font-size:13px; color:#664d03; margin-bottom:20px; }}
+  .body {{ line-height:1.8; word-break:break-word; }}
+  .body table {{ border-collapse:collapse; }}
+</style></head><body>
+<div class="post">
+  <h1>{title}</h1>
+  {placeholder}
+  {img_tags}
+  <div class="body">{body_html}</div>
+</div>
+</body></html>"""
+    out = os.path.join(work_dir, 'index.html')
+    with open(out, 'w', encoding='utf-8') as fh:
+        fh.write(doc)
+    print(f'\n✅ 미리보기 생성: {out}')
+    print('   → 브라우저로 열어 확인하세요 (card.html 은 요약 카드 단독 미리보기).')
+
+
+def main(argv: list[str]) -> int:
+    preview = '--preview' in argv
+    sample = '--sample' in argv
+    from_file = None
+    if '--from-file' in argv:
+        from_file = argv[argv.index('--from-file') + 1]
+
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    # ── 입력(제목/본문 HTML/brief) 확보 ──
+    if sample:
+        import blog_card_render
+        brief = blog_card_render.SAMPLE_BRIEF
+        title = '[샘플] 오늘의 국내 증시 스크리닝'
+    else:
+        post = fetch_latest_screening_post()
+        if not post:
+            raise SystemExit('가져올 게시글이 없습니다.')
+        title, brief = post['title'], post.get('brief')
+
+    if from_file:
+        with open(from_file, encoding='utf-8') as fh:
+            email_html = fh.read()
+    elif sample:
+        email_html = '<body><h2>STOCKWIKI</h2><p>샘플 본문 — 실제 메일 HTML을 --from-file 로 주면 그대로 변환됩니다.</p></body>'
+    else:
+        email_html = post['content']
+
+    body_html = screening_blog_content(email_html)
+
+    # ── 미리보기 모드: 네이버 접속·발행 없이 로컬 HTML만 ──
+    if preview:
+        work_dir = os.path.join(here, '_preview')
+        images = _prepare_images(brief, work_dir)
+        _write_preview(work_dir, title, body_html, images, brief)
+        return 0
+
+    # ── 실제 발행 ──
+    import tempfile
+    work_dir = tempfile.mkdtemp(prefix='swk_blog_')
+    images = _prepare_images(brief, work_dir)
+    ok = post_to_naver_blog(
+        title, body_html, publish=True,
+        image_paths=[i['path'] for i in images],
+    )
+    return 0 if ok else 1
+
+
 if __name__ == '__main__':
-    post = fetch_latest_screening_post()
-    if not post:
-        raise SystemExit('가져올 게시글이 없습니다.')
-    content = screening_blog_content(post['content'])
-    ok = post_to_naver_blog(post['title'], content, publish=True)
-    sys.exit(0 if ok else 1)
+    sys.exit(main(sys.argv[1:]))

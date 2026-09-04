@@ -124,21 +124,35 @@ def _save_results(results: list[dict]):
         print(f"⚠️  스크리닝 결과 저장 오류: {e}")
 
 
-def _archive_email(subject: str, html: str, plain_text: str):
-    """실제 발송한 메일의 HTML/텍스트 원본을 그대로 저장 (블로그 등 다른 채널에서 재사용)."""
+def _archive_email(subject: str, html: str, plain_text: str, brief: dict | None = None):
+    """실제 발송한 메일의 HTML/텍스트 원본을 그대로 저장 (블로그 등 다른 채널에서 재사용).
+    brief(요약 지표 dict)도 함께 저장해 두면 로컬 블로그 스크립트가 요약 카드 이미지를 만들 때 쓴다.
+    brief_json 컬럼이 아직 없으면(마이그레이션 전) 그 필드만 빼고 다시 저장한다."""
     if not (_SUPABASE_URL and _SUPABASE_KEY):
         return
-    try:
-        r = requests.post(
+
+    payload = {'subject': subject, 'html': html, 'plain_text': plain_text}
+    if brief is not None:
+        payload['brief_json'] = brief
+
+    def _post(body: dict):
+        return requests.post(
             f"{_SUPABASE_URL}/rest/v1/email_archive",
             headers={
                 'apikey':        _SUPABASE_KEY,
                 'Authorization': f'Bearer {_SUPABASE_KEY}',
                 'Content-Type':  'application/json',
             },
-            json={'subject': subject, 'html': html, 'plain_text': plain_text},
+            json=body,
             timeout=10,
         )
+
+    try:
+        r = _post(payload)
+        if not r.ok and 'brief_json' in payload:
+            print(f"⚠️  brief_json 포함 저장 실패({r.status_code}) — 해당 컬럼 없이 재시도합니다.")
+            payload.pop('brief_json')
+            r = _post(payload)
         if r.ok:
             print("🗄️  메일 원본 저장 완료")
         else:
@@ -377,7 +391,7 @@ def screen():
             html = us_market_brief.render_email_html(brief, report)
             brief_text = us_market_brief.render_text(brief)
             plain = f"{brief_text}\n\n{report}" if brief_text else report
-            _archive_email(bp_title, html, plain)
+            _archive_email(bp_title, html, plain, brief)
             ok = email_notify.send_html_to(html, plain, recipients)
         else:
             ok = email_notify.send_to(report, recipients)

@@ -162,7 +162,45 @@ def get_brief(kis_api=None) -> dict:
         'kr_investors': kr_investors,
     }
     brief['signals'] = _compute_signals(brief)
+    brief['generated_at'] = datetime.now(pytz.timezone('Asia/Seoul')).strftime(
+        '%Y.%m.%d (%a) %H:%M KST')
+    brief['kr_verdict'] = _kr_verdict(brief)
     return brief
+
+
+def _kr_verdict(brief: dict) -> str:
+    """국내 마감 시황 '그래서 결과가 뭔데' 한 줄 해설.
+    규칙 기반 문장을 기본으로 하고, ANTHROPIC_API_KEY가 있으면 Haiku로 자연스럽게 다듬는다
+    (수치는 새로 지어내지 않도록 제약). 실패하면 규칙 문장 그대로 반환한다."""
+    import blog_card_render
+    base = blog_card_render.verdict_line(brief)
+    if not _ANTHROPIC_KEY or base.startswith('오늘 시장 데이터'):
+        return base
+    try:
+        resp = requests.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'x-api-key':         _ANTHROPIC_KEY,
+                'anthropic-version': '2023-06-01',
+                'content-type':      'application/json',
+            },
+            json={
+                'model':      'claude-haiku-4-5-20251001',
+                'max_tokens': 200,
+                'messages':   [{'role': 'user', 'content': (
+                    "아래는 국내 증시 마감 요약(규칙으로 조립한 문장)입니다. 같은 사실만 유지한 채 "
+                    "주식을 모르는 사람도 이해할 수 있게 1~2문장으로 자연스럽게 다듬어 주세요. "
+                    "새로운 수치·종목·전망을 추가하지 말고, 존댓말로, 설명 없이 문장만 답하세요.\n\n"
+                    f"{base}"
+                )}],
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        out = resp.json()['content'][0]['text'].strip()
+        return out or base
+    except Exception:
+        return base
 
 
 # ── 강세/약세 신호 스코어 ────────────────────────────────────────────────────
@@ -252,6 +290,9 @@ def render_text(brief: dict) -> str:
     if kr_indices or kr_oi:
         lines.append('')
         lines.append('[국내 마감 시황]')
+        kr_verdict = (brief.get('kr_verdict') or '').strip()
+        if kr_verdict:
+            lines.append(f'  💬 {kr_verdict}')
         if kr_indices:
             lines.append('  ' + '  '.join(
                 f"{r['label']} {r['price']:,.2f} ({r['pct']:+.2f}%)" for r in kr_indices))
@@ -291,6 +332,20 @@ def _pct_color(pct: float) -> str:
     return _UP if pct >= 0 else _DOWN
 
 
+def _fmt_index_volume(vol) -> str:
+    try:
+        v = float(vol)
+    except (TypeError, ValueError):
+        return ''
+    if v <= 0:
+        return ''
+    if v >= 1e8:
+        return f'{v / 1e8:.1f}억주'
+    if v >= 1e4:
+        return f'{v / 1e4:.0f}만주'
+    return f'{v:,.0f}주'
+
+
 def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
     """지수/섹터 등락률을 네온 카드 그리드로 렌더링."""
     if not rows:
@@ -301,6 +356,11 @@ def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
         cells = []
         for r in chunk:
             color = _pct_color(r['pct'])
+            vol_html = ''
+            vol = _fmt_index_volume(r.get('volume'))
+            if vol:
+                vol_html = (f'<div style="color:{_MUTED};font-size:10px;margin-top:2px;">'
+                            f'거래량 {vol}</div>')
             cells.append(
                 f'<td width="{cell_w}" style="padding:5px;">'
                 f'<div style="background:{_SURFACE_SOFT};border:1px solid {_LINE};'
@@ -308,6 +368,7 @@ def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
                 f'<div style="color:{_MUTED};font-size:11px;letter-spacing:.2px;">{html_lib.escape(r["label"])}</div>'
                 f'<div style="color:{_INK};font-size:14px;font-weight:700;margin-top:3px;font-family:Consolas,Menlo,monospace;">{r["price"]:,.2f}</div>'
                 f'<div style="color:{color};font-size:12px;font-weight:700;margin-top:2px;font-family:Consolas,Menlo,monospace;">{r["pct"]:+.2f}%</div>'
+                f'{vol_html}'
                 '</div></td>'
             )
         # 마지막 줄 셀 개수가 모자라면 빈 셀로 채워 정렬 유지
@@ -507,8 +568,17 @@ def render_email_html(brief: dict, report_text: str) -> str:
             + ''.join(inv_rows) + '</table>'
         )
 
+    kr_verdict = (brief.get('kr_verdict') or '').strip()
+    kr_verdict_html = ''
+    if kr_verdict:
+        kr_verdict_html = (
+            f'<div style="margin-top:12px;padding:12px 14px;background:{_SURFACE_SOFT};'
+            f'border-left:3px solid {_ACCENT};border-radius:6px;color:{_INK};'
+            f'font-size:13.5px;font-weight:600;line-height:1.7;">💬 {html_lib.escape(kr_verdict)}</div>'
+        )
+
     kr_section = ''
-    if kr_indices_html or kr_oi_html or kr_investors_html:
+    if kr_indices_html or kr_oi_html or kr_investors_html or kr_verdict_html:
         kr_section = f"""
 <tr><td style="padding-bottom:16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
@@ -519,6 +589,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
         🇰🇷 국내 마감 시황
       </span>
+      {kr_verdict_html}
       {kr_indices_html}
       {kr_oi_html}
       {kr_investors_html}
