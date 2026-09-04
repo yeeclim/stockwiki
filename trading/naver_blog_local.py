@@ -260,31 +260,38 @@ def _find_in_any_frame(driver, by, selector, timeout=10):
 
 
 def _upload_images(driver, image_paths: list[str]) -> int:
-    """SmartEditor의 파일 입력(input[type=file])에 이미지 경로를 넣어 본문에 삽입한다.
-    현재 캐럿 위치(본문 맨 위로 옮겨둔 상태)에 삽입된다. 셀렉터가 깨져도 글 발행은 계속되도록
-    실패는 예외를 던지지 않고 0을 반환한다."""
+    """SmartEditor의 숨은 파일 입력(input[type=file])에 이미지 경로를 넣어 본문에 삽입한다.
+
+    ※ 무인 실행 안전 원칙: 툴바 '사진' 버튼은 누르지 않는다 — 그 버튼은 OS 파일 열기
+       대화상자를 띄우고, 기다려줄 사람이 없으면 스크립트가 멈춰버린다. 이미 DOM에 있는
+       파일 입력에 send_keys 하는 방식만 쓴다. 셀렉터가 없으면 이미지 없이 넘어간다.
+    절대 예외를 던지지 않고 0(삽입 실패)을 반환한다."""
     from selenium.webdriver.common.by import By
 
-    existing = [p for p in image_paths if p and os.path.exists(p)]
+    existing = [os.path.abspath(p) for p in image_paths if p and os.path.exists(p)]
     if not existing:
         return 0
-    try:
-        driver.switch_to.default_content()
-        driver.switch_to.frame('mainFrame')
-    except Exception:
-        pass
 
-    inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-    for inp in inputs:
-        try:
-            inp.send_keys('\n'.join(os.path.abspath(p) for p in existing))
-            time.sleep(2.5 + 1.5 * len(existing))
-            print(f'🖼️  이미지 {len(existing)}장 업로드 시도 완료')
-            return len(existing)
-        except Exception:
-            continue
-    print('⚠️  에디터에서 이미지 파일 입력(input[type=file])을 찾지 못했습니다 — 텍스트만 발행합니다.')
-    return 0
+    try:
+        inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+        for inp in inputs:
+            try:
+                accept = (inp.get_attribute('accept') or '').lower()
+                if accept and 'image' not in accept and '*' not in accept:
+                    continue
+                inp.send_keys('\n'.join(existing))
+                time.sleep(3.0 + 1.5 * len(existing))
+                print(f'🖼️  이미지 {len(existing)}장 업로드 시도 완료')
+                return len(existing)
+            except Exception:
+                continue
+
+        print(f'⚠️  에디터에서 이미지 파일 입력을 찾지 못했습니다 (input[type=file] {len(inputs)}개) '
+              '— 이미지 없이 텍스트만 발행합니다.')
+        return 0
+    except Exception as e:
+        print(f'⚠️  이미지 삽입 중 오류(무시하고 발행 계속): {e}')
+        return 0
 
 
 def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
@@ -354,11 +361,19 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
         print('📋 본문 붙여넣기 완료 (표 서식이 살아있는지 화면에서 확인하세요)')
 
         if image_paths:
-            # 캐럿을 본문 맨 위로 옮긴 뒤 이미지를 삽입 → [요약 카드][차트]가 글 최상단에 온다
-            body_el.click()
-            ActionChains(driver).key_down(Keys.CONTROL).send_keys(Keys.HOME).key_up(Keys.CONTROL).perform()
-            time.sleep(0.3)
-            _upload_images(driver, image_paths)
+            # [요약 카드][차트]를 글 최상단에 삽입. 이미지 단계에서 무슨 일이 있어도
+            # 발행까지는 반드시 진행되도록 통째로 방어한다.
+            try:
+                fresh_body = driver.find_elements(By.CSS_SELECTOR, '.se-section-text')
+                if fresh_body:
+                    fresh_body[0].click()
+                    time.sleep(0.2)
+                    ActionChains(driver).key_down(Keys.CONTROL).send_keys(Keys.HOME) \
+                        .key_up(Keys.CONTROL).perform()
+                    time.sleep(0.2)
+                _upload_images(driver, image_paths)
+            except Exception as e:
+                print(f'⚠️  이미지 삽입 건너뜀(발행은 계속): {e}')
 
         if publish:
             # 1단계: 상단 "발행" 버튼(#mainFrame 안, data-click-area로 식별) → 공개설정 팝업이 뜬다
@@ -504,14 +519,18 @@ def main(argv: list[str]) -> int:
         return 0
 
     # ── 실제 발행 ──
+    import shutil
     import tempfile
     work_dir = tempfile.mkdtemp(prefix='swk_blog_')
-    images = _prepare_images(brief, work_dir)
-    ok = post_to_naver_blog(
-        title, body_html, publish=True,
-        image_paths=[i['path'] for i in images],
-    )
-    return 0 if ok else 1
+    try:
+        images = _prepare_images(brief, work_dir)
+        ok = post_to_naver_blog(
+            title, body_html, publish=True,
+            image_paths=[i['path'] for i in images],
+        )
+        return 0 if ok else 1
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 if __name__ == '__main__':
