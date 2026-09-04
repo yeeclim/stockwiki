@@ -164,6 +164,8 @@ def get_brief(kis_api=None) -> dict:
     brief['signals'] = _compute_signals(brief)
     brief['generated_at'] = datetime.now(pytz.timezone('Asia/Seoul')).strftime(
         '%Y.%m.%d (%a) %H:%M KST')
+    import blog_card_render
+    brief['close_phase'] = blog_card_render.close_phase_now()
     brief['kr_verdict'] = _kr_verdict(brief)
     return brief
 
@@ -289,7 +291,9 @@ def render_text(brief: dict) -> str:
         lines.append(summary)
     if kr_indices or kr_oi:
         lines.append('')
-        lines.append('[국내 마감 시황]')
+        _krt = {'prev': '[전일 국내 증시 마감]', 'intraday': '[국내 증시 (장중)]',
+                'today': '[국내 증시 마감]'}.get(brief.get('close_phase', 'prev'), '[전일 국내 증시 마감]')
+        lines.append(_krt)
         kr_verdict = (brief.get('kr_verdict') or '').strip()
         if kr_verdict:
             lines.append(f'  💬 {kr_verdict}')
@@ -568,6 +572,11 @@ def render_email_html(brief: dict, report_text: str) -> str:
             + ''.join(inv_rows) + '</table>'
         )
 
+    kr_section_title = {
+        'prev': '🇰🇷 전일 국내 증시 마감', 'intraday': '🇰🇷 국내 증시 (장중)',
+        'today': '🇰🇷 국내 증시 마감',
+    }.get(brief.get('close_phase', 'prev'), '🇰🇷 전일 국내 증시 마감')
+
     kr_verdict = (brief.get('kr_verdict') or '').strip()
     kr_verdict_html = ''
     if kr_verdict:
@@ -587,7 +596,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
       <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
-        🇰🇷 국내 마감 시황
+        {kr_section_title}
       </span>
       {kr_verdict_html}
       {kr_indices_html}

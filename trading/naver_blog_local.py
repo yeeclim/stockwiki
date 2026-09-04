@@ -216,10 +216,19 @@ def _to_blog_friendly_html(html: str) -> str:
         flags=re.DOTALL,
     )
 
-    # 섹션 제목(📊 오늘의 시장 신호 / 🌙 간밤 미국시장 브리핑 / 🇰🇷 국내 마감 시황)을
-    # 진짜 제목으로 승격 — 네이버가 style을 지워도 <h3>는 크고 굵게 유지돼 단락 구분이 산다.
+    # 예전 메일에 남아 있는 "내일 시장 신호" 표현 정정 — 스크리닝은 장 시작 전에 돌아
+    # 신호는 '오늘' 장에 대한 것이다. (메일 자체는 다음 스크리닝부터 '오늘의 시장 신호')
+    html = html.replace('내일 시장 신호', '오늘의 시장 신호')
+
+    # 시장 신호 단락은 이 글의 핵심 → <h2>로 가장 크게. 나머지 섹션 제목은 <h3>.
+    # (네이버가 style을 지워도 h2/h3 크기·굵기는 유지돼 단락 구분이 산다)
     html = re.sub(
-        r'<span[^>]*>\s*((?:\U0001F4CA|\U0001F319|\U0001F1F0\U0001F1F7)[^<]*?)\s*</span>',
+        r'<span[^>]*>\s*[📊📍\s]*(오늘의?\s*시장\s*신호)[📊📍\s]*</span>',
+        r'<h2>📊 \1</h2>',
+        html,
+    )
+    html = re.sub(
+        r'<span[^>]*>\s*((?:\U0001F319|\U0001F1F0\U0001F1F7)[^<]*?)\s*</span>',
         r'<h3>\1</h3>',
         html,
     )
@@ -462,31 +471,61 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
             driver.quit()
 
 
-def _minimal_brief() -> dict | None:
-    """email_archive에 brief_json이 아직 없을 때(마이그레이션 전) 쓰는 최소 brief —
-    네이버 금융에서 코스피/코스닥/선물 시세만 즉석 조회한다 (신호·수급은 없음)."""
+_ARROW_DIR = {'▲': 1, '▼': -1, '－': 0, '-': 0}
+
+
+def _extract_signals_from_email(email_html: str) -> list[dict]:
+    """메일 HTML의 '시장 신호' 칩(라벨 + ▲/▼/－)을 파싱해 [{'label','direction'}] 로.
+    brief_json이 없을 때도 요약 카드에 신호 블록을 넣기 위한 폴백 (메일엔 늘 들어있다)."""
+    import re
+    out = []
+    for m in re.finditer(
+        r'white-space:\s*nowrap[^>]*>\s*([^<]+?)\s*<span[^>]*>\s*([▲▼－-])\s*</span>\s*</span>',
+        email_html,
+    ):
+        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+        if label:
+            out.append({'label': label, 'direction': _ARROW_DIR.get(m.group(2), 0)})
+    return out
+
+
+def _minimal_brief(email_html: str | None = None) -> dict | None:
+    """email_archive에 brief_json이 아직 없을 때(마이그레이션 전) 쓰는 폴백 brief.
+    - 코스피/코스닥/선물 시세: 네이버 금융에서 즉석 조회
+    - 시장 신호: 메일 HTML에서 파싱 (수급 수치는 없음)"""
     try:
-        from datetime import datetime
+        from datetime import datetime, timedelta, timezone
+        import blog_card_render
         import kr_market_data as kmd
+
         q = kmd.get_quotes()
         kr = [q[c] for c in ('KOSPI', 'KOSDAQ', 'FUT') if c in q]
-        if not kr:
+        signals = _extract_signals_from_email(email_html) if email_html else []
+        if not kr and not signals:
             return None
-        return {'kr_indices': kr,
-                'generated_at': datetime.now().strftime('%Y.%m.%d %H:%M KST')}
+        now_kst = datetime.now(timezone(timedelta(hours=9)))
+        return {
+            'kr_indices': kr,
+            'signals': signals,
+            'close_phase': blog_card_render.close_phase_now(now_kst),
+            'generated_at': now_kst.strftime('%Y.%m.%d %H:%M KST'),
+        }
     except Exception as e:
-        print(f'⚠️  즉석 지수 조회 실패: {e}')
+        print(f'⚠️  폴백 brief 생성 실패: {e}')
         return None
 
 
-def _prepare_images(brief: dict | None, work_dir: str) -> list[dict]:
+def _prepare_images(brief: dict | None, work_dir: str,
+                    email_html: str | None = None) -> list[dict]:
     """요약 카드 + 지수 흐름 패널(네이버 차트 + 등락·관전포인트) PNG를 만든다.
     개별 실패는 건너뛴다 (이미지 없이도 글은 발행)."""
     os.makedirs(work_dir, exist_ok=True)
     images: list[dict] = []
 
     if not brief:
-        brief = _minimal_brief()
+        brief = _minimal_brief(email_html)
+    elif not brief.get('signals') and email_html:
+        brief['signals'] = _extract_signals_from_email(email_html)
 
     try:
         import blog_card_render
@@ -612,7 +651,7 @@ def main(argv: list[str]) -> int:
     # ── 미리보기 모드: 네이버 접속·발행 없이 로컬 HTML만 ──
     if preview:
         work_dir = os.path.join(here, '_preview')
-        images = _prepare_images(brief, work_dir)
+        images = _prepare_images(brief, work_dir, email_html)
         _write_preview(work_dir, title, body_html, images, brief)
         return 0
 
@@ -621,7 +660,7 @@ def main(argv: list[str]) -> int:
     import tempfile
     work_dir = tempfile.mkdtemp(prefix='swk_blog_')
     try:
-        images = _prepare_images(brief, work_dir)
+        images = _prepare_images(brief, work_dir, email_html)
         ok = post_to_naver_blog(
             title, body_html, publish=True,
             image_paths=[i['path'] for i in images],

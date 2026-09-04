@@ -53,6 +53,22 @@ def _fmt_volume(vol) -> str:
     return f'{v:,.0f}주'
 
 
+def close_phase_now(now=None) -> str:
+    """KST 현재 시각으로 지수 데이터의 성격을 판정한다.
+    'prev'     : 장 시작(09:00) 전 — 지수 값은 '전일 종가'
+    'intraday' : 09:00~15:30 — 장중 시세
+    'today'    : 15:30 이후 — '당일 종가'
+    아침에 도는 스크리닝/블로그 포스팅은 대부분 'prev'다."""
+    from datetime import datetime, timedelta, timezone
+    now = now or datetime.now(timezone(timedelta(hours=9)))
+    hm = now.hour * 60 + now.minute
+    if hm < 9 * 60:
+        return 'prev'
+    if hm < 15 * 60 + 30:
+        return 'intraday'
+    return 'today'
+
+
 def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
     bull = sum(1 for s in signals if s.get('direction', 0) > 0)
     bear = sum(1 for s in signals if s.get('direction', 0) < 0)
@@ -73,6 +89,11 @@ def verdict_line(brief: dict) -> str:
     kospi, kosdaq = kr.get('코스피'), kr.get('코스닥')
     parts: list[str] = []
 
+    # 아침 포스팅 기준: 지수 데이터는 '전일' 종가다. 장중/마감 후면 각각 다르게 표현.
+    phase = brief.get('close_phase', 'prev')
+    lead = {'prev': '전일 ', 'intraday': '', 'today': ''}.get(phase, '전일 ')
+    tail = {'prev': ' 마감', 'intraday': ' 거래 중', 'today': ' 마감'}.get(phase, ' 마감')
+
     def _word(p: float) -> str:
         if p >= 1.0:
             return '강세'
@@ -86,19 +107,19 @@ def verdict_line(brief: dict) -> str:
 
     if kospi and kosdaq:
         kp, kq = kospi['pct'], kosdaq['pct']
-        nums = f'코스피 {kp:+.2f}%·코스닥 {kq:+.2f}%'
+        nums = f'{lead}코스피 {kp:+.2f}%·코스닥 {kq:+.2f}%'
         if (kp > 0) == (kq > 0) and min(abs(kp), abs(kq)) > 0.2:
-            parts.append(f'{nums} ' + ('동반 상승' if kp > 0 else '동반 하락') + ' 마감')
+            parts.append(f'{nums} ' + ('동반 상승' if kp > 0 else '동반 하락') + tail)
         elif kp > 0 >= kq:
             parts.append(f'{nums} — 대형주 강세·중소형주 약세로 엇갈림')
         elif kq > 0 >= kp:
             parts.append(f'{nums} — 중소형주 강세·대형주 약세로 엇갈림')
         else:
-            parts.append(f'{nums} 혼조 마감')
+            parts.append(f'{nums} 혼조{tail}')
     elif kospi:
-        parts.append(f'코스피 {kospi["pct"]:+.2f}% {_word(kospi["pct"])} 마감')
+        parts.append(f'{lead}코스피 {kospi["pct"]:+.2f}% {_word(kospi["pct"])}{tail}')
     elif kosdaq:
-        parts.append(f'코스닥 {kosdaq["pct"]:+.2f}% {_word(kosdaq["pct"])} 마감')
+        parts.append(f'{lead}코스닥 {kosdaq["pct"]:+.2f}% {_word(kosdaq["pct"])}{tail}')
 
     kospi_inv = next(
         (i for i in (brief.get('kr_investors') or []) if i.get('label') == '코스피'), None
@@ -155,6 +176,9 @@ def build_card_html(brief: dict) -> str:
     """카드 HTML 문서. #card 요소만 스크린샷하면 된다."""
     now_str = (brief.get('generated_at') or '').strip()
 
+    phase = brief.get('close_phase', 'prev')
+    grid_label = {'prev': '전일 종가', 'intraday': '장중 시세', 'today': '오늘 종가'}.get(phase, '전일 종가')
+
     kr_rows = list(brief.get('kr_indices') or [])
     # 정확히 3칸(코스피/코스닥/선물)으로 맞춘다
     order = {'코스피': 0, '코스닥': 1, '코스피200 선물': 2}
@@ -163,8 +187,10 @@ def build_card_html(brief: dict) -> str:
     while cells.count('<td') < 3:
         cells += '<td width="33%"></td>'
     quote_grid = (
+        f'<div style="color:{_MUTED};font-size:12px;font-weight:700;letter-spacing:.4px;'
+        f'margin-top:14px;">{grid_label}</div>'
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        f'style="margin-top:4px;"><tr>{cells}</tr></table>'
+        f'style="margin-top:6px;"><tr>{cells}</tr></table>'
         if kr_rows else ''
     )
 
@@ -222,7 +248,7 @@ def build_card_html(brief: dict) -> str:
                font-family:Consolas,Menlo,monospace;">{html_lib.escape(now_str)}</td>
   </tr></table>
   <div style="color:{_INK};font-size:22px;font-weight:800;margin-top:14px;">
-    📊 오늘의 국내 증시, 한눈에
+    📊 국내 증시 한눈에
   </div>
   {quote_grid}
   {signal_block}
@@ -349,6 +375,9 @@ def build_chart_panel_html(chart_items: list[dict], brief: dict) -> str:
         return ''
 
     now_str = (brief.get('generated_at') or '').strip()
+    phase = brief.get('close_phase', 'prev')
+    panel_title = {'prev': '📈 전일 지수 흐름', 'intraday': '📈 지수 흐름(장중)',
+                   'today': '📈 오늘 지수 흐름'}.get(phase, '📈 전일 지수 흐름')
     return f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
@@ -366,7 +395,7 @@ def build_chart_panel_html(chart_items: list[dict], brief: dict) -> str:
     <td style="text-align:right;color:{_MUTED};font-size:13px;
                font-family:Consolas,Menlo,monospace;">{html_lib.escape(now_str)}</td>
   </tr></table>
-  <div style="color:{_INK};font-size:21px;font-weight:800;margin-top:14px;">📈 지수 흐름</div>
+  <div style="color:{_INK};font-size:21px;font-weight:800;margin-top:14px;">{panel_title}</div>
   {''.join(blocks)}
 </div>
 </body></html>"""
@@ -383,7 +412,8 @@ def make_chart_panel(chart_items: list[dict], brief: dict, out_path: str) -> str
 # ── 단독 실행용 샘플 ──────────────────────────────────────────────────────────
 
 SAMPLE_BRIEF = {
-    'generated_at': '2026.09.04 (목) 15:40 KST',
+    'generated_at': '2026.09.05 (금) 08:26 KST',
+    'close_phase': 'prev',
     'kr_indices': [
         {'label': '코스피', 'price': 3201.55, 'pct': 0.82, 'volume': 520_000_000},
         {'label': '코스닥', 'price': 1045.22, 'pct': -0.31, 'volume': 810_000_000},
