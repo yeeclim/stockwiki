@@ -270,7 +270,7 @@ def render_text(brief: dict) -> str:
     if signals:
         bull, bear, neutral = _signal_counts(signals)
         verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
-        lines.append(f"📍 내일 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
+        lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
         arrow_of = {1: '▲', -1: '▼', 0: '－'}
         lines.append('   ' + '  '.join(f"[{s['label']} {arrow_of[s['direction']]}]" for s in signals))
         lines.append('   ※ 통계적 확률이 아닌 단순 신호 조합입니다')
@@ -478,16 +478,16 @@ def render_email_html(brief: dict, report_text: str) -> str:
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
          style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
     <tr><td style="padding:16px 20px;">
-      <span style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">
-        📍 내일 시장 신호
+      <span style="color:{_ACCENT};font-size:16px;font-weight:800;letter-spacing:.3px;">
+        📊 오늘의 시장 신호 📍
       </span>
-      <div style="margin-top:6px;">
-        <span style="color:{_INK};font-weight:800;font-size:18px;">강세 {bull}</span>
-        <span style="color:{_MUTED};font-size:14px;"> · </span>
-        <span style="color:{_INK};font-weight:800;font-size:18px;">약세 {bear}</span>
-        <span style="color:{_MUTED};font-size:14px;"> · </span>
-        <span style="color:{_INK};font-weight:800;font-size:18px;">중립 {neutral}</span>
-        <span style="color:{verdict_color};font-weight:700;font-size:13px;margin-left:8px;">({verdict})</span>
+      <div style="margin-top:8px;">
+        <span style="color:{_INK};font-weight:800;font-size:20px;">강세 {bull}</span>
+        <span style="color:{_MUTED};font-size:15px;"> · </span>
+        <span style="color:{_INK};font-weight:800;font-size:20px;">약세 {bear}</span>
+        <span style="color:{_MUTED};font-size:15px;"> · </span>
+        <span style="color:{_INK};font-weight:800;font-size:20px;">중립 {neutral}</span>
+        <span style="color:{verdict_color};font-weight:800;font-size:14px;margin-left:8px;">({verdict})</span>
       </div>
       <div style="margin-top:10px;">{chips}</div>
       <div style="margin-top:8px;color:{_MUTED};font-size:10.5px;">
@@ -628,7 +628,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
 </head>
 <body style="margin:0;padding:0;background-color:{_BG};">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-  오늘의 종목 스크리닝 결과, 내일 시장 신호, 국내 마감 시황, 간밤 미국시장 브리핑
+  오늘의 종목 스크리닝 결과, 오늘의 시장 신호, 국내 마감 시황, 간밤 미국시장 브리핑
 </div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:{_BG};">
 <tr><td align="center" style="padding:28px 12px;">

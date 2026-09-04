@@ -118,11 +118,11 @@ def verdict_line(brief: dict) -> str:
     if signals:
         bull, bear, _ = _signal_counts(signals)
         if bull > bear:
-            parts.append(f'내일 강세 신호 우세({bull}:{bear})')
+            parts.append(f'오늘 강세 신호 우세({bull}:{bear})')
         elif bear > bull:
-            parts.append(f'내일 약세 신호 우세({bear}:{bull})')
+            parts.append(f'오늘 약세 신호 우세({bear}:{bull})')
         else:
-            parts.append('내일 신호 팽팽')
+            parts.append('오늘 신호 팽팽')
 
     if not parts:
         return ''
@@ -181,8 +181,8 @@ def build_card_html(brief: dict) -> str:
         signal_block = (
             f'<div style="margin-top:18px;padding:16px 18px;background:{_SURFACE_SOFT};'
             f'border:1px solid {_LINE};border-radius:14px;">'
-            f'<span style="color:{_MUTED};font-size:13px;font-weight:700;letter-spacing:.4px;">'
-            f'📍 내일 시장 신호</span>'
+            f'<span style="color:{_ACCENT};font-size:15px;font-weight:800;letter-spacing:.3px;">'
+            f'📊 오늘의 시장 신호 📍</span>'
             f'<div style="margin-top:8px;">'
             f'<span style="color:{_INK};font-size:22px;font-weight:800;">강세 {bull}</span>'
             f'<span style="color:{_MUTED};font-size:16px;"> · </span>'
@@ -401,7 +401,7 @@ SAMPLE_BRIEF = {
         {'label': '선물 미결제약정', 'direction': 1},
         {'label': '코스피 수급(외국인+기관)', 'direction': 1},
         {'label': '코스닥 수급(외국인+기관)', 'direction': -1},
-        {'label': '내일 지수', 'direction': 0},
+        {'label': '지수 방향', 'direction': 0},
     ],
 }
 
