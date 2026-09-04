@@ -57,7 +57,7 @@ def download_index_charts(out_dir: str) -> list[dict]:
         with open(path, 'wb') as fh:
             fh.write(data)
         print(f'📈 {label} 차트 이미지 저장: {path}')
-        results.append({'label': f'{label} 일간 차트', 'path': path})
+        results.append({'label': f'{label} 일간 차트', 'code': code, 'path': path})
     return results
 
 

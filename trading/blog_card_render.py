@@ -13,6 +13,7 @@
 """
 import html as html_lib
 import os
+import time
 
 # ── StockWiki 블랙+네온 테마 (us_market_brief.py 와 동일값, 색상 관행: 상승=빨강 / 하락=파랑) ──
 _BG           = '#050706'
@@ -218,8 +219,9 @@ def build_card_html(brief: dict) -> str:
 </body></html>"""
 
 
-def render_html_to_png(card_html: str, out_path: str, scale: int = 2) -> bool:
-    """헤드리스 Chrome으로 #card 요소만 PNG로 저장. selenium은 여기서만 필요."""
+def render_html_to_png(doc_html: str, out_path: str, elem_id: str = 'card',
+                       scale: int = 2, label: str = '이미지') -> bool:
+    """헤드리스 Chrome으로 #<elem_id> 요소만 PNG로 저장. selenium은 여기서만 필요."""
     import tempfile
 
     from selenium import webdriver
@@ -229,7 +231,7 @@ def render_html_to_png(card_html: str, out_path: str, scale: int = 2) -> bool:
     driver = None
     try:
         with tempfile.NamedTemporaryFile('w', suffix='.html', delete=False, encoding='utf-8') as fh:
-            fh.write(card_html)
+            fh.write(doc_html)
             tmp_path = fh.name
 
         opts = webdriver.ChromeOptions()
@@ -237,16 +239,17 @@ def render_html_to_png(card_html: str, out_path: str, scale: int = 2) -> bool:
         opts.add_argument('--hide-scrollbars')
         opts.add_argument('--disable-gpu')
         opts.add_argument(f'--force-device-scale-factor={scale}')
-        opts.add_argument(f'--window-size={_CARD_WIDTH + 80},1400')
+        opts.add_argument(f'--window-size={_CARD_WIDTH + 80},3200')
         driver = webdriver.Chrome(options=opts)
         driver.get('file:///' + tmp_path.replace('\\', '/'))
-        el = driver.find_element(By.ID, 'card')
+        time.sleep(0.4)  # 이미지(data URI) 디코딩 여유
+        el = driver.find_element(By.ID, elem_id)
         ok = el.screenshot(out_path)
         if ok:
-            print(f'🖼️  요약 카드 이미지 생성: {out_path}')
+            print(f'🖼️  {label} 생성: {out_path}')
         return bool(ok)
     except Exception as e:
-        print(f'⚠️  요약 카드 이미지 생성 실패: {e}')
+        print(f'⚠️  {label} 생성 실패: {e}')
         return False
     finally:
         if driver is not None:
@@ -265,7 +268,114 @@ def make_market_card(brief: dict, out_path: str) -> str | None:
         return None
     html_doc = build_card_html(brief)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    return out_path if render_html_to_png(html_doc, out_path) else None
+    return out_path if render_html_to_png(html_doc, out_path, label='요약 카드') else None
+
+
+# ── 지수 흐름 패널 (네이버 차트 이미지 + 제목·등락·관전포인트를 우리 디자인으로 감싼다) ──
+
+def _img_data_uri(path: str) -> str:
+    import base64
+    with open(path, 'rb') as fh:
+        b64 = base64.b64encode(fh.read()).decode('ascii')
+    return f'data:image/png;base64,{b64}'
+
+
+def _chart_flow_hint(pct) -> str:
+    try:
+        p = float(pct)
+    except (TypeError, ValueError):
+        return ''
+    if p >= 1.0:
+        return '상승 마감 — 매수세 우위'
+    if p > 0:
+        return '강보합 — 관망 속 소폭 상승'
+    if p == 0:
+        return '보합 — 방향성 뚜렷하지 않음'
+    if p > -1.0:
+        return '약보합 — 매물 소화 중'
+    return '하락 마감 — 매도세 우위'
+
+
+def build_chart_panel_html(chart_items: list[dict], brief: dict) -> str:
+    """chart_items = [{'label','path','code'}]. 각 지수의 종가/등락률(brief)과 함께
+    네이버 차트 이미지를 우리 카드 디자인 안에 넣는다."""
+    by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
+    code_to_label = {'KOSPI': '코스피', 'KOSDAQ': '코스닥'}
+
+    blocks = []
+    for it in chart_items:
+        if not os.path.exists(it['path']):
+            continue
+        name = code_to_label.get(it.get('code', ''), it['label'].replace(' 일간 차트', ''))
+        row = by_label.get(name)
+        head = f'<span style="color:{_INK};font-size:16px;font-weight:800;">{html_lib.escape(name)}</span>'
+        if row:
+            color = _pct_color(row['pct'])
+            vol = _fmt_volume(row.get('volume'))
+            head += (
+                f'<span style="color:{_INK};font-size:15px;font-weight:800;margin-left:10px;'
+                f'font-family:Consolas,Menlo,monospace;">{row["price"]:,.2f}</span>'
+                f'<span style="color:{color};font-size:14px;font-weight:800;margin-left:8px;'
+                f'font-family:Consolas,Menlo,monospace;">{_arrow(row["pct"])} {row["pct"]:+.2f}%</span>'
+            )
+            sub = _chart_flow_hint(row['pct'])
+            if vol:
+                sub = f'거래량 {vol} · {sub}' if sub else f'거래량 {vol}'
+        else:
+            sub = ''
+        sub_html = (f'<div style="color:{_MUTED};font-size:12px;margin-top:6px;">{html_lib.escape(sub)}</div>'
+                    if sub else '')
+        blocks.append(
+            f'<div style="margin-top:16px;">'
+            f'<div style="margin-bottom:8px;">{head}</div>'
+            f'<img src="{_img_data_uri(it["path"])}" alt="{html_lib.escape(name)} 차트" '
+            f'style="display:block;width:100%;border:1px solid {_LINE};border-radius:10px;background:#fff;">'
+            f'{sub_html}</div>'
+        )
+
+    if not blocks:
+        return ''
+
+    outlook = verdict_line(brief)
+    outlook_html = ''
+    if outlook and not outlook.startswith('오늘 시장 데이터'):
+        outlook_html = (
+            f'<div style="margin-top:16px;padding:14px 16px;background:#0B0F0C;'
+            f'border-left:4px solid {_ACCENT};border-radius:8px;color:{_INK};'
+            f'font-size:14.5px;font-weight:600;line-height:1.7;">💬 오늘 관전포인트 · {html_lib.escape(outlook)}</div>'
+        )
+
+    now_str = (brief.get('generated_at') or '').strip()
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{ background:{_BG}; }}
+  #panel {{
+    width:{_CARD_WIDTH}px; background:{_BG};
+    border:1px solid {_LINE}; border-radius:22px; padding:26px 28px;
+    font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  }}
+</style></head><body>
+<div id="panel">
+  <table role="presentation" width="100%"><tr>
+    <td style="color:{_ACCENT};font-family:Consolas,Menlo,monospace;font-size:16px;
+               font-weight:800;letter-spacing:2px;">STOCKWIKI</td>
+    <td style="text-align:right;color:{_MUTED};font-size:13px;
+               font-family:Consolas,Menlo,monospace;">{html_lib.escape(now_str)}</td>
+  </tr></table>
+  <div style="color:{_INK};font-size:21px;font-weight:800;margin-top:14px;">📈 지수 흐름</div>
+  {''.join(blocks)}
+  {outlook_html}
+</div>
+</body></html>"""
+
+
+def make_chart_panel(chart_items: list[dict], brief: dict, out_path: str) -> str | None:
+    doc = build_chart_panel_html(chart_items, brief or {})
+    if not doc:
+        return None
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    return out_path if render_html_to_png(doc, out_path, elem_id='panel', label='지수 흐름 패널') else None
 
 
 # ── 단독 실행용 샘플 ──────────────────────────────────────────────────────────

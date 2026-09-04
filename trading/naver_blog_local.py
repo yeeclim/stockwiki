@@ -449,15 +449,40 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
             driver.quit()
 
 
+def _minimal_brief() -> dict | None:
+    """email_archive에 brief_json이 아직 없을 때(마이그레이션 전) 쓰는 최소 brief —
+    네이버 금융에서 코스피/코스닥/선물 시세만 즉석 조회한다 (신호·수급은 없음)."""
+    try:
+        from datetime import datetime
+        import kr_market_data as kmd
+        q = kmd.get_quotes()
+        kr = [q[c] for c in ('KOSPI', 'KOSDAQ', 'FUT') if c in q]
+        if not kr:
+            return None
+        return {'kr_indices': kr,
+                'generated_at': datetime.now().strftime('%Y.%m.%d %H:%M KST')}
+    except Exception as e:
+        print(f'⚠️  즉석 지수 조회 실패: {e}')
+        return None
+
+
 def _prepare_images(brief: dict | None, work_dir: str) -> list[dict]:
-    """요약 카드 PNG + 네이버 지수 차트 PNG를 만들어 [{'label','path'}, ...] 로 반환.
+    """요약 카드 + 지수 흐름 패널(네이버 차트 + 등락·관전포인트) PNG를 만든다.
     개별 실패는 건너뛴다 (이미지 없이도 글은 발행)."""
     os.makedirs(work_dir, exist_ok=True)
     images: list[dict] = []
 
+    if not brief:
+        brief = _minimal_brief()
+
+    try:
+        import blog_card_render
+    except Exception as e:
+        print(f'⚠️  이미지 렌더 모듈 로드 실패: {e}')
+        return images
+
     if brief:
         try:
-            import blog_card_render
             card = blog_card_render.make_market_card(brief, os.path.join(work_dir, 'card.png'))
             if card:
                 images.append({'label': '오늘의 국내 증시 요약', 'path': card})
@@ -466,9 +491,22 @@ def _prepare_images(brief: dict | None, work_dir: str) -> list[dict]:
 
     try:
         import naver_finance_chart
-        images.extend(naver_finance_chart.download_index_charts(work_dir))
+        charts = naver_finance_chart.download_index_charts(work_dir)
     except Exception as e:
-        print(f'⚠️  지수 차트 이미지 건너뜀: {e}')
+        print(f'⚠️  지수 차트 다운로드 건너뜀: {e}')
+        charts = []
+
+    if charts:
+        try:
+            panel = blog_card_render.make_chart_panel(
+                charts, brief or {}, os.path.join(work_dir, 'chart_panel.png'))
+        except Exception as e:
+            print(f'⚠️  지수 흐름 패널 생성 실패: {e}')
+            panel = None
+        if panel:
+            images.append({'label': '지수 흐름', 'path': panel})
+        else:
+            images.extend(charts)  # 패널 실패 시 원본 차트라도
 
     return images
 
