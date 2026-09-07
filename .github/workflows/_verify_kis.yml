@@ -3,6 +3,14 @@ name: (임시) KIS 리팩터 검증
 # Phase 3 KIS API 통합 검증용 일회성 워크플로우. 검증 후 삭제.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - cleanup/phase3-dedup
+    paths:
+      - trading/kis_api.py
+      - trading/brokers/kis_api.py
+      - trading/_verify_kis.py
+      - .github/workflows/_verify_kis.yml
 
 jobs:
   verify:
