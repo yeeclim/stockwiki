@@ -8,6 +8,7 @@
 // (Vercel Hobby 플랜 서버리스 함수 12개 제한 때문에 별도 파일 대신 같은 함수에서 분기)
 
 import { fetchLiveQuotes, scoreToAction, buildReasons } from './_us-recommend-shared.js';
+import { applyCors } from './_shared.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
@@ -17,11 +18,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
 const MAX_SCREENED_AGE_DAYS = 3;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (applyCors(req, res)) return;
 
   if (req.query.view === 'sector') {
     return handleSectorView(req, res);

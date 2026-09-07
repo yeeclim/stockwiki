@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fetchStockDataDirect } from './_naver-stock.js';
+import { applyCors } from './_shared.js';
 import iconv from 'iconv-lite';
 import { JSDOM } from 'jsdom';
 
@@ -54,17 +55,7 @@ const GLOBAL_THEME_KEYWORDS = [
 
 // 테마별 추천 종목 API
 export default async function handler(req, res) {
-  // CORS 헤더 설정
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Content-Type', 'application/json');
-
-  // OPTIONS 요청 처리
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  if (applyCors(req, res)) return;
 
   const { theme, action = 'list' } = req.query;
 

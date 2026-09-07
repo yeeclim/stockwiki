@@ -1,14 +1,9 @@
 import { readFile, access } from 'fs/promises';
 import path from 'path';
-import { checkRateLimit, getClientIp, validateString, validateInt, fail } from './_shared.js';
+import { checkRateLimit, getClientIp, validateString, validateInt, fail, applyCors } from './_shared.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (applyCors(req, res)) return;
 
   if (!checkRateLimit(getClientIp(req), 60, 60_000)) {
     return fail(res, 429, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');

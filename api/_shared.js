@@ -79,6 +79,29 @@ export function validateInt(value, { min = 0, max = 100 } = {}) {
   return n;
 }
 
+// ── CORS ──────────────────────────────────────────────────────────────
+
+/**
+ * 표준 CORS 헤더 설정 + OPTIONS 프리플라이트 처리.
+ * @param {object} req
+ * @param {object} res
+ * @param {{methods?: string, json?: boolean}} [opts]
+ *   methods - Access-Control-Allow-Methods 값 (기본 'GET, OPTIONS')
+ *   json    - Content-Type: application/json 을 미리 설정할지 (기본 true)
+ * @returns {boolean} true면 프리플라이트로 응답이 끝났으므로 호출부에서 즉시 return 할 것
+ */
+export function applyCors(req, res, { methods = 'GET, OPTIONS', json = true } = {}) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', methods);
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (json) res.setHeader('Content-Type', 'application/json');
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return true;
+  }
+  return false;
+}
+
 // ── 표준 응답 ──────────────────────────────────────────────────────────
 
 export function ok(res, data, extra = {}) {

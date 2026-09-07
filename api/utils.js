@@ -1,15 +1,10 @@
 // Utility API
 // Charts, Commodity Prices, Fear & Greed Index, 국내주식 KIS 일봉
 
-export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { applyCors } from './_shared.js';
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
+export default async function handler(req, res) {
+    if (applyCors(req, res, { methods: 'GET, POST, OPTIONS', json: false })) return;
 
     try {
         const { type } = req.query;

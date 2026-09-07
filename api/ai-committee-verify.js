@@ -1,6 +1,8 @@
 // AI 검증위원회 API
 // Gemini (Google AI Studio 무료) + Llama 3.3 / Llama 3.1 / Gemma 2 / Mixtral (Groq 무료)
 
+import { applyCors } from './_shared.js';
+
 function getEnv(key) {
   const K = key.toUpperCase();
   return process.env[K] || process.env[key.toLowerCase()] || process.env[key] || '';
@@ -12,11 +14,7 @@ const CACHE_TTL = 30 * 60 * 1000;
 
 export default async function handler(req, res) {
   const fetch = globalThis.fetch || (await import('node-fetch')).default;
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (applyCors(req, res, { methods: 'GET, POST, OPTIONS', json: false })) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   try {

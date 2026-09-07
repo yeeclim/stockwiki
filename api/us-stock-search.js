@@ -1,5 +1,5 @@
 // 미국 주식 검색 API (Yahoo Finance)
-import { checkRateLimit, getClientIp, fail } from './_shared.js';
+import { checkRateLimit, getClientIp, fail, applyCors } from './_shared.js';
 
 const YF_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -11,12 +11,7 @@ const YF_HEADERS = {
 };
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (applyCors(req, res)) return;
 
   if (!checkRateLimit(getClientIp(req), 30, 60_000)) {
     return fail(res, 429, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');

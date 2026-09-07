@@ -1,10 +1,7 @@
-import { checkRateLimit, getClientIp, fail } from './_shared.js';
+import { checkRateLimit, getClientIp, fail, applyCors } from './_shared.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Content-Type', 'application/json');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (applyCors(req, res)) return;
 
   if (!checkRateLimit(getClientIp(req), 30, 60_000)) {
     return fail(res, 429, '요청이 너무 많습니다.');

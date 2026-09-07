@@ -1,5 +1,5 @@
 import { fetchStockDataDirect } from './_naver-stock.js';
-import { checkRateLimit, getClientIp, validateInt, fail } from './_shared.js';
+import { checkRateLimit, getClientIp, validateInt, fail, applyCors } from './_shared.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
@@ -10,12 +10,7 @@ let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5분
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (applyCors(req, res)) return;
   if (req.method !== 'GET') return fail(res, 405, 'Method not allowed');
 
   if (!checkRateLimit(getClientIp(req), 20, 60_000)) {
