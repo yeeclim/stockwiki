@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { applyCors } from './_shared.js';
+import { applyCors, verifyAdmin } from './_shared.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
@@ -12,7 +12,6 @@ function sha256(str, salt) {
   return createHash('sha256').update(str + salt).digest('hex');
 }
 function ipHash(ip) { return sha256(ip,  'sw_ip').substring(0, 16); }
-function pwHash(pw) { return sha256(pw,  'sw_pw'); }
 
 async function db(path, options = {}) {
   const { method = 'GET', body, prefer } = options;
@@ -165,24 +164,19 @@ export default async function handler(req, res) {
       return res.json({ success: true, posts: list, total, page: parseInt(page), limit: lim });
     }
 
-    // ── POST ─────────────────────────────────────────────────────────────────
+    // ── POST (관리자 전용 — AI 매매일지 게시판) ───────────────────────────────
     if (req.method === 'POST') {
-      const { title, nickname, content, password } = req.body ?? {};
+      const adm = await verifyAdmin(req);
+      if (!adm.ok) return res.status(adm.status).json({ error: adm.error });
 
-      if (!title?.trim() || !nickname?.trim() || !content?.trim() || !password?.trim())
-        return res.status(400).json({ error: '제목·닉네임·내용·비밀번호를 모두 입력해주세요' });
+      const { title, nickname, content } = req.body ?? {};
+
+      if (!title?.trim() || !nickname?.trim() || !content?.trim())
+        return res.status(400).json({ error: '제목·닉네임·내용을 모두 입력해주세요' });
       if (title.trim().length > MAX_TITLE)
         return res.status(400).json({ error: `제목은 ${MAX_TITLE}자 이하` });
       if (nickname.trim().length > MAX_NICKNAME)
         return res.status(400).json({ error: `닉네임은 ${MAX_NICKNAME}자 이하` });
-      if (password.trim().length < 4)
-        return res.status(400).json({ error: '비밀번호는 4자 이상' });
-
-      const today = new Date().toISOString().split('T')[0];
-      const cr = await db(`/board_posts?ip_hash=eq.${ih}&created_at=gte.${today}T00:00:00Z&select=id`);
-      const todayPosts = await cr.json();
-      if (Array.isArray(todayPosts) && todayPosts.length >= MAX_PER_DAY)
-        return res.status(429).json({ error: `하루 최대 ${MAX_PER_DAY}개까지 작성 가능합니다` });
 
       const ir = await db('/board_posts', {
         method: 'POST',
@@ -191,7 +185,7 @@ export default async function handler(req, res) {
           title:         title.trim().substring(0, MAX_TITLE),
           nickname:      nickname.trim().substring(0, MAX_NICKNAME),
           content:       sanitize(content),
-          password_hash: pwHash(password.trim()),
+          password_hash: '',
           ip_hash:       ih,
         },
       });
@@ -204,18 +198,19 @@ export default async function handler(req, res) {
       return res.status(201).json({ success: true, id: inserted?.[0]?.id });
     }
 
-    // ── PUT ──────────────────────────────────────────────────────────────────
+    // ── PUT (관리자 전용) ────────────────────────────────────────────────────
     if (req.method === 'PUT') {
-      const { title, content, password } = req.body ?? {};
+      const adm = await verifyAdmin(req);
+      if (!adm.ok) return res.status(adm.status).json({ error: adm.error });
+
+      const { title, content } = req.body ?? {};
       const id = toPositiveIntId(req.query.id);
-      if (id === null || !content?.trim() || !password?.trim())
+      if (id === null || !content?.trim())
         return res.status(400).json({ error: '필수 값 누락' });
 
-      const gr = await db(`/board_posts?id=eq.${id}&select=password_hash`);
+      const gr = await db(`/board_posts?id=eq.${id}&select=id`);
       const rows = await gr.json();
       if (!rows?.length) return res.status(404).json({ error: '게시글 없음' });
-      if (rows[0].password_hash !== pwHash(password.trim()))
-        return res.status(403).json({ error: '비밀번호가 틀렸습니다' });
 
       const updateBody = {
         content:    sanitize(content),
@@ -231,18 +226,17 @@ export default async function handler(req, res) {
       return res.json({ success: true });
     }
 
-    // ── DELETE ───────────────────────────────────────────────────────────────
+    // ── DELETE (관리자 전용) ─────────────────────────────────────────────────
     if (req.method === 'DELETE') {
-      const { password } = req.body ?? {};
-      const id = toPositiveIntId(req.query.id);
-      if (id === null || !password?.trim())
-        return res.status(400).json({ error: '필수 값 누락' });
+      const adm = await verifyAdmin(req);
+      if (!adm.ok) return res.status(adm.status).json({ error: adm.error });
 
-      const gr = await db(`/board_posts?id=eq.${id}&select=password_hash`);
+      const id = toPositiveIntId(req.query.id);
+      if (id === null) return res.status(400).json({ error: '필수 값 누락' });
+
+      const gr = await db(`/board_posts?id=eq.${id}&select=id`);
       const rows = await gr.json();
       if (!rows?.length) return res.status(404).json({ error: '게시글 없음' });
-      if (rows[0].password_hash !== pwHash(password.trim()))
-        return res.status(403).json({ error: '비밀번호가 틀렸습니다' });
 
       await db(`/board_posts?id=eq.${id}`, { method: 'DELETE' });
       return res.json({ success: true });

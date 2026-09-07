@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { applyCors } from './_shared.js';
+import { applyCors, verifyAdmin } from './_shared.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
@@ -104,18 +104,17 @@ export default async function handler(req, res) {
       return res.status(201).json({ success: true, id: inserted?.[0]?.id });
     }
 
-    // ── DELETE: 댓글 삭제 ────────────────────────────────────────────────────
+    // ── DELETE: 댓글 삭제 (관리자 전용) ──────────────────────────────────────
     if (req.method === 'DELETE') {
-      const { password } = req.body ?? {};
-      const id = toPositiveIntId(req.query.id);
-      if (id === null || !password?.trim())
-        return res.status(400).json({ error: '필수 값 누락' });
+      const adm = await verifyAdmin(req);
+      if (!adm.ok) return res.status(adm.status).json({ error: adm.error });
 
-      const gr = await db(`/board_comments?id=eq.${id}&select=password_hash`);
+      const id = toPositiveIntId(req.query.id);
+      if (id === null) return res.status(400).json({ error: '필수 값 누락' });
+
+      const gr = await db(`/board_comments?id=eq.${id}&select=id`);
       const rows = await gr.json();
       if (!rows?.length) return res.status(404).json({ error: '댓글 없음' });
-      if (rows[0].password_hash !== pwHash(password.trim()))
-        return res.status(403).json({ error: '비밀번호가 틀렸습니다' });
 
       await db(`/board_comments?id=eq.${id}`, { method: 'DELETE' });
       return res.json({ success: true });

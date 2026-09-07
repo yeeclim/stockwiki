@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'board_detail_page.dart';
 import '../utils/admin.dart';
 
@@ -346,18 +347,15 @@ class _WriteSheet extends StatefulWidget {
 
 class _WriteSheetState extends State<_WriteSheet> {
   final _titleCtrl = TextEditingController();
-  final _nicknameCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
+  final _nicknameCtrl = TextEditingController(text: 'StockWiki');
   final _contentCtrl = TextEditingController();
   bool _submitting = false;
-  bool _pwVisible = false;
   String _error = '';
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _nicknameCtrl.dispose();
-    _passwordCtrl.dispose();
     _contentCtrl.dispose();
     super.dispose();
   }
@@ -370,14 +368,17 @@ class _WriteSheetState extends State<_WriteSheet> {
     });
     try {
       final origin = Uri.base.origin;
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
       final res = await http
           .post(
             Uri.parse('$origin/api/board'),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
             body: json.encode({
               'title': _titleCtrl.text.trim(),
               'nickname': _nicknameCtrl.text.trim(),
-              'password': _passwordCtrl.text.trim(),
               'content': _contentCtrl.text.trim(),
             }),
           )
@@ -453,36 +454,12 @@ class _WriteSheetState extends State<_WriteSheet> {
             decoration: _deco(theme, '제목').copyWith(counterText: ''),
           ),
           const SizedBox(height: 8),
-          // 닉네임 + 비밀번호
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _nicknameCtrl,
-                  maxLength: 30,
-                  style: theme.textTheme.bodyMedium,
-                  decoration: _deco(theme, '닉네임').copyWith(counterText: ''),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _passwordCtrl,
-                  obscureText: !_pwVisible,
-                  style: theme.textTheme.bodyMedium,
-                  decoration: _deco(theme, '비밀번호 (수정·삭제용)').copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _pwVisible ? Icons.visibility_off : Icons.visibility,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      onPressed: () => setState(() => _pwVisible = !_pwVisible),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          // 닉네임
+          TextField(
+            controller: _nicknameCtrl,
+            maxLength: 30,
+            style: theme.textTheme.bodyMedium,
+            decoration: _deco(theme, '닉네임').copyWith(counterText: ''),
           ),
           const SizedBox(height: 8),
           // 내용

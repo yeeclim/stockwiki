@@ -79,6 +79,43 @@ export function validateInt(value, { min = 0, max = 100 } = {}) {
   return n;
 }
 
+// ── 관리자 인증 ────────────────────────────────────────────────────────
+
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+
+/**
+ * `Authorization: Bearer <supabase JWT>` 를 검증하고 관리자 계정인지 확인한다.
+ * Supabase Auth 의 /auth/v1/user 엔드포인트로 토큰 유효성 + 이메일을 확인한다.
+ * @returns {Promise<{ok:true, email:string} | {ok:false, status:number, error:string}>}
+ */
+export async function verifyAdmin(req) {
+  const raw = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
+  if (!token) return { ok: false, status: 401, error: '로그인이 필요합니다' };
+
+  const url = process.env.SUPABASE_URL?.trim();
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '') ||
+    process.env.SUPABASE_ANON_KEY?.trim();
+  if (!url || !key) return { ok: false, status: 500, error: 'DB 미설정' };
+  if (!ADMIN_EMAIL) return { ok: false, status: 500, error: 'ADMIN_EMAIL 미설정' };
+
+  try {
+    const r = await fetch(`${url}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: key },
+    });
+    if (!r.ok) return { ok: false, status: 401, error: '유효하지 않은 인증 정보' };
+    const user = await r.json();
+    const email = (user?.email || '').toLowerCase();
+    if (email !== ADMIN_EMAIL) {
+      return { ok: false, status: 403, error: '관리자 권한이 필요합니다' };
+    }
+    return { ok: true, email };
+  } catch {
+    return { ok: false, status: 502, error: '인증 서버 오류' };
+  }
+}
+
 // ── CORS ──────────────────────────────────────────────────────────────
 
 /**
@@ -93,7 +130,7 @@ export function validateInt(value, { min = 0, max = 100 } = {}) {
 export function applyCors(req, res, { methods = 'GET, OPTIONS', json = true } = {}) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', methods);
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (json) res.setHeader('Content-Type', 'application/json');
   if (req.method === 'OPTIONS') {
     res.status(200).end();

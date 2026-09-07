@@ -4,7 +4,17 @@ import 'dart:ui_web' as ui_web;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/admin.dart';
+
+/// 관리자 API 호출용 인증 헤더 (Supabase JWT).
+Map<String, String> _adminHeaders() {
+  final token = Supabase.instance.client.auth.currentSession?.accessToken;
+  return {
+    'Content-Type': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
+}
 
 class BoardDetailPage extends StatefulWidget {
   final String postId;
@@ -233,7 +243,6 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
         TextEditingController(text: _post!['title'] as String? ?? '');
     final contentCtrl =
         TextEditingController(text: _post!['content'] as String? ?? '');
-    final passwordCtrl = TextEditingController();
     bool submitting = false;
     String error = '';
 
@@ -247,17 +256,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  controller: passwordCtrl,
-                  obscureText: true,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: '비밀번호',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
                   controller: titleCtrl,
+                  autofocus: true,
                   maxLength: 100,
                   decoration: const InputDecoration(
                     labelText: '제목',
@@ -304,10 +304,9 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                             .put(
                               Uri.parse(
                                   '$origin/api/board?id=${widget.postId}'),
-                              headers: {'Content-Type': 'application/json'},
+                              headers: _adminHeaders(),
                               body: json.encode({
                                 'title': titleCtrl.text.trim(),
-                                'password': passwordCtrl.text.trim(),
                                 'content': contentCtrl.text.trim(),
                               }),
                             )
@@ -344,7 +343,6 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
 
   // ── 게시글 삭제 ──────────────────────────────────────────────────────────────
   void _showDeleteDialog(BuildContext context, ThemeData theme) {
-    final passwordCtrl = TextEditingController();
     bool submitting = false;
     String error = '';
 
@@ -357,16 +355,6 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('삭제하면 복구할 수 없습니다.', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordCtrl,
-                obscureText: true,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: '비밀번호 확인',
-                  border: OutlineInputBorder(),
-                ),
-              ),
               if (error.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(error,
@@ -394,9 +382,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                         final origin = Uri.base.origin;
                         final req = http.Request('DELETE',
                             Uri.parse('$origin/api/board?id=${widget.postId}'));
-                        req.headers['Content-Type'] = 'application/json';
-                        req.body =
-                            json.encode({'password': passwordCtrl.text.trim()});
+                        req.headers.addAll(_adminHeaders());
                         final streamed = await req
                             .send()
                             .timeout(const Duration(seconds: 10));
@@ -435,7 +421,6 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
   // ── 댓글 삭제 ────────────────────────────────────────────────────────────────
   void _showCommentDeleteDialog(
       BuildContext context, ThemeData theme, String commentId) {
-    final passwordCtrl = TextEditingController();
     bool submitting = false;
     String error = '';
 
@@ -447,15 +432,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: passwordCtrl,
-                obscureText: true,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: '비밀번호',
-                  border: OutlineInputBorder(),
-                ),
-              ),
+              Text('이 댓글을 삭제할까요?', style: theme.textTheme.bodyMedium),
               if (error.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(error,
@@ -485,9 +462,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                             'DELETE',
                             Uri.parse(
                                 '$origin/api/board_comments?id=$commentId'));
-                        req.headers['Content-Type'] = 'application/json';
-                        req.body =
-                            json.encode({'password': passwordCtrl.text.trim()});
+                        req.headers.addAll(_adminHeaders());
                         final streamed = await req
                             .send()
                             .timeout(const Duration(seconds: 10));
