@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/login_history_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _currentUser;
@@ -11,6 +12,12 @@ class AuthProvider extends ChangeNotifier {
     _authSubscription =
         Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       _currentUser = data.session?.user;
+      // 실제 로그인 이벤트만 이 기기 기록에 남긴다 (세션 복원·토큰 갱신 제외)
+      if (data.event == AuthChangeEvent.signedIn) {
+        final provider =
+            data.session?.user.appMetadata['provider'] as String? ?? 'email';
+        LoginHistoryService.record(provider);
+      }
       notifyListeners();
     });
   }
