@@ -46,4 +46,21 @@ class AuthService {
   static Future<void> signOut() async {
     await _supabase.auth.signOut();
   }
+
+  // ── 회원 탈퇴 ────────────────────────────────────────────────────────────────
+  /// 서버(delete-account 엣지 함수)에서 계정과 연결 데이터를 삭제한 뒤 로그아웃한다.
+  /// bookmarks / trading_configs / screening_candidates 는 auth.users 삭제 시
+  /// ON DELETE CASCADE 로 함께 지워진다.
+  static Future<void> deleteAccount() async {
+    final session = _supabase.auth.currentSession;
+    if (session == null) throw Exception('로그인이 필요합니다.');
+
+    final res = await _supabase.functions.invoke('delete-account');
+    if (res.status >= 400) {
+      final msg = (res.data as Map?)?['error'] ?? '계정 삭제에 실패했습니다.';
+      throw Exception(msg);
+    }
+
+    await _supabase.auth.signOut();
+  }
 }
