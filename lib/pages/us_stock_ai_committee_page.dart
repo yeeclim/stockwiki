@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../models/news.dart';
 import '../services/news_service.dart';
@@ -296,15 +295,15 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
       final question =
           '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n'
-                  '현재 가격: $priceFormat\n'
-                  '$changeInfo\n\n'
-                  '다음 관점에서 종합적으로 분석해주세요:\n'
-                  '1. 재무 건전성 및 수익성\n' +
-              '2. 성장 가능성 및 시장 전망\n' +
-              '3. 기술적 분석 (가격 추세, 거래량 등)\n' +
-              '4. 리스크 요인\n' +
-              '5. 투자 가치 평가\n\n' +
-              '위 분석을 바탕으로 투자 의견을 제시해주세요.';
+          '현재 가격: $priceFormat\n'
+          '$changeInfo\n\n'
+          '다음 관점에서 종합적으로 분석해주세요:\n'
+          '1. 재무 건전성 및 수익성\n'
+          '2. 성장 가능성 및 시장 전망\n'
+          '3. 기술적 분석 (가격 추세, 거래량 등)\n'
+          '4. 리스크 요인\n'
+          '5. 투자 가치 평가\n\n'
+          '위 분석을 바탕으로 투자 의견을 제시해주세요.';
 
       debugPrint('🎯 AI 검증위원회 질문: $question');
       debugPrint(

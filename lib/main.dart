@@ -56,7 +56,7 @@ void main() async {
   // Supabase 초기화
   await Supabase.initialize(
     url: _supabaseUrl,
-    anonKey: _supabaseAnonKey,
+    publishableKey: _supabaseAnonKey,
     debug: true,
     authOptions: FlutterAuthClientOptions(
       pkceAsyncStorage: createPkceStorage(),
@@ -129,7 +129,7 @@ class _StockSearchPageState extends State<StockSearchPage>
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleIncomingLink());
   }
 
-  /// 메일/카카오톡 링크(?stock=005930&name=삼성전자, ?board=<id>) 또는 카카오
+  /// 메일/카카오톡 링크(?stock=005930&name=삼성전자, ?board=`<id>`) 또는 카카오
   /// 로그인 콜백(?code=...&state=...)으로 들어온 경우 각각 처리한다.
   /// 'code'는 OAuth 리다이렉트 표준 파라미터라 종목코드 파라미터명과는
   /// 반드시 분리해야 한다 (겹치면 인가 코드를 종목코드로 오인하는 버그가 생김).
