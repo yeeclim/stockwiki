@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'market_data_card.dart';
-import 'price_cache_mixin.dart';
+import '../services/cache_service.dart';
 import '../utils/number_format_utils.dart';
+import 'market_data_card.dart';
 
 class BtcWidget extends StatefulWidget {
   const BtcWidget({super.key});
@@ -12,7 +12,9 @@ class BtcWidget extends StatefulWidget {
   State<BtcWidget> createState() => _BtcWidgetState();
 }
 
-class _BtcWidgetState extends State<BtcWidget> with PriceCacheMixin {
+class _BtcWidgetState extends State<BtcWidget> {
+  static const _cacheKey = 'btc_price';
+
   double? _btcPrice;
   double? _changePercent;
   bool _isLoading = true;
@@ -26,10 +28,10 @@ class _BtcWidgetState extends State<BtcWidget> with PriceCacheMixin {
   }
 
   Future<void> _loadCachedPrice() async {
-    final cached = await loadCachedPrice('btc', const Duration(minutes: 5));
-    if (cached != null && mounted) {
+    final cached = await CacheService.get(_cacheKey);
+    if (cached is num && mounted) {
       setState(() {
-        _btcPrice = cached;
+        _btcPrice = cached.toDouble();
         _isLoading = false;
       });
     }
@@ -53,7 +55,8 @@ class _BtcWidgetState extends State<BtcWidget> with PriceCacheMixin {
             if (change != null) _changePercent = (change as num).toDouble();
             _isLoading = false;
           });
-          await cachePrice('btc', _btcPrice!);
+          await CacheService.set(_cacheKey, _btcPrice!,
+              expiration: const Duration(minutes: 5));
           return;
         }
       }
@@ -61,7 +64,7 @@ class _BtcWidgetState extends State<BtcWidget> with PriceCacheMixin {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = '데이터 로드 실패';
+        if (_btcPrice == null) _error = '데이터 로드 실패';
         _isLoading = false;
       });
     }

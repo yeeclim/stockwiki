@@ -23,8 +23,9 @@ class CacheService {
     debugPrint('💾 [Cache] 저장: $key (만료: ${expiration.inMinutes}분 후)');
   }
 
-  /// 데이터 캐시 조회
-  static Future<dynamic> get(String key) async {
+  /// 데이터 캐시 조회.
+  /// [allowExpired] 가 true면 만료된 값도 반환한다(네트워크 실패 시 stale 폴백용).
+  static Future<dynamic> get(String key, {bool allowExpired = false}) async {
     if (_prefs == null) await init();
 
     if (!_prefs!.containsKey(key)) {
@@ -39,6 +40,10 @@ class CacheService {
       final expiry = data['expiry'] as int;
 
       if (DateTime.now().millisecondsSinceEpoch > expiry) {
+        if (allowExpired) {
+          debugPrint('⌛ [Cache] 만료(stale 반환): $key');
+          return data['value'];
+        }
         debugPrint('🗑️ [Cache] 만료됨: $key');
         await _prefs!.remove(key);
         return null; // 만료됨
