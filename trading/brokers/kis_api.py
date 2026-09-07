@@ -1,6 +1,10 @@
 """
-한국투자증권 KIS OpenAPI 래퍼
+한국투자증권 KIS OpenAPI 래퍼 (공통 베이스)
 실전투자: https://openapi.koreainvestment.com:9443
+
+main.py(실매매)는 이 베이스를 그대로 사용한다.
+trading/kis_api.py 가 이 클래스를 상속해 세션/재시도·기술적 지표·시간외
+주문구분·투자자동향/선물 등 스크리닝 전용 확장을 덧붙인다.
 """
 import os
 import requests
@@ -19,17 +23,14 @@ class KISApi(BaseBrokerApi):
         self.acnt_code  = acnt_code  or os.environ.get('KIS_ACCOUNT_PROD_CODE', '01')
         self.token      = None
 
-    def auth(self):
-        res = requests.post(
-            f"{BASE_URL}/oauth2/tokenP",
-            headers={"content-type": "application/json"},
-            json={"grant_type": "client_credentials",
-                  "appkey": self.app_key, "appsecret": self.app_secret},
-            timeout=_TIMEOUT,
-        )
-        res.raise_for_status()
-        self.token = res.json()['access_token']
-        print("✅ KIS 토큰 발급 완료")
+    # ── HTTP (서브클래스에서 세션/타임아웃으로 교체 가능) ────────────────────────
+    def _get(self, path, **kw):
+        kw.setdefault('timeout', _TIMEOUT)
+        return requests.get(f"{BASE_URL}{path}", **kw)
+
+    def _post(self, path, **kw):
+        kw.setdefault('timeout', _TIMEOUT)
+        return requests.post(f"{BASE_URL}{path}", **kw)
 
     def _h(self, tr_id):
         return {
@@ -41,31 +42,59 @@ class KISApi(BaseBrokerApi):
             "custtype":      "P",
         }
 
-    def get_price(self, code: str) -> int:
-        r = requests.get(
-            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
+    def auth(self):
+        res = self._post(
+            "/oauth2/tokenP",
+            headers={"content-type": "application/json"},
+            json={"grant_type": "client_credentials",
+                  "appkey": self.app_key, "appsecret": self.app_secret},
+        )
+        res.raise_for_status()
+        self.token = res.json()['access_token']
+        print("✅ KIS 토큰 발급 완료")
+
+    # ── 시세 조회 (raw 헬퍼는 서브클래스와 공유) ────────────────────────────────
+    def _inquire_price_output(self, code: str, err_label: str = '시세 오류') -> dict:
+        """inquire-price(FHKST01010100)의 output 딕셔너리 반환."""
+        r = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-price",
             headers=self._h("FHKST01010100"),
             params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
-            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
         if d['rt_cd'] != '0':
-            raise RuntimeError(f"현재가 오류: {d['msg1']}")
-        return int(d['output']['stck_prpr'])
+            raise RuntimeError(f"{err_label}: {d['msg1']}")
+        return d['output']
+
+    def _inquire_daily_rows(self, code: str, days: int) -> list:
+        """inquire-daily-itemchartprice(FHKST03010100)의 output2 행 리스트(최신→과거)."""
+        end   = datetime.now().strftime('%Y%m%d')
+        start = (datetime.now() - timedelta(days=days)).strftime('%Y%m%d')
+        r = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+            headers=self._h("FHKST03010100"),
+            params={
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_INPUT_ISCD":         code,
+                "FID_INPUT_DATE_1":       start,
+                "FID_INPUT_DATE_2":       end,
+                "FID_PERIOD_DIV_CODE":    "D",
+                "FID_ORG_ADJ_PRC":        "0",
+            },
+        )
+        r.raise_for_status()
+        d = r.json()
+        if d['rt_cd'] != '0':
+            raise RuntimeError(f"차트 오류: {d['msg1']}")
+        return [x for x in d.get('output2', [])
+                if x.get('stck_clpr', '0') not in ('0', '', None)]
+
+    def get_price(self, code: str) -> int:
+        return int(self._inquire_price_output(code, '현재가 오류')['stck_prpr'])
 
     def get_fundamentals(self, code: str) -> dict:
-        r = requests.get(
-            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
-            headers=self._h("FHKST01010100"),
-            params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
-            timeout=_TIMEOUT,
-        )
-        r.raise_for_status()
-        d = r.json()
-        if d['rt_cd'] != '0':
-            raise RuntimeError(f"시세 오류: {d['msg1']}")
-        out = d['output']
+        out = self._inquire_price_output(code)
 
         def _f(v):
             try: return float(v) if v and str(v).strip() not in ('', '-') else 0.0
@@ -85,28 +114,7 @@ class KISApi(BaseBrokerApi):
         }
 
     def get_ma_data(self, code: str) -> dict:
-        end   = datetime.now().strftime('%Y%m%d')
-        start = (datetime.now() - timedelta(days=250)).strftime('%Y%m%d')
-        r = requests.get(
-            f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
-            headers=self._h("FHKST03010100"),
-            params={
-                "FID_COND_MRKT_DIV_CODE": "J",
-                "FID_INPUT_ISCD":         code,
-                "FID_INPUT_DATE_1":       start,
-                "FID_INPUT_DATE_2":       end,
-                "FID_PERIOD_DIV_CODE":    "D",
-                "FID_ORG_ADJ_PRC":        "0",
-            },
-            timeout=_TIMEOUT,
-        )
-        r.raise_for_status()
-        d = r.json()
-        if d['rt_cd'] != '0':
-            raise RuntimeError(f"차트 오류: {d['msg1']}")
-
-        prices = [int(x['stck_clpr']) for x in d.get('output2', [])
-                  if x.get('stck_clpr', '0') not in ('0', '', None)]
+        prices = [int(x['stck_clpr']) for x in self._inquire_daily_rows(code, 250)]
 
         def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
         def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
@@ -120,11 +128,12 @@ class KISApi(BaseBrokerApi):
             'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
         }
 
+    # ── 잔고 조회 ──────────────────────────────────────────────────────────────
     def _fetch_all_holdings(self) -> dict:
         if hasattr(self, '_holdings_cache'):
             return self._holdings_cache
-        r = requests.get(
-            f"{BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance",
+        r = self._get(
+            "/uapi/domestic-stock/v1/trading/inquire-balance",
             headers=self._h("TTTC8434R"),
             params={
                 "CANO":                  self.account_no,
@@ -139,7 +148,6 @@ class KISApi(BaseBrokerApi):
                 "CTX_AREA_FK100":        "",
                 "CTX_AREA_NK100":        "",
             },
-            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -157,8 +165,8 @@ class KISApi(BaseBrokerApi):
         return self._fetch_all_holdings().get(code, {'shares': 0, 'avg_price': 0.0})
 
     def get_cash(self) -> int:
-        r = requests.get(
-            f"{BASE_URL}/uapi/domestic-stock/v1/trading/inquire-psbl-order",
+        r = self._get(
+            "/uapi/domestic-stock/v1/trading/inquire-psbl-order",
             headers=self._h("TTTC8908R"),
             params={
                 "CANO":              self.account_no,
@@ -169,7 +177,6 @@ class KISApi(BaseBrokerApi):
                 "CMA_EVLU_AMT_ICLD_YN": "N",
                 "OVRS_ICLD_YN":      "N",
             },
-            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -177,24 +184,28 @@ class KISApi(BaseBrokerApi):
             raise RuntimeError(f"예수금 오류: {d['msg1']}")
         return int(d['output']['ord_psbl_cash'])
 
+    # ── 주문 ──────────────────────────────────────────────────────────────────
+    def _ord_dvsn(self) -> str:
+        """주문구분. 베이스는 정규장 시장가(01) 고정. 서브클래스가 시간외 대응."""
+        return "01"
+
     def buy(self, code: str, amount: int) -> dict | None:
         price  = self.get_price(code)
         shares = amount // price
         if shares <= 0:
             print(f"⚠️  매수 불가: {amount:,}원 / 현재가 {price:,}원")
             return None
-        r = requests.post(
-            f"{BASE_URL}/uapi/domestic-stock/v1/trading/order-cash",
+        r = self._post(
+            "/uapi/domestic-stock/v1/trading/order-cash",
             headers=self._h("TTTC0802U"),
             json={
                 "CANO":         self.account_no,
                 "ACNT_PRDT_CD": self.acnt_code,
                 "PDNO":         code,
-                "ORD_DVSN":     "01",
+                "ORD_DVSN":     self._ord_dvsn(),
                 "ORD_QTY":      str(shares),
                 "ORD_UNPR":     "0",
             },
-            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()
@@ -207,18 +218,17 @@ class KISApi(BaseBrokerApi):
         if shares <= 0:
             return None
         price = self.get_price(code)
-        r = requests.post(
-            f"{BASE_URL}/uapi/domestic-stock/v1/trading/order-cash",
+        r = self._post(
+            "/uapi/domestic-stock/v1/trading/order-cash",
             headers=self._h("TTTC0801U"),
             json={
                 "CANO":         self.account_no,
                 "ACNT_PRDT_CD": self.acnt_code,
                 "PDNO":         code,
-                "ORD_DVSN":     "01",
+                "ORD_DVSN":     self._ord_dvsn(),
                 "ORD_QTY":      str(shares),
                 "ORD_UNPR":     "0",
             },
-            timeout=_TIMEOUT,
         )
         r.raise_for_status()
         d = r.json()

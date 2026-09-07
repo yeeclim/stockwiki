@@ -1,18 +1,25 @@
 """
-한국투자증권 KIS OpenAPI 래퍼
-실전투자: https://openapi.koreainvestment.com:9443
+한국투자증권 KIS OpenAPI 래퍼 — 스크리닝 전용 확장.
+
+공통 HTTP/인증/주문/잔고 로직은 brokers/kis_api.py 의 베이스에 있고,
+여기서는 스크리닝에만 필요한 것들만 덧붙인다:
+  - requests.Session + 재시도 어댑터 (대량 종목 조회 안정성)
+  - get_fundamentals 에 시가총액(market_cap) 추가
+  - get_ma_data 에 RSI/basing/거래량감소 등 기술적 지표 추가
+  - 투자자매매동향 / 선물 미결제약정 조회
+  - 정규장/NXT 시간외 주문구분 자동 전환
 """
 import os
 import requests
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
 import technical_indicators as ti
+from brokers.kis_api import KISApi as _BaseKISApi, BASE_URL
 
-BASE_URL = "https://openapi.koreainvestment.com:9443"
 
-
-class KISApi:
+class KISApi(_BaseKISApi):
     def __init__(self):
         self.app_key    = os.environ.get('KIS_APP_KEY', '')
         self.app_secret = os.environ.get('KIS_APP_SECRET', '')
@@ -20,7 +27,6 @@ class KISApi:
         self.acnt_code  = os.environ.get('KIS_ACCOUNT_PROD_CODE', '01')
         self.token      = None
 
-        # session with retries
         self._session = requests.Session()
         retries = Retry(total=3, backoff_factor=0.5,
                         status_forcelist=[429, 500, 502, 503, 504],
@@ -29,21 +35,28 @@ class KISApi:
         self._session.mount('https://', adapter)
         self._session.mount('http://', adapter)
 
-        # timeouts: (connect, read)
-        self._timeout = (5, 15)
+        self._timeout = (5, 15)  # (connect, read)
 
-    # ── 인증 ──────────────────────────────────────────────────────────────────
+    # ── HTTP: 세션 + 튜플 타임아웃 사용 ────────────────────────────────────────
+    def _get(self, path, **kw):
+        kw.setdefault('timeout', self._timeout)
+        return self._session.get(f"{BASE_URL}{path}", **kw)
+
+    def _post(self, path, **kw):
+        kw.setdefault('timeout', self._timeout)
+        return self._session.post(f"{BASE_URL}{path}", **kw)
+
+    # ── 인증: 실패 원인을 RuntimeError 로 감싸고 빈 토큰 검증 ───────────────────
     def auth(self):
         try:
-            res = self._session.post(
-                f"{BASE_URL}/oauth2/tokenP",
+            res = self._post(
+                "/oauth2/tokenP",
                 headers={"content-type": "application/json"},
                 json={
                     "grant_type": "client_credentials",
                     "appkey":     self.app_key,
                     "appsecret":  self.app_secret,
                 },
-                timeout=self._timeout,
             )
             res.raise_for_status()
             data = res.json()
@@ -54,219 +67,57 @@ class KISApi:
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"KIS 토큰 발급 실패: {e}") from e
 
-    def _h(self, tr_id):
+    # ── 시세: 시가총액 포함 ───────────────────────────────────────────────────
+    def get_fundamentals(self, code: str) -> dict:
+        out = self._inquire_price_output(code)
+
+        def _f(v):
+            try: return float(v) if v and str(v).strip() not in ('', '-') else 0.0
+            except: return 0.0
+        def _i(v):
+            try: return int(v) if v else 0
+            except: return 0
+
         return {
-            "content-type": "application/json",
-            "authorization": f"Bearer {self.token}",
-            "appkey":   self.app_key,
-            "appsecret": self.app_secret,
-            "tr_id":    tr_id,
-            "custtype": "P",
+            'price':      _i(out.get('stck_prpr')),
+            'per':        _f(out.get('per')),
+            'pbr':        _f(out.get('pbr')),
+            'volume':     _i(out.get('acml_vol')),
+            'prdy_ctrt':  _f(out.get('prdy_ctrt')),
+            'open':       _i(out.get('stck_oprc')),
+            'prdy_clpr':  _i(out.get('stck_prdy_clpr') or 0),
+            'market_cap': _i(out.get('hts_avls')),  # 시가총액 (억원)
         }
 
-    # ── 시세 조회 ──────────────────────────────────────────────────────────────
-    def get_price(self, code) -> int:
-        """현재가"""
-        try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
-                headers=self._h("FHKST01010100"),
-                params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"현재가 오류: {d.get('msg1')}")
-            return int(d['output']['stck_prpr'])
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"현재가 조회 실패: {e}") from e
-
-    def get_ma60(self, code) -> float | None:
-        """60일 이동평균선"""
-        end   = datetime.now().strftime('%Y%m%d')
-        start = (datetime.now() - timedelta(days=120)).strftime('%Y%m%d')
-        try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
-                headers=self._h("FHKST03010100"),
-                params={
-                    "FID_COND_MRKT_DIV_CODE": "J",
-                    "FID_INPUT_ISCD":         code,
-                    "FID_INPUT_DATE_1":       start,
-                    "FID_INPUT_DATE_2":       end,
-                    "FID_PERIOD_DIV_CODE":    "D",
-                    "FID_ORG_ADJ_PRC":        "0",
-                },
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"이평선 오류: {d.get('msg1')}")
-            prices = [int(x['stck_clpr']) for x in d.get('output2', []) if x.get('stck_clpr', '0') != '0']
-            if len(prices) < 60:
-                print(f"⚠️  데이터 부족: {len(prices)}일 (60일 필요)")
-                return None
-            return sum(prices[:60]) / 60
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"이평선 조회 실패: {e}") from e
-
-    # ── 잔고 조회 ──────────────────────────────────────────────────────────────
-    def get_cash(self) -> int:
-        """주문 가능 예수금"""
-        try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/trading/inquire-psbl-order",
-                headers=self._h("TTTC8908R"),
-                params={
-                    "CANO":              self.account_no,
-                    "ACNT_PRDT_CD":      self.acnt_code,
-                    "PDNO":              "005930",
-                    "ORD_UNPR":          "0",
-                    "ORD_DVSN":          "01",
-                    "CMA_EVLU_AMT_ICLD_YN": "N",
-                    "OVRS_ICLD_YN":      "N",
-                },
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"예수금 오류: {d.get('msg1')}")
-            return int(d['output']['ord_psbl_cash'])
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"예수금 조회 실패: {e}") from e
-
-    def _fetch_all_holdings(self) -> dict:
-        """전체 잔고를 한 번 조회하여 {종목코드: {shares, avg_price}} 캐시 반환"""
-        if hasattr(self, '_holdings_cache'):
-            return self._holdings_cache
-        try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance",
-                headers=self._h("TTTC8434R"),
-                params={
-                    "CANO":                  self.account_no,
-                    "ACNT_PRDT_CD":          self.acnt_code,
-                    "AFHR_FLPR_YN":          "N",
-                    "OFL_YN":                "N",
-                    "INQR_DVSN":             "02",
-                    "UNPR_DVSN":             "01",
-                    "FUND_STTL_ICLD_YN":     "N",
-                    "FNCG_AMT_AUTO_RDPT_YN": "N",
-                    "PRCS_DVSN":             "01",
-                    "CTX_AREA_FK100":        "",
-                    "CTX_AREA_NK100":        "",
-                },
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            self._holdings_cache = {
-                item['pdno']: {
-                    'shares':    int(item['hldg_qty']),
-                    'avg_price': float(item['pchs_avg_pric']),
-                }
-                for item in d.get('output1', [])
-                if item.get('pdno')
-            }
-            return self._holdings_cache
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"잔고 조회 실패: {e}") from e
-
-    def get_holdings(self, code) -> dict:
-        """보유 수량 + 평단가 (세션당 1회 조회 후 캐시 사용)"""
-        return self._fetch_all_holdings().get(code, {'shares': 0, 'avg_price': 0.0})
-
-    def get_fundamentals(self, code: str) -> dict:
-        """현재가 + PER + PBR + 거래량 (FHKST01010100 재활용)"""
-        try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price",
-                headers=self._h("FHKST01010100"),
-                params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"시세 오류: {d.get('msg1')}")
-            out = d['output']
-
-            def _f(v):
-                try: return float(v) if v and str(v).strip() not in ('', '-') else 0.0
-                except: return 0.0
-            def _i(v):
-                try: return int(v) if v else 0
-                except: return 0
-
-            return {
-                'price':      _i(out.get('stck_prpr')),
-                'per':        _f(out.get('per')),
-                'pbr':        _f(out.get('pbr')),
-                'volume':     _i(out.get('acml_vol')),
-                'prdy_ctrt':  _f(out.get('prdy_ctrt')),
-                'open':       _i(out.get('stck_oprc')),
-                'prdy_clpr':  _i(out.get('stck_prdy_clpr') or 0),
-                'market_cap': _i(out.get('hts_avls')),  # 시가총액 (억원)
-            }
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"시세 조회 실패: {e}") from e
-
+    # ── MA + 기술적 지표 ─────────────────────────────────────────────────────
     def get_ma_data(self, code: str) -> dict:
-        """MA5 / MA20 / MA60 / MA120 + 골든크로스 여부"""
-        end   = datetime.now().strftime('%Y%m%d')
-        start = (datetime.now() - timedelta(days=250)).strftime('%Y%m%d')
-        try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
-                headers=self._h("FHKST03010100"),
-                params={
-                    "FID_COND_MRKT_DIV_CODE": "J",
-                    "FID_INPUT_ISCD":         code,
-                    "FID_INPUT_DATE_1":       start,
-                    "FID_INPUT_DATE_2":       end,
-                    "FID_PERIOD_DIV_CODE":    "D",
-                    "FID_ORG_ADJ_PRC":        "0",
-                },
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"차트 오류: {d.get('msg1')}")
+        rows = self._inquire_daily_rows(code, 250)
+        prices = [int(x['stck_clpr']) for x in rows]
 
-            rows = [x for x in d.get('output2', [])
-                    if x.get('stck_clpr', '0') not in ('0', '', None)]
-            prices = [int(x['stck_clpr']) for x in rows]
+        def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
+        def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
 
-            def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
-            def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
+        ma5, ma20, ma60, ma120 = ma(5), ma(20), ma(60), ma(120)
+        p5, p20 = ma_prev(5), ma_prev(20)
 
-            ma5, ma20, ma60, ma120 = ma(5), ma(20), ma(60), ma(120)
-            p5, p20 = ma_prev(5), ma_prev(20)
+        # rows/prices는 최신→과거 순서 — 지표 함수는 과거→최신(오름차순)을 기대하므로 뒤집는다
+        closes_asc = list(reversed(prices))
+        volumes_asc = [int(x.get('acml_vol', 0) or 0) for x in reversed(rows)]
 
-            # rows/prices는 최신→과거 순서 — 지표 함수는 과거→최신(오름차순)을 기대하므로 뒤집는다
-            closes_asc = list(reversed(prices))
-            volumes_asc = [int(x.get('acml_vol', 0) or 0) for x in reversed(rows)]
+        rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes_asc)
+        basing = ti.basing_near_low(closes_asc)
+        vol_declining = ti.volume_declining(volumes_asc)
 
-            rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes_asc)
-            basing = ti.basing_near_low(closes_asc)
-            vol_declining = ti.volume_declining(volumes_asc)
-
-            return {
-                'ma5':   ma5,  'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
-                'golden_cross': bool(ma5 and ma20 and p5 and p20
-                                     and ma5 > ma20 and p5 <= p20),
-                'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
-                'rsi':               rsi_now,
-                'rsi_rebound':       rsi_rebound,
-                'basing':            basing,
-                'volume_declining':  vol_declining,
-            }
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"MA 데이터 조회 실패: {e}") from e
+        return {
+            'ma5':   ma5,  'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
+            'golden_cross': bool(ma5 and ma20 and p5 and p20
+                                 and ma5 > ma20 and p5 <= p20),
+            'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
+            'rsi':               rsi_now,
+            'rsi_rebound':       rsi_rebound,
+            'basing':            basing,
+            'volume_declining':  vol_declining,
+        }
 
     def get_financial_ratios(self, code: str) -> dict | None:
         """재무비율 4종 — DART API 우선, 실패 시 FnGuide 스크래핑 fallback"""
@@ -309,6 +160,17 @@ class KISApi:
             print(f"⚠️  재무비율 조회 실패 ({code}): {e}")
             return None
 
+    # ── 정규장/NXT 시간외 주문구분 ───────────────────────────────────────────
+    def _ord_dvsn(self) -> str:
+        """정규장 시장가(01) / NXT 시간외 최유리지정가(03)"""
+        from datetime import time as _time
+        import pytz
+        kst = pytz.timezone('Asia/Seoul')
+        t = datetime.now(kst).time()
+        if _time(8, 0) <= t < _time(9, 0) or _time(15, 40) <= t < _time(20, 0):
+            return "03"  # NXT 프리/포스트마켓 — 최유리지정가
+        return "01"  # 정규장 — 시장가
+
     # ── 투자자매매동향 ────────────────────────────────────────────────────────
     def get_investor_trend(self, index_code: str, market_code: str) -> dict | None:
         """시장별 투자자매매동향(일별) — 외국인/기관/개인 순매수 수량(최신 영업일).
@@ -320,8 +182,8 @@ class KISApi:
         from datetime import datetime as _dt
         today = _dt.now().strftime('%Y%m%d')
         try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-investor-daily-by-market",
+            r = self._get(
+                "/uapi/domestic-stock/v1/quotations/inquire-investor-daily-by-market",
                 headers=self._h("FHPTJ04040000"),
                 params={
                     "FID_COND_MRKT_DIV_CODE": "U",
@@ -331,7 +193,6 @@ class KISApi:
                     "FID_INPUT_DATE_2":       today,
                     "FID_INPUT_ISCD_2":       index_code,
                 },
-                timeout=self._timeout,
             )
             r.raise_for_status()
             d = r.json()
@@ -360,11 +221,10 @@ class KISApi:
         생성. 실패 시 예외를 전파하지 않고 None을 반환한다(메일 발송은 계속됨).
         """
         try:
-            r = self._session.get(
-                f"{BASE_URL}/uapi/domestic-futureoption/v1/quotations/inquire-price",
+            r = self._get(
+                "/uapi/domestic-futureoption/v1/quotations/inquire-price",
                 headers=self._h("FHMIF10000000"),
                 params={"FID_COND_MRKT_DIV_CODE": "F", "FID_INPUT_ISCD": code},
-                timeout=self._timeout,
             )
             r.raise_for_status()
             d = r.json()
@@ -399,72 +259,3 @@ class KISApi:
         except Exception as e:
             print(f"⚠️  선물 미결제약정 조회 실패 (code={code}): {e}")
             return None
-
-    # ── 주문 ──────────────────────────────────────────────────────────────────
-    def _ord_dvsn(self) -> str:
-        """시간대에 따른 주문구분: 정규장 시장가(01) / NXT 시간외 최유리지정가(03)"""
-        from datetime import time as _time
-        import pytz
-        kst = pytz.timezone('Asia/Seoul')
-        t = datetime.now(kst).time()
-        if _time(8, 0) <= t < _time(9, 0) or _time(15, 40) <= t < _time(20, 0):
-            return "03"  # NXT 프리/포스트마켓 — 최유리지정가
-        return "01"  # 정규장 — 시장가
-
-    def buy(self, code, amount: int) -> dict | None:
-        """시장가 매수 (금액 → 수량 계산)"""
-        price  = self.get_price(code)
-        shares = amount // price
-        if shares <= 0:
-            print(f"⚠️  매수 불가 (금액 부족): {amount:,}원 / 현재가 {price:,}원")
-            return None
-        try:
-            r = self._session.post(
-                f"{BASE_URL}/uapi/domestic-stock/v1/trading/order-cash",
-                headers=self._h("TTTC0802U"),
-                json={
-                    "CANO":         self.account_no,
-                    "ACNT_PRDT_CD": self.acnt_code,
-                    "PDNO":         code,
-                    "ORD_DVSN":     self._ord_dvsn(),
-                    "ORD_QTY":      str(shares),
-                    "ORD_UNPR":     "0",
-                },
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"매수 오류: {d.get('msg1')}")
-            print(f"📈 매수: {shares}주 × {price:,}원 = {shares*price:,}원")
-            return {'shares': shares, 'price': price, 'amount': shares * price}
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"매수 요청 실패: {e}") from e
-
-    def sell(self, code, shares: int) -> dict | None:
-        """시장가 매도"""
-        if shares <= 0:
-            return None
-        price = self.get_price(code)
-        try:
-            r = self._session.post(
-                f"{BASE_URL}/uapi/domestic-stock/v1/trading/order-cash",
-                headers=self._h("TTTC0801U"),
-                json={
-                    "CANO":         self.account_no,
-                    "ACNT_PRDT_CD": self.acnt_code,
-                    "PDNO":         code,
-                    "ORD_DVSN":     self._ord_dvsn(),
-                    "ORD_QTY":      str(shares),
-                    "ORD_UNPR":     "0",
-                },
-                timeout=self._timeout,
-            )
-            r.raise_for_status()
-            d = r.json()
-            if d.get('rt_cd') != '0':
-                raise RuntimeError(f"매도 오류: {d.get('msg1')}")
-            print(f"📉 매도: {shares}주 × {price:,}원 = {shares*price:,}원")
-            return {'shares': shares, 'price': price, 'amount': shares * price}
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"매도 요청 실패: {e}") from e
