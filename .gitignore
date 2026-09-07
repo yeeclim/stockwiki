@@ -7,9 +7,24 @@
 .atom/
 .buildlog/
 .history
-.svn/\bermonts-projects\stockwiki\settings
 .swiftpm/
 migrate_working_dir/
+__pycache__/
+
+# Node
+node_modules/
+
+# Tooling output (generated, do not commit)
+npm-audit.json
+npm-outdated.json
+**/pip-outdated.json
+**/npm-outdated.json
+
+# Flutter build artifacts leaking into source tree
+.last_build_id
+/assets/AssetManifest*
+/assets/FontManifest.json
+/assets/NOTICES
 
 # IntelliJ related
 *.iml
