@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-const _adminEmail = String.fromEnvironment('ADMIN_EMAIL');
+import '../utils/admin.dart';
 
 class AdminScreeningPage extends StatefulWidget {
   const AdminScreeningPage({super.key});
@@ -202,10 +201,9 @@ class _AdminScreeningPageState extends State<AdminScreeningPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user = _sb.auth.currentUser;
 
     // 관리자 이메일 체크
-    if (user?.email != _adminEmail) {
+    if (!isAdminUser) {
       return Scaffold(
         appBar: AppBar(title: const Text('관리자 전용')),
         body: const Center(child: Text('접근 권한이 없습니다.')),

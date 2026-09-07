@@ -4,6 +4,7 @@ import 'dart:ui_web' as ui_web;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../utils/admin.dart';
 
 class BoardDetailPage extends StatefulWidget {
   final String postId;
@@ -129,7 +130,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.onSurface)),
         actions: [
-          if (_post != null) ...[
+          // AI 매매일지는 봇/관리자 전용 게시판 — 수정·삭제는 관리자만
+          if (_post != null && isAdminUser) ...[
             IconButton(
               icon:
                   Icon(Icons.edit_outlined, color: theme.colorScheme.onSurface),
@@ -678,14 +680,15 @@ class _CommentSectionState extends State<_CommentSection> {
                                                 color: theme.colorScheme
                                                     .onSurfaceVariant)),
                                     const Spacer(),
-                                    GestureDetector(
-                                      onTap: () => widget
-                                          .showDeleteDialog(c['id'].toString()),
-                                      child: Icon(Icons.close,
-                                          size: 16,
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant),
-                                    ),
+                                    if (isAdminUser)
+                                      GestureDetector(
+                                        onTap: () => widget.showDeleteDialog(
+                                            c['id'].toString()),
+                                        child: Icon(Icons.close,
+                                            size: 16,
+                                            color: theme
+                                                .colorScheme.onSurfaceVariant),
+                                      ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),

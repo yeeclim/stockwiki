@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/screening_service.dart';
+import '../utils/admin.dart';
 
 class ScreeningManagePage extends StatefulWidget {
   const ScreeningManagePage({super.key});
@@ -92,9 +92,7 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final userEmail = Supabase.instance.client.auth.currentUser?.email;
-    const adminEmail = String.fromEnvironment('ADMIN_EMAIL');
-    final isAdmin = adminEmail.isNotEmpty && userEmail == adminEmail;
+    final isAdmin = isAdminUser;
 
     return Scaffold(
       appBar: AppBar(

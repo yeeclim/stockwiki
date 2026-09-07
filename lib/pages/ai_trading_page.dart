@@ -7,6 +7,7 @@ import 'trading_setup_page.dart';
 import 'kis_guide_page.dart';
 import 'screening_manage_page.dart';
 import 'admin_screening_page.dart';
+import '../utils/admin.dart';
 
 class AiTradingPage extends StatelessWidget {
   const AiTradingPage({super.key});
@@ -144,9 +145,7 @@ class AiTradingPage extends StatelessWidget {
                 ),
               ),
             ),
-            if (const String.fromEnvironment('ADMIN_EMAIL').isNotEmpty &&
-                authProvider.currentUser?.email ==
-                    const String.fromEnvironment('ADMIN_EMAIL')) ...[
+            if (isAdminEmail(authProvider.currentUser?.email)) ...[
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,

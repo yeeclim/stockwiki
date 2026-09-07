@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'board_detail_page.dart';
+import '../utils/admin.dart';
 
 class BoardPage extends StatefulWidget {
   const BoardPage({super.key});
@@ -165,13 +166,16 @@ class _BoardPageState extends State<BoardPage> {
                           },
                         ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showWriteSheet(context, theme),
-        icon: const Icon(Icons.edit_outlined),
-        label: const Text('글쓰기'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-      ),
+      // AI 매매일지는 봇·관리자 전용 게시판 — 글쓰기도 관리자만
+      floatingActionButton: isAdminUser
+          ? FloatingActionButton.extended(
+              onPressed: () => _showWriteSheet(context, theme),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('글쓰기'),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+            )
+          : null,
     );
   }
 
