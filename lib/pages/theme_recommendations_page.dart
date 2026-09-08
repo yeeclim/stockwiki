@@ -39,19 +39,22 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
       final screeningCandidates = results[0] as List<ScreeningCandidate>;
       final krxThemes = results[1] as List<String>;
 
-      // 스크리닝 후보를 섹터별로 _themeStocks에 주입
+      // 스크리닝 후보를 섹터별로 _themeStocks에 주입 (사유는 분석 후 채움)
       final sectorMap = <String, List<Map<String, dynamic>>>{};
       for (final c in screeningCandidates) {
         sectorMap.putIfAbsent(c.sector, () => []).add({
           'symbol': c.stockCode,
           'name': c.stockName,
           'sector': c.sector,
-          'reason': '스크리닝 관리 종목',
+          'reason': '투자 포인트 분석 중…',
         });
       }
       for (final entry in sectorMap.entries) {
         _themeStocks[entry.key] = entry.value;
       }
+
+      // 관리 종목별 투자 포인트 분석 (백그라운드 — 탭은 먼저 노출)
+      _analyzeScreeningCandidates(screeningCandidates);
 
       // 스크리닝 섹터는 이미 종목이 확정돼 있으므로 바로 탭으로 노출
       final screeningSectors = sectorMap.keys.toList();
@@ -80,6 +83,32 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _analyzeScreeningCandidates(
+      List<ScreeningCandidate> candidates) async {
+    final codes = candidates.map((c) => c.stockCode).toSet().toList();
+    final analysis = await KrxLoader.analyzeSymbols(codes);
+    if (analysis.isEmpty || !mounted) return;
+
+    for (final list in _themeStocks.values) {
+      for (final stock in list) {
+        final a = analysis[stock['symbol']];
+        if (a == null) continue;
+        final points = (a['points'] as List<dynamic>? ?? []).cast<String>();
+        stock['reason'] = points.isNotEmpty
+            ? points.join('\n')
+            : (a['recommendation']?.toString() ?? '관망');
+        stock['points'] = points;
+        stock['recommendation'] = a['recommendation'];
+        stock['price'] = a['price'];
+        stock['changePercent'] = a['changePercent'];
+        stock['ma20'] = a['ma20'];
+        stock['ma60'] = a['ma60'];
+        stock['high52w'] = a['high52w'];
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadExtraThemes(List<String> themes) async {
@@ -337,6 +366,9 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     final name = stock['name'] as String;
     final sector = stock['sector'] as String;
     final reason = stock['reason'] as String? ?? '관련 테마의 대표적인 수혜주로 분석됨';
+    final points = (stock['points'] as List<dynamic>? ?? []).cast<String>();
+    final recommendation = stock['recommendation'] as String?;
+    final changePercent = (stock['changePercent'] as num?)?.toDouble();
     final ma20 = stock['ma20'] as num?;
     final ma60 = stock['ma60'] as num?;
     final high52w = stock['high52w'] as num?;
@@ -392,14 +424,23 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               ),
               const SizedBox(height: 12),
 
-              // MA / 52주 고가 뱃지
-              if (ma20 != null || high52w != null)
+              // 현재가 / 등락률 / MA / 52주 고가 뱃지
+              if (ma20 != null || high52w != null || changePercent != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 4,
                     children: [
+                      if (price != null)
+                        _techBadge(
+                            themeData, _fmtPrice(price), Colors.blueGrey),
+                      if (changePercent != null)
+                        _techBadge(
+                          themeData,
+                          '${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+                          changePercent >= 0 ? Colors.red : Colors.blue,
+                        ),
                       if (ma20 != null)
                         _techBadge(
                           themeData,
@@ -449,16 +490,52 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
                             color: themeData.colorScheme.primary,
                           ),
                         ),
+                        if (recommendation != null) ...[
+                          const Spacer(),
+                          Text(
+                            recommendation,
+                            style: themeData.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: themeData.colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      reason,
-                      style: themeData.textTheme.bodySmall?.copyWith(
-                        color: themeData.colorScheme.onSurfaceVariant,
-                        height: 1.4,
+                    const SizedBox(height: 6),
+                    if (points.isNotEmpty)
+                      ...points.map((p) => Padding(
+                            padding: const EdgeInsets.only(bottom: 3),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('· ',
+                                    style: themeData.textTheme.bodySmall
+                                        ?.copyWith(
+                                            color: themeData
+                                                .colorScheme.onSurfaceVariant)),
+                                Expanded(
+                                  child: Text(
+                                    p,
+                                    style:
+                                        themeData.textTheme.bodySmall?.copyWith(
+                                      color: themeData
+                                          .colorScheme.onSurfaceVariant,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ))
+                    else
+                      Text(
+                        reason,
+                        style: themeData.textTheme.bodySmall?.copyWith(
+                          color: themeData.colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

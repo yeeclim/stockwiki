@@ -56,6 +56,33 @@ class KrxLoader {
     }
   }
 
+  // 관리 종목(스크리닝 후보)들의 개별 투자 포인트 조회.
+  // 반환: { 종목코드: { points: [...], recommendation, price, changePercent, ma20, ma60, high52w } }
+  static Future<Map<String, Map<String, dynamic>>> analyzeSymbols(
+      List<String> codes) async {
+    final valid = codes.where((c) => RegExp(r'^\d{6}$').hasMatch(c)).toList();
+    if (valid.isEmpty) return {};
+    try {
+      final response = await http
+          .get(Uri.parse(
+              '$_baseUrl/api/theme-recommendations?action=analyze&symbols=${valid.join(',')}'))
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final list = (data['data'] as List<dynamic>? ?? []);
+          return {
+            for (final e in list.cast<Map<String, dynamic>>())
+              e['symbol'] as String: e,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('관리 종목 분석 실패: $e');
+    }
+    return {};
+  }
+
   // 특정 테마의 추천 종목 가져오기 (비동기)
   static Future<List<Map<String, dynamic>>> getThemeStocks(String theme) async {
     // 5분 캐시 적용 (종목 데이터는 더 자주 갱신)

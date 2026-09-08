@@ -162,6 +162,26 @@ export default async function handler(req, res) {
       });
     }
 
+    if (action === 'analyze') {
+      // 관리 종목(스크리닝 후보) 개별 투자 포인트 — symbols=005930,000660,...
+      const symbols = String(req.query.symbols || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (symbols.length === 0) {
+        return res.status(400).json({ success: false, error: 'symbols 파라미터가 필요합니다' });
+      }
+      const data = await analyzeSymbols(symbols);
+      res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1800');
+      return res.status(200).json({
+        success: true,
+        data,
+        count: data.length,
+        timestamp: new Date().toISOString(),
+        source: 'theme-recommendations',
+      });
+    }
+
     if (action === 'recommendations') {
       // 추천 종목 랭킹 반환
       const { limit = 10, sortBy = 'totalScore' } = req.query;
@@ -415,14 +435,19 @@ async function fetchTechnicalData(symbol) {
     if (!res.ok) return null;
 
     const xml = await res.text();
+    // item data="YYYYMMDD|open|high|low|close|volume"
     const closes = [];
+    const volumes = [];
     const re = /<item data="([^"]+)"/g;
     let m;
     while ((m = re.exec(xml)) !== null) {
       const parts = m[1].split('|');
       if (parts.length >= 5) {
         const c = parseInt(parts[4]);
-        if (c > 0) closes.push(c);
+        if (c > 0) {
+          closes.push(c);
+          volumes.push(parts.length >= 6 ? (parseInt(parts[5]) || 0) : 0);
+        }
       }
     }
 
@@ -434,10 +459,25 @@ async function fetchTechnicalData(symbol) {
       return slice.reduce((a, b) => a + b, 0) / n;
     };
 
+    const lastClose = closes[closes.length - 1];
+    const prevClose = closes[closes.length - 2] ?? lastClose;
+    const lastVolume = volumes[volumes.length - 1] ?? 0;
+    const priorVols = volumes.slice(-21, -1).filter((v) => v > 0);
+    const avgVolume20 =
+      priorVols.length > 0
+        ? priorVols.reduce((a, b) => a + b, 0) / priorVols.length
+        : 0;
+
     const data = {
       ma20: calcMA(20),
       ma60: calcMA(60),
       high52w: Math.max(...closes.slice(-252)),
+      low52w: Math.min(...closes.slice(-252)),
+      lastClose,
+      prevClose,
+      changePercent: prevClose ? ((lastClose - prevClose) / prevClose) * 100 : 0,
+      lastVolume,
+      avgVolume20,
     };
 
     technicalCache[symbol] = { data, lastUpdate: now };
@@ -558,6 +598,117 @@ function buildThemeReasons(stock, score) {
 
   reasons.push(`${stock.sector} 테마 — 저평가 스크리닝 점수 ${score}점 / 100점`);
   return reasons;
+}
+
+// ── 관리 종목(스크리닝 후보) 개별 투자 포인트 ────────────────────────────
+// fchart 일봉만으로 계산 (fetchTechnicalData 캐시 재활용, 종목당 요청 1회)
+// 반환 points 는 증권사 코멘트 톤의 한 줄 사유 배열
+function buildInvestmentPoints(tech) {
+  if (!tech) return { points: ['시세 데이터 수집 대기 중'], recommendation: '분석 대기' };
+
+  const { ma20, ma60, high52w, low52w, lastClose: price, changePercent: cp,
+          lastVolume: vol, avgVolume20 } = tech;
+  const points = [];
+  let score = 0;
+
+  // ① 52주 고점 대비 낙폭 (낙폭과대)
+  if (high52w && price) {
+    const dropFromHigh = (1 - price / high52w) * 100;
+    if (dropFromHigh >= 40) {
+      points.push(`52주 고점 대비 -${dropFromHigh.toFixed(0)}% — 낙폭과대 구간`);
+      score += 26;
+    } else if (dropFromHigh >= 25) {
+      points.push(`52주 고점 대비 -${dropFromHigh.toFixed(0)}% 조정 — 가격 부담 완화`);
+      score += 18;
+    } else if (dropFromHigh <= 8) {
+      points.push(`52주 신고가 부근 (고점 대비 -${dropFromHigh.toFixed(0)}%) — 강세 지속`);
+      score += 14;
+    }
+  }
+
+  // ② 52주 저점 대비 위치 (바닥 확인)
+  if (low52w && price && low52w > 0) {
+    const upFromLow = (price / low52w - 1) * 100;
+    if (upFromLow <= 8) points.push(`52주 저점 부근 — 지지선 테스트 구간`);
+  }
+
+  // ③ 이동평균선 대비 위치
+  if (ma60 && price) {
+    const disc = ((ma60 - price) / ma60) * 100;
+    if (disc >= 8) {
+      points.push(`60일선(${Math.round(ma60).toLocaleString()}원) 대비 ${disc.toFixed(1)}% 아래 — 저평가 매력`);
+      score += 20;
+    } else if (disc <= -8) {
+      points.push(`60일선을 ${Math.abs(disc).toFixed(1)}% 상회 — 중기 상승 추세`);
+      score += 12;
+    } else {
+      points.push(`60일선 부근 등락 — 방향 탐색 구간`);
+    }
+  }
+  if (ma20 && price) {
+    if (price > ma20 * 1.01) { points.push('20일선 회복 — 단기 반등 시도'); score += 8; }
+    else if (price < ma20 * 0.97) points.push('20일선 하회 — 단기 조정 진행');
+  }
+  if (ma20 && ma60) {
+    if (ma20 > ma60) { points.push('MA20 > MA60 정배열 — 추세 우호적'); score += 10; }
+    else             { points.push('MA20 < MA60 역배열 — 추세 전환 확인 필요'); }
+  }
+
+  // ④ 당일 등락 (낙폭과대 / 반등)
+  if (typeof cp === 'number') {
+    if (cp <= -4)      { points.push(`당일 ${cp.toFixed(1)}% 급락 — 단기 낙폭과대`); score += 14; }
+    else if (cp <= -1.5) points.push(`당일 ${cp.toFixed(1)}% 조정`);
+    else if (cp >= 4)  { points.push(`당일 +${cp.toFixed(1)}% 급등 — 매수세 유입`); score += 16; }
+    else if (cp >= 1.5){ points.push(`당일 +${cp.toFixed(1)}% 반등 — 저점 매수세`); score += 10; }
+  }
+
+  // ⑤ 거래량 급증 (관심 집중)
+  if (vol && avgVolume20 > 0) {
+    const ratio = vol / avgVolume20;
+    if (ratio >= 2)      { points.push(`거래량 20일 평균의 ${ratio.toFixed(1)}배 급증 — 수급 집중`); score += 14; }
+    else if (ratio >= 1.4) points.push(`거래량 평소 대비 ${ratio.toFixed(1)}배 증가`);
+  } else if (vol >= 1_000_000) {
+    points.push(`거래량 ${(vol / 10000).toFixed(0)}만주 — 유동성 풍부`);
+  }
+
+  if (points.length === 0) {
+    points.push('뚜렷한 기술적 신호 없음 — 관망 구간');
+  }
+
+  const recommendation =
+    score >= 45 ? '적극 검토'
+    : score >= 28 ? '분할 매수 검토'
+    : score >= 14 ? '관심 관찰'
+    : '관망';
+
+  return { points, recommendation, pointScore: score };
+}
+
+async function analyzeSymbol(symbol) {
+  const tech = await fetchTechnicalData(symbol).catch(() => null);
+  const { points, recommendation } = buildInvestmentPoints(tech);
+  return {
+    symbol,
+    price: tech?.lastClose ?? null,
+    changePercent: tech?.changePercent ?? null,
+    volume: tech?.lastVolume ?? null,
+    ma20: tech?.ma20 ?? null,
+    ma60: tech?.ma60 ?? null,
+    high52w: tech?.high52w ?? null,
+    points,
+    recommendation,
+  };
+}
+
+async function analyzeSymbols(symbols) {
+  const uniq = [...new Set(symbols.filter((s) => /^\d{6}$/.test(s)))].slice(0, 40);
+  // 동시 요청 8개로 제한
+  const out = [];
+  for (let i = 0; i < uniq.length; i += 8) {
+    const batch = uniq.slice(i, i + 8);
+    out.push(...(await Promise.all(batch.map(analyzeSymbol))));
+  }
+  return out;
 }
 
 function getComprehensiveAnalysis(stockData) {
