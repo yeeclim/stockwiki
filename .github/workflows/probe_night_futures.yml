@@ -1,0 +1,37 @@
+name: KIS 야간선물 탐색
+
+# 수동 전용 — 스케줄 없음.
+# 조회만 하는 격리 워크플로우다. 메일 발송·DB 쓰기·주문이 전부 없어서
+# 실계좌 자격증명으로 반복 실행해도 바깥으로 나가는 게 없다.
+#
+# 야간시장은 18:00~05:00 KST 에 열린다. 그 시간대(UTC 09:00~20:00)에 돌려야
+# 살아있는 값이 나오고, 낮에 돌리면 "되는 조합 없음"만 확인된다.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: trading/requirements.txt
+
+      - name: 패키지 설치
+        run: pip install -r trading/requirements.txt
+
+      - name: 야간선물 조회 경로 탐색
+        env:
+          KIS_APP_KEY:           ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET:        ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO:        ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_ACCOUNT_PROD_CODE: ${{ secrets.KIS_ACCOUNT_PROD_CODE }}
+        run: |
+          cd trading
+          python probe_night_futures.py

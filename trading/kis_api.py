@@ -214,6 +214,50 @@ class KISApi(_BaseKISApi):
             return None
 
     # ── 선물 시세 ──────────────────────────────────────────────────────────────
+    # ── 코스피200 야간선물 ────────────────────────────────────────────────────
+    # KRX 야간선물은 18:00~05:00 KST 에 열린다. 아침 06:30 스크리닝 시점엔 방금
+    # 끝난 야간장의 종가라, 정규장 선물(전일 15:45 종가)과 달리 오버나이트 정보를
+    # 담고 있다. 갭 예측에 쓸 수 있는 유일한 국내 지표다.
+    #
+    # 다만 KIS 공식 문서에 야간 시세용 FID_COND_MRKT_DIV_CODE 가 공개돼 있지 않다.
+    # (ngt 계열 엔드포인트는 전부 /trading/ — 주문·잔고·증거금용이다.)
+    # 그래서 후보 코드를 순서대로 시도하고, 처음 응답하는 조합을 쓴다.
+    # 되는 조합은 probe_night_futures.py 로 확인할 수 있다.
+    NIGHT_MARKET_CODES = ('CM', 'CF', 'NF')
+
+    def get_night_futures_quote(self, code: str) -> dict | None:
+        """{'price', 'pct'} 또는 None. 야간장이 닫혀 있으면 대개 None 이다."""
+        for mrkt in self.NIGHT_MARKET_CODES:
+            try:
+                r = self._get(
+                    "/uapi/domestic-futureoption/v1/quotations/inquire-price",
+                    headers=self._h("FHMIF10000000"),
+                    params={"FID_COND_MRKT_DIV_CODE": mrkt, "FID_INPUT_ISCD": code},
+                )
+                r.raise_for_status()
+                d = r.json()
+                if d.get('rt_cd') != '0':
+                    continue
+
+                merged: dict = {}
+                for key in ('output', 'output1', 'output2', 'output3'):
+                    section = d.get(key)
+                    if isinstance(section, dict):
+                        merged.update(section)
+                    elif isinstance(section, list) and section and isinstance(section[0], dict):
+                        merged.update(section[0])
+
+                price = next((merged[k] for k in ('futs_prpr', 'prpr', 'stck_prpr')
+                              if merged.get(k)), None)
+                pct = next((merged[k] for k in ('prdy_ctrt', 'futs_prdy_ctrt')
+                            if merged.get(k) is not None), None)
+                if price is None or pct is None:
+                    continue
+                return {'price': float(price), 'pct': float(pct), 'market_code': mrkt}
+            except Exception as e:
+                print(f"⚠️  야간선물 조회 실패 (code={code}, mrkt={mrkt}): {e}")
+        return None
+
     def get_futures_open_interest(self, code: str) -> dict | None:
         """국내선물옵션 시세 조회 — 미결제약정수량(hts_otst_stpl_qty) 및
         전일대비 증감(otst_stpl_qty_icdc)을 output1에서 읽는다. 실계좌로 검증됨

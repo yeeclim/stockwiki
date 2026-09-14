@@ -24,7 +24,7 @@ _EXCLUDE_NAME_PATTERNS = (
 )
 
 _QUOTE_FIELDS = ('shortName,regularMarketPrice,regularMarketChange,'
-                  'regularMarketChangePercent,'
+                  'regularMarketChangePercent,regularMarketTime,'
                   'regularMarketVolume,marketCap,trailingPE,priceToBook')
 _BATCH_SIZE = 100
 

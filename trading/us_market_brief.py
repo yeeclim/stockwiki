@@ -5,6 +5,7 @@ news_sentiment.py 와 동일한 패턴(Google News RSS + Claude Haiku)을 재사
 """
 import os
 import re
+import time
 import html as html_lib
 from datetime import datetime
 from urllib.parse import quote
@@ -25,11 +26,23 @@ _INDICES = [
     ('^VIX',  'VIX'),
 ]
 
-# 유가·금리는 지수와 단위가 달라(달러/배럴, %) 따로 모아 별도 그리드로 렌더링한다.
+# 유가·금리·환율·한국물은 지수와 단위가 달라(달러/배럴, %, 원, 달러) 따로 모아
+# 별도 그리드로 렌더링한다.
+#
+# EWY(iShares MSCI South Korea ETF)는 KRX 야간선물의 대용이다. KRX 야간
+# 파생상품시장 시세를 주는 무료 API가 없어서, 국내장이 닫힌 동안 글로벌 투자자가
+# 한국 주식을 어떻게 사고팔았는지를 보여주는 지표로 EWY를 쓴다. 미국 정규장
+# 마감(=05:00 KST 전후)에 확정되므로 06:30 발송 시점엔 1~2시간 된 신선한 값이다.
 _MACRO = [
-    ('CL=F', '국제유가(WTI)'),
-    ('^TNX', '미 국채 10년'),
+    ('CL=F',  '국제유가(WTI)'),
+    ('^TNX',  '미 국채 10년'),
+    ('KRW=X', '원/달러'),
+    ('EWY',   '한국물 야간(EWY)'),
 ]
+
+# 미국 시세가 이 시간보다 오래됐으면(장기 휴장 등) 신호로 쓰지 않는다.
+# 주말을 낀 월요일 아침엔 금요일 종가라 약 50시간까지 벌어진다.
+_STALE_HOURS = 60
 
 _SECTORS = [
     ('SMH', '반도체'),
@@ -58,8 +71,10 @@ def _fetch_rows(items: list[tuple[str, str]]) -> list[dict]:
         if price is None or pct is None:
             continue
         # change(절대 변화량)는 국채금리를 bp로 표시/판정하는 데 쓴다.
+        # market_time(마지막 체결 epoch)은 스테일 데이터를 신호에서 빼는 데 쓴다.
         rows.append({'symbol': symbol, 'label': label, 'price': price, 'pct': pct,
-                     'change': q.get('regularMarketChange')})
+                     'change': q.get('regularMarketChange'),
+                     'market_time': q.get('regularMarketTime')})
     return rows
 
 
@@ -71,10 +86,40 @@ def _macro_display(row: dict) -> dict:
         bp = (row.get('change') or 0.0) * 100
         out['price_text'] = f"{row['price']:.3f}%"
         out['delta_text'] = f"{bp:+.1f}bp"
+    elif row['symbol'] == 'KRW=X':
+        out['price_text'] = f"{row['price']:,.2f}원"
+        out['delta_text'] = f"{row['pct']:+.2f}%"
     else:
         out['price_text'] = f"${row['price']:,.2f}"
         out['delta_text'] = f"{row['pct']:+.2f}%"
     return out
+
+
+def _is_fresh(row: dict, hours: int = _STALE_HOURS) -> bool:
+    """미국 시세의 마지막 체결이 hours 안쪽인가. 시각을 못 받았으면 신선한 것으로 본다
+    (신호를 통째로 잃는 것보다 낫다)."""
+    ts = row.get('market_time')
+    if not ts:
+        return True
+    age = time.time() - float(ts)
+    return 0 <= age <= hours * 3600
+
+
+def _traded_today_kst(traded_at: str | None) -> bool:
+    """네이버 체결 시각(ISO, +09:00)이 오늘(KST)인가.
+
+    장 시작 전에는 전일 종가가 그대로 내려온다. 그 값을 '오늘 신호'로 세면
+    아침 메일에서 선물이 늘 의미 없는 한 칸을 차지하므로 걸러낸다."""
+    if not traded_at:
+        return False
+    try:
+        ts = datetime.fromisoformat(traded_at)
+    except ValueError:
+        return False
+    kst = pytz.timezone('Asia/Seoul')
+    if ts.tzinfo is None:
+        ts = kst.localize(ts)
+    return ts.astimezone(kst).date() == datetime.now(kst).date()
 
 
 def _get_market_headlines(limit: int = 6) -> list[str]:
@@ -114,12 +159,12 @@ def _summarize_issues(headlines: list[str], index_rows: list[dict], sector_rows:
         f"{r['label']} {r.get('price_text', r['price'])} ({r.get('delta_text', '')})"
         for r in (macro_rows or [])) or '데이터 없음'
     prompt = (
-        "다음은 간밤 미국 증시 관련 최신 뉴스 헤드라인과 실제 지수/섹터/유가·금리 등락률입니다.\n\n"
+        "다음은 간밤 미국 증시 관련 최신 뉴스 헤드라인과 실제 지수/섹터/유가·금리·환율 등락률입니다.\n\n"
         f"지수 등락률: {idx_str}\n섹터 ETF 등락률: {sec_str}\n"
-        f"유가·금리: {mac_str}\n\n헤드라인:\n"
+        f"유가·금리·환율: {mac_str}\n\n헤드라인:\n"
         + '\n'.join(f'- {h}' for h in headlines)
         + "\n\n이 정보를 바탕으로 한국 투자자를 위한 '간밤 미국시장 브리핑'을 한국어로 3~5줄로 작성하세요. "
-          "지수/섹터/유가·금리 수치는 위에 주어진 값만 언급하고 새로운 수치를 지어내지 마세요. "
+          "지수/섹터/유가·금리·환율 수치는 위에 주어진 값만 언급하고 새로운 수치를 지어내지 마세요. "
           "연준·실적발표·지정학 등 핵심 이슈를 중심으로 간결하게 서술하세요. "
           "설명 없이 브리핑 본문만 순수 텍스트로 응답하세요."
     )
@@ -175,8 +220,13 @@ def get_brief(kis_api=None) -> dict:
     kr_indices = [kr_quotes[c] for c in ('KOSPI', 'KOSDAQ', 'FUT') if c in kr_quotes]
 
     kr_open_interest = None
+    kr_night_futures = None
     kr_investors: list[dict] = []
     if kis_api is not None:
+        try:
+            kr_night_futures = kis_api.get_night_futures_quote(kmd.kospi200_futures_code())
+        except Exception as e:
+            print(f"⚠️  야간선물 조회 실패: {e}")
         try:
             kr_open_interest = kis_api.get_futures_open_interest(kmd.kospi200_futures_code())
         except Exception as e:
@@ -193,6 +243,7 @@ def get_brief(kis_api=None) -> dict:
         'indices': index_rows, 'sectors': sector_rows, 'macro': macro_rows,
         'summary': summary,
         'kr_indices': kr_indices, 'kr_open_interest': kr_open_interest,
+        'kr_night_futures': kr_night_futures,
         'kr_investors': kr_investors,
     }
     brief['signals'] = _compute_signals(brief)
@@ -288,6 +339,28 @@ def _compute_signals(brief: dict) -> list[dict]:
         signals.append(_signal('VIX(변동성)', -vix_move, move=vix_move))
 
     macro_by_symbol = {r['symbol']: r for r in (brief.get('macro') or [])}
+    krw = macro_by_symbol.get('KRW=X')
+    ewy = macro_by_symbol.get('EWY')
+    # 야간 국내물은 '야간선물 → EWY' 순으로 하나만 센다. 둘 다 같은 것(국내장이
+    # 닫힌 동안의 한국 주식 방향)을 재므로 함께 세면 중복 계산이 된다.
+    night = brief.get('kr_night_futures')
+    if night:
+        # 코스피200 야간선물 — 원화 표시라 보정이 필요 없는 직접 관측치다.
+        signals.append(_signal('코스피200 야간선물', _dir_band(night['pct'], 0.3)))
+    elif ewy and krw and _is_fresh(ewy):
+        # 폴백. EWY 는 달러 표시라 원화 기준 코스피 등락률로 환산해야 갭 추정이 된다.
+        #   EWY(USD) = 코스피(KRW) / 원달러  ⇒  %코스피 ≈ %EWY + %원달러
+        # 이렇게 보정해두면 아래 '원/달러' 신호와 환율 부분이 중복 계산되지 않는다.
+        #
+        # 월요일 아침엔 금요일 미국장 값이라 주말 재료를 못 담는다. 야간선물도
+        # 같은 한계가 있지만 EWY 는 이틀이 밀려서 더 심하다.
+        implied = ewy['pct'] + krw['pct']
+        signals.append(_signal('야간 한국물(EWY·환율보정)', _dir_band(implied, 0.5)))
+    if krw:
+        # 원화 약세(환율 상승)는 외국인 자금 유출 압력이라 약세 신호.
+        krw_move = _dir_band(krw['pct'], 0.4)
+        signals.append(_signal('원/달러', -krw_move, move=krw_move))
+
     oil = macro_by_symbol.get('CL=F')
     if oil:
         # 한국은 원유 전량 수입국이라 유가 상승은 교역조건 악화·원가 부담(약세 신호)이다.
@@ -303,6 +376,10 @@ def _compute_signals(brief: dict) -> list[dict]:
 
     kr_by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
     fut = kr_by_label.get('코스피200 선물')
+    # 정규장 선물은 06:30 발송 시점엔 전일 종가라 오버나이트 정보가 없다.
+    # 오늘 체결된 값일 때만 신호로 센다 (없으면 위의 EWY 보정치가 그 자리를 맡는다).
+    if fut and not _traded_today_kst(fut.get('traded_at')):
+        fut = None
     if fut:
         signals.append(_signal('코스피200 선물', _dir(fut['pct'])))
 
@@ -376,7 +453,7 @@ def render_text(brief: dict) -> str:
         lines.append('[섹터 ETF] ' + '  '.join(
             f"{r['label']} {r['pct']:+.2f}%" for r in sectors))
     if macro:
-        lines.append('[유가·금리] ' + '  '.join(
+        lines.append('[유가·금리·환율] ' + '  '.join(
             f"{r['label']} {r.get('price_text', r['price'])} ({r.get('delta_text', '')})"
             for r in macro))
     if summary:
@@ -603,7 +680,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
 
     indices_html = _chip_grid_html('주요 지수', brief.get('indices') or [], cols=2)
     sectors_html = _chip_grid_html('섹터 ETF', brief.get('sectors') or [], cols=3)
-    macro_html = _chip_grid_html('유가 · 금리', brief.get('macro') or [], cols=2)
+    macro_html = _chip_grid_html('유가 · 금리 · 환율 · 한국물', brief.get('macro') or [], cols=2)
     summary = (brief.get('summary') or '').strip()
     summary_html = ''
     if summary:
