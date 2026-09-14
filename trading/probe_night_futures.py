@@ -78,13 +78,35 @@ def probe(api: KISApi, code: str, mrkt: str, tr_id: str) -> dict:
     }
 
 
+def _session_label(now: datetime) -> str:
+    """실행 시각이 야간장의 어느 국면인가."""
+    hm = now.hour * 60 + now.minute
+    if hm >= 18 * 60 or hm < 5 * 60:
+        return '야간장 진행 중'
+    if hm < 9 * 60:
+        return '야간장 마감 후 / 정규장 개장 전 — 종가가 남아있는지 보는 게 핵심'
+    if hm < 15 * 60 + 30:
+        return '정규장 진행 중'
+    return '정규장 마감 후 / 야간장 개장 전'
+
+
 def main() -> int:
     kst = pytz.timezone('Asia/Seoul')
     now = datetime.now(kst)
     code = kmd.kospi200_futures_code()
-    print(f'실행 시각 : {now:%Y-%m-%d %a %H:%M KST}')
+    print(f'실행 시각 : {now:%Y-%m-%d %a %H:%M KST}  ({_session_label(now)})')
     print(f'최근월물   : {code}')
-    print('야간시장 운영 시간은 18:00~05:00 KST — 그 시간대에 돌려야 살아있는 값이 나온다.')
+
+    # 대조군: 네이버가 주는 정규장 선물. 후보 조합이 이 값을 그대로 돌려주면
+    # 야간 시세가 아니라 정규장 데이터를 재탕하는 것이라 쓸모가 없다.
+    day_price = day_pct = None
+    try:
+        fut = kmd.get_quotes().get('FUT')
+        if fut:
+            day_price, day_pct = fut['price'], fut['pct']
+            print(f'정규장 선물 : {day_price} ({day_pct:+.2f}%)  ← 대조군')
+    except Exception as e:
+        print(f'정규장 선물 조회 실패(비교 생략): {e}')
     print('=' * 78)
 
     try:
@@ -100,9 +122,17 @@ def main() -> int:
             res = probe(api, code, mrkt, tr_id)
             tag = f'{tr_id} / MRKT={mrkt:<3}'
             if res.get('ok'):
+                verdict = ''
+                if day_price is not None and res['price'] is not None:
+                    try:
+                        same = abs(float(res['price']) - float(day_price)) < 1e-9
+                        verdict = ('  ⚠️ 정규장과 동일값(야간 시세 아님)' if same
+                                   else '  ⭐ 정규장과 다름 — 야간 시세 후보')
+                    except (TypeError, ValueError):
+                        pass
                 print(f'✅ {tag} → price={res["price"]} rate={res["rate"]} '
-                      f'fields={res["field_count"]}')
-                hits.append({'tr_id': tr_id, 'mrkt': mrkt, **res})
+                      f'fields={res["field_count"]}{verdict}')
+                hits.append({'tr_id': tr_id, 'mrkt': mrkt, 'verdict': verdict.strip(), **res})
             else:
                 detail = res.get('err') or f'rt_cd={res.get("rt_cd")} {res.get("msg")}'
                 print(f'   {tag} → {detail}')
@@ -114,10 +144,21 @@ def main() -> int:
 
     print(f'응답한 조합 {len(hits)}개:')
     for h in hits:
-        print(f'  - {h["tr_id"]} / {h["mrkt"]} : price={h["price"]} rate={h["rate"]}')
+        print(f'  - {h["tr_id"]} / {h["mrkt"]} : price={h["price"]} rate={h["rate"]} '
+              f'{h.get("verdict", "")}')
+
+    winners = [h for h in hits if '⭐' in h.get('verdict', '')]
     print()
-    print('첫 조합의 응답 필드:')
-    print(json.dumps(hits[0]['keys'], ensure_ascii=False, indent=2))
+    if winners:
+        w = winners[0]
+        print(f'>>> 야간 시세로 쓸 조합: FID_COND_MRKT_DIV_CODE={w["mrkt"]}, '
+              f'tr_id={w["tr_id"]}')
+        print('    kis_api.KISApi.NIGHT_MARKET_CODES 를 이 순서로 고칠 것.')
+        print()
+        print('응답 필드:')
+        print(json.dumps(w['keys'], ensure_ascii=False, indent=2))
+    else:
+        print('>>> 응답은 있으나 전부 정규장과 같은 값 — 야간 시세 경로는 아직 못 찾음.')
     return 0
 
 
