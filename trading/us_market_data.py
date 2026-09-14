@@ -23,7 +23,8 @@ _EXCLUDE_NAME_PATTERNS = (
     'preferred', ' pfd', 'depositary', 'trust preferred',
 )
 
-_QUOTE_FIELDS = ('shortName,regularMarketPrice,regularMarketChangePercent,'
+_QUOTE_FIELDS = ('shortName,regularMarketPrice,regularMarketChange,'
+                  'regularMarketChangePercent,'
                   'regularMarketVolume,marketCap,trailingPE,priceToBook')
 _BATCH_SIZE = 100
 

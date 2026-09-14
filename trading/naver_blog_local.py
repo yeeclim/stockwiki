@@ -472,20 +472,29 @@ def post_to_naver_blog(title: str, html_content: str, publish: bool = True,
 
 
 _ARROW_DIR = {'▲': 1, '▼': -1, '－': 0, '-': 0}
+_WORD_DIR = {'강세': 1, '약세': -1, '중립': 0}
 
 
 def _extract_signals_from_email(email_html: str) -> list[dict]:
-    """메일 HTML의 '시장 신호' 칩(라벨 + ▲/▼/－)을 파싱해 [{'label','direction'}] 로.
-    brief_json이 없을 때도 요약 카드에 신호 블록을 넣기 위한 폴백 (메일엔 늘 들어있다)."""
+    """메일 HTML의 '시장 신호' 칩을 파싱해 [{'label','direction','move'}] 로.
+    brief_json이 없을 때도 요약 카드에 신호 블록을 넣기 위한 폴백 (메일엔 늘 들어있다).
+
+    현재 칩은 '라벨 ▲ 강세' 꼴로 화살표(지표 방향)와 판정(강세/약세)이 분리돼 있다.
+    판정 글자가 없는 옛 메일은 화살표를 그대로 direction으로 읽는다 — 다만 그 시절
+    화살표는 이미 direction이었으므로 VIX도 결과는 맞다."""
     import re
     out = []
     for m in re.finditer(
-        r'white-space:\s*nowrap[^>]*>\s*([^<]+?)\s*<span[^>]*>\s*([▲▼－-])\s*</span>\s*</span>',
+        r'white-space:\s*nowrap[^>]*>\s*([^<]+?)\s*<span[^>]*>\s*([▲▼－-])\s*</span>'
+        r'(?:\s*<span[^>]*>\s*(강세|약세|중립)\s*</span>)?\s*</span>',
         email_html,
     ):
         label = re.sub(r'\s+', ' ', m.group(1)).strip()
-        if label:
-            out.append({'label': label, 'direction': _ARROW_DIR.get(m.group(2), 0)})
+        if not label:
+            continue
+        move = _ARROW_DIR.get(m.group(2), 0)
+        direction = _WORD_DIR[m.group(3)] if m.group(3) else move
+        out.append({'label': label, 'direction': direction, 'move': move})
     return out
 
 

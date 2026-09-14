@@ -25,6 +25,12 @@ _INDICES = [
     ('^VIX',  'VIX'),
 ]
 
+# 유가·금리는 지수와 단위가 달라(달러/배럴, %) 따로 모아 별도 그리드로 렌더링한다.
+_MACRO = [
+    ('CL=F', '국제유가(WTI)'),
+    ('^TNX', '미 국채 10년'),
+]
+
 _SECTORS = [
     ('SMH', '반도체'),
     ('XLK', '기술'),
@@ -51,8 +57,24 @@ def _fetch_rows(items: list[tuple[str, str]]) -> list[dict]:
         pct = q.get('regularMarketChangePercent')
         if price is None or pct is None:
             continue
-        rows.append({'symbol': symbol, 'label': label, 'price': price, 'pct': pct})
+        # change(절대 변화량)는 국채금리를 bp로 표시/판정하는 데 쓴다.
+        rows.append({'symbol': symbol, 'label': label, 'price': price, 'pct': pct,
+                     'change': q.get('regularMarketChange')})
     return rows
+
+
+def _macro_display(row: dict) -> dict:
+    """유가·금리는 '4.98 (+0.63%)'처럼 지수 포맷으로 찍으면 오해를 부른다
+    (금리 0.63%는 절대 수준이 아니라 수익률의 변화율이다). 단위를 붙여 돌려준다."""
+    out = dict(row)
+    if row['symbol'] == '^TNX':
+        bp = (row.get('change') or 0.0) * 100
+        out['price_text'] = f"{row['price']:.3f}%"
+        out['delta_text'] = f"{bp:+.1f}bp"
+    else:
+        out['price_text'] = f"${row['price']:,.2f}"
+        out['delta_text'] = f"{row['pct']:+.2f}%"
+    return out
 
 
 def _get_market_headlines(limit: int = 6) -> list[str]:
@@ -81,17 +103,23 @@ def _get_market_headlines(limit: int = 6) -> list[str]:
         return []
 
 
-def _summarize_issues(headlines: list[str], index_rows: list[dict], sector_rows: list[dict]) -> str:
+def _summarize_issues(headlines: list[str], index_rows: list[dict], sector_rows: list[dict],
+                      macro_rows: list[dict] | None = None) -> str:
     if not _ANTHROPIC_KEY or not headlines:
         return ''
     idx_str = ', '.join(f"{r['label']} {r['pct']:+.2f}%" for r in index_rows) or '데이터 없음'
     sec_str = ', '.join(f"{r['label']} {r['pct']:+.2f}%" for r in sector_rows) or '데이터 없음'
+    # 유가·금리는 단위가 달라 표시용 문자열(달러/bp)을 그대로 넘긴다.
+    mac_str = ', '.join(
+        f"{r['label']} {r.get('price_text', r['price'])} ({r.get('delta_text', '')})"
+        for r in (macro_rows or [])) or '데이터 없음'
     prompt = (
-        "다음은 간밤 미국 증시 관련 최신 뉴스 헤드라인과 실제 지수/섹터 등락률입니다.\n\n"
-        f"지수 등락률: {idx_str}\n섹터 ETF 등락률: {sec_str}\n\n헤드라인:\n"
+        "다음은 간밤 미국 증시 관련 최신 뉴스 헤드라인과 실제 지수/섹터/유가·금리 등락률입니다.\n\n"
+        f"지수 등락률: {idx_str}\n섹터 ETF 등락률: {sec_str}\n"
+        f"유가·금리: {mac_str}\n\n헤드라인:\n"
         + '\n'.join(f'- {h}' for h in headlines)
         + "\n\n이 정보를 바탕으로 한국 투자자를 위한 '간밤 미국시장 브리핑'을 한국어로 3~5줄로 작성하세요. "
-          "지수/섹터 등락률 수치는 위에 주어진 값만 언급하고 새로운 수치를 지어내지 마세요. "
+          "지수/섹터/유가·금리 수치는 위에 주어진 값만 언급하고 새로운 수치를 지어내지 마세요. "
           "연준·실적발표·지정학 등 핵심 이슈를 중심으로 간결하게 서술하세요. "
           "설명 없이 브리핑 본문만 순수 텍스트로 응답하세요."
     )
@@ -131,8 +159,13 @@ def get_brief(kis_api=None) -> dict:
     except Exception as e:
         print(f"⚠️  미국 섹터 ETF 조회 실패: {e}")
         sector_rows = []
+    try:
+        macro_rows = [_macro_display(r) for r in _fetch_rows(_MACRO)]
+    except Exception as e:
+        print(f"⚠️  유가/금리 조회 실패: {e}")
+        macro_rows = []
     headlines = _get_market_headlines()
-    summary = _summarize_issues(headlines, index_rows, sector_rows)
+    summary = _summarize_issues(headlines, index_rows, sector_rows, macro_rows)
 
     try:
         kr_quotes = kmd.get_quotes()
@@ -157,7 +190,8 @@ def get_brief(kis_api=None) -> dict:
                 print(f"⚠️  {label} 투자자매매동향 조회 실패: {e}")
 
     brief = {
-        'indices': index_rows, 'sectors': sector_rows, 'summary': summary,
+        'indices': index_rows, 'sectors': sector_rows, 'macro': macro_rows,
+        'summary': summary,
         'kr_indices': kr_indices, 'kr_open_interest': kr_open_interest,
         'kr_investors': kr_investors,
     }
@@ -217,21 +251,60 @@ def _dir(value: float) -> int:
     return 0
 
 
+def _dir_band(value: float, band: float) -> int:
+    """|value| 가 band 이하면 중립(0). 유가·금리처럼 하루 등락이 대부분 잡음인
+    지표를 부호만으로 세면 신호 개수가 잡음에 따라 흔들려서 완충구간을 둔다."""
+    if value > band:
+        return 1
+    if value < -band:
+        return -1
+    return 0
+
+
+def _signal(label: str, direction: int, move: int | None = None) -> dict:
+    """신호 하나. 두 값을 분리해 담는다.
+
+    - move      : 지표 자체가 어느 쪽으로 움직였는가 (화면의 ▲/▼ 표시용)
+    - direction : 그 움직임이 시장에 강세(+1)/약세(-1)인가 (강세·약세 개수 집계용)
+
+    대부분은 둘이 같지만 VIX는 반대다(VIX 하락 = 위험선호 = 강세). 예전엔 화살표를
+    direction으로 그려서 'VIX -11%'인 날에도 요약에 'VIX ▲'가 찍혀, 본문 시황과
+    어긋나 보였다. 그래서 화살표는 move, 강세/약세 판정은 direction으로 분리한다.
+    """
+    return {'label': label, 'direction': direction,
+            'move': direction if move is None else move}
+
+
 def _compute_signals(brief: dict) -> list[dict]:
     signals = []
     us_by_symbol = {r['symbol']: r for r in (brief.get('indices') or [])}
 
     us_core_pct = [us_by_symbol[s]['pct'] for s in ('^GSPC', '^IXIC', '^DJI') if s in us_by_symbol]
     if us_core_pct:
-        signals.append({'label': '미국 증시', 'direction': _dir(sum(us_core_pct) / len(us_core_pct))})
+        signals.append(_signal('미국 증시', _dir(sum(us_core_pct) / len(us_core_pct))))
     if '^VIX' in us_by_symbol:
         # VIX 상승 = 시장 불안 심화(약세 신호)이므로 부호를 반대로 해석한다.
-        signals.append({'label': 'VIX(변동성)', 'direction': _dir(-us_by_symbol['^VIX']['pct'])})
+        vix_move = _dir(us_by_symbol['^VIX']['pct'])
+        signals.append(_signal('VIX(변동성)', -vix_move, move=vix_move))
+
+    macro_by_symbol = {r['symbol']: r for r in (brief.get('macro') or [])}
+    oil = macro_by_symbol.get('CL=F')
+    if oil:
+        # 한국은 원유 전량 수입국이라 유가 상승은 교역조건 악화·원가 부담(약세 신호)이다.
+        # 일간 ±1% 안쪽은 잡음으로 보고 중립 처리.
+        oil_move = _dir_band(oil['pct'], 1.0)
+        signals.append(_signal('국제유가(WTI)', -oil_move, move=oil_move))
+    tnx = macro_by_symbol.get('^TNX')
+    if tnx:
+        # 금리 상승 = 할인율 상승 + 달러 강세 → 성장주 비중 큰 국내 증시엔 약세 신호.
+        # ^TNX 의 change 는 수익률 자체의 변화(%p)라 100을 곱해 bp 로 본다. ±3bp 완충.
+        tnx_move = _dir_band((tnx.get('change') or 0.0) * 100, 3.0)
+        signals.append(_signal('미 국채 10년', -tnx_move, move=tnx_move))
 
     kr_by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
     fut = kr_by_label.get('코스피200 선물')
     if fut:
-        signals.append({'label': '코스피200 선물', 'direction': _dir(fut['pct'])})
+        signals.append(_signal('코스피200 선물', _dir(fut['pct'])))
 
     kr_oi = brief.get('kr_open_interest')
     if fut and kr_oi:
@@ -240,13 +313,27 @@ def _compute_signals(brief: dict) -> list[dict]:
         # 가격↑+OI↑=신규매수 유입(강세), 가격↓+OI↑=신규매도 유입(약세),
         # OI가 줄었으면(청산 위주) 방향성이 약하므로 중립 처리.
         d = 1 if (price_up and oi_up) else (-1 if (not price_up and oi_up) else 0)
-        signals.append({'label': '선물 미결제약정', 'direction': d})
+        signals.append(_signal('선물 미결제약정', d, move=_dir(kr_oi['open_interest_change'])))
 
     for inv in brief.get('kr_investors') or []:
         net = inv['frgn_net'] + inv['orgn_net']
-        signals.append({'label': f"{inv['label']} 수급(외국인+기관)", 'direction': _dir(net)})
+        signals.append(_signal(f"{inv['label']} 수급(외국인+기관)", _dir(net)))
 
     return signals
+
+
+# 화살표는 지표의 실제 방향(move), 옆의 글자는 시장 해석(direction).
+SIGNAL_ARROW = {1: '▲', -1: '▼', 0: '－'}
+SIGNAL_WORD = {1: '강세', -1: '약세', 0: '중립'}
+
+
+def signal_move(s: dict) -> int:
+    """move가 없는 옛 brief_json(아카이브)도 읽을 수 있도록 direction으로 폴백."""
+    return int(s.get('move', s.get('direction', 0)) or 0)
+
+
+def signal_chip_text(s: dict) -> str:
+    return f"{s['label']} {SIGNAL_ARROW[signal_move(s)]} {SIGNAL_WORD[s.get('direction', 0)]}"
 
 
 def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
@@ -260,12 +347,13 @@ def render_text(brief: dict) -> str:
     multipart/alternative 의 text/plain 파트에도 동일한 내용을 담기 위해 사용한다."""
     indices = brief.get('indices') or []
     sectors = brief.get('sectors') or []
+    macro = brief.get('macro') or []
     summary = (brief.get('summary') or '').strip()
     kr_indices = brief.get('kr_indices') or []
     kr_oi = brief.get('kr_open_interest')
     kr_investors = brief.get('kr_investors') or []
     signals = brief.get('signals') or []
-    if not (indices or sectors or summary or kr_indices or kr_oi or kr_investors):
+    if not (indices or sectors or macro or summary or kr_indices or kr_oi or kr_investors):
         return ''
 
     lines = []
@@ -273,8 +361,9 @@ def render_text(brief: dict) -> str:
         bull, bear, neutral = _signal_counts(signals)
         verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
         lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
-        arrow_of = {1: '▲', -1: '▼', 0: '－'}
-        lines.append('   ' + '  '.join(f"[{s['label']} {arrow_of[s['direction']]}]" for s in signals))
+        lines.append('   ' + '  '.join(f"[{signal_chip_text(s)}]" for s in signals))
+        lines.append('   ※ ▲▼는 지표 자체의 방향, 강세/약세는 그 움직임의 시장 해석입니다'
+                     ' (예: VIX ▼ = 강세)')
         lines.append('   ※ 통계적 확률이 아닌 단순 신호 조합입니다')
         lines.append('')
 
@@ -286,6 +375,10 @@ def render_text(brief: dict) -> str:
     if sectors:
         lines.append('[섹터 ETF] ' + '  '.join(
             f"{r['label']} {r['pct']:+.2f}%" for r in sectors))
+    if macro:
+        lines.append('[유가·금리] ' + '  '.join(
+            f"{r['label']} {r.get('price_text', r['price'])} ({r.get('delta_text', '')})"
+            for r in macro))
     if summary:
         lines.append('')
         lines.append(summary)
@@ -360,6 +453,10 @@ def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
         cells = []
         for r in chunk:
             color = _pct_color(r['pct'])
+            # 유가·금리처럼 단위가 붙는 행은 미리 만들어둔 문자열을 쓴다.
+            # (f-string 중첩은 CI의 Python 3.11에서 문법 오류라 여기서 풀어둔다)
+            price_text = r.get('price_text') or f"{r['price']:,.2f}"
+            delta_text = r.get('delta_text') or f"{r['pct']:+.2f}%"
             vol_html = ''
             vol = _fmt_index_volume(r.get('volume'))
             if vol:
@@ -370,8 +467,8 @@ def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
                 f'<div style="background:{_SURFACE_SOFT};border:1px solid {_LINE};'
                 f'border-radius:10px;padding:10px 6px;text-align:center;">'
                 f'<div style="color:{_MUTED};font-size:11px;letter-spacing:.2px;">{html_lib.escape(r["label"])}</div>'
-                f'<div style="color:{_INK};font-size:14px;font-weight:700;margin-top:3px;font-family:Consolas,Menlo,monospace;">{r["price"]:,.2f}</div>'
-                f'<div style="color:{color};font-size:12px;font-weight:700;margin-top:2px;font-family:Consolas,Menlo,monospace;">{r["pct"]:+.2f}%</div>'
+                f'<div style="color:{_INK};font-size:14px;font-weight:700;margin-top:3px;font-family:Consolas,Menlo,monospace;">{price_text}</div>'
+                f'<div style="color:{color};font-size:12px;font-weight:700;margin-top:2px;font-family:Consolas,Menlo,monospace;">{delta_text}</div>'
                 f'{vol_html}'
                 '</div></td>'
             )
@@ -469,12 +566,14 @@ def render_email_html(brief: dict, report_text: str) -> str:
         verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
         verdict_color = _UP if bull > bear else (_DOWN if bear > bull else _AMBER)
         chip_color = {1: _UP, -1: _DOWN, 0: _MUTED}
-        chip_arrow = {1: '▲', -1: '▼', 0: '－'}
         chips = ''.join(
             f'<span style="display:inline-block;margin:3px 6px 3px 0;padding:3px 9px;'
             f'border-radius:999px;background:{_SURFACE_SOFT};border:1px solid {_LINE};'
             f'font-size:11px;color:{_INK};white-space:nowrap;">{html_lib.escape(s["label"])} '
-            f'<span style="color:{chip_color[s["direction"]]};font-weight:700;">{chip_arrow[s["direction"]]}</span></span>'
+            f'<span style="color:{chip_color[signal_move(s)]};font-weight:700;">'
+            f'{SIGNAL_ARROW[signal_move(s)]}</span> '
+            f'<span style="color:{chip_color[s.get("direction", 0)]};font-weight:700;">'
+            f'{SIGNAL_WORD[s.get("direction", 0)]}</span></span>'
             for s in signals
         )
         signal_html = f"""
@@ -495,6 +594,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       </div>
       <div style="margin-top:10px;">{chips}</div>
       <div style="margin-top:8px;color:{_MUTED};font-size:10.5px;">
+        ※ ▲▼는 지표 자체의 방향, 옆의 강세/약세는 그 움직임의 시장 해석입니다 (예: VIX ▼ = 위험선호 = 강세).<br>
         ※ 통계적으로 검증된 확률이 아니라, 이미 수집한 지표들을 방향(상승/하락)으로만 환산해 개수를 센 단순 신호 조합입니다.
       </div>
     </td></tr>
@@ -503,6 +603,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
 
     indices_html = _chip_grid_html('주요 지수', brief.get('indices') or [], cols=2)
     sectors_html = _chip_grid_html('섹터 ETF', brief.get('sectors') or [], cols=3)
+    macro_html = _chip_grid_html('유가 · 금리', brief.get('macro') or [], cols=2)
     summary = (brief.get('summary') or '').strip()
     summary_html = ''
     if summary:
@@ -513,7 +614,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
         )
 
     brief_section = ''
-    if indices_html or sectors_html or summary_html:
+    if indices_html or sectors_html or macro_html or summary_html:
         brief_section = f"""
 <tr><td style="padding-bottom:16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
@@ -526,6 +627,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       </span>
       {indices_html}
       {sectors_html}
+      {macro_html}
       {summary_html}
     </td></tr>
   </table>

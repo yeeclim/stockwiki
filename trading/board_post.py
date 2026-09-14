@@ -58,16 +58,17 @@ def screening_content(
 
     signal_html = ''
     if signals:
-        arrow_of = {1: '▲', -1: '▼', 0: '－'}
+        from us_market_brief import signal_chip_text
         bull = sum(1 for s in signals if s['direction'] > 0)
         bear = sum(1 for s in signals if s['direction'] < 0)
         neutral = len(signals) - bull - bear
         verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
-        chips = ' '.join(f"[{s['label']} {arrow_of[s['direction']]}]" for s in signals)
+        chips = ' '.join(f"[{signal_chip_text(s)}]" for s in signals)
         signal_html = (
             f"<p><b>📍 당시 시장 신호:</b> 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})<br>"
             f"<span style='font-size:0.9em'>{chips}</span><br>"
-            f"<span style='font-size:0.8em;opacity:0.7'>※ 통계적 확률이 아닌 단순 신호 조합입니다</span></p>"
+            f"<span style='font-size:0.8em;opacity:0.7'>※ ▲▼는 지표 방향, 강세/약세는 그 움직임의 "
+            f"시장 해석입니다 (예: VIX ▼ = 강세). 통계적 확률이 아닌 단순 신호 조합입니다</span></p>"
         )
 
     excluded_html = ''
