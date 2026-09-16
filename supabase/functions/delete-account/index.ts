@@ -7,7 +7,7 @@
  *    ON DELETE CASCADE 로 함께 삭제됨
  *
  * USR_<uid>_* GitHub repo secrets 정리 단계가 있었으나, 그 시크릿을 만드는
- * 경로(register-to-github)를 제거하면서 함께 걷어냈다. 읽는 코드가 없는 사본을
+ * 경로(save-trading-config, 당시 이름 register-to-github)를 제거하면서 함께 걷어냈다. 읽는 코드가 없는 사본을
  * public 저장소 시크릿에 두던 구조라, 만들지도 지우지도 않는 쪽이 맞다.
  *
  * Supabase Secrets:

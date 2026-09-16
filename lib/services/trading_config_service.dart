@@ -62,7 +62,7 @@ class TradingConfig {
         hasStoredKakao: m['notify_kakao_active'] as bool? ?? false,
       );
 
-  /// 비어 있는 민감 필드는 아예 보내지 않는다. 서버(register-to-github)는
+  /// 비어 있는 민감 필드는 아예 보내지 않는다. 서버(save-trading-config)는
   /// 누락된 필드를 "기존 값 유지"로 처리하므로, 사용자가 한도만 바꾸고 저장해도
   /// 저장된 키가 지워지지 않는다.
   Map<String, dynamic> toMap() {
@@ -102,15 +102,13 @@ class TradingConfigService {
 
   /// 설정 저장. Edge Function이 민감 필드를 암호화해 DB에 upsert 합니다.
   ///
-  /// (함수 이름은 register-to-github 지만 GitHub 등록은 하지 않습니다 —
-  ///  읽는 곳이 없는 repo secrets 사본이라 제거했습니다.)
   /// 반환값: {'ok': true, 'saved': true}
   static Future<Map<String, dynamic>> saveAndRegister(TradingConfig cfg) async {
     final session = _sb.auth.currentSession;
     if (session == null) throw Exception('로그인이 필요합니다.');
 
     final res = await _sb.functions.invoke(
-      'register-to-github',
+      'save-trading-config',
       body: cfg.toMap(),
     );
 

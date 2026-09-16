@@ -1,11 +1,10 @@
 /**
- * Supabase Edge Function: register-to-github
+ * Supabase Edge Function: save-trading-config
  *
- * ⚠️ 이름이 실제 동작과 다릅니다. 지금은 GitHub 에 아무것도 등록하지 않고,
- *    trading_configs 에 암호화 저장만 합니다. Flutter 클라이언트가 이 이름으로
- *    호출 중이라 배포 이름을 유지했을 뿐입니다 (개명하려면 새 이름으로 배포 →
- *    앱 빌드 교체 → 구 함수 삭제 순서로 진행해야 합니다).
+ * Flutter 앱에서 사용자가 KIS API 키를 저장하면 호출됩니다.
+ * trading_configs 에 민감 필드를 암호화해 upsert 합니다.
  *
+ * 이전 이름은 register-to-github 였습니다 (2026-09-16 개명).
  * GitHub repository secrets 등록을 제거한 이유
  * -------------------------------------------
  * 예전엔 사용자 KIS 키를 USR_<uid>_* 라는 이름으로 GitHub repo secrets 에도

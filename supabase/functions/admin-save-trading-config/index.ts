@@ -1,12 +1,12 @@
 /**
- * Supabase Edge Function: admin-register-to-github
+ * Supabase Edge Function: admin-save-trading-config
  *
  * Allows a trusted operator (with ADMIN_API_KEY) to upsert `trading_configs`
  * for any `user_id`. This is intended for administrative workflows only.
  *
- * ⚠️ 이름과 달리 GitHub 에는 아무것도 등록하지 않습니다. 읽는 곳이 없는
- *    USR_<uid>_* repo secrets 사본을 제거했습니다 — register-to-github 쪽
- *    헤더 주석에 경위가 적혀 있습니다.
+ * 이전 이름은 admin-register-to-github 였습니다 (2026-09-16 개명).
+ * 읽는 곳이 없던 USR_<uid>_* repo secrets 사본을 제거하면서, 이름과 동작이
+ * 어긋나 함께 개명했습니다 — 경위는 save-trading-config 헤더 참조.
  *
  * KIS 자격증명은 AES-256-GCM 으로 암호화해 저장합니다 (../_shared/crypto.ts).
  * Supabase Secrets: TRADING_ENC_KEY (base64 32바이트, GitHub Secrets 와 동일 값)
