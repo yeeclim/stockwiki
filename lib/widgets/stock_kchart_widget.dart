@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:k_chart_plus/k_chart_plus.dart';
-import '../services/kr_chart_service.dart';
+import '../services/chart_service.dart';
 import 'kr_volume_profile_widget.dart';
 
 /// 국내주식 실차트 — KIS Open API 일봉 데이터 + k_chart_plus 지표 렌더링.
-class KrStockKChartWidget extends StatefulWidget {
+/// 국내·미국 공용 K라인 차트.
+///
+/// 두 시장 모두 /api/utils 가 같은 JSON 형태로 캔들을 내려주므로 위젯은 하나면
+/// 된다. 예전엔 미국만 finviz PNG 를 받아 [Image.memory] 로 그리는 별도 위젯을
+/// 썼는데, finviz 가 막히면서 미국 차트가 죽었다 — 이미지가 아니라 데이터를
+/// 받으면 지표·기간 전환도 국내와 동일하게 동작한다.
+class StockKChartWidget extends StatefulWidget {
   final String symbol;
+  final ChartMarket market;
 
-  const KrStockKChartWidget({super.key, required this.symbol});
+  const StockKChartWidget({
+    super.key,
+    required this.symbol,
+    this.market = ChartMarket.kr,
+  });
 
   @override
-  State<KrStockKChartWidget> createState() => _KrStockKChartWidgetState();
+  State<StockKChartWidget> createState() => _StockKChartWidgetState();
 }
 
 enum _DrawTool { none, trendLine, fibonacci }
 
-class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
+class _StockKChartWidgetState extends State<StockKChartWidget> {
   List<KLineEntity>? _candles;
   bool _isLoading = true;
   String? _error;
@@ -50,8 +61,8 @@ class _KrStockKChartWidgetState extends State<KrStockKChartWidget> {
       _error = null;
     });
     try {
-      final candles =
-          await KrChartService.fetchCandles(widget.symbol, period: _period);
+      final candles = await ChartService.fetchCandles(widget.symbol,
+          market: widget.market, period: _period);
       if (candles.isEmpty) {
         throw Exception('차트 데이터가 없습니다');
       }

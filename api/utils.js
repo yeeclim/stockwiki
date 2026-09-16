@@ -14,6 +14,7 @@ export default async function handler(req, res) {
         if (type === 'fear-greed') return await handleFearGreed(req, res);
         if (type === 'cnn-fear-greed') return await handleCnnFearGreed(req, res);
         if (type === 'kr-candles') return await handleKrCandles(req, res);
+        if (type === 'us-candles') return await handleUsCandles(req, res);
 
         return res.status(400).json({ error: 'Invalid utility type' });
     } catch (error) {
@@ -179,6 +180,69 @@ async function handleKrCandles(req, res) {
         return res.status(200).json({ success: true, data });
     } catch (error) {
         console.error(`❌ 국내주식 차트 조회 실패 (${code}, ${period}):`, error.message);
+        return res.status(500).json({ success: false, error: error.message || '차트 조회 중 오류 발생' });
+    }
+}
+
+// 미국주식 일/주/월봉 — Yahoo Finance.
+//
+// 예전엔 finviz 차트 PNG를 프록시해 이미지로 보여줬는데, finviz 가 Cloudflare 로
+// 막히면서(자기 자신으로 302 무한 리다이렉트) 미국 차트가 통째로 죽어 있었다.
+// 국내(kr-candles)와 똑같은 JSON 형태로 내려주고 클라이언트의 k_chart_plus 가
+// 그리게 하면, 이미지 소스 한 곳이 막힌다고 차트가 사라지는 구조에서 벗어난다.
+async function handleUsCandles(req, res) {
+    const symbol = (req.query.symbol || '').toString().trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(symbol)) {
+        return res.status(400).json({ success: false, error: '유효하지 않은 심볼입니다' });
+    }
+    const periodRaw = (req.query.period || 'D').toString().toUpperCase();
+    const period = ['D', 'W', 'M'].includes(periodRaw) ? periodRaw : 'D';
+
+    const cacheKey = `us:${symbol}:${period}`;
+    const cached = _krCandleCache.get(cacheKey);
+    if (cached && Date.now() - cached.time < KR_CANDLE_CACHE_TTL) {
+        return res.status(200).json({ success: true, data: cached.data, cached: true });
+    }
+
+    const { range, interval } = period === 'M' ? { range: '10y', interval: '1mo' }
+                             : period === 'W' ? { range: '5y',  interval: '1wk' }
+                             : { range: '2y',  interval: '1d' };
+
+    try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`
+                  + `?range=${range}&interval=${interval}`;
+        const response = await fetchWithTimeout(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        });
+        if (!response.ok) throw new Error(`Yahoo ${response.status}`);
+
+        const json = await response.json();
+        const result = json?.chart?.result?.[0];
+        const stamps = result?.timestamp || [];
+        const q = result?.indicators?.quote?.[0] || {};
+        if (!stamps.length) throw new Error('데이터 없음');
+
+        // 종가가 null 인 봉(거래정지·데이터 결측)은 건너뛴다. k_chart_plus 가
+        // null 을 만나면 지표 계산에서 NaN 이 번진다.
+        const data = [];
+        for (let i = 0; i < stamps.length; i++) {
+            const close = q.close?.[i];
+            if (close === null || close === undefined) continue;
+            data.push({
+                time:  stamps[i] * 1000,
+                open:  Number(q.open?.[i] ?? close),
+                high:  Number(q.high?.[i] ?? close),
+                low:   Number(q.low?.[i] ?? close),
+                close: Number(close),
+                vol:   Number(q.volume?.[i] ?? 0),
+            });
+        }
+        if (!data.length) throw new Error('유효한 봉 없음');
+
+        _krCandleCache.set(cacheKey, { data, time: Date.now() });
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error(`❌ 미국주식 차트 조회 실패 (${symbol}, ${period}):`, error.message);
         return res.status(500).json({ success: false, error: error.message || '차트 조회 중 오류 발생' });
     }
 }

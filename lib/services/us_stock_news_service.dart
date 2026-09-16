@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/news.dart';
-import 'http_client.dart';
 
 class UsStockNewsService {
   /// 주식 관련 뉴스 조회 (서버사이드 news-search API 사용, API 키 불필요)
@@ -11,31 +10,9 @@ class UsStockNewsService {
     return await searchNewsByKeyword(keyword, limit: limit);
   }
 
-  /// 여러 주식 관련 뉴스 조회
-  static Future<List<News>> fetchMultipleStockNews(List<String> symbols,
-      {int limit = 20}) async {
-    try {
-      final tickers = symbols.join(',');
-      final data = await callProxy('fmp', '/stock_news',
-          params: {'tickers': tickers, 'limit': '$limit'});
-      if (data is List) {
-        return data.map((item) {
-          final news = News.fromJson(item);
-          return News(
-            title: news.title,
-            description: news.description,
-            link: news.link,
-            source: news.source,
-            publishedAt: news.publishedAt,
-            sentiment: _analyzeSentiment('${news.title} ${news.description}'),
-          );
-        }).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
+  // fetchMultipleStockNews / fetchMarketNews 가 여기 있었다. 둘 다 FMP
+  // /stock_news 전용인데 FMP v3 가 2025-08-31 자로 폐기돼 항상 빈 목록을
+  // 반환했고, 호출하는 화면도 없었다.
 
   /// 키워드 기반 뉴스 검색 (백엔드 프록시 사용)
   static Future<List<News>> searchNewsByKeyword(String keyword,
@@ -52,33 +29,27 @@ class UsStockNewsService {
         if (jsonData['success'] == true) {
           final results = jsonData['results'] as List<dynamic>? ?? [];
           return results
-              .map<News>((item) => News(
-                    title: item['title']?.toString() ?? '',
-                    description: item['description']?.toString() ?? '',
-                    link: item['link']?.toString() ?? '',
-                    publishedAt: item['publishedAt']?.toString() ?? '',
-                    source: item['source']?.toString() ?? 'News',
-                  ))
+              .map<News>((item) {
+                final title = item['title']?.toString() ?? '';
+                final description = item['description']?.toString() ?? '';
+                return News(
+                  title: title,
+                  description: description,
+                  link: item['link']?.toString() ?? '',
+                  publishedAt: item['publishedAt']?.toString() ?? '',
+                  source: item['source']?.toString() ?? 'News',
+                  // 상세 화면과 AI 위원회 화면이 news.sentiment 로 긍정/부정 뱃지를
+                  // 그린다. FMP 경로에서만 감정 분석을 돌리고 있었던 탓에, FMP 가
+                  // 폐기된 뒤로는 모든 뉴스가 'Neutral' 로 떨어져 뱃지가 사라졌다.
+                  sentiment: _analyzeSentiment('$title $description'),
+                );
+              })
               .take(limit)
               .toList();
         }
       }
     } catch (_) {}
     return [];
-  }
-
-  /// 주식 시장 전체 뉴스 조회
-  static Future<List<News>> fetchMarketNews({int limit = 20}) async {
-    try {
-      final data =
-          await callProxy('fmp', '/stock_news', params: {'limit': '$limit'});
-      if (data is List) {
-        return data.map((item) => News.fromJson(item)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
   }
 
   /// 텍스트 감정 분석 (키워드 기반)
