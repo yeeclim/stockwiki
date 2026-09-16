@@ -5,7 +5,10 @@ import { applyCors } from './_shared.js';
 
 function getEnv(key) {
   const K = key.toUpperCase();
-  return process.env[K] || process.env[key.toLowerCase()] || process.env[key] || '';
+  const v = process.env[K] || process.env[key.toLowerCase()] || process.env[key] || '';
+  // 대시보드에서 값을 붙여넣을 때 앞뒤 공백·개행이 섞여 들어오는 일이 잦다.
+  // 계정 ID 처럼 URL 경로에 들어가는 값은 그대로 두면 라우팅이 깨진다.
+  return v.trim();
 }
 
 // 종목별 결과 캐시 (30분)
@@ -50,7 +53,7 @@ export default async function handler(req, res) {
     // 검증도가 억울하게 깎인다.
     const ALL_MODELS = [
       { p: 'groq',    key: 'GROQ_API_KEY',         name: 'GPT-OSS 120B', id: 'openai/gpt-oss-120b', fn: q => askGroqOss(q, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
-      { p: 'mistral', key: 'MISTRAL_API_KEY',      name: 'Mistral Small', fn: q => askMistral(q, 'mistral-small-4-0-26-03', 'Mistral Small') },
+      { p: 'mistral', key: 'MISTRAL_API_KEY',      name: 'Mistral Small', fn: q => askMistral(q, 'mistral-small-latest', 'Mistral Small') },
       { p: 'cohere',  key: 'COHERE_API_KEY',       name: 'Command A',     fn: q => askCohere(q, 'command-a-03-2025', 'Command A') },
       { p: 'cf',      key: 'CLOUDFLARE_API_TOKEN', name: 'Llama 3.1 (CF)', fn: q => askCloudflare(q, '@cf/meta/llama-3.1-8b-instruct', 'Llama 3.1 (CF)') },
       { p: 'or',      key: 'OPENROUTER_API_KEY',   name: 'GLM 5.2',      id: 'z-ai/glm-5.2:free',   fn: q => askOpenRouter(q, 'z-ai/glm-5.2:free', 'GLM 5.2') },
@@ -82,7 +85,9 @@ export default async function handler(req, res) {
       throw new Error('사용 가능한 AI 모델이 없습니다 (API 키 설정을 확인하세요)');
     }
 
-    const withTimeout = (fn, ms = 20000) => Promise.race([
+    // 무료 티어 모델(특히 OpenRouter)은 대기열 때문에 20초를 넘기는 일이 있다.
+    // 엔드포인트 maxDuration 이 60초이고 전부 병렬이라 30초까지는 안전하다.
+    const withTimeout = (fn, ms = 30000) => Promise.race([
       fn(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('응답 시간 초과')), ms)),
     ]);
