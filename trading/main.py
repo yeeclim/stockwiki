@@ -41,45 +41,41 @@ def _fetch_active_users() -> list[dict]:
     return r.json()
 
 
-def _fetch_watchlist(user_id: str) -> list[dict]:
-    """감시 종목 조회 우선순위:
-    1. 사용자 지정 trading_watchlist
-    2. 최신 스크리닝 결과 상위 5종목 (2일 이내)
-    3. 하드코딩 fallback
-    """
-    # 1. 사용자 지정 watchlist
-    try:
-        r = requests.get(
-            f"{_SUPABASE_URL}/rest/v1/trading_watchlist"
-            f"?user_id=eq.{user_id}&is_active=eq.true",
-            headers=_supabase_headers(),
-            timeout=10,
-        )
-        items = r.json() if r.ok else []
-        if items:
-            return [{'code': w['stock_code'], 'name': w['stock_name']} for w in items]
-    except Exception:
-        pass
+def _fetch_watchlist() -> list[dict]:
+    """감시 종목 = 최신 스크리닝 결과 상위 5종목 (2일 이내). 없으면 빈 리스트.
 
-    # 2. 최신 스크리닝 결과 상위 5종목
+    예전엔 이 앞에 trading_watchlist(사용자 지정 종목) 조회가 있었는데, 그 테이블은
+    실제로 만들어진 적이 없다. PostgREST가 PGRST205(테이블 없음)를 돌려주는 걸
+    except 로 삼켜서, 기능이 죽은 줄 모른 채 항상 아래 스크리닝 결과로 넘어가고
+    있었다. 죽은 경로를 남겨두면 다음 사람이 또 속으므로 걷어냈다.
+    사용자 지정 감시종목이 필요해지면 그때 테이블부터 만들고 되살린다.
+    """
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
     try:
-        from datetime import datetime, timedelta, timezone
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
         r = requests.get(
             f"{_SUPABASE_URL}/rest/v1/screening_results"
             f"?pass=eq.true&screened_at=gte.{cutoff}&order=score.desc&limit=5",
             headers=_supabase_headers(),
             timeout=10,
         )
-        picks = r.json() if r.ok else []
-        if picks:
-            print(f"📋 스크리닝 상위 {len(picks)}종목 사용: "
-                  f"{', '.join(p['stock_name'] for p in picks)}")
-            return [{'code': p['stock_code'], 'name': p['stock_name']} for p in picks]
-    except Exception:
-        pass
+        if not r.ok:
+            # 조용히 []를 돌려주면 "감시할 종목이 없는 날"과 구분이 안 된다.
+            # 위 trading_watchlist 버그가 오래 숨어 있었던 이유가 정확히 이것이다.
+            print(f"⚠️  스크리닝 결과 조회 실패({r.status_code}) — 감시 종목 없음")
+            return []
+        picks = r.json()
+    except Exception as e:
+        print(f"⚠️  스크리닝 결과 조회 오류({e}) — 감시 종목 없음")
+        return []
 
-    return []
+    if not picks:
+        print("📋 최근 2일 내 통과 종목 없음 — 감시 종목 없음")
+        return []
+
+    print(f"📋 스크리닝 상위 {len(picks)}종목 사용: "
+          f"{', '.join(p['stock_name'] for p in picks)}")
+    return [{'code': p['stock_code'], 'name': p['stock_name']} for p in picks]
 
 
 def is_market_open() -> bool:
@@ -112,7 +108,7 @@ def run_for_user(user_cfg: dict) -> str:
     buf.write(f"  StockWiki 자동매매  |  {now_str}\n")
     buf.write(f"{'='*60}\n")
 
-    watchlist = _fetch_watchlist(user_cfg.get('user_id', ''))
+    watchlist = _fetch_watchlist()
     if not watchlist:
         buf.write("⏸  스크리닝 통과 종목 없음 — 매매 건너뜀\n")
         return buf.getvalue()
