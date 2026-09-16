@@ -43,28 +43,35 @@ export default async function handler(req, res) {
     //
     // 게다가 Groq 이 지금 대화용으로 주는 모델은 3개뿐이라, 한 provider 에 묶여
     // 있으면 정원 자체가 그만큼으로 깎인다. OpenRouter 무료 모델을 섞는다.
+    // provider 를 번갈아 배치한다. 같은 provider 를 몰아 두면 그 조직의 분당
+    // 한도에 한꺼번에 걸려 위원회가 통째로 비기 때문이다 (Groq 3개를 동시에
+    // 쏘다가 429 "Request too large for organization" 을 맞은 적이 있다).
+    // key 가 없는 provider 는 아예 후보에서 빠진다 — 실패로 세면 정원만 부풀고
+    // 검증도가 억울하게 깎인다.
     const ALL_MODELS = [
-      // Groq — 응답이 빠르다
-      { p: 'groq', name: 'Qwen3.8 27B',  id: 'qwen/qwen3.8-27b',    fn: q => askGroqThink(q, 'qwen/qwen3.8-27b', 'Qwen3.8 27B') },
-      { p: 'groq', name: 'GPT-OSS 120B', id: 'openai/gpt-oss-120b', fn: q => askGroqOss(q, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
-      { p: 'groq', name: 'GPT-OSS 20B',  id: 'openai/gpt-oss-20b',  fn: q => askGroqOss(q, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
-      // OpenRouter 무료 — provider 분산용. 코드용·비전용·초소형 모델은 제외하고
-      // 지시 이행이 되는 범용 모델만 골랐다 (ling-fin 은 금융 튜닝 모델).
-      { p: 'or', name: 'GLM 5.2',    id: 'z-ai/glm-5.2:free',                       fn: q => askOpenRouter(q, 'z-ai/glm-5.2:free', 'GLM 5.2') },
-      { p: 'or', name: 'Nemotron',   id: 'nvidia/nemotron-3-super-120b-a12b:free',  fn: q => askOpenRouter(q, 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron') },
-      { p: 'or', name: 'Ling Fin',   id: 'inclusionai/ling-3.0-flash-fin:free',     fn: q => askOpenRouter(q, 'inclusionai/ling-3.0-flash-fin:free', 'Ling Fin') },
-      { p: 'or', name: 'Gemma 4',    id: 'google/gemma-4-31b-it:free',              fn: q => askOpenRouter(q, 'google/gemma-4-31b-it:free', 'Gemma 4') },
+      { p: 'groq',    key: 'GROQ_API_KEY',         name: 'GPT-OSS 120B', id: 'openai/gpt-oss-120b', fn: q => askGroqOss(q, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
+      { p: 'mistral', key: 'MISTRAL_API_KEY',      name: 'Mistral Small', fn: q => askMistral(q, 'mistral-small-4-0-26-03', 'Mistral Small') },
+      { p: 'cohere',  key: 'COHERE_API_KEY',       name: 'Command A',     fn: q => askCohere(q, 'command-a-03-2025', 'Command A') },
+      { p: 'cf',      key: 'CLOUDFLARE_API_TOKEN', name: 'Llama 3.1 (CF)', fn: q => askCloudflare(q, '@cf/meta/llama-3.1-8b-instruct', 'Llama 3.1 (CF)') },
+      { p: 'or',      key: 'OPENROUTER_API_KEY',   name: 'GLM 5.2',      id: 'z-ai/glm-5.2:free',   fn: q => askOpenRouter(q, 'z-ai/glm-5.2:free', 'GLM 5.2') },
+      { p: 'groq',    key: 'GROQ_API_KEY',         name: 'GPT-OSS 20B',  id: 'openai/gpt-oss-20b',  fn: q => askGroqOss(q, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
+      { p: 'or',      key: 'OPENROUTER_API_KEY',   name: 'Ling Fin',     id: 'inclusionai/ling-3.0-flash-fin:free', fn: q => askOpenRouter(q, 'inclusionai/ling-3.0-flash-fin:free', 'Ling Fin') },
+      { p: 'groq',    key: 'GROQ_API_KEY',         name: 'Qwen3.8 27B',  id: 'qwen/qwen3.8-27b',    fn: q => askGroqThink(q, 'qwen/qwen3.8-27b', 'Qwen3.8 27B') },
+      { p: 'or',      key: 'OPENROUTER_API_KEY',   name: 'Gemma 4',      id: 'google/gemma-4-31b-it:free', fn: q => askOpenRouter(q, 'google/gemma-4-31b-it:free', 'Gemma 4') },
     ];
 
     const [groqIds, orIds] = await Promise.all([
       getAvailableModelIds(),
       getAvailableOpenRouterIds(),
     ]);
-    // 목록 조회가 실패한(null) provider 는 필터링 없이 그대로 시도한다 —
-    // 목록 때문에 위원회가 통째로 비는 쪽이 더 나쁘다.
+    // 모델 목록을 주는 provider(Groq/OpenRouter)는 폐기된 ID 를 걸러내고,
+    // 나머지는 키 존재 여부로만 판단한다. 목록 조회가 실패하면(null) 필터링을
+    // 건너뛴다 — 목록 때문에 위원회가 통째로 비는 쪽이 더 나쁘다.
     const isAvailable = (m) => {
-      const ids = m.p === 'groq' ? groqIds : orIds;
-      return ids === null ? true : ids.has(m.id);
+      if (!getEnv(m.key)) return false;
+      if (m.p === 'groq') return groqIds === null || groqIds.has(m.id);
+      if (m.p === 'or')   return orIds   === null || orIds.has(m.id);
+      return true;
     };
 
     const MODEL_POOL = ALL_MODELS.filter(isAvailable)
@@ -72,7 +79,7 @@ export default async function handler(req, res) {
       .map(m => ({ name: m.name, fn: () => m.fn(question) }));
 
     if (MODEL_POOL.length === 0) {
-      throw new Error('사용 가능한 AI 모델이 없습니다 (Groq 모델 목록 확인 필요)');
+      throw new Error('사용 가능한 AI 모델이 없습니다 (API 키 설정을 확인하세요)');
     }
 
     const withTimeout = (fn, ms = 20000) => Promise.race([
@@ -614,6 +621,101 @@ async function askOpenRouter(question, model, displayName) {
   }
   content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
+}
+
+// ── 추가 무료 티어 provider ──────────────────────────────────────────────────
+// Groq 하나에 의존하면 그 조직의 분당 토큰 한도가 곧 위원회 정원이 된다.
+// 아래 셋은 각각 별도 한도를 쓰므로, 한쪽이 429 여도 다른 쪽이 답한다.
+
+// Mistral La Plateforme — 무료 Experiment 플랜. OpenAI 호환 형식.
+async function askMistral(question, model, displayName) {
+  const apiKey = getEnv('MISTRAL_API_KEY');
+  if (!apiKey) throw new Error('MISTRAL_API_KEY 미설정');
+
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_INSTRUCTION },
+        { role: 'user', content: question + PROMPT_SUFFIX },
+      ],
+      max_tokens: 2000,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
+  }
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
+  return validateConclusion(sanitizeAndValidateLanguage(content.trim(), displayName), displayName);
+}
+
+// Cohere — 무료 trial 키(월 1,000회 / 분 20회). v2/chat 은 응답 형식이 다르다:
+// message.content 가 문자열이 아니라 [{type:'text', text:'...'}] 배열이다.
+async function askCohere(question, model, displayName) {
+  const apiKey = getEnv('COHERE_API_KEY');
+  if (!apiKey) throw new Error('COHERE_API_KEY 미설정');
+
+  const response = await fetch('https://api.cohere.com/v2/chat', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_INSTRUCTION },
+        { role: 'user', content: question + PROMPT_SUFFIX },
+      ],
+      max_tokens: 2000,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
+  }
+  const data = await response.json();
+  const parts = data.message?.content;
+  const content = Array.isArray(parts)
+    ? parts.filter(c => c?.type === 'text').map(c => c.text).join('')
+    : parts;
+  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
+  return validateConclusion(sanitizeAndValidateLanguage(content.trim(), displayName), displayName);
+}
+
+// Cloudflare Workers AI — 계정당 일 10,000 뉴런 무료 (Llama 8B 기준 15~25회).
+// 한도가 작아 금방 소진되지만, 소진되면 그 위원만 빠진다.
+// 모델 ID 는 CLOUDFLARE_AI_MODEL 로 덮어쓸 수 있다(재배포 없이 교체하려고).
+async function askCloudflare(question, model, displayName) {
+  const apiKey = getEnv('CLOUDFLARE_API_TOKEN');
+  const accountId = getEnv('CLOUDFLARE_ACCOUNT_ID');
+  if (!apiKey || !accountId) throw new Error('CLOUDFLARE_API_TOKEN/ACCOUNT_ID 미설정');
+
+  const target = getEnv('CLOUDFLARE_AI_MODEL') || model;
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${target}`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: SYSTEM_INSTRUCTION },
+          { role: 'user', content: question + PROMPT_SUFFIX },
+        ],
+        max_tokens: 2000,
+      }),
+    },
+  );
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
+  }
+  const data = await response.json();
+  const content = data.result?.response;
+  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
+  return validateConclusion(sanitizeAndValidateLanguage(content.trim(), displayName), displayName);
 }
 
 // AI 응답에서 추천 파싱
