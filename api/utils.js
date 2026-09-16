@@ -191,10 +191,14 @@ async function handleKrCandles(req, res) {
 // 국내(kr-candles)와 똑같은 JSON 형태로 내려주고 클라이언트의 k_chart_plus 가
 // 그리게 하면, 이미지 소스 한 곳이 막힌다고 차트가 사라지는 구조에서 벗어난다.
 async function handleUsCandles(req, res) {
-    const symbol = (req.query.symbol || '').toString().trim().toUpperCase();
-    if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(symbol)) {
+    const raw = (req.query.symbol || '').toString().trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(raw)) {
         return res.status(400).json({ success: false, error: '유효하지 않은 심볼입니다' });
     }
+    // Yahoo 는 클래스주를 BRK-B 처럼 하이픈으로 쓴다. /api/us-stock-search 도
+    // 하이픈 형식을 주므로 실사용 경로는 그대로지만, 다른 소스에서 온 BRK.B
+    // 형식이 들어와도 404 로 떨어지지 않도록 맞춰 준다.
+    const symbol = raw.replace('.', '-');
     const periodRaw = (req.query.period || 'D').toString().toUpperCase();
     const period = ['D', 'W', 'M'].includes(periodRaw) ? periodRaw : 'D';
 
