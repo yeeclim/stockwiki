@@ -1,5 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// 자동매매 설정.
+///
+/// kisAppKey / kisAppSecret / kisAccountNo / notifyKakaoRefreshToken 은
+/// **저장할 때만** 값이 들어 있다. 서버는 이 값들을 AES-256-GCM 으로 암호화해
+/// 보관하고 복호화해서 돌려주지 않으므로, load() 로 만든 객체에서는 항상 빈
+/// 문자열이다. 저장 여부는 [hasStoredKeys] 로 판단한다.
 class TradingConfig {
   final String brokerType;
   final String kisAppKey;
@@ -12,6 +18,14 @@ class TradingConfig {
   final bool isActive;
   final DateTime? githubRegisteredAt;
 
+  /// 서버에 키가 이미 저장돼 있는가. true 면 설정 화면은 마스킹만 보여주고,
+  /// 사용자가 새로 입력한 항목만 서버로 보낸다(빈 칸은 기존 값 유지).
+  final bool hasStoredKeys;
+
+  /// 카카오 알림 토큰이 저장돼 있는가. 토큰 자체도 암호화돼 있어 값으로는
+  /// 판별할 수 없으므로 notify_kakao_active 플래그를 쓴다.
+  final bool hasStoredKakao;
+
   const TradingConfig({
     this.brokerType = 'kis',
     required this.kisAppKey,
@@ -23,17 +37,20 @@ class TradingConfig {
     this.dailyMaxBuy,
     this.isActive = true,
     this.githubRegisteredAt,
+    this.hasStoredKeys = false,
+    this.hasStoredKakao = false,
   });
 
   factory TradingConfig.fromMap(Map<String, dynamic> m) => TradingConfig(
         brokerType: m['broker_type'] as String? ?? 'kis',
-        kisAppKey: m['kis_app_key'] as String,
-        kisAppSecret: m['kis_app_secret'] as String,
-        kisAccountNo: m['kis_account_no'] as String,
+        // 서버가 돌려주는 건 암호문이다. 화면에 채울 수도, 쓸 수도 없으므로
+        // 모델에 싣지 않는다 — 존재 여부만 hasStoredKeys 로 전달한다.
+        kisAppKey: '',
+        kisAppSecret: '',
+        kisAccountNo: '',
         kisAccountProdCode: m['kis_account_prod_code'] as String? ?? '01',
         notifyEmail: m['notify_email'] as String? ?? '',
-        notifyKakaoRefreshToken:
-            m['notify_kakao_refresh_token'] as String? ?? '',
+        notifyKakaoRefreshToken: '',
         dailyMaxBuy: m['daily_max_buy'] != null
             ? (m['daily_max_buy'] as num).toInt()
             : null,
@@ -41,18 +58,29 @@ class TradingConfig {
         githubRegisteredAt: m['github_registered_at'] != null
             ? DateTime.parse(m['github_registered_at'] as String)
             : null,
+        hasStoredKeys:
+            ((m['kis_app_key'] as String?) ?? '').isNotEmpty,
+        hasStoredKakao: m['notify_kakao_active'] as bool? ?? false,
       );
 
-  Map<String, dynamic> toMap() => {
-        'broker_type': brokerType,
-        'kis_app_key': kisAppKey,
-        'kis_app_secret': kisAppSecret,
-        'kis_account_no': kisAccountNo,
-        'kis_account_prod_code': kisAccountProdCode,
-        'notify_email': notifyEmail,
-        'notify_kakao_refresh_token': notifyKakaoRefreshToken,
-        'daily_max_buy': dailyMaxBuy,
-      };
+  /// 비어 있는 민감 필드는 아예 보내지 않는다. 서버(register-to-github)는
+  /// 누락된 필드를 "기존 값 유지"로 처리하므로, 사용자가 한도만 바꾸고 저장해도
+  /// 저장된 키가 지워지지 않는다.
+  Map<String, dynamic> toMap() {
+    final m = <String, dynamic>{
+      'broker_type': brokerType,
+      'kis_account_prod_code': kisAccountProdCode,
+      'notify_email': notifyEmail,
+      'daily_max_buy': dailyMaxBuy,
+    };
+    if (kisAppKey.isNotEmpty) m['kis_app_key'] = kisAppKey;
+    if (kisAppSecret.isNotEmpty) m['kis_app_secret'] = kisAppSecret;
+    if (kisAccountNo.isNotEmpty) m['kis_account_no'] = kisAccountNo;
+    if (notifyKakaoRefreshToken.isNotEmpty) {
+      m['notify_kakao_refresh_token'] = notifyKakaoRefreshToken;
+    }
+    return m;
+  }
 }
 
 class TradingConfigService {
@@ -73,10 +101,11 @@ class TradingConfigService {
     return TradingConfig.fromMap(rows.first);
   }
 
-  /// 설정 저장 + GitHub Actions 시크릿 자동 등록
+  /// 설정 저장. Edge Function이 민감 필드를 암호화해 DB에 upsert 합니다.
   ///
-  /// Edge Function이 DB upsert + GitHub API 등록을 모두 처리합니다.
-  /// 반환값: {'ok': true, 'github': true/false}
+  /// (함수 이름은 register-to-github 지만 GitHub 등록은 하지 않습니다 —
+  ///  읽는 곳이 없는 repo secrets 사본이라 제거했습니다.)
+  /// 반환값: {'ok': true, 'saved': true}
   static Future<Map<String, dynamic>> saveAndRegister(TradingConfig cfg) async {
     final session = _sb.auth.currentSession;
     if (session == null) throw Exception('로그인이 필요합니다.');

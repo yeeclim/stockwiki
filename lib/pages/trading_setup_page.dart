@@ -64,12 +64,11 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
         _loading = false;
         if (cfg != null) {
           _selectedBroker = cfg.brokerType;
-          _appKeyCtrl.text = cfg.kisAppKey;
-          _appSecretCtrl.text = cfg.kisAppSecret;
-          _accountCtrl.text = cfg.kisAccountNo;
+          // App Key / Secret / 계좌번호 / 카카오 토큰은 서버에 암호화돼 있고
+          // 복호화해서 돌려주지 않으므로 채우지 않는다. 저장돼 있다는 사실만
+          // 힌트로 보여주고, 사용자가 새로 입력할 때만 교체된다.
           _prodCodeCtrl.text = cfg.kisAccountProdCode;
           _emailCtrl.text = cfg.notifyEmail;
-          _kakaoCtrl.text = cfg.notifyKakaoRefreshToken;
           if (cfg.dailyMaxBuy != null) {
             _dailyMaxCtrl.text = cfg.dailyMaxBuy.toString();
           }
@@ -104,17 +103,31 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     );
 
     try {
-      final res = await TradingConfigService.saveAndRegister(cfg);
+      await TradingConfigService.saveAndRegister(cfg);
       if (!mounted) return;
 
-      final githubOk = res['github'] == true;
       _showResult(
-        githubOk
-            ? '✅ 저장 완료!\nGitHub Actions 시크릿에 자동 등록됐습니다.'
-            : '✅ 저장 완료!\n(GitHub 등록은 관리자에게 문의하세요)',
+        '✅ 저장 완료!\n키는 암호화되어 저장됐습니다. 다음 장부터 적용됩니다.',
         isError: false,
       );
-      setState(() => _existing = cfg);
+      // 저장 직후에도 화면은 "등록됨" 상태여야 한다. 방금 보낸 평문을 그대로
+      // 들고 있으면 안 되므로 민감 필드를 비운 사본으로 교체한다.
+      setState(() {
+        _existing = TradingConfig(
+          brokerType: cfg.brokerType,
+          kisAppKey: '',
+          kisAppSecret: '',
+          kisAccountNo: '',
+          kisAccountProdCode: cfg.kisAccountProdCode,
+          notifyEmail: cfg.notifyEmail,
+          dailyMaxBuy: cfg.dailyMaxBuy,
+          hasStoredKeys: true,
+        );
+        _appKeyCtrl.clear();
+        _appSecretCtrl.clear();
+        _accountCtrl.clear();
+        _kakaoCtrl.clear();
+      });
     } catch (e) {
       if (!mounted) return;
       _showResult('오류: $e', isError: true);
@@ -294,15 +307,15 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                         _Field(
                           controller: _appKeyCtrl,
                           label: 'App Key',
-                          hint: 'P5...로 시작하는 키',
+                          hint: _storedHint('P5...로 시작하는 키'),
                           icon: Icons.vpn_key_outlined,
-                          validator: _required,
+                          validator: _requiredUnlessStored,
                         ),
                         const SizedBox(height: 12),
                         _Field(
                           controller: _appSecretCtrl,
                           label: 'App Secret',
-                          hint: '발급받은 App Secret',
+                          hint: _storedHint('발급받은 App Secret'),
                           icon: Icons.lock_outline,
                           obscure: _obscureSecret,
                           suffixIcon: IconButton(
@@ -312,18 +325,19 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                             onPressed: () => setState(
                                 () => _obscureSecret = !_obscureSecret),
                           ),
-                          validator: _required,
+                          validator: _requiredUnlessStored,
                         ),
                         const SizedBox(height: 12),
                         _Field(
                           controller: _accountCtrl,
                           label: '계좌번호',
-                          hint: '8자리 숫자',
+                          hint: _storedHint('8자리 숫자'),
                           icon: Icons.account_balance_outlined,
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
-                              return '계좌번호를 입력하세요.';
+                              // 저장된 값이 있으면 빈 칸 = 변경 안 함
+                              return _keysStored ? null : '계좌번호를 입력하세요.';
                             }
                             if (v.trim().length != 8) return '계좌번호는 8자리입니다.';
                             return null;
@@ -366,7 +380,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                                 ?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         Text(
-                          _kakaoCtrl.text.trim().isEmpty
+                          !_kakaoLinked
                               ? '카카오 로그인 한 번으로 스크리닝 결과를 카카오톡으로 받아보세요.'
                               : '✅ 카카오톡 알림이 연동되어 있습니다.',
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -378,7 +392,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                           child: OutlinedButton.icon(
                             onPressed: _existing == null ? null : _connectKakao,
                             icon: const Icon(Icons.chat_bubble_outline),
-                            label: Text(_kakaoCtrl.text.trim().isEmpty
+                            label: Text(!_kakaoLinked
                                 ? '카카오 알림 연동하기'
                                 : '카카오 알림 다시 연동하기'),
                           ),
@@ -525,6 +539,20 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
     );
   }
 
+  /// 이미 저장된 키가 있으면 빈 칸은 "변경 안 함"이지 오류가 아니다.
+  bool get _keysStored => _existing?.hasStoredKeys ?? false;
+
+  /// 카카오 토큰도 암호화 저장이라 값으로 판별할 수 없다. 저장 플래그 또는
+  /// 이번 화면에서 새로 입력/연동한 값이 있으면 연동된 것으로 본다.
+  bool get _kakaoLinked =>
+      _kakaoCtrl.text.trim().isNotEmpty || (_existing?.hasStoredKakao ?? false);
+
+  String? _requiredUnlessStored(String? v) =>
+      _keysStored && (v == null || v.trim().isEmpty) ? null : _required(v);
+
+  String _storedHint(String label) =>
+      _keysStored ? '•••••••• 저장됨 — 변경하려면 새로 입력' : label;
+
   String? _required(String? v) =>
       (v == null || v.trim().isEmpty) ? '필수 항목입니다.' : null;
 }
@@ -555,15 +583,12 @@ class _StatusBanner extends StatelessWidget {
         text: '자동매매가 일시 중지 상태입니다.\n키를 재등록하면 다시 활성화됩니다.',
       );
     }
-    final registered = existing!.githubRegisteredAt;
-    final dateStr = registered != null
-        ? '${registered.year}-${registered.month.toString().padLeft(2, '0')}-${registered.day.toString().padLeft(2, '0')}'
-        : '알 수 없음';
     return _banner(
       icon: Icons.check_circle_outline,
       color: Colors.green,
       bg: Colors.green.withValues(alpha: 0.1),
-      text: '자동매매 활성 중  •  GitHub 등록일: $dateStr\n수정 후 다시 등록하면 즉시 반영됩니다.',
+      text: '자동매매 활성 중  •  API 키는 암호화되어 저장됩니다.\n'
+          '보안상 저장된 키는 다시 표시하지 않습니다. 바꿀 항목만 새로 입력하세요.',
     );
   }
 

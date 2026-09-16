@@ -14,6 +14,7 @@ import email_notify
 import us_market_brief
 from strategy import _score_entry
 from news_sentiment import get_sentiment
+import config_crypto
 
 _SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
@@ -384,7 +385,17 @@ def screen():
             )
             r.raise_for_status()
             rows = r.json()
-            return [row.get('notify_kakao_refresh_token') for row in rows if row.get('notify_kakao_refresh_token')]
+            # 토큰도 trading_configs 에 암호화 저장돼 있다 (config_crypto 참조).
+            tokens = []
+            for row in rows:
+                raw = row.get('notify_kakao_refresh_token')
+                if not raw:
+                    continue
+                try:
+                    tokens.append(config_crypto.decrypt(raw))
+                except Exception as e:
+                    print(f"⚠️  카카오 토큰 복호화 실패 (user_id={row.get('user_id')}): {e}")
+            return tokens
         except Exception as e:
             print(f"⚠️  카카오 수신자 조회 실패: {e}")
             return []

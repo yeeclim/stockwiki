@@ -11,6 +11,8 @@ import traceback
 from datetime import datetime
 from io import StringIO
 import pytz
+
+import config_crypto
 import requests
 
 from brokers import create_api
@@ -31,14 +33,29 @@ def _supabase_headers():
 
 
 def _fetch_active_users() -> list[dict]:
-    """trading_configs에서 활성 사용자 설정 전체 조회"""
+    """trading_configs에서 활성 사용자 설정 전체 조회 (민감 필드는 복호화해서 반환).
+
+    DB에는 KIS App Key/Secret·계좌번호·카카오 토큰이 AES-256-GCM 으로 들어 있다.
+    복호화 키(TRADING_ENC_KEY)는 GitHub Secrets 에만 있으므로 DB 가 유출돼도
+    자격증명은 풀리지 않는다. 암호화 이전에 저장된 평문 행은 config_crypto 가
+    접두사로 구분해 그대로 통과시킨다.
+    """
     r = requests.get(
         f"{_SUPABASE_URL}/rest/v1/trading_configs?is_active=eq.true",
         headers=_supabase_headers(),
         timeout=10,
     )
     r.raise_for_status()
-    return r.json()
+
+    users = []
+    for cfg in r.json():
+        try:
+            users.append(config_crypto.decrypt_config(cfg))
+        except Exception as e:
+            # 이 사용자만 건너뛴다. 깨진 키로 증권사 인증을 시도하면 계정이
+            # 잠길 수 있으므로 조용히 평문 취급하며 진행하지 않는다.
+            print(f"⚠️  설정 복호화 실패 (user_id={cfg.get('user_id')}): {e} — 건너뜀")
+    return users
 
 
 def _fetch_watchlist() -> list[dict]:

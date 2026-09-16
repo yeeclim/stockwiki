@@ -4,3 +4,5 @@ beautifulsoup4==4.12.3
 lxml==5.2.2
 anthropic>=0.40.0
 finance-datareader>=0.9.50
+# trading_configs 민감 필드 복호화 (AES-256-GCM) — config_crypto.py
+cryptography>=42.0
