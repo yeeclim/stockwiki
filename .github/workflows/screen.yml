@@ -35,6 +35,9 @@ jobs:
           KIS_ACCOUNT_PROD_CODE:     ${{ secrets.KIS_ACCOUNT_PROD_CODE }}
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # trading_configs 의 KIS 자격증명 복호화 (trading/config_crypto.py).
+          # 없으면 모든 사용자가 복호화 실패로 건너뛰어진다.
+          TRADING_ENC_KEY:          ${{ secrets.TRADING_ENC_KEY }}
           EMAIL_SENDER:              ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD:            ${{ secrets.EMAIL_PASSWORD }}
           KAKAO_REST_API_KEY:        ${{ secrets.KAKAO_REST_API_KEY }}
