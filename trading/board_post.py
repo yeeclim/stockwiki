@@ -59,9 +59,8 @@ def screening_content(
     signal_html = ''
     if signals:
         from us_market_brief import signal_chip_text
-        bull = sum(1 for s in signals if s['direction'] > 0)
-        bear = sum(1 for s in signals if s['direction'] < 0)
-        neutral = len(signals) - bull - bear
+        import market_signals
+        bull, bear, neutral = market_signals.signal_counts(signals)
         verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
         chips = ' '.join(f"[{signal_chip_text(s)}]" for s in signals)
         signal_html = (

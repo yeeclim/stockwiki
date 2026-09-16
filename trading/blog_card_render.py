@@ -70,9 +70,9 @@ def close_phase_now(now=None) -> str:
 
 
 def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
-    bull = sum(1 for s in signals if s.get('direction', 0) > 0)
-    bear = sum(1 for s in signals if s.get('direction', 0) < 0)
-    return bull, bear, len(signals) - bull - bear
+    """메일·게시판과 같은 기준(상관 그룹당 1표)으로 센다. market_signals 참조."""
+    import market_signals
+    return market_signals.signal_counts(signals)
 
 
 def verdict_line(brief: dict) -> str:

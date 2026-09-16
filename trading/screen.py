@@ -332,6 +332,18 @@ def screen():
         print(f"⚠️  미국시장 브리핑 생성 실패: {e}")
         brief = None
 
+    # 오늘 신호 판정을 적중률 로그에 남긴다. 나중에 forecast_log.py report 로
+    # "이 판정이 그냥 '항상 강세' 라고 찍는 것보다 나았나" 를 검증하기 위한 기록이다.
+    # 실패해도 스크리닝 본 흐름에 영향을 주면 안 된다.
+    try:
+        import forecast_log
+        forecast_log.record(brief)
+        # 어제까지의 미기입 행에 실제 시가/종가를 채운다. 매일 도는 이 스크립트가
+        # 채우기까지 겸하므로 별도 워크플로가 필요 없다.
+        forecast_log.fill_outcomes()
+    except Exception as e:
+        print(f"⚠️  적중률 로그 기록 생략: {e}")
+
     # 게시판 히스토리 등록
     import board_post
     from datetime import datetime, timezone

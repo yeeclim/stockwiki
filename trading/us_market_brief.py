@@ -16,6 +16,7 @@ import requests
 
 import us_market_data as umd
 import kr_market_data as kmd
+import market_signals
 
 _ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '').strip()
 
@@ -414,9 +415,9 @@ def signal_chip_text(s: dict) -> str:
 
 
 def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
-    bull = sum(1 for s in signals if s['direction'] > 0)
-    bear = sum(1 for s in signals if s['direction'] < 0)
-    return bull, bear, len(signals) - bull - bear
+    """상관 그룹 단위 집계 (market_signals 참조). 지표 하나당 1표로 세면
+    같은 재료가 여러 지표에 중복 반영돼 표차가 부풀려지기 때문이다."""
+    return market_signals.signal_counts(signals)
 
 
 def render_text(brief: dict) -> str:
@@ -438,9 +439,11 @@ def render_text(brief: dict) -> str:
         bull, bear, neutral = _signal_counts(signals)
         verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
         lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
+        lines.append('   집계(그룹): ' + market_signals.votes_line(signals))
         lines.append('   ' + '  '.join(f"[{signal_chip_text(s)}]" for s in signals))
         lines.append('   ※ ▲▼는 지표 자체의 방향, 강세/약세는 그 움직임의 시장 해석입니다'
                      ' (예: VIX ▼ = 강세)')
+        lines.append('   ※ 서로 상관된 지표(미국증시·VIX·금리 등)는 한 그룹으로 묶어 1표만 셉니다')
         lines.append('   ※ 통계적 확률이 아닌 단순 신호 조합입니다')
         lines.append('')
 
@@ -669,9 +672,13 @@ def render_email_html(brief: dict, report_text: str) -> str:
         <span style="color:{_INK};font-weight:800;font-size:20px;">중립 {neutral}</span>
         <span style="color:{verdict_color};font-weight:800;font-size:14px;margin-left:8px;">({verdict})</span>
       </div>
+      <div style="margin-top:6px;color:{_MUTED};font-size:11px;">
+        집계(그룹): {html_lib.escape(market_signals.votes_line(signals))}
+      </div>
       <div style="margin-top:10px;">{chips}</div>
       <div style="margin-top:8px;color:{_MUTED};font-size:10.5px;">
         ※ ▲▼는 지표 자체의 방향, 옆의 강세/약세는 그 움직임의 시장 해석입니다 (예: VIX ▼ = 위험선호 = 강세).<br>
+        ※ 미국증시·VIX·미금리처럼 같은 재료를 다르게 본 지표는 한 그룹으로 묶어 1표만 셉니다 (중복 계산 방지).<br>
         ※ 통계적으로 검증된 확률이 아니라, 이미 수집한 지표들을 방향(상승/하락)으로만 환산해 개수를 센 단순 신호 조합입니다.
       </div>
     </td></tr>
