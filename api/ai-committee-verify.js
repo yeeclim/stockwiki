@@ -32,28 +32,44 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...cached.data, cached: true });
     }
 
-    // 후보 모델. Groq 는 모델을 주기적으로 폐기(retire)하는데, 그때마다 여기 박아둔
-    // ID 가 404 를 내며 위원회 자리가 에러 카드로 바뀐다. 실제로 세 번 겪었다:
+    // 후보 모델. provider 별로 "지금 실제 제공되는지"를 확인해 거른다.
+    //
+    // 왜 이렇게까지 하냐면, 모델 ID 를 박아두면 provider 가 폐기할 때마다 위원
+    // 자리가 404 에러 카드로 바뀌기 때문이다. 실제로 세 번 겪었다:
     //   2026-07-31  qwen3-32b, llama-4-scout 폐기
     //   2026-08-16  llama-3.3-70b-versatile, llama-3.1-8b-instant 폐기
-    //   2026-09-16  qwen3.6-27b 폐기 (이때 활동 위원이 5명 중 1명까지 떨어져 있었다)
-    // 그래서 아래 getAvailableModelIds() 로 매번 실제 제공 목록을 확인하고, 사라진
-    // 모델은 에러로 보여주는 대신 후보에서 빼버린다. 다음 폐기 때는 위원 수가
-    // 줄어들 뿐 에러 카드가 뜨지 않는다.
+    //   2026-09-16  qwen3.6-27b 폐기 — 이때 활동 위원이 5명 중 1명까지 떨어져
+    //               있었는데, 화면에는 슬롯이 3칸뿐이라 한 명만 실패한 것처럼 보였다
+    //
+    // 게다가 Groq 이 지금 대화용으로 주는 모델은 3개뿐이라, 한 provider 에 묶여
+    // 있으면 정원 자체가 그만큼으로 깎인다. OpenRouter 무료 모델을 섞는다.
     const ALL_MODELS = [
-      { name: 'Qwen3.8 27B',  id: 'qwen/qwen3.8-27b',        fn: q => askGroqThink(q, 'qwen/qwen3.8-27b', 'Qwen3.8 27B') },
-      { name: 'GPT-OSS 120B', id: 'openai/gpt-oss-120b',     fn: q => askGroqOss(q, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
-      { name: 'GPT-OSS 20B',  id: 'openai/gpt-oss-20b',      fn: q => askGroqOss(q, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
-      { name: 'MiniMax M2.7', id: 'minimaxai/minimax-m2.7',  fn: q => askGroqThink(q, 'minimaxai/minimax-m2.7', 'MiniMax M2.7') },
-      { name: 'Llama 3.3',    id: 'llama-3.3-70b-versatile', fn: q => askGroq(q, 'llama-3.3-70b-versatile', 'Llama 3.3') },
-      { name: 'Llama 3.1',    id: 'llama-3.1-8b-instant',    fn: q => askGroq(q, 'llama-3.1-8b-instant', 'Llama 3.1') },
+      // Groq — 응답이 빠르다
+      { p: 'groq', name: 'Qwen3.8 27B',  id: 'qwen/qwen3.8-27b',    fn: q => askGroqThink(q, 'qwen/qwen3.8-27b', 'Qwen3.8 27B') },
+      { p: 'groq', name: 'GPT-OSS 120B', id: 'openai/gpt-oss-120b', fn: q => askGroqOss(q, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
+      { p: 'groq', name: 'GPT-OSS 20B',  id: 'openai/gpt-oss-20b',  fn: q => askGroqOss(q, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
+      // OpenRouter 무료 — provider 분산용. 코드용·비전용·초소형 모델은 제외하고
+      // 지시 이행이 되는 범용 모델만 골랐다 (ling-fin 은 금융 튜닝 모델).
+      { p: 'or', name: 'GLM 5.2',    id: 'z-ai/glm-5.2:free',                       fn: q => askOpenRouter(q, 'z-ai/glm-5.2:free', 'GLM 5.2') },
+      { p: 'or', name: 'Nemotron',   id: 'nvidia/nemotron-3-super-120b-a12b:free',  fn: q => askOpenRouter(q, 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron') },
+      { p: 'or', name: 'Ling Fin',   id: 'inclusionai/ling-3.0-flash-fin:free',     fn: q => askOpenRouter(q, 'inclusionai/ling-3.0-flash-fin:free', 'Ling Fin') },
+      { p: 'or', name: 'Gemma 4',    id: 'google/gemma-4-31b-it:free',              fn: q => askOpenRouter(q, 'google/gemma-4-31b-it:free', 'Gemma 4') },
     ];
 
-    const availableIds = await getAvailableModelIds();
-    const MODEL_POOL = (availableIds
-      ? ALL_MODELS.filter(m => availableIds.has(m.id))
-      : ALL_MODELS            // 목록 조회 실패 시엔 예전처럼 전부 시도
-    ).slice(0, 5).map(m => ({ name: m.name, fn: () => m.fn(question) }));
+    const [groqIds, orIds] = await Promise.all([
+      getAvailableModelIds(),
+      getAvailableOpenRouterIds(),
+    ]);
+    // 목록 조회가 실패한(null) provider 는 필터링 없이 그대로 시도한다 —
+    // 목록 때문에 위원회가 통째로 비는 쪽이 더 나쁘다.
+    const isAvailable = (m) => {
+      const ids = m.p === 'groq' ? groqIds : orIds;
+      return ids === null ? true : ids.has(m.id);
+    };
+
+    const MODEL_POOL = ALL_MODELS.filter(isAvailable)
+      .slice(0, 5)
+      .map(m => ({ name: m.name, fn: () => m.fn(question) }));
 
     if (MODEL_POOL.length === 0) {
       throw new Error('사용 가능한 AI 모델이 없습니다 (Groq 모델 목록 확인 필요)');
@@ -400,6 +416,26 @@ async function getAvailableModelIds() {
   }
 }
 
+// OpenRouter 가 지금 제공하는 모델 ID 목록. Groq 과 달리 조회에 키가 필요 없다.
+let _orIdCache = null;
+
+async function getAvailableOpenRouterIds() {
+  if (_orIdCache && Date.now() - _orIdCache.time < MODEL_LIST_TTL) return _orIdCache.ids;
+  if (!getEnv('OPENROUTER_API_KEY')) return new Set();   // 키가 없으면 후보에서 전부 제외
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/models');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const ids = new Set((data.data || []).map(m => m.id));
+    if (ids.size === 0) throw new Error('빈 목록');
+    _orIdCache = { ids, time: Date.now() };
+    return ids;
+  } catch (e) {
+    console.error('⚠️ OpenRouter 모델 목록 조회 실패 — 후보 필터링 생략:', e.message);
+    return null;
+  }
+}
+
 // Groq 추론 모델 (Qwen 등) — reasoning_effort: none으로 추론 자체를 꺼서, 좁은
 // max_tokens 예산을 추론이 아니라 최종 답변에만 쓰게 함. reasoning_format: hidden은
 // (추론을 껐어도) 혹시 모델이 추론 텍스트를 반환하는 경우를 대비한 이중 안전장치.
@@ -549,8 +585,15 @@ async function askOpenRouter(question, model, displayName) {
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: 'user', content: question + PROMPT_SUFFIX }],
-      max_tokens: 1000,
+      // Groq 쪽 헬퍼와 달리 SYSTEM_INSTRUCTION 이 빠져 있었다. 한국어·결론 형식을
+      // 지시하는 건 전부 이 시스템 메시지라, 없으면 모델이 영어로 답하거나 결론
+      // 줄을 빼먹어 validateConclusion 에서 떨어진다. 과거 OpenRouter 모델들이
+      // "불안정" 하다고 판단돼 하나씩 빠진 데는 이 누락도 한몫했을 것이다.
+      messages: [
+        { role: 'system', content: SYSTEM_INSTRUCTION },
+        { role: 'user', content: question + PROMPT_SUFFIX },
+      ],
+      max_tokens: 2000,
     }),
   });
 
@@ -559,9 +602,10 @@ async function askOpenRouter(question, model, displayName) {
     throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
+  let content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
-  return validateConclusion(content, displayName);
+  content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
 
 // AI 응답에서 추천 파싱
