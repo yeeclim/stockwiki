@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   try {
-    const { question, symbol, price, changePercent, isKorean = false } = req.body;
+    const { question, symbol, price, changePercent, isKorean = false, debug = false } = req.body;
 
     if (!question) {
       return res.status(400).json({ success: false, error: '질문이 필요합니다' });
@@ -142,6 +142,15 @@ export default async function handler(req, res) {
       finalRecommendation,
       summary,
       timestamp: new Date().toISOString(),
+      // debug:true 로 요청하면 시도한 위원 전원의 성공/실패를 함께 돌려준다.
+      // 화면에는 답한 위원만 보이므로, 왜 위원 수가 적은지는 이걸로만 알 수 있다.
+      // (Vercel 런타임 로그는 보존이 짧아 사후 조사에 쓰기 어렵다)
+      ...(debug ? {
+        attempts: [
+          ...answered.map(a => ({ name: a.name, ok: true })),
+          ...failed.map(f => ({ name: f.name, ok: false, error: f.error })),
+        ],
+      } : {}),
     };
 
     // 성공 → 30분 캐시 / 전체 실패 → 5분 캐시 (rate limit 반복 방지)
