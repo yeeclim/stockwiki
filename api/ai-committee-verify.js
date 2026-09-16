@@ -603,8 +603,15 @@ async function askOpenRouter(question, model, displayName) {
     throw new Error(`${displayName} HTTP ${response.status}: ${err.substring(0, 100)}`);
   }
   const data = await response.json();
-  let content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
+  const msg = data.choices?.[0]?.message;
+  // 추론형 모델은 본문을 content 가 아니라 reasoning 에 담아 보내기도 한다
+  // (Nemotron 이 그래서 '응답 파싱 실패' 로 떨어지고 있었다). 둘 다 비어 있으면
+  // finish_reason 을 에러에 실어 둔다 — length 면 max_tokens 부족이라는 뜻이다.
+  let content = msg?.content || msg?.reasoning;
+  if (!content) {
+    const why = data.choices?.[0]?.finish_reason || '내용 없음';
+    throw new Error(`${displayName} 응답 파싱 실패 (${why})`);
+  }
   content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
 }
