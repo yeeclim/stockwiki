@@ -34429,7 +34429,7 @@ if(m.length!==0)n.m(0,"kis_account_no",m)
 m=a.r
 if(m.length!==0)n.m(0,"notify_kakao_refresh_token",m)
 s=3
-return A.j(j.jK("register-to-github",n),$async$aCf)
+return A.j(j.jK("save-trading-config",n),$async$aCf)
 case 3:l=c
 if(l.b>=400){j=t.F5.a(l.a)
 k=j==null?null:J.R(j,"error")
