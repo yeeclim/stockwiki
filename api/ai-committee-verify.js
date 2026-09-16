@@ -82,37 +82,29 @@ export default async function handler(req, res) {
 
     const allResults = await Promise.allSettled(MODEL_POOL.map(m => withTimeout(m.fn)));
 
-    // 첫 번째 슬롯은 항상 표시 (성공·실패 무관)
-    const firstModel = MODEL_POOL[0];
-    const firstResult = allResults[0];
-    const firstEntry = (firstResult.status === 'fulfilled' && firstResult.value)
-      ? { name: firstModel.name, response: firstResult.value }
-      : { name: firstModel.name, error: firstResult.reason?.message || '응답 실패' };
-
-    if (firstEntry.error) console.error(`❌ ${firstModel.name} 실패:`, firstEntry.error);
-
-    // 나머지 Groq 모델 중 성공한 것 2개 채움
-    const groqSuccesses = [];
-    const groqFailures = [];
-    allResults.slice(1).forEach((result, i) => {
-      const name = MODEL_POOL[i + 1].name;
+    // 시도한 전부를 성공/실패로 갈라 둔다. 표시는 일부만 하더라도 검증도 계산은
+    // '시도한 전체' 기준이어야 하기 때문이다.
+    //
+    // 예전엔 표시용으로 고른 3개만 가지고 successRate = 성공/정원 을 계산했다.
+    // 표시가 3칸인데 분모는 정원(5)이라, 전원이 정상 응답해도 검증도가 60% 를
+    // 넘을 수 없었다. 점수가 모델 합의도가 아니라 표시 칸 수에 묶여 있었던 셈이다.
+    const answered = [];
+    const failed = [];
+    allResults.forEach((result, i) => {
+      const name = MODEL_POOL[i].name;
       if (result.status === 'fulfilled' && result.value) {
-        groqSuccesses.push({ name, response: result.value });
+        answered.push({ name, response: result.value });
       } else {
         const msg = result.reason?.message || '응답 실패';
         console.error(`❌ ${name} 실패:`, msg);
-        groqFailures.push({ name, error: msg });
+        failed.push({ name, error: msg });
       }
     });
 
-    const selected = [
-      firstEntry,
-      ...groqSuccesses.slice(0, 2),
-      ...groqFailures.slice(0, Math.max(0, 2 - groqSuccesses.length)),
-    ];
-
-    const successes = selected.filter(s => s.response);
-    const failures = selected.filter(s => s.error);
+    // 표시는 응답한 위원 전부 + (아무도 답하지 않았을 때만) 실패 사유 하나.
+    // 답한 위원이 있는데 굳이 에러 카드를 끼워 넣을 이유가 없다 — 모델 폐기 같은
+    // 운영 문제를 사용자 화면에 노출하던 게 오늘 발견한 Qwen 404 카드였다.
+    const selected = answered.length > 0 ? answered : failed.slice(0, 1);
 
     const models = selected.map(item =>
       item.response
@@ -134,7 +126,7 @@ export default async function handler(req, res) {
       throw new Error('모든 AI 모델 응답에 실패했습니다.');
     }
 
-    const verification = calculateVerification(models, MODEL_POOL.length);
+    const verification = calculateVerification(models, MODEL_POOL.length, answered.length);
     const finalRecommendation = determineFinalRecommendation(models);
     const summary = generateSummary(models, finalRecommendation, verification, {
       symbol, price, changePercent, isKorean: isKorean || false,
@@ -144,7 +136,7 @@ export default async function handler(req, res) {
       success: true,
       models,
       verificationCount: MODEL_POOL.length,
-      activeCount: successes.length,
+      activeCount: answered.length,
       verificationScore: verification.score,
       agreement: verification.agreement,
       finalRecommendation,
@@ -630,11 +622,14 @@ function parseRecommendation(response) {
   return 'Watch';
 }
 
-function calculateVerification(models, totalTried) {
+// answeredCount = 실제로 응답한 위원 수(표시 여부와 무관). 표시된 목록만으로
+// 성공률을 재면 표시 칸 수가 점수 상한이 돼 버린다.
+function calculateVerification(models, totalTried, answeredCount) {
   const validModels = models.filter(m => m.recommendation !== 'Error');
   if (validModels.length === 0) return { score: 0, agreement: '오류' };
 
-  const successRate = validModels.length / (totalTried || validModels.length);
+  const answered = answeredCount ?? validModels.length;
+  const successRate = answered / (totalTried || answered);
   const counts = {};
   validModels.forEach(m => counts[m.recommendation] = (counts[m.recommendation] || 0) + 1);
   const maxCount = Math.max(...Object.values(counts));
