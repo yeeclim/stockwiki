@@ -18,7 +18,8 @@
 
 사용법
 ------
-  python forecast_log.py record   # (screen.py 가 자동 호출) 오늘 판정 기록
+  python forecast_log.py record   # (screen.py 가 자동 호출) 오늘 장전 판정 기록
+                                  #  장 시작(09:00 KST) 후에는 건너뛴다. --force 로 강제 가능
   python forecast_log.py fill     # 결과 미기입 행에 실제 시가/종가 채우기
   python forecast_log.py report   # 적중률 집계 출력
 """
@@ -56,16 +57,32 @@ def _configured() -> bool:
 
 
 # ── 1. 판정 기록 ─────────────────────────────────────────────────────────────
-def record(brief: dict | None, trade_date: str | None = None) -> bool:
-    """메일 발송 시점의 신호 판정을 저장. 같은 날 재실행하면 덮어쓴다(upsert)."""
+# 장 시작(09:00 KST) 전에 낸 판정만 기록한다.
+#
+# screen.py 는 하루 두 번 돈다 — 06:30(장전 메일)과 15:00(마감 정리). 15:00 실행분의
+# 신호에는 이미 당일 장중 데이터가 섞여 있어서 '예측'이 아니라 '사후 관찰'이다.
+# 그걸 같은 trade_date 에 덮어쓰면 적중률 로그 전체가 무의미해진다(결과를 보고
+# 찍은 판정을 채점하는 꼴). 그래서 장 시작 이후 호출은 기록하지 않는다.
+_MARKET_OPEN_HOUR = 9
+
+
+def record(brief: dict | None, trade_date: str | None = None,
+           force: bool = False) -> bool:
+    """장전 신호 판정을 저장. 같은 날 장 시작 전에 재실행하면 덮어쓴다(upsert)."""
     if not _configured():
         return False
+
+    now = datetime.now(_KST)
+    if not force and now.hour >= _MARKET_OPEN_HOUR:
+        print(f'⏭  적중률 로그 생략 — 장 시작 후 실행({now:%H:%M} KST)이라 예측이 아닙니다')
+        return False
+
     signals = (brief or {}).get('signals') or []
     if not signals:
         print('⚠️  신호가 없어 적중률 로그를 남기지 않습니다')
         return False
 
-    trade_date = trade_date or datetime.now(_KST).strftime('%Y-%m-%d')
+    trade_date = trade_date or now.strftime('%Y-%m-%d')
     bull, bear, neutral = market_signals.signal_counts(signals)
     raw_bull, raw_bear, _ = market_signals.raw_counts(signals)
 
@@ -328,7 +345,7 @@ def main():
     elif cmd == 'record':
         import us_market_brief
         from kis_api import KISApi
-        record(us_market_brief.get_brief(KISApi()))
+        record(us_market_brief.get_brief(KISApi()), force='--force' in sys.argv)
     else:
         print(__doc__)
 

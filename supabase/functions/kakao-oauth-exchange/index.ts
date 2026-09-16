@@ -4,13 +4,19 @@
  * Flutter 앱에서 사용자가 "카카오 알림 연동하기" 버튼으로 카카오 로그인을
  * 마치고 돌아오면(인가 코드 획득) 호출됩니다.
  * 1. 인가 코드를 카카오 서버에서 access_token/refresh_token으로 교환
- * 2. trading_configs.notify_kakao_refresh_token 갱신
+ * 2. trading_configs.notify_kakao_refresh_token 갱신 (AES-256-GCM 암호화)
+ *
+ * refresh_token 은 이 사용자 명의로 카카오톡 메시지를 보낼 수 있는 자격증명이라
+ * save-trading-config 와 동일하게 암호화해서 넣는다. 예전엔 여기만 평문으로
+ * 써서, 카카오를 재연동하면 암호화가 도로 풀리는 구멍이 있었다.
  *
  * Supabase Secrets (supabase secrets set 으로 등록):
  *   KAKAO_REST_API_KEY  — StockWiki 카카오 앱의 REST API 키 (client_id)
  *   KAKAO_CLIENT_SECRET — 위 앱의 카카오 로그인용 클라이언트 시크릿
+ *   TRADING_ENC_KEY     — base64 32바이트 (GitHub Secrets 와 동일 값)
  */
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+import { encryptField } from "../_shared/crypto.ts";
 
 const KAKAO_REST_API_KEY  = Deno.env.get("KAKAO_REST_API_KEY")  ?? "";
 const KAKAO_CLIENT_SECRET = Deno.env.get("KAKAO_CLIENT_SECRET") ?? "";
@@ -82,10 +88,19 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── 2. trading_configs 갱신 (기존 행이 있을 때만 — kis_* 컬럼이 NOT NULL) ───
+  let encryptedToken: string | null;
+  try {
+    encryptedToken = await encryptField(tokenData.refresh_token);
+  } catch (e) {
+    // 암호화에 실패하면 평문으로 떨어뜨리지 않고 요청을 실패시킨다.
+    console.error("토큰 암호화 실패:", e);
+    return json({ error: "서버 암호화 설정 오류 — 관리자에게 문의하세요" }, 500);
+  }
+
   const { data, error: dbErr } = await supabase
     .from("trading_configs")
     .update({
-      notify_kakao_refresh_token: tokenData.refresh_token,
+      notify_kakao_refresh_token: encryptedToken,
       notify_kakao_active:        true,
     })
     .eq("user_id", user.id)
