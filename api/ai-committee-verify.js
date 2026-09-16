@@ -32,15 +32,32 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...cached.data, cached: true });
     }
 
-    // 5개 모델 동시 시도 → 성공한 것 3개만 표시 (provider 다변화)
-    // Qwen3 32B, Llama 4 Scout는 Groq가 모델을 폐기(retire)해서 항상 404였음 (2026-07-31 확인) → 현재 유효 모델로 교체
-    const MODEL_POOL = [
-      { name: 'Qwen3.6 27B',  fn: () => askGroqThink(question, 'qwen/qwen3.6-27b', 'Qwen3.6 27B') },
-      { name: 'Llama 3.3',    fn: () => askGroq(question, 'llama-3.3-70b-versatile', 'Llama 3.3') },
-      { name: 'GPT-OSS 120B', fn: () => askGroqOss(question, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
-      { name: 'GPT-OSS 20B',  fn: () => askGroqOss(question, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
-      { name: 'Llama 3.1',    fn: () => askGroq(question, 'llama-3.1-8b-instant', 'Llama 3.1') },
+    // 후보 모델. Groq 는 모델을 주기적으로 폐기(retire)하는데, 그때마다 여기 박아둔
+    // ID 가 404 를 내며 위원회 자리가 에러 카드로 바뀐다. 실제로 세 번 겪었다:
+    //   2026-07-31  qwen3-32b, llama-4-scout 폐기
+    //   2026-08-16  llama-3.3-70b-versatile, llama-3.1-8b-instant 폐기
+    //   2026-09-16  qwen3.6-27b 폐기 (이때 활동 위원이 5명 중 1명까지 떨어져 있었다)
+    // 그래서 아래 getAvailableModelIds() 로 매번 실제 제공 목록을 확인하고, 사라진
+    // 모델은 에러로 보여주는 대신 후보에서 빼버린다. 다음 폐기 때는 위원 수가
+    // 줄어들 뿐 에러 카드가 뜨지 않는다.
+    const ALL_MODELS = [
+      { name: 'Qwen3.8 27B',  id: 'qwen/qwen3.8-27b',        fn: q => askGroqThink(q, 'qwen/qwen3.8-27b', 'Qwen3.8 27B') },
+      { name: 'GPT-OSS 120B', id: 'openai/gpt-oss-120b',     fn: q => askGroqOss(q, 'openai/gpt-oss-120b', 'GPT-OSS 120B') },
+      { name: 'GPT-OSS 20B',  id: 'openai/gpt-oss-20b',      fn: q => askGroqOss(q, 'openai/gpt-oss-20b', 'GPT-OSS 20B') },
+      { name: 'MiniMax M2.7', id: 'minimaxai/minimax-m2.7',  fn: q => askGroqThink(q, 'minimaxai/minimax-m2.7', 'MiniMax M2.7') },
+      { name: 'Llama 3.3',    id: 'llama-3.3-70b-versatile', fn: q => askGroq(q, 'llama-3.3-70b-versatile', 'Llama 3.3') },
+      { name: 'Llama 3.1',    id: 'llama-3.1-8b-instant',    fn: q => askGroq(q, 'llama-3.1-8b-instant', 'Llama 3.1') },
     ];
+
+    const availableIds = await getAvailableModelIds();
+    const MODEL_POOL = (availableIds
+      ? ALL_MODELS.filter(m => availableIds.has(m.id))
+      : ALL_MODELS            // 목록 조회 실패 시엔 예전처럼 전부 시도
+    ).slice(0, 5).map(m => ({ name: m.name, fn: () => m.fn(question) }));
+
+    if (MODEL_POOL.length === 0) {
+      throw new Error('사용 가능한 AI 모델이 없습니다 (Groq 모델 목록 확인 필요)');
+    }
 
     const withTimeout = (fn, ms = 20000) => Promise.race([
       fn(),
@@ -353,6 +370,34 @@ async function askDeepSeek(question, model, displayName) {
   if (!content) throw new Error(`${displayName} 응답 파싱 실패`);
 
   return validateConclusion(sanitizeAndValidateLanguage(content, displayName), displayName);
+}
+
+// Groq 이 지금 실제로 서빙하는 모델 ID 목록. 폐기된 모델을 후보에서 빼기 위해 쓴다.
+// 목록 자체가 실패하면 null 을 돌려주고, 호출부는 예전처럼 전부 시도한다
+// (목록 조회 실패 때문에 위원회가 통째로 비는 것이 더 나쁘다).
+let _modelIdCache = null;
+const MODEL_LIST_TTL = 6 * 60 * 60 * 1000;  // 6시간
+
+async function getAvailableModelIds() {
+  if (_modelIdCache && Date.now() - _modelIdCache.time < MODEL_LIST_TTL) {
+    return _modelIdCache.ids;
+  }
+  const apiKey = getEnv('GROQ_API_KEY');
+  if (!apiKey) return null;
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const ids = new Set((data.data || []).map(m => m.id));
+    if (ids.size === 0) throw new Error('빈 목록');
+    _modelIdCache = { ids, time: Date.now() };
+    return ids;
+  } catch (e) {
+    console.error('⚠️ Groq 모델 목록 조회 실패 — 후보 필터링 생략:', e.message);
+    return null;
+  }
 }
 
 // Groq 추론 모델 (Qwen 등) — reasoning_effort: none으로 추론 자체를 꺼서, 좁은
