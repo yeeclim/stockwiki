@@ -58,8 +58,7 @@ class TradingConfig {
         githubRegisteredAt: m['github_registered_at'] != null
             ? DateTime.parse(m['github_registered_at'] as String)
             : null,
-        hasStoredKeys:
-            ((m['kis_app_key'] as String?) ?? '').isNotEmpty,
+        hasStoredKeys: ((m['kis_app_key'] as String?) ?? '').isNotEmpty,
         hasStoredKakao: m['notify_kakao_active'] as bool? ?? false,
       );
 
