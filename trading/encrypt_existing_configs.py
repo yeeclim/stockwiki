@@ -11,6 +11,7 @@ Edge Function 은 새로 저장할 때만 암호화하므로, 기존 행은 이 
     export TRADING_ENC_KEY=...               # Edge Function 과 동일한 base64 32바이트
     python trading/encrypt_existing_configs.py --dry-run   # 먼저 확인
     python trading/encrypt_existing_configs.py
+    python trading/encrypt_existing_configs.py --verify    # 복호화되는지 확인
 
 새 키를 만들려면:
     python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
@@ -38,6 +39,46 @@ def _headers(extra: dict | None = None) -> dict:
     }
 
 
+def verify() -> int:
+    """저장된 값이 실제로 복호화되는지 확인한다 (main.py 와 같은 경로).
+
+    값은 절대 출력하지 않는다 — 필드별로 복호화 성공 여부와 길이만 남긴다.
+    자동매매 워크플로가 꺼져 있어도, 키 주입이 맞는지 부작용 없이 점검할 수 있다.
+    """
+    r = requests.get(
+        f'{_URL}/rest/v1/trading_configs?select=user_id,'
+        + ','.join(config_crypto.SENSITIVE_FIELDS),
+        headers=_headers(), timeout=15,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    print(f'대상 행 {len(rows)}개\n')
+
+    failed = 0
+    for row in rows:
+        uid = row.get('user_id')
+        print(f'  {uid}')
+        for field in config_crypto.SENSITIVE_FIELDS:
+            value = row.get(field)
+            if not value:
+                print(f'    - {field}: (비어 있음)')
+                continue
+            state = '암호문' if config_crypto.is_encrypted(value) else '평문(미암호화)'
+            try:
+                plain = config_crypto.decrypt(value)
+                print(f'    ✅ {field}: {state} → 복호화 OK ({len(plain)}자)')
+            except Exception as e:
+                print(f'    ❌ {field}: {state} → 복호화 실패 {type(e).__name__}')
+                failed += 1
+
+    print()
+    if failed:
+        print(f'❌ 복호화 실패 {failed}건 — TRADING_ENC_KEY 가 암호화 당시와 다른 값일 수 있습니다')
+        return 1
+    print('✅ 전부 복호화 확인 — main.py 가 같은 경로로 읽습니다')
+    return 0
+
+
 def main() -> int:
     dry_run = '--dry-run' in sys.argv
 
@@ -49,6 +90,9 @@ def main() -> int:
     except Exception as e:
         print(f'❌ {e}')
         return 1
+
+    if '--verify' in sys.argv:
+        return verify()
 
     r = requests.get(
         f'{_URL}/rest/v1/trading_configs?select=user_id,'

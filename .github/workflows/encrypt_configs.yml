@@ -12,10 +12,11 @@ name: trading_configs 암호화 마이그레이션
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: '변경 없이 대상만 확인 (권장: 먼저 true 로 한 번)'
-        type: boolean
-        default: true
+      mode:
+        description: '실행 모드'
+        type: choice
+        options: [dry-run, encrypt, verify]
+        default: dry-run
 
 jobs:
   encrypt:
@@ -39,8 +40,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TRADING_ENC_KEY:           ${{ secrets.TRADING_ENC_KEY }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python encrypt_existing_configs.py --dry-run
-          else
-            python encrypt_existing_configs.py
-          fi
+          case "${{ inputs.mode }}" in
+            dry-run) python encrypt_existing_configs.py --dry-run ;;
+            encrypt) python encrypt_existing_configs.py ;;
+            verify)  python encrypt_existing_configs.py --verify ;;
+          esac
