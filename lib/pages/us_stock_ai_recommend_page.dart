@@ -146,12 +146,20 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.refresh, color: theme.colorScheme.primary, size: 48),
+            Icon(Icons.inbox_outlined,
+                color: theme.colorScheme.primary, size: 48),
             const SizedBox(height: 16),
+            // 서버는 'Buy' 등급(8점 이상)만 내려준다 — 해당 종목이 없는 날은 빈 목록이 정상이다
             Text(
-              '추천 주식을 불러오는 중입니다',
+              '오늘은 Buy 등급 추천 종목이 없습니다',
               style: theme.textTheme.bodyLarge
                   ?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '스크리닝 점수 8점(10점 만점) 이상 종목만 표시합니다',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             TextButton(

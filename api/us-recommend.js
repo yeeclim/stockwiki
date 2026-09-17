@@ -7,7 +7,7 @@
 // ?view=sector 를 붙이면 Sector별 추천 종목 화면용으로 GICS 섹터 그룹핑 응답을 반환한다.
 // (Vercel Hobby 플랜 서버리스 함수 12개 제한 때문에 별도 파일 대신 같은 함수에서 분기)
 
-import { fetchLiveQuotes, scoreToAction, buildReasons } from './_us-recommend-shared.js';
+import { fetchLiveQuotes, scoreToAction, buildReasons, BUY_SCORE } from './_us-recommend-shared.js';
 import { applyCors } from './_shared.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
@@ -36,10 +36,10 @@ const FLAT_CACHE_TTL = 10 * 60 * 1000; // 10분
 // 높게 잡아 대형주 위주로만 노출 (스크리닝 자체 기준은 건드리지 않음)
 const MIN_DISPLAY_MARKET_CAP_USD = 1_000_000_000; // $10억(1B)
 
-// AI 미국주식 추천 화면 전용 점수 하한선 — strategy.py BUY_THRESHOLD(6점)보다 높게 잡아
-// 상위권 종목만 노출 (스크리닝 자체 통과 기준은 건드리지 않음)
-// 8점 이상은 실제 일별 스캔에서 거의 나오지 않는 수준이라(대부분 6.5~7.5점대) 7점으로 설정
-const MIN_DISPLAY_SCORE = 7; // 10점 만점
+// AI 미국주식 추천 화면 전용 점수 하한선 — 'Buy' 등급(8점 이상)만 노출한다.
+// (2026-09-17 변경: 예전엔 7점부터 노출해 대부분이 'Watch' 등급이었다.
+//  8점 이상은 일별 스캔에서 드물어 목록이 비는 날이 있을 수 있다 — 스크리닝 통과 기준은 그대로)
+const MIN_DISPLAY_SCORE = BUY_SCORE; // 10점 만점
 
 async function handleFlatView(req, res) {
   try {
@@ -116,7 +116,7 @@ async function buildFromScreening() {
         exchange: row.sector,
       };
     })
-    .filter(Boolean)
+    .filter((item) => item && item.action === 'Buy')
     .sort((a, b) => b.score - a.score);
 }
 

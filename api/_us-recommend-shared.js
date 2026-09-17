@@ -70,8 +70,11 @@ export async function fetchLiveQuotes(symbols, fields = DEFAULT_FIELDS) {
 }
 
 // screen_us_broad.py 기준 — 10점 만점, BUY_THRESHOLD(6점) 이상만 us_screening_results.pass=true로 저장됨
+// 10점 만점 중 'Buy' 등급 하한. AI 미국주식 추천 목록은 이 등급만 노출한다 (us-recommend.js).
+export const BUY_SCORE = 8;
+
 export function scoreToAction(score) {
-  if (score >= 8) return 'Buy';
+  if (score >= BUY_SCORE) return 'Buy';
   if (score >= 6) return 'Watch';
   return 'Hold';
 }
