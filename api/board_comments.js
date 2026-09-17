@@ -100,7 +100,12 @@ export default async function handler(req, res) {
           ip_hash:       ih,
         },
       });
-      const inserted = await ir.json();
+      const inserted = await ir.json().catch(() => null);
+      if (!ir.ok) {
+        // 예전엔 저장 실패도 201 success 로 응답해 사용자는 댓글이 달린 줄 알았다
+        console.error('[board_comments] insert failed:', ir.status, inserted);
+        return res.status(500).json({ error: '댓글 저장에 실패했습니다' });
+      }
       return res.status(201).json({ success: true, id: inserted?.[0]?.id });
     }
 

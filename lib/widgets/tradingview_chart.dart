@@ -1,7 +1,8 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+
+import '../utils/web_iframe.dart';
 
 class TradingViewChart extends StatefulWidget {
   final String tvSymbol; // e.g. "KRX:005930" or "NASDAQ:AAPL"
@@ -26,12 +27,11 @@ class _TradingViewChartState extends State<TradingViewChart> {
     final safeId = widget.tvSymbol.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
     final themeId = widget.isDark ? 'dark' : 'light';
     _viewType = 'tv_${safeId}_$themeId';
-    try {
-      ui_web.platformViewRegistry.registerViewFactory(_viewType, (int id) {
-        final theme = widget.isDark ? 'dark' : 'light';
-        // XSS 방지: 심볼에서 따옴표 제거
-        final symbol = widget.tvSymbol.replaceAll('"', '').replaceAll("'", '');
-        final srcdoc = '''<!DOCTYPE html>
+    final theme = widget.isDark ? 'dark' : 'light';
+    // XSS 방지: 따옴표만 지우면 </script> 같은 입력을 못 막는다.
+    // JSON 문자열 리터럴로 넣고 '</' 를 이스케이프해 스크립트 블록을 벗어날 수 없게 한다.
+    final symbol = jsonEncode(widget.tvSymbol).replaceAll('</', r'<\/');
+    final srcdoc = '''<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -46,7 +46,7 @@ class _TradingViewChartState extends State<TradingViewChart> {
 <script>
 new TradingView.widget({
   autosize:true,
-  symbol:"$symbol",
+  symbol:$symbol,
   interval:"D",
   timezone:"Asia/Seoul",
   theme:"$theme",
@@ -59,20 +59,9 @@ new TradingView.widget({
 </script>
 </body>
 </html>''';
-        return html.IFrameElement()
-          ..srcdoc = srcdoc
-          ..style.width = '100%'
-          ..style.height = '100%'
-          ..style.border = 'none'
-          ..allowFullscreen = true;
-      });
-    } catch (_) {
-      // 동일 viewType이 이미 등록된 경우 무시
-    }
+    registerSrcdocIframe(_viewType, srcdoc: srcdoc, allowFullscreen: true);
   }
 
   @override
-  Widget build(BuildContext context) {
-    return HtmlElementView(viewType: _viewType);
-  }
+  Widget build(BuildContext context) => iframeView(_viewType);
 }

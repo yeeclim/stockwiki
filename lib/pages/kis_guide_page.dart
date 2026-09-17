@@ -283,13 +283,19 @@ class _BrokerGuideTab extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TradingSetupPage(initialBroker: broker.id),
-                ),
-              ),
+              // KIS 외 증권사는 자동매매 서버가 아직 지원하지 않는다
+              onPressed: broker.id != 'kis'
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              TradingSetupPage(initialBroker: broker.id),
+                        ),
+                      ),
               icon: const Icon(Icons.vpn_key_outlined),
-              label: Text('${broker.shortName} API 키 등록하러 가기'),
+              label: Text(broker.id == 'kis'
+                  ? '${broker.shortName} API 키 등록하러 가기'
+                  : '${broker.shortName} 자동매매 지원 준비 중'),
               style: FilledButton.styleFrom(
                 backgroundColor: broker.color,
                 padding: const EdgeInsets.symmetric(vertical: 16),

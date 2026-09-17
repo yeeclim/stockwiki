@@ -75,13 +75,18 @@ Deno.serve(async (req: Request) => {
     kis_account_prod_code, notify_kakao_refresh_token, notify_email, daily_max_buy,
   } = body;
 
+  // 자동매매 서버(trading/brokers)가 실제로 지원하는 증권사만 받는다.
+  if (broker_type && broker_type !== "kis") {
+    return json({ error: "현재 한국투자증권(KIS)만 지원합니다" }, 400);
+  }
+
   // ── 기존 행 조회 ───────────────────────────────────────────────────────────
   // 앱이 저장된 키를 마스킹으로만 보여주므로(복호화해서 돌려주지 않는다), 사용자가
   // 한도만 바꾸고 저장하면 키 칸은 비어서 온다. 그때 빈 값으로 덮어쓰면 자동매매가
   // 죽는다. 새로 입력된 필드만 교체하고 나머지는 기존 암호문을 그대로 유지한다.
   const { data: existing } = await supabase
     .from("trading_configs")
-    .select("kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_kakao_refresh_token")
+    .select("kis_app_key, kis_app_secret, kis_account_no, kis_account_prod_code, notify_kakao_refresh_token, notify_kakao_active")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -103,16 +108,20 @@ Deno.serve(async (req: Request) => {
   let row: Record<string, unknown>;
   try {
     const kakao = await keep(notify_kakao_refresh_token, existing?.notify_kakao_refresh_token);
+    // 새 토큰을 넣었을 때만 알림을 켠다. 설정만 다시 저장했는데 꺼둔 알림이 되살아나면 안 된다.
+    const kakaoActive = notify_kakao_refresh_token
+      ? true
+      : !!kakao && (existing?.notify_kakao_active ?? true);
     row = {
       user_id:                    user.id,
-      broker_type:                broker_type || "kis",
+      broker_type:                "kis",
       kis_app_key:                await keep(kis_app_key,    existing?.kis_app_key),
       kis_app_secret:             await keep(kis_app_secret, existing?.kis_app_secret),
       kis_account_no:             await keep(kis_account_no, existing?.kis_account_no),
       kis_account_prod_code:      kis_account_prod_code || existing?.kis_account_prod_code || "01",
       notify_email:               notify_email || user.email || null,
       notify_kakao_refresh_token: kakao,
-      notify_kakao_active:        !!kakao,
+      notify_kakao_active:        kakaoActive,
       daily_max_buy:              dailyMax,
       is_active:                  true,
     };

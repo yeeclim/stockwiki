@@ -55,7 +55,8 @@ async function fetchStockData(symbol) {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'application/json, text/plain, */*',
             'Referer': 'https://finance.naver.com/',
-          }
+          },
+          signal: AbortSignal.timeout(5000),
         });
 
         if (apiResponse.ok) {
@@ -63,18 +64,27 @@ async function fetchStockData(symbol) {
 
           // JSONP 형식일 수 있으므로 파싱 시도
           try {
-            // JSONP 제거 시도
+            // JSONP 래퍼만 벗긴다. 순수 JSON 안의 '(' (예: "(주)")까지 건드리면 파싱이 깨진다.
             let jsonText = apiText.trim();
-            if (jsonText.startsWith('(') || jsonText.includes('(')) {
+            if (!jsonText.startsWith('{') && !jsonText.startsWith('[')) {
               jsonText = jsonText.replace(/^[^(]*\(/, '').replace(/\);?$/, '');
             }
 
             const apiData = JSON.parse(jsonText);
 
             // 다양한 응답 형식 처리
-            let price, change, changePercent, volume, name;
+            let price, change, changePercent, volume, name, marketCap = 0;
 
-            if (apiData.nowVal) {
+            if (typeof apiData.now === 'number') {
+              // itemSummary.nhn 현행 형식 (2026-09 확인):
+              // {now, diff(부호 포함), rate(부호 포함 %), quant, marketSum(백만원)}
+              // 예전 필드명(nowVal/diffVal)만 보고 있어서 가격이 전부 null 로 떨어졌다.
+              price = apiData.now;
+              change = Number(apiData.diff) || 0;
+              changePercent = Number(apiData.rate) || 0;
+              volume = Number(apiData.quant) || 0;
+              marketCap = (Number(apiData.marketSum) || 0) * 1_000_000;
+            } else if (apiData.nowVal) {
               // itemSummary.nhn 형식
               price = parseInt(apiData.nowVal.replace(/,/g, ''));
               change = parseInt((apiData.diffVal || '0').replace(/,/g, ''));
@@ -115,7 +125,7 @@ async function fetchStockData(symbol) {
                 changePercent: changePercent || 0,
                 previousClose: previousClose || null, // 전일 종가
                 volume: volume || 0,
-                marketCap: 0, // API에서 제공하지 않음
+                marketCap,
                 lastUpdate: new Date().toISOString(),
                 source: 'naver-api',
                 note: '실시간 API 데이터'
@@ -138,6 +148,7 @@ async function fetchStockData(symbol) {
     const url = `https://finance.naver.com/item/main.naver?code=${symbol}`;
 
     const response = await fetch(url, {
+      signal: AbortSignal.timeout(5000),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',

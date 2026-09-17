@@ -1,6 +1,6 @@
 """
 자동매매 메인 실행 파일
-GitHub Actions에서 장중 5분마다 호출됨.
+GitHub Actions에서 장중 30분마다 호출됨.
 
 Supabase trading_configs 테이블에서 is_active=true인 모든 사용자 설정을 읽어
 각 사용자의 KIS API로 전략을 실행하고, 결과를 이메일로 발송합니다.
@@ -13,6 +13,7 @@ from io import StringIO
 import pytz
 
 import config_crypto
+from exclusions import get_excluded_codes
 import requests
 
 from brokers import create_api
@@ -86,6 +87,14 @@ def _fetch_watchlist() -> list[dict]:
         print(f"⚠️  스크리닝 결과 조회 오류({e}) — 감시 종목 없음")
         return []
 
+    # 관리자가 제외한 종목은 절대 매수하지 않는다. 제외 목록을 못 읽으면 매매를 쉰다.
+    try:
+        excluded = get_excluded_codes()
+    except Exception as e:
+        print(f"⛔ 제외 종목 조회 실패({e}) — 안전을 위해 감시 종목 없음")
+        return []
+    picks = [p for p in picks if p['stock_code'] not in excluded]
+
     if not picks:
         print("📋 최근 2일 내 통과 종목 없음 — 감시 종목 없음")
         return []
@@ -108,13 +117,13 @@ def is_market_open() -> bool:
     return _time(9, 0) <= t <= _time(15, 20)  # 정규장 (마감 10분 전 컷)
 
 
-def run_for_user(user_cfg: dict) -> str:
+def run_for_user(user_cfg: dict, watchlist: list[dict]) -> str:
     """한 사용자에 대한 전략 실행. 결과 텍스트 반환."""
     buf = StringIO()
 
     broker = user_cfg.get('broker_type', 'kis')
-    api = create_api(broker, user_cfg)
     try:
+        api = create_api(broker, user_cfg)
         api.auth()
     except Exception as e:
         return f"❌ [{broker}] 인증 실패: {e}\n"
@@ -125,7 +134,6 @@ def run_for_user(user_cfg: dict) -> str:
     buf.write(f"  StockWiki 자동매매  |  {now_str}\n")
     buf.write(f"{'='*60}\n")
 
-    watchlist = _fetch_watchlist()
     if not watchlist:
         buf.write("⏸  스크리닝 통과 종목 없음 — 매매 건너뜀\n")
         return buf.getvalue()
@@ -178,12 +186,15 @@ def main():
 
     print(f"👤 활성 사용자 {len(users)}명 처리 시작")
 
+    # 감시 종목은 모든 사용자에게 같다 — 사용자마다 다시 조회하지 않는다
+    watchlist = _fetch_watchlist()
+
     any_trade = False
     for user_cfg in users:
         notify_email_addr = user_cfg.get('notify_email') or ''
         print(f"\n▶ 사용자: {notify_email_addr or user_cfg.get('user_id', '?')}")
 
-        content = run_for_user(user_cfg)
+        content = run_for_user(user_cfg, watchlist)
 
         # 실제 매수 체결 또는 오류가 있을 때만 알림 발송
         has_trade = '진입 확정' in content or '% 도달 →' in content

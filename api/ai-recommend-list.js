@@ -8,6 +8,15 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, '');
 let cache = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5분
+// refresh=true 는 클라이언트가 매 진입마다 붙여 보내 캐시가 사실상 무용지물이었다.
+// 강제 새로고침도 이 간격 안에서는 캐시를 쓴다 (매번 종목 수만큼 네이버를 긁지 않도록).
+const MIN_REFRESH_INTERVAL = 60 * 1000;
+// 캐시는 항상 최대치로 만들고 요청 limit 만큼 잘라서 준다. 예전엔 첫 요청의 limit 크기로
+// 캐시돼, 이후 더 큰 limit 요청도 작은 결과를 받았다.
+const MAX_LIMIT = 50;
+// screen.py 는 평일에만 돈다. 주말·연휴를 넘기되 몇 주 전 통과 종목이 계속 "추천"으로
+// 남지 않도록 자른다 (screening_results 는 오래된 행을 지우지 않는다).
+const MAX_SCREENED_AGE_DAYS = 5;
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
@@ -18,22 +27,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    const forceRefresh = req.query.refresh === 'true';
-    const limit = validateInt(req.query.limit, { min: 1, max: 50 }) ?? 20;
+    const limit = validateInt(req.query.limit, { min: 1, max: MAX_LIMIT }) ?? 20;
     const now = Date.now();
+    const age = now - cacheTime;
+    const ttl = req.query.refresh === 'true' ? MIN_REFRESH_INTERVAL : CACHE_TTL;
 
-    if (!forceRefresh && cache && (now - cacheTime) < CACHE_TTL) {
+    if (cache && age < ttl) {
       return res.status(200).json({
         success: true,
         total: cache.length,
-        count: cache.length,
+        count: Math.min(cache.length, limit),
         data: cache.slice(0, limit),
         lastUpdated: new Date(cacheTime).toISOString(),
         cached: true,
       });
     }
 
-    const recommendations = await buildFromScreening(limit);
+    const recommendations = await buildFromScreening(MAX_LIMIT);
 
     if (recommendations.length > 0) {
       cache = recommendations;
@@ -43,8 +53,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       total: recommendations.length,
-      count: recommendations.length,
-      data: recommendations,
+      count: Math.min(recommendations.length, limit),
+      data: recommendations.slice(0, limit),
       lastUpdated: new Date().toISOString(),
       cached: false,
     });
@@ -64,8 +74,9 @@ async function fetchScreeningResults(limit) {
     return [];
   }
   try {
+    const cutoff = new Date(Date.now() - MAX_SCREENED_AGE_DAYS * 86_400_000).toISOString();
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/screening_results?pass=eq.true&order=score.desc&limit=${limit}`,
+      `${SUPABASE_URL}/rest/v1/screening_results?pass=eq.true&screened_at=gte.${cutoff}&order=score.desc&limit=${limit}`,
       {
         headers: {
           apikey: SUPABASE_KEY,

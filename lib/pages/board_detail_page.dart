@@ -1,11 +1,9 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/admin.dart';
+import '../utils/web_iframe.dart';
 
 /// 관리자 API 호출용 인증 헤더 (Supabase JWT).
 Map<String, String> _adminHeaders() {
@@ -107,12 +105,8 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
   }
 
   // iframe pointer-events 토글 (다이얼로그 열릴 때 이벤트 차단)
-  void _setIframePointerEvents(bool enabled) {
-    final iframes = html.document.querySelectorAll('iframe');
-    for (final el in iframes) {
-      (el as html.IFrameElement).style.pointerEvents = enabled ? '' : 'none';
-    }
-  }
+  void _setIframePointerEvents(bool enabled) =>
+      setIframesPointerEvents(enabled);
 
   Future<T?> _showDialogDisablingIframe<T>(
       BuildContext context, Widget Function(BuildContext) builder) {
@@ -895,21 +889,16 @@ class _HtmlContentViewState extends State<_HtmlContentView> {
 </head>
 <body>${widget.htmlContent}</body>
 </html>''';
-    try {
-      ui_web.platformViewRegistry.registerViewFactory(_viewType, (int id) {
-        return html.IFrameElement()
-          ..srcdoc = srcdoc
-          ..style.width = '100%'
-          ..style.height = '100%'
-          ..style.border = 'none'
-          ..tabIndex = -1
-          ..setAttribute('sandbox', '');
-      });
-    } catch (_) {}
+    registerSrcdocIframe(
+      _viewType,
+      srcdoc: srcdoc,
+      focusable: false,
+      // 스크립트는 계속 막되, 본문 링크(target=_blank)는 새 탭으로 열리게 한다.
+      // sandbox='' 만 두면 팝업이 차단돼 게시글 링크를 눌러도 아무 일도 없었다.
+      sandbox: 'allow-popups allow-popups-to-escape-sandbox',
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return HtmlElementView(viewType: _viewType);
-  }
+  Widget build(BuildContext context) => iframeView(_viewType);
 }

@@ -1,8 +1,5 @@
 from .base_api import BaseBrokerApi
 from .kis_api import KISApi
-from .kiwoom_api import KiwoomApi
-from .nh_api import NHApi
-from .samsung_api import SamsungApi
 import os
 
 
@@ -53,15 +50,11 @@ def create_api(broker_type: str, cfg: dict) -> BaseBrokerApi:
     acct   = cfg.get('kis_account_no')
     prod   = cfg.get('kis_account_prod_code', '01')
 
-    match broker_type:
-        case 'kiwoom':
-            api = KiwoomApi(key, secret, acct, prod)
-        case 'nh':
-            api = NHApi(key, secret, acct, prod)
-        case 'samsung':
-            api = SamsungApi(key, secret, acct, prod)
-        case _:
-            api = KISApi(key, secret, acct, prod)
+    # 키움/NH/삼성 래퍼는 KIS 의 TR ID·경로를 다른 도메인에 복사해 둔 것이라 실제로
+    # 동작하지 않는다. 조용히 엉뚱한 서버로 인증·주문을 보내지 않도록 명시적으로 막는다.
+    if broker_type not in (None, '', 'kis'):
+        raise NotImplementedError(f"'{broker_type}' 증권사는 아직 지원하지 않습니다 (KIS 만 지원)")
+    api = KISApi(key, secret, acct, prod)
 
     dry = os.environ.get('DRY_RUN')
     if dry and str(dry).lower() in ('1', 'true', 'yes'):

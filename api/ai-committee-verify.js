@@ -1,7 +1,7 @@
 // AI 검증위원회 API
 // Gemini (Google AI Studio 무료) + Llama 3.3 / Llama 3.1 / Gemma 2 / Mixtral (Groq 무료)
 
-import { applyCors } from './_shared.js';
+import { applyCors, checkRateLimit, getClientIp } from './_shared.js';
 
 function getEnv(key) {
   const K = key.toUpperCase();
@@ -14,6 +14,29 @@ function getEnv(key) {
 // 종목별 결과 캐시 (30분)
 const cache = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
+const CACHE_MAX = 500;
+
+const toFiniteNumber = (v) => {
+  const n = typeof v === 'string' ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+};
+
+// 프롬프트는 서버가 구조화된 필드로 만든다. 예전엔 클라이언트가 보낸 question 을
+// 그대로 모델에 넘기면서 캐시 키는 symbol 이라, 조작한 질문 한 번이 30분 동안 그
+// 종목을 조회하는 모든 사용자 결과를 오염시킬 수 있었다.
+function buildQuestion({ symbol, name, price, changePercent, isKorean }) {
+  const priceText = price === null ? 'N/A'
+    : isKorean ? `₩${Math.round(price)}` : `$${price.toFixed(2)}`;
+  const changeText = changePercent === null
+    ? '가격 변동 정보 없음'
+    : `현재 ${changePercent >= 0 ? '상승' : '하락'}률: ${Math.abs(changePercent).toFixed(2)}%`;
+  return `${name} (${symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n`
+    + `현재 가격: ${priceText}\n${changeText}\n\n`
+    + '다음 관점에서 종합적으로 분석해주세요:\n'
+    + '1. 재무 건전성 및 수익성\n2. 성장 가능성 및 시장 전망\n'
+    + '3. 기술적 분석 (가격 추세, 거래량 등)\n4. 리스크 요인\n5. 투자 가치 평가\n\n'
+    + '위 분석을 바탕으로 투자 의견을 제시해주세요.';
+}
 
 export default async function handler(req, res) {
   const fetch = globalThis.fetch || (await import('node-fetch')).default;
@@ -21,18 +44,31 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   try {
-    const { question, symbol, price, changePercent, isKorean = false, debug = false } = req.body;
-
-    if (!question) {
-      return res.status(400).json({ success: false, error: '질문이 필요합니다' });
+    const body = req.body ?? {};
+    const symbol = typeof body.symbol === 'string' ? body.symbol.trim().toUpperCase() : '';
+    if (!/^[A-Z0-9][A-Z0-9.\-]{0,11}$/.test(symbol)) {
+      return res.status(400).json({ success: false, error: '유효한 종목 코드가 필요합니다' });
     }
+    // 종목명은 프롬프트에 들어가므로 한 줄·길이 제한
+    const name = (typeof body.name === 'string' ? body.name : symbol)
+      .replace(/[\r\n\t]+/g, ' ').trim().slice(0, 60) || symbol;
+    const price = toFiniteNumber(body.price);
+    const changePercent = toFiniteNumber(body.changePercent);
+    const isKorean = body.isKorean === true;
+    const debug = body.debug === true;
+    const question = buildQuestion({ symbol, name, price, changePercent, isKorean });
 
-    // 캐시 확인 (symbol 기준 30분)
-    const cacheKey = symbol || question.substring(0, 50);
+    // 캐시 확인 (종목 기준 30분) — 히트는 외부 호출이 없으므로 rate limit 보다 먼저 본다
+    const cacheKey = `${symbol}|${name}`;
     const cached = cache.get(cacheKey);
     if (cached && (Date.now() - cached.time) < CACHE_TTL) {
       console.log(`✅ 캐시 응답: ${cacheKey}`);
       return res.status(200).json({ ...cached.data, cached: true });
+    }
+
+    // 캐시 미스 한 번이 무료 LLM 5곳을 동시에 호출하므로 IP 당 분당 5회로 제한
+    if (!checkRateLimit(`committee:${getClientIp(req)}`, 5, 60_000)) {
+      return res.status(429).json({ success: false, error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' });
     }
 
     // 후보 모델. provider 별로 "지금 실제 제공되는지"를 확인해 거른다.
@@ -168,7 +204,11 @@ export default async function handler(req, res) {
     // 성공 → 30분 캐시 / 전체 실패 → 5분 캐시 (rate limit 반복 방지)
     const hasSuccess = models.some(m => m.recommendation !== 'Error');
     const cacheTime = hasSuccess ? Date.now() : Date.now() - (CACHE_TTL - 5 * 60 * 1000);
-    cache.set(cacheKey, { data: responseData, time: cacheTime });
+    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value); // 가장 오래된 항목
+    // debug 응답의 attempts(실패 위원의 오류 원문)는 요청한 사람에게만 준다.
+    // 그대로 캐시하면 이후 30분간 일반 사용자 응답에도 섞여 나간다.
+    const { attempts: _debugOnly, ...cacheable } = responseData;
+    cache.set(cacheKey, { data: cacheable, time: cacheTime });
 
     return res.status(200).json(responseData);
 

@@ -1,5 +1,6 @@
 // 미국 주식 검색 API (Yahoo Finance)
 import { checkRateLimit, getClientIp, fail, applyCors } from './_shared.js';
+import { fetchLiveQuotes } from './_us-recommend-shared.js';
 
 const YF_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -79,13 +80,12 @@ export default async function handler(req, res) {
   }
 }
 
+// v7 quote 는 crumb 가 필요하다 — 예전엔 crumb 없이 불러 401 로 가격이 항상 null 이었다
 async function fetchQuotes(symbols) {
   try {
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}&fields=symbol,longName,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,marketCap,fullExchangeName`;
-    const r = await fetch(url, { headers: YF_HEADERS });
-    if (!r.ok) return [];
-    const data = await r.json();
-    return (data.quoteResponse?.result || [])
+    const map = await fetchLiveQuotes(symbols,
+      'symbol,longName,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,marketCap,fullExchangeName');
+    return symbols.map(s => map[s]).filter(Boolean)
       .filter(q => q.regularMarketPrice != null)
       .map(q => ({
         symbol: q.symbol,

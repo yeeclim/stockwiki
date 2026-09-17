@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +22,8 @@ import 'package:stockwiki/widgets/app_drawer.dart';
 import 'package:stockwiki/widgets/terminal_grid.dart';
 import 'package:stockwiki/widgets/hover_lift.dart';
 import 'package:stockwiki/widgets/btc_sparkline_widget.dart';
+import 'package:stockwiki/widgets/email_consent.dart';
+import 'dart:async';
 
 // Global Theme Notifier
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
@@ -57,7 +59,7 @@ void main() async {
   await Supabase.initialize(
     url: _supabaseUrl,
     publishableKey: _supabaseAnonKey,
-    debug: true,
+    debug: kDebugMode, // 운영 빌드에서 인증 디버그 로그를 남기지 않는다
     authOptions: FlutterAuthClientOptions(
       pkceAsyncStorage: createPkceStorage(),
     ),
@@ -115,7 +117,9 @@ class StockSearchPage extends StatefulWidget {
 
 class _StockSearchPageState extends State<StockSearchPage>
     with SingleTickerProviderStateMixin {
-  bool _showWidgets = true;
+  // 당겨서 새로고침 시 값을 바꿔 시세 위젯들을 새로 만든다(= 각자 initState 에서 재조회).
+  // 예전엔 늘 true 인 플래그를 다시 true 로 세팅만 해서 새로고침이 아무 동작도 안 했다.
+  int _refreshGeneration = 0;
   bool _deepLinkChecked = false;
   late final AnimationController _liveDotController;
 
@@ -126,8 +130,19 @@ class _StockSearchPageState extends State<StockSearchPage>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _handleIncomingLink());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleIncomingLink();
+      maybePromptEmailConsent(context);
+    });
+    // 로그인 직후(소셜 로그인 리다이렉트 포함)에도 수신 동의 안내를 한 번 띄운다
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted) {
+        maybePromptEmailConsent(context);
+      }
+    });
   }
+
+  StreamSubscription<AuthState>? _authSub;
 
   /// 메일/카카오톡 링크(?stock=005930&name=삼성전자, ?board=`<id>`) 또는 카카오
   /// 로그인 콜백(?code=...&state=...)으로 들어온 경우 각각 처리한다.
@@ -191,14 +206,13 @@ class _StockSearchPageState extends State<StockSearchPage>
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _liveDotController.dispose();
     super.dispose();
   }
 
   void _refresh() {
-    setState(() {
-      _showWidgets = true;
-    });
+    setState(() => _refreshGeneration++);
   }
 
   @override
@@ -316,29 +330,36 @@ class _StockSearchPageState extends State<StockSearchPage>
               ),
               const SizedBox(height: 36),
 
-              if (_showWidgets) ...[
-                _buildSectionTitle(market, '금융 상품'),
-                const SizedBox(height: 12),
-                const TerminalGrid(children: [GoldWidget(), SilverWidget()]),
-                const SizedBox(height: 28),
-                _buildSectionTitle(market, '시장 지표'),
-                const SizedBox(height: 12),
-                const TerminalGrid(children: [UsdKrwWidget()]),
-                const SizedBox(height: 10),
-                const StockFearGreedWidget(),
-                const SizedBox(height: 28),
-                _buildSectionTitle(market, '에너지'),
-                const SizedBox(height: 12),
-                const TerminalGrid(children: [WtiWidget()]),
-                const SizedBox(height: 28),
-                _buildSectionTitle(market, '암호화폐'),
-                const SizedBox(height: 12),
-                const TerminalGrid(
-                    children: [BtcWidget(), BtcSparklineWidget()]),
-                const SizedBox(height: 10),
-                const FearGreedWidget(),
-                const SizedBox(height: 36),
-              ],
+              KeyedSubtree(
+                key: ValueKey(_refreshGeneration),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle(market, '금융 상품'),
+                    const SizedBox(height: 12),
+                    const TerminalGrid(
+                        children: [GoldWidget(), SilverWidget()]),
+                    const SizedBox(height: 28),
+                    _buildSectionTitle(market, '시장 지표'),
+                    const SizedBox(height: 12),
+                    const TerminalGrid(children: [UsdKrwWidget()]),
+                    const SizedBox(height: 10),
+                    const StockFearGreedWidget(),
+                    const SizedBox(height: 28),
+                    _buildSectionTitle(market, '에너지'),
+                    const SizedBox(height: 12),
+                    const TerminalGrid(children: [WtiWidget()]),
+                    const SizedBox(height: 28),
+                    _buildSectionTitle(market, '암호화폐'),
+                    const SizedBox(height: 12),
+                    const TerminalGrid(
+                        children: [BtcWidget(), BtcSparklineWidget()]),
+                    const SizedBox(height: 10),
+                    const FearGreedWidget(),
+                    const SizedBox(height: 36),
+                  ],
+                ),
+              ),
 
               // 푸터
               Divider(color: market.line),

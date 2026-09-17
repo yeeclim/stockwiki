@@ -23,6 +23,9 @@ class _BrokerOption {
   final String name;
   final Color color;
   const _BrokerOption(this.id, this.name, this.color);
+
+  /// 서버(trading/brokers)가 실제로 주문을 낼 수 있는 증권사는 현재 KIS 뿐이다.
+  bool get supported => id == 'kis';
 }
 
 class _TradingSetupPageState extends State<TradingSetupPage> {
@@ -51,9 +54,12 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
   @override
   void initState() {
     super.initState();
-    _selectedBroker = widget.initialBroker;
+    _selectedBroker = _supportedOrKis(widget.initialBroker);
     _loadExisting();
   }
+
+  static String _supportedOrKis(String id) =>
+      _brokers.any((b) => b.id == id && b.supported) ? id : 'kis';
 
   Future<void> _loadExisting() async {
     try {
@@ -63,7 +69,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
         _existing = cfg;
         _loading = false;
         if (cfg != null) {
-          _selectedBroker = cfg.brokerType;
+          _selectedBroker = _supportedOrKis(cfg.brokerType);
           // App Key / Secret / 계좌번호 / 카카오 토큰은 서버에 암호화돼 있고
           // 복호화해서 돌려주지 않으므로 채우지 않는다. 저장돼 있다는 사실만
           // 힌트로 보여주고, 사용자가 새로 입력할 때만 교체된다.
@@ -259,7 +265,13 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                     children: _brokers.map((b) {
                       final selected = _selectedBroker == b.id;
                       return GestureDetector(
-                        onTap: () => setState(() => _selectedBroker = b.id),
+                        onTap: b.supported
+                            ? () => setState(() => _selectedBroker = b.id)
+                            : () => ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content:
+                                          Text('${b.name}는 아직 지원 준비 중입니다.')),
+                                ),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           padding: const EdgeInsets.symmetric(
@@ -274,7 +286,7 @@ class _TradingSetupPageState extends State<TradingSetupPage> {
                             ),
                           ),
                           child: Text(
-                            b.name,
+                            b.supported ? b.name : '${b.name} (준비중)',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: selected
                                   ? Colors.white

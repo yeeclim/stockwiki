@@ -8,6 +8,10 @@ on:
     - cron: '0 6 * * 1-5'
   workflow_dispatch:  # 수동 실행
 
+concurrency:
+  group: screening
+  cancel-in-progress: false
+
 jobs:
   screen:
     runs-on: ubuntu-latest

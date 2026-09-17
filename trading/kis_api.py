@@ -4,8 +4,6 @@
 공통 HTTP/인증/주문/잔고 로직은 brokers/kis_api.py 의 베이스에 있고,
 여기서는 스크리닝에만 필요한 것들만 덧붙인다:
   - requests.Session + 재시도 어댑터 (대량 종목 조회 안정성)
-  - get_fundamentals 에 시가총액(market_cap) 추가
-  - get_ma_data 에 RSI/basing/거래량감소 등 기술적 지표 추가
   - 투자자매매동향 / 선물 미결제약정 조회
   - 정규장/NXT 시간외 주문구분 자동 전환
 """
@@ -15,7 +13,6 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-import technical_indicators as ti
 from brokers.kis_api import KISApi as _BaseKISApi, BASE_URL
 
 
@@ -66,58 +63,6 @@ class KISApi(_BaseKISApi):
             print("✅ KIS 토큰 발급 완료")
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"KIS 토큰 발급 실패: {e}") from e
-
-    # ── 시세: 시가총액 포함 ───────────────────────────────────────────────────
-    def get_fundamentals(self, code: str) -> dict:
-        out = self._inquire_price_output(code)
-
-        def _f(v):
-            try: return float(v) if v and str(v).strip() not in ('', '-') else 0.0
-            except: return 0.0
-        def _i(v):
-            try: return int(v) if v else 0
-            except: return 0
-
-        return {
-            'price':      _i(out.get('stck_prpr')),
-            'per':        _f(out.get('per')),
-            'pbr':        _f(out.get('pbr')),
-            'volume':     _i(out.get('acml_vol')),
-            'prdy_ctrt':  _f(out.get('prdy_ctrt')),
-            'open':       _i(out.get('stck_oprc')),
-            'prdy_clpr':  _i(out.get('stck_prdy_clpr') or 0),
-            'market_cap': _i(out.get('hts_avls')),  # 시가총액 (억원)
-        }
-
-    # ── MA + 기술적 지표 ─────────────────────────────────────────────────────
-    def get_ma_data(self, code: str) -> dict:
-        rows = self._inquire_daily_rows(code, 250)
-        prices = [int(x['stck_clpr']) for x in rows]
-
-        def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
-        def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
-
-        ma5, ma20, ma60, ma120 = ma(5), ma(20), ma(60), ma(120)
-        p5, p20 = ma_prev(5), ma_prev(20)
-
-        # rows/prices는 최신→과거 순서 — 지표 함수는 과거→최신(오름차순)을 기대하므로 뒤집는다
-        closes_asc = list(reversed(prices))
-        volumes_asc = [int(x.get('acml_vol', 0) or 0) for x in reversed(rows)]
-
-        rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes_asc)
-        basing = ti.basing_near_low(closes_asc)
-        vol_declining = ti.volume_declining(volumes_asc)
-
-        return {
-            'ma5':   ma5,  'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
-            'golden_cross': bool(ma5 and ma20 and p5 and p20
-                                 and ma5 > ma20 and p5 <= p20),
-            'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
-            'rsi':               rsi_now,
-            'rsi_rebound':       rsi_rebound,
-            'basing':            basing,
-            'volume_declining':  vol_declining,
-        }
 
     def get_financial_ratios(self, code: str) -> dict | None:
         """재무비율 4종 — DART API 우선, 실패 시 FnGuide 스크래핑 fallback"""

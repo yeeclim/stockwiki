@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:stockwiki/providers/bookmark_provider.dart';
 import 'package:stockwiki/main.dart';
 import 'package:stockwiki/services/http_client.dart';
@@ -14,6 +16,17 @@ Widget withProviders(Widget child) {
 }
 
 void main() {
+  // BookmarkProvider·AuthService 가 생성 시점에 Supabase.instance 를 읽는다.
+  // 초기화 없이 만들면 assertion 으로 테스트가 시작도 못 했다.
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+    await Supabase.initialize(
+      url: 'https://example.supabase.co',
+      publishableKey: 'test-key',
+    );
+  });
+
   // ── BookmarkProvider 단위 테스트 ────────────────────────
   group('BookmarkProvider', () {
     test('초기 상태는 비어있음', () {
@@ -49,8 +62,8 @@ void main() {
         ),
       );
       await tester.pump();
-      // 앱 제목이 존재하는지 확인
-      expect(find.text('StockWiki'), findsWidgets);
+      // 앱 제목이 존재하는지 확인 (AppBar 로고 텍스트는 대문자)
+      expect(find.text('STOCKWIKI'), findsWidgets);
     });
 
     testWidgets('AppBar가 존재함', (WidgetTester tester) async {

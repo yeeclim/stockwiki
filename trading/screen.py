@@ -1,6 +1,6 @@
 """
 종목 스크리닝 — 진입 조건 사전 평가
-GitHub Actions 매일 장 시작 전(08:50 KST) 자동 실행
+GitHub Actions 평일 06:30 / 15:00 KST 자동 실행 (스케줄 지연 가능)
 결과를 카카오톡(관리자) + 이메일(가입 유저 전체) 발송
 """
 import os
@@ -15,30 +15,12 @@ import us_market_brief
 from strategy import _score_entry
 from news_sentiment import get_sentiment
 import config_crypto
+import subscriptions
+from exclusions import get_excluded_codes
 
 _SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
 
-
-def _fetch_user_emails() -> list[str]:
-    """가입한 모든 유저 이메일 조회 (API 키 등록 여부 무관)"""
-    if not (_SUPABASE_URL and _SUPABASE_KEY):
-        return []
-    try:
-        r = requests.get(
-            f"{_SUPABASE_URL}/auth/v1/admin/users?per_page=1000",
-            headers={
-                'apikey':        _SUPABASE_KEY,
-                'Authorization': f'Bearer {_SUPABASE_KEY}',
-            },
-            timeout=10,
-        )
-        r.raise_for_status()
-        users = r.json().get('users', [])
-        return [u['email'] for u in users if u.get('email')]
-    except Exception as e:
-        print(f"⚠️  유저 이메일 조회 실패: {e}")
-        return []
 
 BUY_THRESHOLD = 6
 
@@ -65,18 +47,26 @@ def _fetch_candidates() -> list[dict]:
         )
         r.raise_for_status()
         rows = r.json()
-        # 중복 종목코드 제거 (같은 종목이 여러 유저에 의해 추가된 경우)
-        seen = set()
-        result = []
+        # 관리자가 제외한 종목은 사용자 추가분까지 통째로 뺀다 (메일·게시판·추천에 노출 금지)
+        excluded = get_excluded_codes()
+        rows = [row for row in rows if row['stock_code'] not in excluded]
+        if excluded:
+            print(f"🚫 관리자 제외 종목 {len(excluded)}개 건너뜀")
+        # 중복 종목코드 제거 (같은 종목이 여러 유저에 의해 추가된 경우).
+        # 시스템 종목과 겹치면 시스템 쪽을 남긴다 — source 가 결과 저장 범위를 가른다.
+        by_code: dict[str, dict] = {}
         for row in rows:
             code = row['stock_code']
-            if code not in seen:
-                seen.add(code)
-                result.append({
+            is_system = row.get('source') == 'system' and not row.get('user_id')
+            prev = by_code.get(code)
+            if prev is None or (is_system and not prev['system']):
+                by_code[code] = {
                     'code':   code,
                     'name':   row['stock_name'],
                     'sector': row['sector'],
-                })
+                    'system': is_system,
+                }
+        result = list(by_code.values())
         print(f"📋 스크리닝 대상 {len(result)}종목 로드 완료")
         return result
     except Exception as e:
@@ -90,6 +80,9 @@ def _save_results(results: list[dict]):
         return
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
+    # screening_results 는 자동매매 감시종목(main.py)과 전체 공개 추천 목록의 원천이다.
+    # 사용자가 임의로 추가한 종목이 여기 들어가면 다른 모든 사용자의 자동매수 대상이
+    # 될 수 있으므로 시스템 후보만 저장한다.
     rows = [
         {
             'stock_code':  r['code'],
@@ -101,7 +94,7 @@ def _save_results(results: list[dict]):
             'pass':        r.get('pass', False),
             'screened_at': now,
         }
-        for r in results if not r.get('error')
+        for r in results if not r.get('error') and r.get('system')
     ]
     if not rows:
         return
@@ -211,6 +204,7 @@ def screen():
                 'code':       code,
                 'name':       name,
                 'sector':     sector,
+                'system':     stock['system'],
                 'price':      price,
                 'ma60':       ma60,
                 'ma5':        ma5,
@@ -371,10 +365,15 @@ def screen():
     kakao_notify.send(report, link_url=kakao_link)
 
     # 가입 유저: 카카오톡 (등록된 리프레시 토큰을 가진 사용자에 한해)
+    # 발송 시각이 21~08시(KST)면 야간 수신 동의까지 있어야 보낸다 (정보통신망법 제50조)
+    night = subscriptions.is_night_kst()
+
     def _fetch_user_kakao_tokens() -> list[str]:
         if not (_SUPABASE_URL and _SUPABASE_KEY):
             return []
         try:
+            # 카카오 연동 자체가 알림 수신 의사 표시지만, 야간 발송은 별도 동의가 필요하다
+            allowed = set(subscriptions.consented_rows(night)) if night else None
             r = requests.get(
                 f"{_SUPABASE_URL}/rest/v1/trading_configs?is_active=eq.true",
                 headers={
@@ -390,6 +389,8 @@ def screen():
             for row in rows:
                 raw = row.get('notify_kakao_refresh_token')
                 if not raw:
+                    continue
+                if allowed is not None and row.get('user_id') not in allowed:
                     continue
                 try:
                     tokens.append(config_crypto.decrypt(raw))
@@ -407,25 +408,31 @@ def screen():
     else:
         print("⚠️  카카오톡 수신자 없음")
 
-    # 가입 유저 전체: 이메일 (간밤 미국시장 브리핑을 상단에 포함한 HTML)
-    recipients = _fetch_user_emails()
-    if recipients:
-        if brief:
-            html = us_market_brief.render_email_html(brief, report)
-            brief_text = us_market_brief.render_text(brief)
-            plain = f"{brief_text}\n\n{report}" if brief_text else report
-            _archive_email(bp_title, html, plain, brief)
-            ok = email_notify.send_html_to(html, plain, recipients)
-        else:
-            ok = email_notify.send_to(report, recipients)
-        if ok:
-            print(f"📧 이메일 발송 완료 → {len(recipients)}명")
-        else:
-            print("⚠️  이메일 발송 실패 (EMAIL_SENDER / EMAIL_PASSWORD 환경변수 확인)")
+    # 메일 본문 (간밤 미국시장 브리핑을 상단에 포함한 HTML)
+    if brief:
+        html = us_market_brief.render_email_html(brief, report)
+        brief_text = us_market_brief.render_text(brief)
+        plain = f"{brief_text}\n\n{report}" if brief_text else report
+        # 블로그 등 다른 채널용 원본 — 수신자 수와 무관하게 보관한다
+        # (동의자가 0명인 날에도 기록이 끊기지 않도록)
+        _archive_email(bp_title, html, plain, brief)
     else:
-        print("⚠️  이메일 수신자 없음")
+        from html import escape
+        html = f"<html><body><pre style='font-family:inherit;white-space:pre-wrap'>{escape(report)}</pre></body></html>"
+        plain = report
 
-    return ok
+    # 수신 동의한 사용자에게만 이메일 발송
+    try:
+        recipients = subscriptions.email_recipients(night)
+    except Exception as e:
+        # 동의 여부를 확인할 수 없으면 보내지 않는다
+        print(f"⚠️  수신 동의 조회 실패 — 이메일 발송 생략: {e}")
+        recipients = []
+    if not recipients:
+        print(f"⚠️  이메일 수신 동의자 없음 ({'야간 동의 필요' if night else '주간 발송'})")
+        return False
+    sent, tried = email_notify.send_newsletter(html, plain, recipients)
+    return sent > 0
 
 
 if __name__ == '__main__':

@@ -67,15 +67,15 @@ if __name__ == '__main__':
     # Monkeypatch `strategy`'s `db` to avoid Supabase network calls during local dry-run
     import types
     fake_db = types.SimpleNamespace()
-    fake_db.get_position = lambda stock_code: {
+    fake_db.get_position = lambda stock_code, user_id=None: {
         'stock_code': stock_code,
         'sell_5_done': False,
         'sell_10_done': False,
         'buy_minus5_done': False,
         'buy_minus10_done': False,
     }
-    fake_db.upsert_position = lambda stock_code, **fields: {}
-    fake_db.reset_position = lambda stock_code, stock_name='': {}
+    fake_db.upsert_position = lambda stock_code, user_id=None, **fields: {}
+    fake_db.reset_position = lambda stock_code, stock_name='', user_id=None: {}
     fake_db.log_trade = lambda *args, **kwargs: {}
     fake_db.get_today_buy_sum = lambda user_id: 0
     strategy.db = fake_db

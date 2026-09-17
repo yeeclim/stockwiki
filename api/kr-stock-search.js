@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   }
 
   const { query = '', type = 'all' } = req.query;
+  if (typeof query !== 'string') return fail(res, 400, '검색어가 올바르지 않습니다');
   const q = query.trim();
   if (!q) return res.json({ success: true, data: [] });
 
@@ -88,7 +89,7 @@ export default async function handler(req, res) {
     res.json({ success: true, data });
   } catch (e) {
     console.error('kr-stock-search error:', e.message);
-    res.status(500).json({ success: false, error: '검색 중 오류: ' + e.message });
+    res.status(500).json({ success: false, error: '검색 중 오류가 발생했습니다' });
   }
 }
 
@@ -162,8 +163,9 @@ async function krxQuery(q, type, seen) {
       );
       if (etfText) {
         let d; try { d = JSON.parse(etfText); } catch { d = null; }
+        // 빈 목록이면 아무것도 추가하지 않고 아래 일반 주식 검색으로 넘어간다
+        // (예전엔 여기서 return 해서 ETF 0건이면 주식 검색까지 건너뛰었다)
         const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
-        if (list.length === 0) return; // KRX 응답 파싱 실패
         for (const item of list) {
           const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
           const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';
@@ -191,7 +193,6 @@ async function krxQuery(q, type, seen) {
       if (stkText) {
         let d; try { d = JSON.parse(stkText); } catch { d = null; }
         const list = d?.OutBlock_1 ?? d?.result ?? d?.block1 ?? [];
-        if (list.length === 0) return; // KRX 응답 파싱 실패
         for (const item of list) {
           const code = (item.ISU_SRT_CD || item.isuSrtCd || item.shortCode || '').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
           const name = item.ISU_ABBR_NM || item.isuAbbrNm || item.ISU_NM || item.isuNm || '';

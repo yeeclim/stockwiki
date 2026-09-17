@@ -11,6 +11,11 @@ on:
         required: false
         default: 'false'
 
+# 스케줄 지연으로 두 실행이 겹치면 같은 종목을 중복 매수할 수 있다 — 한 번에 하나만.
+concurrency:
+  group: auto-trading
+  cancel-in-progress: false
+
 jobs:
   trade:
     runs-on: ubuntu-latest

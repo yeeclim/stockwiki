@@ -242,14 +242,41 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
     return score, max_score, log
 
 
+# ── 일일 매수 한도 ─────────────────────────────────────────────────────────────
+GLOBAL_MAX_BUY = 500_000   # 사용자 설정(daily_max_buy)이 없을 때의 1일 최대 매수금액
+
+
+def _remaining_buy_cap(user_cfg: dict | None, user_id: str | None) -> int:
+    """오늘 더 매수할 수 있는 금액(원). 0 이하면 매수 금지.
+
+    오늘 매수 합계를 조회하지 못하면 한도가 없는 것으로 치지 않고 0을 돌려준다.
+    (예전엔 조회 실패 = 0원 매수로 취급해 한도가 통째로 무력화됐다)
+    """
+    cap = GLOBAL_MAX_BUY
+    try:
+        dm = (user_cfg or {}).get('daily_max_buy')
+        if dm is not None and int(dm) > 0:
+            cap = int(dm)
+    except (TypeError, ValueError):
+        pass
+
+    if not user_id:
+        return cap
+    bought_today = db.get_today_buy_sum(user_id)
+    if bought_today is None:
+        print("⛔ 오늘 매수 합계 조회 실패 — 한도 확인 불가로 매수 보류")
+        return 0
+    return cap - bought_today
+
+
 # ── 메인 전략 실행 ─────────────────────────────────────────────────────────────
 def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
     sep = "=" * 55
 
     # 데이터 수집 (중복 API 호출 최소화)
-    fund    = api.get_fundamentals(stock_code)   # price, PER, PBR, volume
+    fund    = api.get_fundamentals(stock_code)   # price, PER, PBR, volume, 시총
     price   = fund['price']
-    ma_data = api.get_ma_data(stock_code)        # MA5/20/60/120 + 골든크로스
+    ma_data = api.get_ma_data(stock_code)        # MA + RSI/바닥/거래량 지표
     ma60    = ma_data.get('ma60')
 
     h         = api.get_holdings(stock_code)
@@ -263,13 +290,10 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
     if not prdy_clpr and prdy_ctrt and price:
         prdy_clpr = round(price / (1 + prdy_ctrt / 100))
     gap_pct = (open_price - prdy_clpr) / prdy_clpr * 100 if prdy_clpr else 0.0
-    daily_drop = prdy_ctrt
     ma5, ma20 = ma_data.get('ma5'), ma_data.get('ma20')
 
-    state = db.get_position(stock_code)
-    user_id = None
-    if user_cfg:
-        user_id = user_cfg.get('user_id')
+    user_id = (user_cfg or {}).get('user_id')
+    state = db.get_position(stock_code, user_id)
 
     # ── 포지션 없음 → 복합 진입 조건 평가 ───────────────────────────────────
     if shares == 0:
@@ -287,87 +311,81 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
 
         # 당일 급등 방지
         DAILY_SURGE_LIMIT = 5.0
-        if daily_drop >= DAILY_SURGE_LIMIT:
+        if prdy_ctrt >= DAILY_SURGE_LIMIT:
             return
 
-        orig_buy = int(cash * 0.25)
-        user_cap = None
-        if user_cfg:
-            try:
-                dm = user_cfg.get('daily_max_buy')
-                if dm is not None:
-                    user_cap = int(dm)
-            except Exception:
-                user_cap = None
+        orig_buy  = int(cash * 0.25)
+        remaining = _remaining_buy_cap(user_cfg, user_id)
+        if remaining <= 0:
+            return
+        buy_amount = min(orig_buy, remaining)
 
-        GLOBAL_MAX_BUY = 500_000
-        cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
-
-        if user_id:
-            bought_today = db.get_today_buy_sum(user_id)
-            remaining = cap - bought_today if cap else cap
-            if remaining <= 0:
-                return
-        else:
-            remaining = cap
-
-        buy_amount = orig_buy if orig_buy <= remaining else remaining
         result = api.buy(stock_code, buy_amount)
-        if result:
-            # 매수 성공 시에만 상세 출력
-            print(f"\n{sep}")
-            print(f"  {stock_name} ({stock_code})")
-            print(sep)
-            print(f"현재가     : {price:>10,}원")
-            print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
-            print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
-            if ma60:
-                print(f"60일 MA    : {ma60:>10,.0f}원")
-            if ma5 and ma20:
-                cross_tag = ' 🔺골든크로스' if ma_data.get('golden_cross') else ''
-                print(f"MA5/MA20   : {ma5:>10,.0f} / {ma20:,.0f}원{cross_tag}")
-            print(f"PER / PBR  : {fund['per']:>9.1f} / {fund['pbr']:.2f}")
-            print(f"거래량     : {fund['volume']:>10,}주")
-            print(f"예수금     : {cash:>10,}원")
-            bar = '█' * score + '░' * (max_score - score)
-            print(f"\n[ 진입 조건 점수 ]")
-            for line in log_lines:
-                print(line)
-            print(f"\n  📊 [{bar}] {score}/{max_score}점")
-            if orig_buy > remaining:
-                print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
-            else:
-                print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
-            db.reset_position(stock_code, stock_name)
-            db.log_trade(stock_code, stock_name, 'BUY',
-                         result['price'], result['shares'], result['amount'],
-                         f'복합조건 {score}/{max_score}점 진입', user_id)
-            sell_opinion = _ask_sell_timing(
-                stock_name, stock_code, result['price'], fund, ma_data, score)
-            print(f"\n[ AI 매도 타이밍 의견 ]\n  {sell_opinion}")
+        if not result:
+            return
 
-            # 게시판 매수 기록 등록
-            try:
-                import board_post
-                from datetime import datetime
-                import pytz
-                date_str = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M')
-                bp_title = f"[매수] {date_str} {stock_name}({stock_code}) {result['price']:,}원"
-                bp_content = board_post.buy_content(
-                    stock_name, stock_code,
-                    result['price'], result['amount'], result['shares'],
-                    score, max_score, log_lines, sell_opinion,
-                    ratios or {},
-                )
-                board_post.post(bp_title, bp_content)
-            except Exception:
-                pass
+        # 체결 직후 곧바로 기록한다. 아래 출력/AI 의견/게시판 단계에서 예외가 나도
+        # 매수 로그가 남아야 일일 한도 집계와 포지션 상태가 어긋나지 않는다.
+        db.reset_position(stock_code, stock_name, user_id)
+        db.log_trade(stock_code, stock_name, 'BUY',
+                     result['price'], result['shares'], result['amount'],
+                     f'복합조건 {score}/{max_score}점 진입', user_id)
+
+        print(f"\n{sep}")
+        print(f"  {stock_name} ({stock_code})")
+        print(sep)
+        print(f"현재가     : {price:>10,}원")
+        print(f"전일 대비  : {prdy_ctrt:>+10.2f}%  (전일종가 {prdy_clpr:,}원)")
+        print(f"시가       : {open_price:>10,}원  (갭 {gap_pct:+.2f}%)")
+        if ma60:
+            print(f"60일 MA    : {ma60:>10,.0f}원")
+        if ma5 and ma20:
+            cross_tag = ' 🔺골든크로스' if ma_data.get('golden_cross') else ''
+            print(f"MA5/MA20   : {ma5:>10,.0f} / {ma20:,.0f}원{cross_tag}")
+        print(f"PER / PBR  : {fund['per']:>9.1f} / {fund['pbr']:.2f}")
+        print(f"거래량     : {fund['volume']:>10,}주")
+        print(f"예수금     : {cash:>10,}원")
+        # score 는 0.5점 단위 float — 문자열 반복 횟수는 정수여야 한다
+        filled = int(score)
+        bar = '█' * filled + '░' * (max_score - filled)
+        print(f"\n[ 진입 조건 점수 ]")
+        for line in log_lines:
+            print(line)
+        print(f"\n  📊 [{bar}] {score}/{max_score}점")
+        if orig_buy > remaining:
+            print(f"\n✅ 진입 확정 → 예수금 25% = {orig_buy:,}원 → 최대 {remaining:,}원 제한, {buy_amount:,}원 매수")
+        else:
+            print(f"\n✅ 진입 확정 → 예수금 25% = {buy_amount:,}원 매수")
+
+        sell_opinion = _ask_sell_timing(
+            stock_name, stock_code, result['price'], fund, ma_data, score)
+        print(f"\n[ AI 매도 타이밍 의견 ]\n  {sell_opinion}")
+
+        # 게시판 매수 기록 등록
+        try:
+            import board_post
+            from datetime import datetime
+            import pytz
+            date_str = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M')
+            bp_title = f"[매수] {date_str} {stock_name}({stock_code}) {result['price']:,}원"
+            bp_content = board_post.buy_content(
+                stock_name, stock_code,
+                result['price'], result['amount'], result['shares'],
+                score, max_score, log_lines, sell_opinion,
+                ratios or {},
+            )
+            board_post.post(bp_title, bp_content)
+        except Exception as e:
+            print(f"⚠️  게시판 매수 기록 실패: {e}")
         return
 
     # ── 포지션 있음 → 수익률 모니터링 (매도는 사용자 직접 판단)
     print(f"\n{sep}")
     print(f"  {stock_name} ({stock_code})")
     print(sep)
+    if not avg_price:
+        print("⚠️  평균단가 0 — 수익률 계산 불가, 추가매수 건너뜀")
+        return
     chg = (price - avg_price) / avg_price * 100
     print(f"보유수량   : {shares:>10,}주  (평단가 {avg_price:,.0f}원)")
     print(f"예수금     : {cash:>10,}원")
@@ -381,62 +399,24 @@ def run(api, stock_code: str, stock_name: str, user_cfg: dict | None = None):
 
     # ── 추가매수 (물타기) ─────────────────────────────────────────────────────
     if chg <= -10 and not state.get('buy_minus10_done'):
-        buy_amount = int(cash * 0.10)
-        # apply per-user daily cap if available
-        user_cap = None
-        try:
-            if user_cfg:
-                dm = user_cfg.get('daily_max_buy')
-                if dm is not None:
-                    user_cap = int(dm)
-        except Exception:
-            user_cap = None
-        GLOBAL_MAX_BUY = 500_000
-        cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
-        if user_id:
-            bought_today = db.get_today_buy_sum(user_id)
-            remaining = cap - bought_today if cap else cap
-            if remaining <= 0:
-                print(f"\n⏸  오늘 이미 일일 최대 매수금액({cap:,}원)을 소진했습니다. 추가매수 취소")
-                return
-            buy_amount = buy_amount if buy_amount <= remaining else remaining
-
-        result = api.buy(stock_code, buy_amount)
-        if result:
-            print(f"\n✅ -10% 도달 → 예수금 10% ({buy_amount:,}원) 추가매수")
-            db.upsert_position(stock_code, buy_minus10_done=True, user_id=user_id)
-            db.log_trade(stock_code, stock_name, 'BUY',
-                         result['price'], result['shares'], result['amount'],
-                         '-10% 물타기 10%', user_id)
-
+        step = (-10, 0.10, 'buy_minus10_done')
     elif chg <= -5 and not state.get('buy_minus5_done'):
-        buy_amount = int(cash * 0.05)
-        # apply per-user daily cap if available
-        user_cap = None
-        try:
-            if user_cfg:
-                dm = user_cfg.get('daily_max_buy')
-                if dm is not None:
-                    user_cap = int(dm)
-        except Exception:
-            user_cap = None
-        GLOBAL_MAX_BUY = 500_000
-        cap = user_cap if user_cap and user_cap > 0 else GLOBAL_MAX_BUY
-        if user_id:
-            bought_today = db.get_today_buy_sum(user_id)
-            remaining = cap - bought_today if cap else cap
-            if remaining <= 0:
-                print(f"\n⏸  오늘 이미 일일 최대 매수금액({cap:,}원)을 소진했습니다. 추가매수 취소")
-                return
-            buy_amount = buy_amount if buy_amount <= remaining else remaining
-
-        result = api.buy(stock_code, buy_amount)
-        if result:
-            print(f"\n✅ -5% 도달 → 예수금 5% ({buy_amount:,}원) 추가매수")
-            db.upsert_position(stock_code, buy_minus5_done=True, user_id=user_id)
-            db.log_trade(stock_code, stock_name, 'BUY',
-                         result['price'], result['shares'], result['amount'],
-                         '-5% 물타기 5%', user_id)
-
+        step = (-5, 0.05, 'buy_minus5_done')
     else:
         print(f"⏸  추가매수 조건 미달 (수익률 {chg:+.2f}%) → 대기")
+        return
+
+    level, ratio, flag = step
+    remaining = _remaining_buy_cap(user_cfg, user_id)
+    if remaining <= 0:
+        print(f"\n⏸  일일 최대 매수금액 소진(또는 확인 불가) — 추가매수 취소")
+        return
+    buy_amount = min(int(cash * ratio), remaining)
+
+    result = api.buy(stock_code, buy_amount)
+    if result:
+        db.upsert_position(stock_code, user_id, **{flag: True})
+        db.log_trade(stock_code, stock_name, 'BUY',
+                     result['price'], result['shares'], result['amount'],
+                     f'{level}% 물타기 {int(ratio * 100)}%', user_id)
+        print(f"\n✅ {level}% 도달 → 예수금 {int(ratio * 100)}% ({buy_amount:,}원) 추가매수")

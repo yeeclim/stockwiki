@@ -278,34 +278,14 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
 
       debugPrint('🔍 AI 검증위원회 환경: ${isLocalDev ? "로컬 개발" : "운영"}');
 
-      // 가격 포맷 (국내 주식은 원화, 미국 주식은 달러)
+      // 국내/미국 구분 (서버가 가격 표기 통화를 정한다)
       final isKorean = RegExp(r'^\d+$').hasMatch(stock.symbol) ||
           stock.symbol.endsWith('.KS') ||
           stock.symbol.endsWith('.KQ') ||
           RegExp(r'[가-힣]').hasMatch(stock.name);
 
-      final priceFormat = isKorean
-          ? '₩${stock.price?.toStringAsFixed(0) ?? 'N/A'}'
-          : '\$${stock.price?.toStringAsFixed(2) ?? 'N/A'}';
-
-      // 더 상세한 질문 구성
-      final changeInfo = stock.changePercent != null
-          ? '현재 ${stock.changePercent! >= 0 ? '상승' : '하락'}률: ${(stock.changePercent!).abs().toStringAsFixed(2)}%'
-          : '가격 변동 정보 없음';
-
-      final question =
-          '${stock.name} (${stock.symbol}) 주식에 대한 투자 의견을 분석해주세요.\n\n'
-          '현재 가격: $priceFormat\n'
-          '$changeInfo\n\n'
-          '다음 관점에서 종합적으로 분석해주세요:\n'
-          '1. 재무 건전성 및 수익성\n'
-          '2. 성장 가능성 및 시장 전망\n'
-          '3. 기술적 분석 (가격 추세, 거래량 등)\n'
-          '4. 리스크 요인\n'
-          '5. 투자 가치 평가\n\n'
-          '위 분석을 바탕으로 투자 의견을 제시해주세요.';
-
-      debugPrint('🎯 AI 검증위원회 질문: $question');
+      // 질문(프롬프트)은 서버가 아래 필드로 구성한다 — 클라이언트 문자열을 그대로
+      // 모델에 넘기면 캐시 오염·프롬프트 주입이 가능했다.
       debugPrint(
           '📊 주식 정보: ${stock.name} (${stock.symbol}), 가격: ${stock.price}, 변동률: ${stock.changePercent}');
 
@@ -316,8 +296,8 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
               'Content-Type': 'application/json',
             },
             body: json.encode({
-              'question': question,
               'symbol': stock.symbol,
+              'name': stock.name,
               'price': stock.price,
               'changePercent': stock.changePercent,
               'isKorean': isKorean,

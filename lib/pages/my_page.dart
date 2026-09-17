@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
 import '../services/login_history_service.dart';
+import '../widgets/email_consent.dart';
 import 'ai_trading_page.dart';
 
 class MyPage extends StatelessWidget {
@@ -115,6 +116,11 @@ class MyPage extends StatelessWidget {
 
             // ── 최근 로그인 (이 기기) ───────────────────────────────────────
             _LoginHistoryCard(relTime: _relTime),
+
+            const SizedBox(height: 24),
+
+            // ── 스크리닝 메일 수신 설정 ─────────────────────────────────────
+            const EmailSubscriptionCard(),
 
             const SizedBox(height: 24),
 

@@ -3,10 +3,15 @@
 실전투자: https://openapi.koreainvestment.com:9443
 
 main.py(실매매)는 이 베이스를 그대로 사용한다.
-trading/kis_api.py 가 이 클래스를 상속해 세션/재시도·기술적 지표·시간외
-주문구분·투자자동향/선물 등 스크리닝 전용 확장을 덧붙인다.
+trading/kis_api.py 가 이 클래스를 상속해 세션/재시도·시간외 주문구분·
+투자자동향/선물 등 스크리닝 전용 확장을 덧붙인다.
+
+시가총액·RSI·바닥·거래량 지표는 반드시 여기(베이스)에 둔다. 예전엔 스크리닝 쪽
+서브클래스에만 있어서, 실매매는 같은 _score_entry 로 채점하면서도 해당 항목이
+전부 0점(최대 7점)이고 시총 필터도 꺼진 채로 돌았다.
 """
 import os
+import sys
 import requests
 from datetime import datetime, timedelta
 from .base_api import BaseBrokerApi
@@ -111,10 +116,16 @@ class KISApi(BaseBrokerApi):
             'prdy_ctrt':  _f(out.get('prdy_ctrt')),
             'open':       _i(out.get('stck_oprc')),
             'prdy_clpr':  _i(out.get('stck_prdy_clpr') or 0),
+            'market_cap': _i(out.get('hts_avls')),  # 시가총액 (억원)
         }
 
     def get_ma_data(self, code: str) -> dict:
-        prices = [int(x['stck_clpr']) for x in self._inquire_daily_rows(code, 250)]
+        # technical_indicators 는 trading/ 루트 모듈이다 (brokers 패키지 밖)
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        import technical_indicators as ti
+
+        rows = self._inquire_daily_rows(code, 250)
+        prices = [int(x['stck_clpr']) for x in rows]
 
         def ma(n):      return round(sum(prices[:n]) / n, 1) if len(prices) >= n else None
         def ma_prev(n): return round(sum(prices[1:n+1]) / n, 1) if len(prices) >= n + 1 else None
@@ -122,10 +133,19 @@ class KISApi(BaseBrokerApi):
         ma5, ma20, ma60, ma120 = ma(5), ma(20), ma(60), ma(120)
         p5, p20 = ma_prev(5), ma_prev(20)
 
+        # rows/prices 는 최신→과거 — 지표 함수는 과거→최신(오름차순)을 기대한다
+        closes_asc = list(reversed(prices))
+        volumes_asc = [int(x.get('acml_vol', 0) or 0) for x in reversed(rows)]
+        rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes_asc)
+
         return {
             'ma5': ma5, 'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
             'golden_cross': bool(ma5 and ma20 and p5 and p20 and ma5 > ma20 and p5 <= p20),
             'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
+            'rsi':              rsi_now,
+            'rsi_rebound':      rsi_rebound,
+            'basing':           ti.basing_near_low(closes_asc),
+            'volume_declining': ti.volume_declining(volumes_asc),
         }
 
     # ── 잔고 조회 ──────────────────────────────────────────────────────────────

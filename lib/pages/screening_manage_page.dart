@@ -12,6 +12,7 @@ class ScreeningManagePage extends StatefulWidget {
 class _ScreeningManagePageState extends State<ScreeningManagePage> {
   List<ScreeningCandidate> _all = [];
   List<ScreeningCandidate> _mine = [];
+  List<Map<String, dynamic>> _excluded = [];
   bool _loading = true;
 
   // 추가 폼
@@ -33,10 +34,19 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
     try {
       final all = await ScreeningService.loadAll();
       final mine = await ScreeningService.loadMine();
+      var excluded = <Map<String, dynamic>>[];
+      if (isAdminUser) {
+        try {
+          excluded = await ScreeningService.loadExcluded();
+        } catch (e) {
+          _snack('제외 종목 목록을 불러오지 못했습니다: $e');
+        }
+      }
       if (!mounted) return;
       setState(() {
         _all = all;
         _mine = mine;
+        _excluded = excluded;
         _loading = false;
       });
     } catch (_) {
@@ -70,9 +80,52 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   }
 
   Future<void> _remove(ScreeningCandidate c) async {
-    await ScreeningService.remove(c.id);
-    await _load();
-    _snack('${c.stockName} 삭제됐습니다.');
+    try {
+      await ScreeningService.remove(c.id);
+      await _load();
+      _snack('${c.stockName} 삭제됐습니다.');
+    } catch (e) {
+      _snack('삭제 실패: $e');
+    }
+  }
+
+  /// 관리자: 종목을 스크리닝 전체에서 제외 (메일·추천·자동매매 포함, 다음 스캔에도 유지)
+  Future<void> _exclude(ScreeningCandidate c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('종목 제외'),
+        content: Text('${c.stockName}(${c.stockCode})을(를) 스크리닝에서 제외할까요?\n\n'
+            '스크리닝 메일·추천 목록·자동매매에서 모두 빠지고, 다음 날 광역 스캔이 '
+            '다시 올리지 않습니다. 아래 "제외한 종목"에서 복원할 수 있습니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('제외')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ScreeningService.excludeAsAdmin(c.stockCode);
+      await _load();
+      _snack('${c.stockName} 제외됐습니다.');
+    } catch (e) {
+      _snack('제외 실패: $e');
+    }
+  }
+
+  Future<void> _restore(String code, String name) async {
+    try {
+      await ScreeningService.restoreAsAdmin(code);
+      await _load();
+      _snack('$name 복원됐습니다. 다음 스크리닝부터 다시 평가합니다.');
+    } catch (e) {
+      _snack('복원 실패: $e');
+    }
   }
 
   void _snack(String msg) {
@@ -172,13 +225,45 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
                           ),
                           ...entry.value.map((c) => _CandidateTile(
                                 candidate: c,
-                                onRemove: (c.isUserAdded || isAdmin)
-                                    ? () => _remove(c)
-                                    : null,
+                                // 관리자는 제외(서버 처리), 일반 사용자는 본인 종목만 삭제
+                                onRemove: isAdmin
+                                    ? () => _exclude(c)
+                                    : c.isUserAdded
+                                        ? () => _remove(c)
+                                        : null,
                                 theme: theme,
                               )),
                         ],
                       )),
+
+                  // ── 관리자: 제외한 종목 ─────────────────────────────────────
+                  if (isAdmin) ...[
+                    const SizedBox(height: 24),
+                    _SectionTitle(
+                        theme: theme, title: '제외한 종목 (${_excluded.length}개)'),
+                    const SizedBox(height: 4),
+                    Text('메일·추천·자동매매에서 빠져 있는 종목 — 복원하면 다음 스크리닝부터 다시 평가',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    if (_excluded.isEmpty)
+                      Text('제외한 종목이 없습니다.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant))
+                    else
+                      ..._excluded.map((e) => ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('${e['stock_name']}'),
+                            subtitle:
+                                Text('${e['stock_code']} · ${e['sector']}'),
+                            trailing: TextButton(
+                              onPressed: () => _restore(
+                                  '${e['stock_code']}', '${e['stock_name']}'),
+                              child: const Text('복원'),
+                            ),
+                          )),
+                  ],
                   const SizedBox(height: 32),
                 ],
               ),

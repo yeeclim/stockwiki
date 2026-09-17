@@ -2,6 +2,9 @@
 // Charts, Commodity Prices, Fear & Greed Index, 국내주식 KIS 일봉
 
 import { applyCors } from './_shared.js';
+import { fetchLiveQuotes } from './_us-recommend-shared.js';
+import { handleAdminCandidate } from './_admin-screening.js';
+import { handleUnsubscribe } from './_email-unsubscribe.js';
 
 export default async function handler(req, res) {
     if (applyCors(req, res, { methods: 'GET, POST, OPTIONS', json: false })) return;
@@ -15,6 +18,9 @@ export default async function handler(req, res) {
         if (type === 'cnn-fear-greed') return await handleCnnFearGreed(req, res);
         if (type === 'kr-candles') return await handleKrCandles(req, res);
         if (type === 'us-candles') return await handleUsCandles(req, res);
+        if (type === 'us-quote')   return await handleUsQuote(req, res);
+        if (type === 'admin-candidate') return await handleAdminCandidate(req, res);
+        if (type === 'unsubscribe') return await handleUnsubscribe(req, res);
 
         return res.status(400).json({ error: 'Invalid utility type' });
     } catch (error) {
@@ -29,14 +35,23 @@ export default async function handler(req, res) {
 
 const KIS_BASE_URL = 'https://openapi.koreainvestment.com:9443';
 let _kisTokenCache = { token: null, expiresAt: 0 };
+let _kisTokenInflight = null;
 const _krCandleCache = new Map();
 const KR_CANDLE_CACHE_TTL = 4 * 60 * 60 * 1000; // 4시간
 
+// KIS 는 토큰 재발급을 1분 1회로 제한한다. 캐시가 빈 상태에서 요청이 동시에 몰리면
+// 전부 발급을 시도해 뒤쪽 요청이 실패했으므로, 진행 중인 발급 하나를 공유한다.
 async function getKisToken() {
     if (_kisTokenCache.token && Date.now() < _kisTokenCache.expiresAt) {
         return _kisTokenCache.token;
     }
+    if (!_kisTokenInflight) {
+        _kisTokenInflight = issueKisToken().finally(() => { _kisTokenInflight = null; });
+    }
+    return _kisTokenInflight;
+}
 
+async function issueKisToken() {
     const appKey = process.env.KIS_APP_KEY;
     const appSecret = process.env.KIS_APP_SECRET;
     if (!appKey || !appSecret) {
@@ -251,6 +266,31 @@ async function handleUsCandles(req, res) {
     }
 }
 
+// 포트폴리오 화면의 미국 종목 현재가. 별도 api/us-quote.js 를 만들면 Vercel Hobby
+// 함수 12개 한도를 넘으므로 여기서 분기한다 (클라이언트가 404 를 받고 있었다).
+async function handleUsQuote(req, res) {
+    // 요청 표기(BRK.B) → Yahoo 표기(BRK-B). 응답은 요청 표기 그대로 돌려줘야 클라이언트 키와 맞는다.
+    const requested = [...new Set(
+        (req.query.symbols || '').toString().toUpperCase().split(',')
+            .map(s => s.trim())
+            .filter(s => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s))
+    )].slice(0, 50);
+    if (!requested.length) {
+        return res.status(400).json({ success: false, error: 'symbols 파라미터가 필요합니다' });
+    }
+    const toYahoo = (s) => s.replace('.', '-');
+    const map = await fetchLiveQuotes(requested.map(toYahoo), 'symbol,regularMarketPrice,regularMarketChangePercent');
+    const data = requested
+        .filter(s => map[toYahoo(s)]?.regularMarketPrice != null)
+        .map(s => ({
+            symbol: s,
+            price: map[toYahoo(s)].regularMarketPrice,
+            changePercent: map[toYahoo(s)].regularMarketChangePercent ?? null,
+        }));
+    res.setHeader('Cache-Control', 's-maxage=60');
+    return res.status(200).json({ success: true, data });
+}
+
 // Flutter 코드가 기대하는 Yahoo Finance 형식으로 가격을 감싸는 헬퍼
 function wrapPrice(price) {
     return {
@@ -345,7 +385,8 @@ async function handleCommodityPrice(req, res) {
                 if (rate) return res.status(200).json(wrapPrice(rate));
             }
         } catch (_) {}
-        return res.status(200).json(wrapPrice(1380)); // 최후 fallback
+        // 예전엔 여기서 1380 을 실제 환율인 것처럼 돌려줬다. 틀린 숫자보다 실패가 낫다.
+        return res.status(200).json({ success: false, error: 'Rate unavailable' });
     }
 
     // ── 기타 상품: Yahoo Finance (query1 → query2 순서로 시도) ───────────────
@@ -375,21 +416,11 @@ async function handleCommodityPrice(req, res) {
         } catch (_) {}
     }
 
-    // v7 quote 엔드포인트로 최후 시도
-    try {
-        const r = await fetchWithTimeout(
-            `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooSymbol}`,
-            { headers: yahooHeaders },
-            6000
-        );
-        if (r.ok) {
-            const data = await r.json();
-            const q = data?.quoteResponse?.result?.[0];
-            if (q?.regularMarketPrice) {
-                return res.status(200).json(wrapPrice(q.regularMarketPrice));
-            }
-        }
-    } catch (_) {}
+    // v7 quote 로 최후 시도 (crumb 필요 — 공용 헬퍼 사용)
+    const quote = (await fetchLiveQuotes([yahooSymbol], 'symbol,regularMarketPrice'))[yahooSymbol];
+    if (quote?.regularMarketPrice) {
+        return res.status(200).json(wrapPrice(quote.regularMarketPrice));
+    }
 
     return res.status(200).json({ success: false, error: 'Price unavailable' });
 }

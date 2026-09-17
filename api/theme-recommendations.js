@@ -1,9 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import { fetchStockDataDirect } from './_naver-stock.js';
 import { applyCors } from './_shared.js';
-import iconv from 'iconv-lite';
-import { JSDOM } from 'jsdom';
 
 let cachedThemes = null;
 let themesLastUpdate = 0;
@@ -238,130 +234,83 @@ export default async function handler(req, res) {
   }
 }
 
-// 네이버 증권 테마 목록 실시간 스크래핑
+// ── 네이버 증권 테마 데이터 ──────────────────────────────────────────────────
+// 예전엔 finance.naver.com/sise/theme.naver HTML 을 JSDOM 으로 긁었는데, 네이버가
+// 이 페이지를 stock.naver.com(Next.js)으로 옮기면서 302 리다이렉트만 돌아와 테마가
+// 0개가 됐다(운영에서 "테마별 추천 종목" 화면이 통째로 비어 있었다).
+// 모바일 증권이 쓰는 JSON API 로 바꾼다. 종목별 시가총액(marketValue, 억원)도 함께
+// 내려오므로 종목마다 시총을 따로 조회하던 요청(테마당 수십 건)도 없어졌다.
+const NAVER_M_API = 'https://m.stock.naver.com/api/stocks';
+const NAVER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'Referer': 'https://m.stock.naver.com/',
+  'Accept': 'application/json',
+};
+
+const toNum = (v) => {
+  const n = Number(String(v ?? '').replace(/,/g, ''));
+  return Number.isFinite(n) ? n : 0;
+};
+
+async function fetchNaverJson(url) {
+  const res = await fetch(url, { headers: NAVER_HEADERS, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`네이버 API ${res.status}: ${url}`);
+  return res.json();
+}
+
+// 전체 테마 목록 (페이지 단위, 현재 약 260개)
 async function scrapeNaverThemeList() {
   try {
-    const response = await fetch('https://finance.naver.com/sise/theme.naver');
-    if (!response.ok) return [];
-
-    const arrayBuffer = await response.arrayBuffer();
-    const html = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
-
-    const dom = new JSDOM(html);
-    const doc = dom.window.document;
-
     const themes = [];
-    const rows = doc.querySelectorAll('table.type_1.theme tbody tr');
-
-    rows.forEach(row => {
-      const nameCol = row.querySelector('.col_type1 a');
-      const descCol = row.querySelector('.col_type2');
-      if (!nameCol) return;
-
-      const match = nameCol.href.match(/no=(\d+)/);
-      if (match) {
+    for (let page = 1; page <= 10; page++) {
+      const data = await fetchNaverJson(`${NAVER_M_API}/theme?page=${page}&pageSize=100`);
+      const groups = data?.groups ?? [];
+      for (const g of groups) {
         themes.push({
-          id: match[1],
-          name: nameCol.textContent.trim(),
-          description: descCol ? descCol.textContent.trim() : `${nameCol.textContent.trim()} 관련 테마`,
-          url: `https://finance.naver.com${nameCol.href}`
+          id: String(g.no),
+          name: g.name,
+          description: `${g.name} 관련 테마`,
+          url: `https://m.stock.naver.com/domestic/theme/${g.no}`,
         });
       }
-    });
-
+      if (groups.length < 100 || themes.length >= (data?.totalCount ?? 0)) break;
+    }
     return themes;
   } catch (error) {
-    console.error('테마 리스트 스크래핑 실패:', error);
+    console.error('테마 리스트 조회 실패:', error);
     return [];
   }
 }
 
-// 네이버 증권 특정 테마 소속 종목 실시간 스크래핑
+// 특정 테마 소속 종목 (시총 필터 후 상위 10개)
 async function scrapeNaverThemeStocks(themeId, themeName) {
   try {
-    const themeUrl = `https://finance.naver.com/sise/sise_group_detail.naver?type=theme&no=${themeId}`;
-    const response = await fetch(themeUrl);
-    if (!response.ok) return [];
-
-    const arrayBuffer = await response.arrayBuffer();
-    const html = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
-
-    const dom = new JSDOM(html);
-    const doc = dom.window.document;
-
-    const stocks = [];
-    const rows = doc.querySelectorAll('table.type_5 tbody tr');
-
-    rows.forEach(row => {
-      if (row.querySelector('.kline') || row.querySelector('.blank_08')) return;
-
-      const nameArea = row.querySelector('.name_area a');
-      if (!nameArea) return;
-
-      const name = nameArea.textContent.trim();
-      const symbolMatch = nameArea.href.match(/code=(\d+)/);
-      const symbol = symbolMatch ? symbolMatch[1] : '';
-
-      const numberCells = row.querySelectorAll('td.number');
-      if (numberCells.length < 3) return;
-
-      const price = parseInt(numberCells[0].textContent.replace(/,/g, '').trim()) || 0;
-      const changeText = numberCells[1].textContent.replace(/,/g, '').trim();
-      let change = parseInt(changeText) || 0;
-
-      // 하락인 경우 음수 처리
-      const nv01 = row.querySelector('.nv01'); // 하락 클래스
-      if (nv01 && change > 0) change = -change;
-
-      const percentText = numberCells[2].textContent.replace(/,/g, '').replace(/%/g, '').trim();
-      const changePercent = parseFloat(percentText) || 0;
-
-      // 거래량 (4번째 컬럼)
-      const volume = numberCells.length >= 4
-        ? parseInt(numberCells[3].textContent.replace(/,/g, '').trim()) || 0
-        : 0;
-
-      if (symbol && name) {
-        stocks.push({ symbol, name, price, change, changePercent, volume, sector: themeName,
-          description: `네이버 금융 ${themeName} 종목` });
-      }
-    });
-
-    // 종목별 실제 시총 조회 후 필터링
-    const withCap = await Promise.all(
-      stocks.map(async s => {
-        const cap = await fetchMarketCapEok(s.symbol);
-        return { ...s, marketCapEok: cap, marketCap: cap * 100_000_000 };
+    const data = await fetchNaverJson(
+      `${NAVER_M_API}/theme/${encodeURIComponent(themeId)}?page=1&pageSize=100`
+    );
+    const stocks = (data?.stocks ?? [])
+      .filter((s) => s.stockEndType === 'stock' && /^[0-9A-Z]{6}$/.test(s.itemCode ?? ''))
+      .map((s) => {
+        const marketCapEok = toNum(s.marketValue); // 억원
+        return {
+          symbol: s.itemCode,
+          name: s.stockName,
+          price: toNum(s.closePrice),
+          change: toNum(s.compareToPreviousClosePrice),   // 부호 포함
+          changePercent: toNum(s.fluctuationsRatio),      // 부호 포함
+          volume: toNum(s.accumulatedTradingVolume),
+          marketCapEok,
+          marketCap: marketCapEok * 100_000_000,
+          sector: themeName,
+          description: `네이버 금융 ${themeName} 종목`,
+        };
       })
-    );
+      .filter((s) => s.price > 0 && s.marketCapEok >= MIN_MARKET_CAP_EOK);
 
-    const filtered = withCap.filter(s => s.marketCapEok >= MIN_MARKET_CAP_EOK);
-
-    // 테마별 상위 10개만 리턴
-    return filtered.slice(0, 10);
+    return stocks.slice(0, 10);
   } catch (error) {
-    console.error(`테마 ${themeId} 스크래핑 실패:`, error);
+    console.error(`테마 ${themeId} 종목 조회 실패:`, error);
     return [];
-  }
-}
-
-// 네이버 itemSummary API로 시가총액(억원) 조회
-const marketCapCache = {};
-async function fetchMarketCapEok(symbol) {
-  if (marketCapCache[symbol] !== undefined) return marketCapCache[symbol];
-  try {
-    const res = await fetch(
-      `https://api.finance.naver.com/service/itemSummary.nhn?itemcode=${symbol}`,
-      { headers: { 'Referer': 'https://finance.naver.com/' } }
-    );
-    if (!res.ok) return 0;
-    const data = await res.json();
-    // marketSum은 백만원 단위 → 100으로 나누면 억원
-    const cap = Math.floor((parseInt(data.marketSum) || 0) / 100);
-    marketCapCache[symbol] = cap;
-    return cap;
-  } catch {
-    return 0;
   }
 }
 
@@ -899,13 +848,22 @@ async function getThemeRecommendations(theme, limit = 5, sortBy = 'totalScore') 
       continue;
     }
 
-    // MA 정보 reasons에 추가
+    // MA 정보 reasons에 추가 — 실제 수치로 문구를 고른다.
+    // (예전엔 MA60 아래 종목만 통과시키면서도 "상승 추세 유지", "골든크로스 배열"을
+    //  무조건 붙여, 하락 종목에 사실과 반대인 사유가 달렸다)
     if (tech?.ma20) {
-      const ma20Diff = ((stock.price - tech.ma20) / tech.ma20 * 100).toFixed(1);
+      const diff = (stock.price - tech.ma20) / tech.ma20 * 100;
+      const sign = diff >= 0 ? '+' : '';
       analysis.reasons = analysis.reasons ?? [];
-      analysis.reasons.push(`MA20 대비 +${ma20Diff}% — 상승 추세 유지`);
+      analysis.reasons.push(diff >= 0
+        ? `MA20 대비 ${sign}${diff.toFixed(1)}% — 단기 이평선 위`
+        : `MA20 대비 ${diff.toFixed(1)}% — 단기 이평선 아래`);
       if (tech.ma60) {
-        analysis.reasons.push(`MA20(${Math.round(tech.ma20).toLocaleString()}) > MA60(${Math.round(tech.ma60).toLocaleString()}) — 골든크로스 배열`);
+        const ma20Txt = Math.round(tech.ma20).toLocaleString();
+        const ma60Txt = Math.round(tech.ma60).toLocaleString();
+        analysis.reasons.push(tech.ma20 > tech.ma60
+          ? `MA20(${ma20Txt}) > MA60(${ma60Txt}) — 정배열`
+          : `MA20(${ma20Txt}) < MA60(${ma60Txt}) — 역배열`);
       }
       if (tech.high52w) {
         const ratio52w = (stock.price / tech.high52w * 100).toFixed(1);

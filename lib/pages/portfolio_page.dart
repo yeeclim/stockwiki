@@ -85,7 +85,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
       final symbols = tickers.join(',');
       final res = await http
           .get(
-            Uri.parse('$origin/api/us-quote?symbols=$symbols'),
+            Uri.parse('$origin/api/utils?type=us-quote&symbols=$symbols'),
           )
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
