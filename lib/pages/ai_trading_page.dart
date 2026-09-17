@@ -128,24 +128,25 @@ class AiTradingPage extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const ScreeningManagePage()),
-                ),
-                icon: const Icon(Icons.manage_search),
-                label: const Text('스크리닝 종목 관리'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            // 스크리닝 종목 관리·AI 추천 검토는 관리자 전용 (서버·DB 도 관리자만 쓰기 허용)
+            if (isAdminEmail(authProvider.currentUser?.email)) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const ScreeningManagePage()),
+                  ),
+                  icon: const Icon(Icons.manage_search),
+                  label: const Text('스크리닝 종목 관리 (관리자)'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            ),
-            if (isAdminEmail(authProvider.currentUser?.email)) ...[
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,

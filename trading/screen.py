@@ -32,13 +32,18 @@ _SENTIMENT_BUDGET_SEC = 240   # 뉴스 감성 분석 루프
 
 
 def _fetch_candidates() -> list[dict]:
-    """Supabase에서 활성 스크리닝 후보 조회 (시스템 + 전체 유저 추가 종목)"""
+    """Supabase에서 활성 스크리닝 후보 조회 (광역 스캔 선정 system + 관리자 수동 추가 admin)
+
+    스크리닝 종목 관리는 관리자 전용이다. 예전 사용자 추가분(source='user')은 전체
+    회원 메일·게시판에 노출되므로 스캔 대상에서 뺀다.
+    """
     if not (_SUPABASE_URL and _SUPABASE_KEY):
         return []
     try:
         r = requests.get(
             f"{_SUPABASE_URL}/rest/v1/screening_candidates"
-            "?is_active=eq.true&order=sector,stock_code",
+            "?is_active=eq.true&source=in.(system,admin)&user_id=is.null"
+            "&order=sector,stock_code",
             headers={
                 'apikey':        _SUPABASE_KEY,
                 'Authorization': f'Bearer {_SUPABASE_KEY}',
@@ -52,20 +57,15 @@ def _fetch_candidates() -> list[dict]:
         rows = [row for row in rows if row['stock_code'] not in excluded]
         if excluded:
             print(f"🚫 관리자 제외 종목 {len(excluded)}개 건너뜀")
-        # 중복 종목코드 제거 (같은 종목이 여러 유저에 의해 추가된 경우).
-        # 시스템 종목과 겹치면 시스템 쪽을 남긴다 — source 가 결과 저장 범위를 가른다.
+        # 조회 조건상 전부 system/admin 이라 결과 저장(screening_results) 대상이다
         by_code: dict[str, dict] = {}
         for row in rows:
-            code = row['stock_code']
-            is_system = row.get('source') == 'system' and not row.get('user_id')
-            prev = by_code.get(code)
-            if prev is None or (is_system and not prev['system']):
-                by_code[code] = {
-                    'code':   code,
-                    'name':   row['stock_name'],
-                    'sector': row['sector'],
-                    'system': is_system,
-                }
+            by_code.setdefault(row['stock_code'], {
+                'code':   row['stock_code'],
+                'name':   row['stock_name'],
+                'sector': row['sector'],
+                'system': True,
+            })
         result = list(by_code.values())
         print(f"📋 스크리닝 대상 {len(result)}종목 로드 완료")
         return result

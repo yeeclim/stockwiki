@@ -11,7 +11,6 @@ class ScreeningManagePage extends StatefulWidget {
 
 class _ScreeningManagePageState extends State<ScreeningManagePage> {
   List<ScreeningCandidate> _all = [];
-  List<ScreeningCandidate> _mine = [];
   List<Map<String, dynamic>> _excluded = [];
   bool _loading = true;
 
@@ -26,26 +25,22 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (isAdminUser) _load();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       final all = await ScreeningService.loadAll();
-      final mine = await ScreeningService.loadMine();
       var excluded = <Map<String, dynamic>>[];
-      if (isAdminUser) {
-        try {
-          excluded = await ScreeningService.loadExcluded();
-        } catch (e) {
-          _snack('제외 종목 목록을 불러오지 못했습니다: $e');
-        }
+      try {
+        excluded = await ScreeningService.loadExcluded();
+      } catch (e) {
+        _snack('제외 종목 목록을 불러오지 못했습니다: $e');
       }
       if (!mounted) return;
       setState(() {
         _all = all;
-        _mine = mine;
         _excluded = excluded;
         _loading = false;
       });
@@ -55,41 +50,34 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   }
 
   Future<void> _add() async {
-    final code = _codeCtrl.text.trim();
+    final code = _codeCtrl.text.trim().toUpperCase();
     final name = _nameCtrl.text.trim();
     final sector = _sectorCtrl.text.trim();
-    if (code.isEmpty || name.isEmpty || sector.isEmpty) return;
-    if (code.length != 6 || int.tryParse(code) == null) {
-      _snack('종목코드는 6자리 숫자입니다.');
+    if (code.isEmpty || name.isEmpty || sector.isEmpty) {
+      _snack('종목코드·종목명·섹터를 모두 입력해주세요.');
+      return;
+    }
+    if (!RegExp(r'^[0-9A-Z]{6}$').hasMatch(code)) {
+      _snack('종목코드는 6자리입니다.');
       return;
     }
     setState(() => _adding = true);
     try {
-      await ScreeningService.add(
+      await ScreeningService.addAsAdmin(
           stockCode: code, stockName: name, sector: sector);
       _codeCtrl.clear();
       _nameCtrl.clear();
       _sectorCtrl.clear();
       await _load();
-      _snack('추가됐습니다.');
+      _snack('$name 추가됐습니다. 다음 스크리닝부터 평가합니다.');
     } catch (e) {
-      _snack('오류: $e');
+      _snack('추가 실패: $e');
     } finally {
       if (mounted) setState(() => _adding = false);
     }
   }
 
-  Future<void> _remove(ScreeningCandidate c) async {
-    try {
-      await ScreeningService.remove(c.id);
-      await _load();
-      _snack('${c.stockName} 삭제됐습니다.');
-    } catch (e) {
-      _snack('삭제 실패: $e');
-    }
-  }
-
-  /// 관리자: 종목을 스크리닝 전체에서 제외 (메일·추천·자동매매 포함, 다음 스캔에도 유지)
+  /// 종목을 스크리닝 전체에서 제외 (메일·추천·자동매매 포함, 다음 스캔에도 유지)
   Future<void> _exclude(ScreeningCandidate c) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -145,24 +133,34 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isAdmin = isAdminUser;
+
+    final appBar = AppBar(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: Text('스크리닝 종목 관리',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+      actions: [
+        if (isAdminUser)
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+      ],
+    );
+
+    // 관리자 전용 화면 — 버튼을 숨겨도 다른 경로로 들어올 수 있으므로 여기서도 막는다.
+    // (실제 쓰기 권한은 서버·DB 가 관리자만 허용한다)
+    if (!isAdminUser) {
+      return Scaffold(
+        appBar: appBar,
+        body: const Center(child: Text('관리자 전용 화면입니다.')),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text('스크리닝 종목 관리',
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface)),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-        ],
-      ),
+      appBar: appBar,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -170,8 +168,12 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── 내 종목 추가 ───────────────────────────────────────────
+                  // ── 종목 수동 추가 ─────────────────────────────────────────
                   _SectionTitle(theme: theme, title: '종목 추가'),
+                  const SizedBox(height: 4),
+                  Text('수동으로 추가한 종목은 광역 스캔 결과와 관계없이 매일 스크리닝합니다.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 10),
                   _AddForm(
                     codeCtrl: _codeCtrl,
@@ -184,31 +186,11 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ── 내가 추가한 종목 ───────────────────────────────────────
-                  _SectionTitle(
-                      theme: theme, title: '내가 추가한 종목 (${_mine.length}개)'),
-                  const SizedBox(height: 8),
-                  if (_mine.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text('추가한 종목이 없습니다.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant)),
-                    )
-                  else
-                    ..._mine.map((c) => _CandidateTile(
-                          candidate: c,
-                          onRemove: () => _remove(c),
-                          theme: theme,
-                        )),
-
-                  const SizedBox(height: 24),
-
                   // ── 전체 후보 ──────────────────────────────────────────────
                   _SectionTitle(
                       theme: theme, title: '전체 스크리닝 대상 (${_all.length}개)'),
                   const SizedBox(height: 4),
-                  Text('시스템 기본 + 모든 유저 추가 종목',
+                  Text('광역 스캔 자동 선정 + 관리자 수동 추가 종목',
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
@@ -225,45 +207,37 @@ class _ScreeningManagePageState extends State<ScreeningManagePage> {
                           ),
                           ...entry.value.map((c) => _CandidateTile(
                                 candidate: c,
-                                // 관리자는 제외(서버 처리), 일반 사용자는 본인 종목만 삭제
-                                onRemove: isAdmin
-                                    ? () => _exclude(c)
-                                    : c.isUserAdded
-                                        ? () => _remove(c)
-                                        : null,
+                                onRemove: () => _exclude(c),
                                 theme: theme,
                               )),
                         ],
                       )),
 
-                  // ── 관리자: 제외한 종목 ─────────────────────────────────────
-                  if (isAdmin) ...[
-                    const SizedBox(height: 24),
-                    _SectionTitle(
-                        theme: theme, title: '제외한 종목 (${_excluded.length}개)'),
-                    const SizedBox(height: 4),
-                    Text('메일·추천·자동매매에서 빠져 있는 종목 — 복원하면 다음 스크리닝부터 다시 평가',
+                  // ── 제외한 종목 ─────────────────────────────────────────────
+                  const SizedBox(height: 24),
+                  _SectionTitle(
+                      theme: theme, title: '제외한 종목 (${_excluded.length}개)'),
+                  const SizedBox(height: 4),
+                  Text('메일·추천·자동매매에서 빠져 있는 종목 — 복원하면 다음 스크리닝부터 다시 평가',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
+                  const SizedBox(height: 8),
+                  if (_excluded.isEmpty)
+                    Text('제외한 종목이 없습니다.',
                         style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 8),
-                    if (_excluded.isEmpty)
-                      Text('제외한 종목이 없습니다.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant))
-                    else
-                      ..._excluded.map((e) => ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('${e['stock_name']}'),
-                            subtitle:
-                                Text('${e['stock_code']} · ${e['sector']}'),
-                            trailing: TextButton(
-                              onPressed: () => _restore(
-                                  '${e['stock_code']}', '${e['stock_name']}'),
-                              child: const Text('복원'),
-                            ),
-                          )),
-                  ],
+                            color: theme.colorScheme.onSurfaceVariant))
+                  else
+                    ..._excluded.map((e) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('${e['stock_name']}'),
+                          subtitle: Text('${e['stock_code']} · ${e['sector']}'),
+                          trailing: TextButton(
+                            onPressed: () => _restore(
+                                '${e['stock_code']}', '${e['stock_name']}'),
+                            child: const Text('복원'),
+                          ),
+                        )),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -321,6 +295,12 @@ class _CandidateTile extends StatelessWidget {
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(fontWeight: FontWeight.w500)),
             ),
+            if (candidate.isManual) ...[
+              Text('수동',
+                  style: TextStyle(
+                      fontSize: 11, color: theme.colorScheme.tertiary)),
+              const SizedBox(width: 6),
+            ],
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -384,7 +364,6 @@ class _AddFormState extends State<_AddForm> {
               flex: 2,
               child: TextField(
                 controller: widget.codeCtrl,
-                keyboardType: TextInputType.number,
                 maxLength: 6,
                 decoration: const InputDecoration(
                   labelText: '종목코드 (6자리)',

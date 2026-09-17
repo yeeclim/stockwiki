@@ -153,8 +153,11 @@ def _upsert_candidates(candidates: list[dict]):
     codes_param = ",".join(new_codes)
 
     try:
+        # 관리자 수동 추가(admin) 행도 "이미 있음"으로 본다 — 같은 종목을 system 으로 또 넣으면
+        # 고유 인덱스(stock_code, user_id) 충돌로 갱신 전체가 실패한다.
+        # 활성/비활성은 system 행만 건드린다 (수동 추가 종목은 광역 스캔 결과와 무관하게 유지).
         r = requests.get(
-            f"{base}?select=stock_code&source=eq.system&user_id=is.null",
+            f"{base}?select=stock_code&source=in.(system,admin)&user_id=is.null",
             headers=headers, timeout=10,
         )
         r.raise_for_status()

@@ -1,4 +1,4 @@
-// 관리자 스크리닝 종목 제외/복원 — api/utils.js 가 ?type=admin-candidate 로 라우팅한다.
+// 관리자 스크리닝 종목 추가/제외/복원 — api/utils.js 가 ?type=admin-candidate 로 라우팅한다.
 // (Vercel Hobby 함수 12개 한도 때문에 별도 엔드포인트 파일을 만들지 않는다)
 //
 // 왜 서버에서 하나
@@ -60,8 +60,39 @@ export async function handleAdminCandidate(req, res) {
 
     const { stockCode, action } = req.body ?? {};
     const code = typeof stockCode === 'string' ? stockCode.trim().toUpperCase() : '';
-    if (!CODE_RE.test(code) || !['exclude', 'restore'].includes(action)) {
-      return res.status(400).json({ success: false, error: 'stockCode(6자리)와 action(exclude|restore)이 필요합니다' });
+    if (!CODE_RE.test(code) || !['add', 'exclude', 'restore'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'stockCode(6자리)와 action(add|exclude|restore)이 필요합니다' });
+    }
+
+    // 관리자 수동 추가 — source='admin'.
+    // 'system' 으로 넣으면 다음 날 광역 스캔이 "이번 결과에 없다"며 비활성화해 버린다.
+    if (action === 'add') {
+      const name = typeof req.body.stockName === 'string' ? req.body.stockName.trim().slice(0, 40) : '';
+      const sector = typeof req.body.sector === 'string' ? req.body.sector.trim().slice(0, 20) : '';
+      if (!name || !sector) {
+        return res.status(400).json({ success: false, error: '종목명과 섹터가 필요합니다' });
+      }
+      const existing = await db(
+        `/screening_candidates?stock_code=eq.${code}&user_id=is.null&select=id,status`
+      );
+      if (existing.some((r) => r.status === 'rejected')) {
+        return res.status(409).json({ success: false, error: '제외된 종목입니다. "제외한 종목"에서 복원해 주세요' });
+      }
+      if (existing.length) {
+        // 광역 스캔이 넣은 행이면 수동 관리로 전환 (고유 인덱스상 같은 종목 행은 하나뿐)
+        await db(`/screening_candidates?stock_code=eq.${code}&user_id=is.null`, {
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          body: { source: 'admin', stock_name: name, sector, is_active: true },
+        });
+      } else {
+        await db('/screening_candidates', {
+          method: 'POST',
+          prefer: 'return=minimal',
+          body: { stock_code: code, stock_name: name, sector, source: 'admin', is_active: true },
+        });
+      }
+      return res.status(200).json({ success: true });
     }
 
     if (action === 'exclude') {

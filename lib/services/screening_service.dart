@@ -30,13 +30,14 @@ class ScreeningCandidate {
         isActive: m['is_active'] as bool? ?? true,
       );
 
-  bool get isUserAdded => source == 'user';
+  /// 관리자가 수동으로 추가한 종목 (광역 스캔이 자동으로 끄지 않는다)
+  bool get isManual => source == 'admin';
 }
 
 class ScreeningService {
   static final _sb = Supabase.instance.client;
 
-  /// 전체 활성 후보 조회 (시스템 + 내가 추가한 것)
+  /// 전체 활성 후보 조회 (광역 스캔 선정 + 관리자 수동 추가)
   static Future<List<ScreeningCandidate>> loadAll() async {
     final rows = await _sb
         .from('screening_candidates')
@@ -45,53 +46,6 @@ class ScreeningService {
         .order('sector')
         .order('stock_name');
     return rows.map((r) => ScreeningCandidate.fromMap(r)).toList();
-  }
-
-  /// 내가 추가한 종목만 조회
-  static Future<List<ScreeningCandidate>> loadMine() async {
-    final user = _sb.auth.currentUser;
-    if (user == null) return [];
-    final rows = await _sb
-        .from('screening_candidates')
-        .select()
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('sector')
-        .order('stock_name');
-    return rows.map((r) => ScreeningCandidate.fromMap(r)).toList();
-  }
-
-  /// 종목 추가
-  static Future<void> add({
-    required String stockCode,
-    required String stockName,
-    required String sector,
-  }) async {
-    final user = _sb.auth.currentUser;
-    if (user == null) throw Exception('로그인이 필요합니다.');
-    await _sb.from('screening_candidates').insert({
-      'stock_code': stockCode.trim(),
-      'stock_name': stockName.trim(),
-      'sector': sector.trim(),
-      'source': 'user',
-      'user_id': user.id,
-      'is_active': true,
-    });
-  }
-
-  /// 내 종목 삭제 (비활성화).
-  ///
-  /// RLS 로 막힌 행(남의 종목·시스템 종목)은 에러 없이 0행 수정으로 끝나므로,
-  /// 실제로 바뀐 행이 없으면 예외를 던져 화면이 "삭제됐습니다"라고 거짓 표시하지 않게 한다.
-  static Future<void> remove(String id) async {
-    final updated = await _sb
-        .from('screening_candidates')
-        .update({'is_active': false})
-        .eq('id', id)
-        .select('id');
-    if (updated.isEmpty) {
-      throw Exception('삭제 권한이 없거나 이미 삭제된 종목입니다.');
-    }
   }
 
   // ── 관리자 전용: 종목 제외/복원 ─────────────────────────────────────────────
@@ -134,6 +88,26 @@ class ScreeningService {
         .post(_adminUri(),
             headers: _adminHeaders(),
             body: jsonEncode({'stockCode': stockCode, 'action': action}))
+        .timeout(const Duration(seconds: 15));
+    _checked(res);
+  }
+
+  /// 관리자 수동 추가. 스크리닝 종목 관리는 관리자 전용이라 클라이언트가 DB 에 직접
+  /// 쓰지 않고 서버(관리자 확인 후 service_role)가 넣는다.
+  static Future<void> addAsAdmin({
+    required String stockCode,
+    required String stockName,
+    required String sector,
+  }) async {
+    final res = await http
+        .post(_adminUri(),
+            headers: _adminHeaders(),
+            body: jsonEncode({
+              'action': 'add',
+              'stockCode': stockCode,
+              'stockName': stockName,
+              'sector': sector,
+            }))
         .timeout(const Duration(seconds: 15));
     _checked(res);
   }
