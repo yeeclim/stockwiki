@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../services/cache_service.dart';
 import '../utils/number_format_utils.dart';
 import 'market_data_card.dart';
+import 'periodic_refresh.dart';
 
 class BtcWidget extends StatefulWidget {
   const BtcWidget({super.key});
@@ -12,7 +13,7 @@ class BtcWidget extends StatefulWidget {
   State<BtcWidget> createState() => _BtcWidgetState();
 }
 
-class _BtcWidgetState extends State<BtcWidget> {
+class _BtcWidgetState extends State<BtcWidget> with PeriodicRefresh {
   static const _cacheKey = 'btc_price';
 
   double? _btcPrice;
@@ -25,7 +26,11 @@ class _BtcWidgetState extends State<BtcWidget> {
     super.initState();
     _loadCachedPrice();
     _fetchPrice();
+    startPeriodicRefresh();
   }
+
+  @override
+  Future<void> onPeriodicRefresh() => _fetchPrice();
 
   Future<void> _loadCachedPrice() async {
     final cached = await CacheService.get(_cacheKey);

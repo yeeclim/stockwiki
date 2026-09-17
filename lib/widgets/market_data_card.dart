@@ -18,6 +18,9 @@ class MarketDataCard extends StatelessWidget {
   /// 전일 대비 변동률(%). 양수=상승(빨강) / 음수=하락(파랑). null이면 표시 안 함.
   final double? changePercent;
 
+  /// 제목 옆에 작게 붙는 지연 안내 (예: '10분 지연')
+  final String? delayNote;
+
   const MarketDataCard({
     super.key,
     required this.accentColor,
@@ -28,6 +31,7 @@ class MarketDataCard extends StatelessWidget {
     this.valueText,
     this.subText,
     this.changePercent,
+    this.delayNote,
   });
 
   @override
@@ -41,11 +45,7 @@ class MarketDataCard extends StatelessWidget {
         children: [
           _badge(market),
           const SizedBox(width: 10),
-          Text(title,
-              style: TextStyle(
-                  color: market.ink,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13)),
+          _title(market),
           const Spacer(),
           Text('…',
               style: TextStyle(color: market.muted, fontFamily: numberFont)),
@@ -58,11 +58,7 @@ class MarketDataCard extends StatelessWidget {
         children: [
           _badge(market),
           const SizedBox(width: 10),
-          Text(title,
-              style: TextStyle(
-                  color: market.ink,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13)),
+          _title(market),
           const Spacer(),
           Text(error!, style: TextStyle(color: market.muted, fontSize: 11.5)),
         ],
@@ -83,11 +79,7 @@ class MarketDataCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: TextStyle(
-                      color: market.ink,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13)),
+              _title(market),
               if (subText != null)
                 Text(subText!,
                     style: TextStyle(color: market.muted, fontSize: 10.5)),
@@ -122,6 +114,31 @@ class MarketDataCard extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _title(MarketColors market) {
+    final note = delayNote;
+    final titleText = Text(title,
+        style: TextStyle(
+            color: market.ink, fontWeight: FontWeight.w600, fontSize: 13));
+    if (note == null) return titleText;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        titleText,
+        const SizedBox(width: 5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            border: Border.all(color: market.muted.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Text(note,
+              style:
+                  TextStyle(color: market.muted, fontSize: 9.5, height: 1.2)),
+        ),
       ],
     );
   }

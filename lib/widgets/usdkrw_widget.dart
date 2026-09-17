@@ -1,55 +1,23 @@
 import 'package:flutter/material.dart';
 import '../services/exchange_rate_service.dart';
-import '../utils/number_format_utils.dart';
-import 'market_data_card.dart';
+import 'yahoo_price_widget.dart';
 
-class UsdKrwWidget extends StatefulWidget {
+/// USD/KRW 환율. 등락률을 보여주기 위해 Yahoo(KRW=X) 시세를 쓰고,
+/// Yahoo 가 실패하면 기존 환율 API(open.er-api.com)로 가격만 표시한다.
+class UsdKrwWidget extends StatelessWidget {
   const UsdKrwWidget({super.key});
 
   @override
-  State<UsdKrwWidget> createState() => _UsdKrwWidgetState();
-}
-
-class _UsdKrwWidgetState extends State<UsdKrwWidget> {
-  double? _usdKrw;
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUsdKrw();
-  }
-
-  Future<void> _fetchUsdKrw() async {
-    try {
-      final rate = await ExchangeRateService.getUsdToKrw();
-      if (!mounted) return;
-      setState(() {
-        _usdKrw = rate;
-        _error = rate == null ? '데이터 없음' : null;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = '데이터 로드 실패';
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => MarketDataCard(
+  Widget build(BuildContext context) => const YahooPriceWidget(
+        cacheKey: 'usdkrw',
+        symbols: ['KRW=X'],
+        cacheTtl: Duration(minutes: 10),
         accentColor: Colors.indigo,
         headerIcon:
-            const Icon(Icons.currency_exchange, color: Colors.indigo, size: 16),
+            Icon(Icons.currency_exchange, color: Colors.indigo, size: 16),
         title: 'USD/KRW',
-        isLoading: _isLoading,
-        error: _error,
-        valueText: _usdKrw != null
-            ? '₩${formatWithCommas(_usdKrw!, decimals: 2)}'
-            : 'N/A',
+        valuePrefix: '₩',
         subText: '원',
+        fallbackPrice: ExchangeRateService.getUsdToKrw,
       );
 }
