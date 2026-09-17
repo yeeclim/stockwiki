@@ -36,8 +36,9 @@ _INDICES = [
 # 마감(=05:00 KST 전후)에 확정되므로 06:30 발송 시점엔 1~2시간 된 신선한 값이다.
 #
 # SKHY(SK하이닉스 나스닥 ADR)·KORU(MSCI 한국 3배 레버리지 ETF)도 같은 이유로 넣는다.
-# 둘 다 미국장 마감에 확정돼 06:30 에 신선하다. 표시용이며 시장 신호 집계
-# (_compute_signals)에는 넣지 않는다 — 넣으면 적중률 로그의 과거 판정과 기준이 달라진다.
+# 둘 다 미국장 마감에 확정돼 06:30 에 신선하다.
+#   - SKHY : 시장 신호에도 쓴다 (_compute_signals, '국내 야간·선물' 그룹)
+#   - KORU : 표시 전용. EWY 와 같은 지수의 3배라 신호로 세면 같은 정보가 중복 집계된다
 _MACRO = [
     ('CL=F',  '국제유가(WTI)'),
     ('^TNX',  '미 국채 10년'),
@@ -363,6 +364,18 @@ def _compute_signals(brief: dict) -> list[dict]:
         # 같은 한계가 있지만 EWY 는 이틀이 밀려서 더 심하다.
         implied = ewy['pct'] + krw['pct']
         signals.append(_signal('야간 한국물(EWY·환율보정)', _dir_band(implied, 0.5)))
+
+    # SK하이닉스 ADR(나스닥 SKHY) — 코스피 최상위 대형주의 밤사이 움직임.
+    # 지수 추종인 야간선물/EWY 와 달리 반도체 업황이 따로 반영돼 새로운 정보가 있다.
+    # 라벨에 '야간'이 들어가 market_signals 의 '국내 야간·선물' 그룹으로 묶인다 —
+    # 독립 그룹으로 두면 한 종목이 '미국 위험선호' 전체와 같은 1표를 갖게 된다.
+    # 달러 표시라 EWY 와 같은 방식으로 원화 기준 등락률로 환산하고, 개별 종목은
+    # 지수보다 하루 변동이 커서 ±1% 를 잡음으로 본다.
+    # (KORU 는 EWY 와 같은 MSCI 한국 지수 3배라 새 정보가 없어 신호로 쓰지 않는다)
+    skhy = macro_by_symbol.get('SKHY')
+    if skhy and krw and _is_fresh(skhy):
+        implied = skhy['pct'] + krw['pct']
+        signals.append(_signal('SK하이닉스 ADR 야간(환율보정)', _dir_band(implied, 1.0)))
     if krw:
         # 원화 약세(환율 상승)는 외국인 자금 유출 압력이라 약세 신호.
         krw_move = _dir_band(krw['pct'], 0.4)
