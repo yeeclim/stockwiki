@@ -126,8 +126,8 @@ let sectorCache = null;
 let sectorCacheTime = 0;
 const SECTOR_CACHE_TTL = 10 * 60 * 1000; // 10분
 
-// 섹터 브라우즈 뷰는 "top 20 elite" 피드보다 관대한 기준: pass=true(score>=6)만 사용,
-// 별도 점수/시총 하한 없음 (한국 테마 페이지 MIN_THEME_SCORE=55/100 "분할매수검토" 등급과 같은 철학)
+// 섹터 뷰도 'Buy' 등급(8점 이상)만 노출한다 (2026-09-17 변경: 예전엔 pass=true(6점 이상) 전부).
+// 시총 하한은 두지 않는다. Buy 종목이 하나도 없는 섹터는 응답에 키 자체가 없어 화면에서 숨겨진다.
 const SECTOR_CAP = 8; // 섹터당 최대 노출 종목 수
 
 async function handleSectorView(req, res) {
@@ -160,7 +160,7 @@ async function fetchScreeningRowsForSectors() {
   try {
     const cutoff = new Date(Date.now() - MAX_SCREENED_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&gics_sector=not.is.null&screened_at=gte.${cutoff}&order=score.desc&limit=500`,
+      `${SUPABASE_URL}/rest/v1/us_screening_results?pass=eq.true&score=gte.${BUY_SCORE}&gics_sector=not.is.null&screened_at=gte.${cutoff}&order=score.desc&limit=500`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
     if (!res.ok) {
@@ -185,7 +185,9 @@ async function buildSectorGroups() {
     const q = quotes[row.stock_code];
     const price = q?.regularMarketPrice ?? row.price ?? 0;
     if (!price) continue;
+    if (scoreToAction(row.score) !== 'Buy') continue;
 
+    // 종목을 실제로 넣을 때만 섹터 키를 만든다 → 빈 섹터는 응답에 나타나지 않는다
     const key = row.gics_sector;
     if (!grouped[key]) grouped[key] = [];
     if (grouped[key].length >= SECTOR_CAP) continue; // 섹터당 상위 SECTOR_CAP개만

@@ -41,12 +41,12 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
 
     try {
       final grouped = await UsSectorLoader.loadAll();
-      // 종목이 있는 섹터만 탭으로 노출
-      final nonEmpty = grouped.entries.where((e) => e.value.isNotEmpty);
-
+      // Buy 등급 종목만 남기고, 남은 종목이 없는 섹터는 탭에서 숨긴다.
+      // (서버도 Buy 만 내려주지만, 배포 직후 로더의 30분 캐시에 예전 응답이 남아 있을 수 있다)
       _sectorStocks.clear();
-      for (final entry in nonEmpty) {
-        _sectorStocks[entry.key] = entry.value;
+      for (final entry in grouped.entries) {
+        final buys = entry.value.where((s) => s['action'] == 'Buy').toList();
+        if (buys.isNotEmpty) _sectorStocks[entry.key] = buys;
       }
 
       final oldController = _tabController;
@@ -306,12 +306,19 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.refresh, color: theme.colorScheme.primary, size: 48),
+            Icon(Icons.inbox_outlined,
+                color: theme.colorScheme.primary, size: 48),
             const SizedBox(height: 16),
             Text(
-              '섹터별 추천 종목이 없습니다',
+              '오늘은 Buy 등급 종목이 있는 섹터가 없습니다',
               style: theme.textTheme.bodyLarge
                   ?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '스크리닝 점수 8점(10점 만점) 이상 종목만 표시합니다',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             TextButton(
