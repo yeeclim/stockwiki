@@ -1,48 +1,63 @@
 # StockWiki (https://stockwiki.vercel.app)
-# AI 에이전트를 위한 무료 REST API 문서: https://stockwiki.vercel.app/llms.txt
 
+# 웹 페이지는 자유롭게 크롤링 가능. 단 /api/* 는 StockWiki 웹앱 전용이며
+# 외부 호출에는 API 키가 필요하다 (키 없이 호출하면 HTTP 403).
 User-agent: *
 Allow: /
+Disallow: /api/
 
-# 주요 AI 검색/크롤러 명시적 허용
+# 주요 AI 검색/크롤러 — 페이지 색인은 허용, API 직접 호출은 차단
 User-agent: GPTBot
 Allow: /
+Disallow: /api/
 
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /api/
 
 User-agent: OAI-SearchBot
 Allow: /
+Disallow: /api/
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /api/
 
 User-agent: Claude-User
 Allow: /
+Disallow: /api/
 
 User-agent: Claude-SearchBot
 Allow: /
+Disallow: /api/
 
 User-agent: PerplexityBot
 Allow: /
+Disallow: /api/
 
 User-agent: Perplexity-User
 Allow: /
+Disallow: /api/
 
 User-agent: Google-Extended
 Allow: /
+Disallow: /api/
 
 User-agent: Applebot-Extended
 Allow: /
+Disallow: /api/
 
 User-agent: Bytespider
 Allow: /
+Disallow: /api/
 
 User-agent: Amazonbot
 Allow: /
+Disallow: /api/
 
 User-agent: CCBot
 Allow: /
+Disallow: /api/
 
 Sitemap: https://stockwiki.vercel.app/sitemap.xml
 

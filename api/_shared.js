@@ -1,4 +1,6 @@
-// 공통 헬퍼: 입력 검증, Rate Limiting, 표준 응답
+// 공통 헬퍼: 입력 검증, Rate Limiting, 접근 제어, 표준 응답
+
+import { checkAccess, isAllowedOrigin, requestOrigin } from './_guard.js';
 
 // ── Rate Limiting (인스턴스별 sliding window) ──────────────────────────
 // Vercel은 인스턴스가 여러 개일 수 있으므로 분산 완벽 보장은 못하지만
@@ -116,26 +118,68 @@ export async function verifyAdmin(req) {
   }
 }
 
-// ── CORS ──────────────────────────────────────────────────────────────
+// ── CORS + 접근 제어 ──────────────────────────────────────────────────
 
 /**
- * 표준 CORS 헤더 설정 + OPTIONS 프리플라이트 처리.
+ * CORS 헤더 설정 + OPTIONS 프리플라이트 처리 + 무단 호출 차단.
+ *
+ * 모든 엔드포인트가 이미 이 함수를 첫 줄에서 부르고 있으므로, 접근 제어도
+ * 여기 한 곳에 모은다 (엔드포인트마다 가드를 빠뜨릴 여지를 없앤다).
+ *
  * @param {object} req
  * @param {object} res
- * @param {{methods?: string, json?: boolean}} [opts]
- *   methods - Access-Control-Allow-Methods 값 (기본 'GET, OPTIONS')
- *   json    - Content-Type: application/json 을 미리 설정할지 (기본 true)
- * @returns {boolean} true면 프리플라이트로 응답이 끝났으므로 호출부에서 즉시 return 할 것
+ * @param {{methods?: string, json?: boolean, publicAccess?: boolean}} [opts]
+ *   methods      - Access-Control-Allow-Methods 값 (기본 'GET, OPTIONS')
+ *   json         - Content-Type: application/json 을 미리 설정할지 (기본 true)
+ *   publicAccess - 출처 검사를 건너뛰고 누구나 호출 가능하게 한다.
+ *                  메일 수신거부 링크처럼 우리 도메인 밖(메일 클라이언트)에서
+ *                  열리는 경로에만 쓴다.
+ * @returns {boolean} true면 이 함수가 이미 응답을 끝냈으므로 호출부에서 즉시 return 할 것
  */
-export function applyCors(req, res, { methods = 'GET, OPTIONS', json = true } = {}) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+export function applyCors(req, res, { methods = 'GET, OPTIONS', json = true, publicAccess = false } = {}) {
+  const origin = requestOrigin(req);
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : null;
+
+  // 출처별로 응답이 갈리므로 캐시가 섞이지 않게 Vary 를 반드시 붙인다.
+  res.setHeader('Vary', 'Origin');
+  if (publicAccess) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  }
   res.setHeader('Access-Control-Allow-Methods', methods);
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
   if (json) res.setHeader('Content-Type', 'application/json');
+
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return true;
   }
+
+  // 엔드포인트별 세부 제한과 별개로 모든 경로에 공통 상한을 둔다.
+  // board / theme-recommendations / us-recommend / utils 는 지금까지 제한이 아예 없었다.
+  if (!checkRateLimit(`global:${getClientIp(req)}`, 120, 60_000)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Retry-After', '60');
+    res.status(429).json({ success: false, error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', code: 'RATE_LIMITED' });
+    return true;
+  }
+
+  if (!publicAccess) {
+    const access = checkAccess(req);
+    if (!access.allowed) {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(403).json({
+        success: false,
+        error: '이 API는 StockWiki 웹앱 전용입니다. 외부에서 사용하려면 API 키가 필요합니다.',
+        code: 'FORBIDDEN',
+        docs: 'https://stockwiki.vercel.app/llms.txt',
+      });
+      return true;
+    }
+  }
+
   return false;
 }
 

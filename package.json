@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "echo 'Using pre-built files from build/web'"
+    "build": "echo 'Using pre-built files from build/web'",
+    "test:api": "node test/api_guard.test.mjs"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

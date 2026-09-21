@@ -7,10 +7,14 @@ import { handleAdminCandidate } from './_admin-screening.js';
 import { handleUnsubscribe } from './_email-unsubscribe.js';
 
 export default async function handler(req, res) {
-    if (applyCors(req, res, { methods: 'GET, POST, OPTIONS', json: false })) return;
+    const { type } = req.query;
+
+    // 수신거부 링크는 메일 클라이언트에서 열리므로 우리 도메인 출처가 붙지 않는다.
+    // 여기만 출처 검사를 면제한다 (토큰 자체가 인증 수단).
+    const publicAccess = type === 'unsubscribe';
+    if (applyCors(req, res, { methods: 'GET, POST, OPTIONS', json: false, publicAccess })) return;
 
     try {
-        const { type } = req.query;
 
         if (type === 'chart')     return await handleChartProxy(req, res);
         if (type === 'commodity') return await handleCommodityPrice(req, res);

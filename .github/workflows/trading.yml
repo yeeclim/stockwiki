@@ -67,6 +67,10 @@ jobs:
 
       - name: Supabase 활성 유지 (keep-alive)
         if: always()
+        env:
+          # /api/* 는 자사 도메인 외 호출을 403 으로 막으므로 CI 는 API 키로 통과한다.
+          # Vercel 환경변수 API_KEYS 에 넣은 값 중 하나를 GitHub Secrets 에 동일하게 등록할 것.
+          STOCKWIKI_API_KEY: ${{ secrets.STOCKWIKI_API_KEY }}
         run: |
-          curl -s "https://stockwiki.vercel.app/api/board?page=1&limit=1" > /dev/null
+          curl -s -H "X-API-Key: $STOCKWIKI_API_KEY" "https://stockwiki.vercel.app/api/board?page=1&limit=1" > /dev/null
           echo "✅ Supabase ping 완료"
