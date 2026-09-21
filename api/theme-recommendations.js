@@ -168,7 +168,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'symbols 파라미터가 필요합니다' });
       }
       const data = await analyzeSymbols(symbols);
-      res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1800');
+      // s-maxage(CDN 공유 캐시)는 인증 우회를 만든다 → 브라우저 전용 캐시로 둔다.
+      // 상위 호출 비용은 이 파일의 technicalCache(1시간)가 이미 막아 준다.
+      res.setHeader('Cache-Control', 'private, max-age=600');
       return res.status(200).json({
         success: true,
         data,

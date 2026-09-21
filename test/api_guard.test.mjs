@@ -1,4 +1,10 @@
 import { applyCors } from '../api/_shared.js';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const NL = '\n';
+const CACHE_RE = /setHeader\(\s*['"]Cache-Control['"]\s*,\s*['"]([^'"]*)/i;
+const SHARED_RE = /s-maxage|\bpublic\b/i;
 
 function mkRes() {
   const r = { headers: {}, code: null, body: null, ended: false };
@@ -136,6 +142,24 @@ req = mkReq({ 'user-agent': 'Outlook' });
 res = mkRes();
 applyCors(req, res, { publicAccess: true });
 t('공개 경로는 캐시 헤더 미설정', res.headers['cache-control'], undefined);
+
+// 16. 핸들러가 applyCors 의 private, no-store 를 공유 캐시 지시어로 덮어쓰지 못하게 한다.
+//     단위 테스트로는 못 잡는다 — 핸들러는 applyCors 다음에 헤더를 덮어쓰기 때문이다.
+//     실제로 kr-stock-search 의 s-maxage=30 이 인증을 우회시켜 종목 데이터가 유출됐다.
+const apiDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'api');
+const offenders = readdirSync(apiDir)
+  .filter((f) => f.endsWith('.js'))
+  .filter((f) => {
+    const src = readFileSync(join(apiDir, f), 'utf8');
+    return src
+      .split(NL)
+      .filter((line) => !line.trim().startsWith('//'))
+      .some((line) => {
+        const m = line.match(CACHE_RE);
+        return m ? SHARED_RE.test(m[1]) : false;
+      });
+  });
+t('공유 캐시 지시어를 쓰는 핸들러 수 [' + (offenders.join(', ') || '없음') + ']', offenders.length, 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

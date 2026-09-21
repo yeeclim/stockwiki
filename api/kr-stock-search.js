@@ -85,7 +85,10 @@ export default async function handler(req, res) {
       .filter(r => r.status === 'fulfilled' && r.value)
       .map(r => r.value);
 
-    res.setHeader('Cache-Control', 's-maxage=30');
+    // s-maxage 는 CDN 공유 캐시다. 인증 검사를 통과한 응답이 여기 들어가면
+    // 헤더 없는 스크래퍼가 같은 URL 로 X-Vercel-Cache: HIT 를 받아간다
+    // (applyCors 가 건 private, no-store 를 덮어써서 실제로 유출됐다).
+    res.setHeader('Cache-Control', 'private, max-age=30');
     res.json({ success: true, data });
   } catch (e) {
     console.error('kr-stock-search error:', e.message);
