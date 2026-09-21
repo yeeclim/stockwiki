@@ -291,7 +291,8 @@ async function handleUsQuote(req, res) {
             price: map[toYahoo(s)].regularMarketPrice,
             changePercent: map[toYahoo(s)].regularMarketChangePercent ?? null,
         }));
-    res.setHeader('Cache-Control', 's-maxage=60');
+    // s-maxage 는 CDN 공유 캐시라 인증 없는 요청에도 흘러간다 → 브라우저 전용으로 둔다.
+    res.setHeader('Cache-Control', 'private, max-age=30');
     return res.status(200).json({ success: true, data });
 }
 
@@ -341,7 +342,7 @@ async function handleChartProxy(req, res) {
             const response = await fetchWithTimeout(targetUrl, { headers: naverHeaders });
             if (response.ok) {
                 res.setHeader('Content-Type', 'image/png');
-                res.setHeader('Cache-Control', 'public, max-age=60');
+                res.setHeader('Cache-Control', 'private, max-age=60');
                 return res.status(200).send(Buffer.from(await response.arrayBuffer()));
             }
         }
@@ -360,7 +361,7 @@ async function handleChartProxy(req, res) {
     if (!response.ok) return res.status(response.status).end();
 
     res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     return res.status(200).send(Buffer.from(await response.arrayBuffer()));
 }
 

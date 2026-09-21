@@ -125,5 +125,17 @@ for (let i = 0; i < 130; i++) {
 }
 t('130회 중 429 차단 수', blocked, 10);
 
+// 15. 공유 캐시 금지 — 정상 응답이 CDN 에 캐시되면 인증 없는 요청에 HIT 으로 흘러간다.
+//     실제 운영에서 X-Vercel-Cache: HIT 으로 403 이 우회되는 것을 확인했다.
+req = mkReq({ referer: 'https://stockwiki.vercel.app/' });
+res = mkRes();
+applyCors(req, res);
+t('허용 응답은 공유 캐시 금지', res.headers['cache-control'], 'private, no-store');
+
+req = mkReq({ 'user-agent': 'Outlook' });
+res = mkRes();
+applyCors(req, res, { publicAccess: true });
+t('공개 경로는 캐시 헤더 미설정', res.headers['cache-control'], undefined);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

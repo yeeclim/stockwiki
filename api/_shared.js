@@ -140,8 +140,17 @@ export function applyCors(req, res, { methods = 'GET, OPTIONS', json = true, pub
   const origin = requestOrigin(req);
   const allowedOrigin = isAllowedOrigin(origin) ? origin : null;
 
-  // 출처별로 응답이 갈리므로 캐시가 섞이지 않게 Vary 를 반드시 붙인다.
+  // 인증 결과에 따라 응답이 갈리므로 공유 캐시(Vercel CDN)에 넣으면 안 된다.
+  //
+  // Vary: Origin 만으로는 못 막는다. 같은 출처 요청은 브라우저가 Origin 을
+  // 보내지 않고 Referer/Sec-Fetch-Site 로 인증되는데, 헤더 없는 스크래퍼도
+  // Origin 이 없어 캐시 키가 같아진다. 실제로 정상 요청의 200 이 캐시된 뒤
+  // 생 curl 이 X-Vercel-Cache: HIT 으로 그 200 을 받아갔다.
+  // Referer 로 Vary 하면 URL 마다 캐시가 쪼개져 캐시 자체가 무의미해진다.
+  //
+  // 상위 API 쿼터는 각 핸들러의 모듈 레벨 캐시(_krCandleCache 등)가 따로 막는다.
   res.setHeader('Vary', 'Origin');
+  if (!publicAccess) res.setHeader('Cache-Control', 'private, no-store');
   if (publicAccess) {
     res.setHeader('Access-Control-Allow-Origin', '*');
   } else if (allowedOrigin) {
