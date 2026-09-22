@@ -70,6 +70,10 @@ app.*.map.json
 # Flutter web build outputs (public/에 복사본 git 추적)
 /build/
 
+# Gradle 이 남기는 리포트 (android/build.gradle.kts 가 산출물은 /build/ 로 보낸다)
+/android/build/
+/android/.kotlin/
+
 # Documentation (keep README.md only)
 *.md
 !README.md
