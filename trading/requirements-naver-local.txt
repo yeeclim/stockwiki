@@ -1,5 +1,5 @@
 # naver_blog_local.py 전용 — 로컬 Windows에서만 설치 (GitHub Actions에는 절대 넣지 말 것,
 # pywin32는 Windows 전용이라 Linux 러너에서 설치가 깨짐)
 selenium>=4.20.0
-pywin32>=306
+pywin32>=312
 pillow>=10.0.0        # 요약 카드/차트 PNG를 클립보드 비트맵으로 변환해 에디터에 붙여넣기
