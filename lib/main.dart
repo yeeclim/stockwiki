@@ -18,6 +18,8 @@ import 'package:stockwiki/widgets/wti_widget.dart';
 import 'package:stockwiki/widgets/btc_widget.dart';
 import 'package:stockwiki/pages/board_detail_page.dart';
 import 'package:stockwiki/pages/theme_recommendations_page.dart';
+import 'package:stockwiki/config/ads_config.dart';
+import 'package:stockwiki/widgets/ad_banner.dart';
 import 'package:stockwiki/widgets/app_drawer.dart';
 import 'package:stockwiki/widgets/terminal_grid.dart';
 import 'package:stockwiki/widgets/hover_lift.dart';
@@ -360,6 +362,8 @@ class _StockSearchPageState extends State<StockSearchPage>
                   ],
                 ),
               ),
+
+              const AdBanner(slot: AdSlots.homeBottom),
 
               // 푸터
               Divider(color: market.line),

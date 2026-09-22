@@ -9,6 +9,8 @@ import '../widgets/ai_recommend_card.dart';
 import '../widgets/ai_recommend_empty_state.dart';
 import '../widgets/portfolio_add_sheet.dart';
 import 'us_stock_detail_page.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class AiStockRecommendPage extends StatefulWidget {
   const AiStockRecommendPage({super.key});
@@ -291,8 +293,11 @@ class _AiStockRecommendPageState extends State<AiStockRecommendPage> {
       onRefresh: _refreshRecommendations,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _recommendations.length,
+        itemCount: _recommendations.isEmpty ? 0 : _recommendations.length + 1,
         itemBuilder: (context, index) {
+          if (index == _recommendations.length) {
+            return const AdBanner(slot: AdSlots.recommendBottom);
+          }
           final rec = _recommendations[index];
           return AiRecommendCard(
             rec: rec,

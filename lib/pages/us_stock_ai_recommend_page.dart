@@ -3,6 +3,8 @@ import '../services/fmp_service.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/portfolio_add_sheet.dart';
 import 'us_stock_detail_page.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class UsStockAiRecommendPage extends StatefulWidget {
   const UsStockAiRecommendPage({super.key});
@@ -176,8 +178,11 @@ class _UsStockAiRecommendPageState extends State<UsStockAiRecommendPage> {
       color: theme.colorScheme.primary,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _recommendations.length,
+        itemCount: _recommendations.isEmpty ? 0 : _recommendations.length + 1,
         itemBuilder: (context, index) {
+          if (index == _recommendations.length) {
+            return const AdBanner(slot: AdSlots.recommendBottom);
+          }
           final rec = _recommendations[index];
           final stock = rec.stock;
           return Padding(

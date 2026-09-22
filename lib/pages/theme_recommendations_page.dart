@@ -5,6 +5,8 @@ import '../services/krx_loader.dart';
 import '../services/screening_service.dart';
 import '../widgets/app_drawer.dart';
 import 'us_stock_detail_page.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
@@ -349,8 +351,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
               ? const Center(child: Text('해당 테마의 추천 종목이 없습니다.'))
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  itemCount: stocks.length,
+                  itemCount: stocks.isEmpty ? 0 : stocks.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == stocks.length) {
+                      return const AdBanner(slot: AdSlots.recommendBottom);
+                    }
                     final stock = stocks[index];
                     return _buildRecommendationCard(stock, theme);
                   },

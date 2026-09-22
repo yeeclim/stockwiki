@@ -9,6 +9,8 @@ import '../services/bookmark_service.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/stock_kchart_widget.dart';
 import '../services/chart_service.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class UsStockDetailPage extends StatefulWidget {
   final Stock stock;
@@ -197,6 +199,7 @@ class _UsStockDetailPageState extends State<UsStockDetailPage> {
 
             // 뉴스 섹션
             _buildNewsSection(),
+            const AdBanner(slot: AdSlots.stockDetailBottom),
           ],
         ),
       ),

@@ -4,6 +4,8 @@ import '../services/us_sector_loader.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_drawer.dart';
 import 'us_stock_detail_page.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class UsStockThemeRecommendPage extends StatefulWidget {
   const UsStockThemeRecommendPage({super.key});
@@ -343,8 +345,11 @@ class _UsStockThemeRecommendPageState extends State<UsStockThemeRecommendPage>
       onRefresh: _loadData,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        itemCount: stocks.length,
+        itemCount: stocks.isEmpty ? 0 : stocks.length + 1,
         itemBuilder: (context, index) {
+          if (index == stocks.length) {
+            return const AdBanner(slot: AdSlots.recommendBottom);
+          }
           final stock = stocks[index];
           return _buildRecommendationCard(stock);
         },
