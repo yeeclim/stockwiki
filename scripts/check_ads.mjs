@@ -26,6 +26,7 @@ import { join } from 'node:path';
 
 const URL_ARG = process.argv.find((a) => a.startsWith('http')) ?? 'https://stockwiki.vercel.app/';
 const KEEP = process.argv.includes('--keep');
+const MOBILE = process.argv.includes('--mobile');
 const PORT = 9300 + Math.floor(Math.random() * 300);
 const WATCH_SECONDS = 25;
 const BOOT_SECONDS = 30;
@@ -101,7 +102,18 @@ const SNAPSHOT = `(() => {
     }
   };
   walk(document);
-  return JSON.stringify(
+  const anchors = all
+    .filter((e) => {
+      if (!/google|adsby|gtg|aswift|anchor/i.test(e.id + ' ' + String(e.className))) return false;
+      return getComputedStyle(e).position === 'fixed';
+    })
+    .map((e) => {
+      const r = e.getBoundingClientRect();
+      return { id: (e.id || String(e.className)).slice(0, 30), top: Math.round(r.top),
+               h: Math.round(r.height), vh: window.innerHeight };
+    })
+    .filter((a) => a.h > 0);
+  return JSON.stringify({ anchors, ins:
     all.filter((e) => e.tagName === 'INS' && e.classList.contains('adsbygoogle')).map((i) => ({
       slot: i.getAttribute('data-ad-slot'),
       status: i.getAttribute('data-ad-status'),
@@ -109,8 +121,7 @@ const SNAPSHOT = `(() => {
       auto: i.hasAttribute('data-ad-hi'),
       w: i.offsetWidth,
       h: i.offsetHeight,
-    })),
-  );
+    })) });
 })()`;
 
 const chrome = launchChrome();
@@ -157,6 +168,15 @@ const evaluate = async (expression) => {
 await send('Page.enable');
 await send('Runtime.enable');
 await send('Network.enable');
+if (MOBILE) {
+  await send('Emulation.setDeviceMetricsOverride', {
+    width: 390, height: 844, deviceScaleFactor: 3, mobile: true,
+  });
+  await send('Emulation.setUserAgentOverride', {
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 '
+      + '(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  });
+}
 await send('Page.navigate', { url: URL_ARG });
 
 console.log(`점검 대상: ${URL_ARG}`);
@@ -183,13 +203,18 @@ console.log('');
 
 let last = null;
 let sawOurIns = false;
+const anchorsSeen = [];
 const statuses = new Set();
 for (let t = 1; t <= WATCH_SECONDS; t++) {
   await sleep(1000);
   const raw = await evaluate(SNAPSHOT);
   if (raw === last) continue;
   last = raw;
-  for (const ins of JSON.parse(raw)) {
+  const snap = JSON.parse(raw);
+  for (const a of snap.anchors) {
+    if (!anchorsSeen.some((x) => x.id === a.id && x.h === a.h)) anchorsSeen.push(a);
+  }
+  for (const ins of snap.ins) {
     if (ins.slot && !ins.auto) sawOurIns = true;
     const who = ins.auto || !ins.slot ? '자동광고' : `슬롯 ${ins.slot}`;
     if (ins.status) statuses.add(`${who}=${ins.status}`);
@@ -198,7 +223,20 @@ for (let t = 1; t <= WATCH_SECONDS; t++) {
         `크기=${ins.w}x${ins.h} push=${ins.pushed ?? '-'} 상태=${ins.status ?? '대기'}`,
     );
   }
-  if (JSON.parse(raw).length === 0) console.log(`[+${String(t).padStart(2)}s] ins 없음 (접힘)`);
+  if (snap.ins.length === 0) console.log(`[+${String(t).padStart(2)}s] ins 없음 (접힘)`);
+}
+
+console.log('');
+console.log('-- anchor (자동 광고) ------------------');
+if (anchorsSeen.length === 0) {
+  console.log('  상단/하단을 덮는 고정 광고 없음');
+} else {
+  for (const a of anchorsSeen) {
+    const covers = a.top + a.h >= a.vh - 2;
+    console.log(
+      `  ${a.id} h=${a.h}px top=${a.top}/${a.vh}` + (covers ? '  <- 하단을 덮음' : ''),
+    );
+  }
 }
 
 const mine = adRequests.filter((u) => SLOTS.some((s) => u.includes(s)));

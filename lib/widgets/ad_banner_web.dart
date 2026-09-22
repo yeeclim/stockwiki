@@ -53,6 +53,15 @@ class _AdBannerState extends State<AdBanner>
   bool _pushed = false;
   bool _collapsed = false;
 
+  /// adsbygoogle.js 가 <ins> 에 직접 박아 넣은 높이(px).
+  /// 반응형 유닛은 우리가 준 높이를 무시하고 폭에 맞춰 제 높이를 정한다.
+  /// 이걸 따라가지 않으면 호스트가 overflow:hidden 이라 광고가 잘린다.
+  double? _adHeight;
+
+  /// 광고가 실린 시점의 tick. 구글이 크기를 바로 못 정하고 조금 뒤에
+  /// 조정하는 경우가 있어, 실린 직후에도 잠깐 더 높이를 지켜본다.
+  int? _filledAt;
+
   @override
   void initState() {
     super.initState();
@@ -104,15 +113,30 @@ class _AdBannerState extends State<AdBanner>
       return;
     }
 
+    _syncHeight(ins);
+
     switch (ins.getAttribute('data-ad-status')) {
       case 'filled':
-        timer.cancel();
+        _filledAt ??= _ticks;
+        if (_ticks > _filledAt! + 12) timer.cancel();
       case 'unfilled':
         _giveUp(timer);
       default:
         // 차단기에 막히면 상태 속성 자체가 안 붙는다. 약 10초 뒤 접는다.
         if (_ticks > 80) _giveUp(timer);
     }
+  }
+
+  /// 구글이 인라인으로 높이를 지정했으면 바깥 상자를 거기에 맞춘다.
+  /// 스타일이 여전히 '100%' 면 우리 상자를 따라가는 상태라 건드리지 않는다
+  /// (읽고 다시 쓰면 서로를 쫓는 무한 루프가 된다).
+  void _syncHeight(web.HTMLElement ins) {
+    final style = ins.style.height;
+    if (!style.endsWith('px')) return;
+    final h = double.tryParse(style.substring(0, style.length - 2));
+    if (h == null || h <= 0 || h == _adHeight) return;
+    if (!mounted) return;
+    setState(() => _adHeight = h);
   }
 
   void _pushAd() {
@@ -144,8 +168,10 @@ class _AdBannerState extends State<AdBanner>
   Widget build(BuildContext context) {
     super.build(context);
     if (!_enabled || _collapsed) return const SizedBox.shrink();
-    // 반응형 유닛이라 높이만 잡아 주면 폭에 맞춰 구글이 크기를 고른다.
-    final height = MediaQuery.sizeOf(context).width >= 900 ? 250.0 : 280.0;
+    // 첫 렌더에는 구글이 고를 높이를 모르니 대략치를 준다. 광고가 실리면
+    // _syncHeight 가 실제 높이로 바꾼다.
+    final height =
+        _adHeight ?? (MediaQuery.sizeOf(context).width >= 900 ? 250.0 : 280.0);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: SizedBox(
