@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #39FF8C; } a:hover { color: #2FE07A; }
+  </style>
+</helmet>
+<div style="position: relative; width: 640px; height: 640px; background: #050706; overflow: hidden; font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;">
+
+  <div style="position: absolute; inset: 0; background-image: linear-gradient(#0d1712 1px, transparent 1px), linear-gradient(90deg, #0d1712 1px, transparent 1px); background-size: 48px 48px; opacity: 0.5;"></div>
+  <div style="position: absolute; left: 50%; top: 50%; width: 560px; height: 560px; transform: translate(-50%, -50%); background: radial-gradient(circle at center, rgba(57,255,140,0.14), rgba(57,255,140,0) 68%);"></div>
+
+  <!-- 원형 크롭 안전영역(중앙 지름 ~450px) 안에 배치 -->
+  <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 16px;">
+    <span style="width: 16px; height: 16px; border-radius: 50%; background: #FF4550; box-shadow: 0 0 16px rgba(255,69,80,0.85);"></span>
+    <span style="font-weight: 800; font-size: 40px; letter-spacing: 5px; color: #EEF4EF; text-align: center;">STOCK<br>WIKI</span>
+    <div style="width: 120px; height: 3px; background: #39FF8C; box-shadow: 0 0 16px rgba(57,255,140,0.65);"></div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

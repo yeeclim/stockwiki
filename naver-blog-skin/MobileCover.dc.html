@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #39FF8C; } a:hover { color: #2FE07A; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1080px; height: 1300px; background: #050706; overflow: hidden; font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;">
+
+  <div style="position: absolute; inset: 0; background-image: linear-gradient(#0d1712 1px, transparent 1px), linear-gradient(90deg, #0d1712 1px, transparent 1px); background-size: 54px 54px; opacity: 0.5;"></div>
+  <div style="position: absolute; left: 50%; top: 40%; width: 820px; height: 820px; transform: translate(-50%, -50%); background: radial-gradient(circle at center, rgba(57,255,140,0.14), rgba(57,255,140,0) 68%);"></div>
+
+  <!-- 상단 티커 (상태바 아래) -->
+  <div style="position: absolute; left: 0; right: 0; top: 120px; height: 44px; background: rgba(8,12,10,0.8); border-top: 1px solid #182620; border-bottom: 1px solid #182620; display: flex; align-items: center; justify-content: center; gap: 26px; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 15px; color: #6C7A71; letter-spacing: 0.4px;">
+    <span>KOSPI <span style="color: #EEF4EF;">2,680</span> <span style="color: #FF4550;">&#9650;</span></span>
+    <span>USD/KRW <span style="color: #EEF4EF;">1,382</span> <span style="color: #FF4550;">&#9650;</span></span>
+    <span>BTC <span style="color: #EEF4EF;">96,240</span> <span style="color: #FF4550;">&#9650;</span></span>
+  </div>
+
+  <!-- 로고: 상단 38% 지점 (아래쪽 프로필/블로그명 오버레이 피함) -->
+  <div style="position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 22px;">
+    <div style="display: flex; align-items: center; gap: 18px;">
+      <span style="width: 18px; height: 18px; border-radius: 50%; background: #FF4550; box-shadow: 0 0 18px rgba(255,69,80,0.85);"></span>
+      <span style="font-weight: 800; font-size: 78px; letter-spacing: 9px; color: #EEF4EF;">STOCKWIKI</span>
+    </div>
+    <div style="width: 230px; height: 3px; background: #39FF8C; box-shadow: 0 0 20px rgba(57,255,140,0.65);"></div>
+  </div>
+
+  <!-- 하단 40%는 네이버 프로필/블로그명/소개가 얹히므로 비워둠 (그리드만) -->
+
+</div>
+</x-dc>
+</body>
+</html>

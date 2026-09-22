@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #39FF8C; } a:hover { color: #2FE07A; }
+  </style>
+</helmet>
+<div style="width: 340px; padding: 28px 20px; background: #0B0F0C; display: flex; flex-direction: column; gap: 26px; font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;">
+
+  <!-- widget: profile -->
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: 2px; color: #6C7A71;">WIDGET / PROFILE</div>
+    <div style="width: 226px; background: #050706; border: 1px solid #39FF8C; border-radius: 3px; box-shadow: 0 0 18px rgba(57,255,140,0.18); padding: 16px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #FF4550; box-shadow: 0 0 8px rgba(255,69,80,0.8);"></span>
+        <span style="font-weight: 800; font-size: 14px; letter-spacing: 1.2px; color: #EEF4EF;">STOCKWIKI</span>
+      </div>
+      <div style="height: 1px; background: #182620; margin: 12px 0;"></div>
+      <div style="font-size: 11px; line-height: 1.7; color: #6C7A71;">AI가 검증하는 국내외 종목 분석 &middot; 테마 추천 &middot; 시장 지표 기록</div>
+      <div style="display: flex; gap: 8px; margin-top: 12px;">
+        <div style="flex: 1; border: 1px solid #182620; border-radius: 3px; padding: 8px; text-align: center;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: #EEF4EF;">128</div>
+          <div style="font-size: 9px; color: #6C7A71; letter-spacing: 1px;">POSTS</div>
+        </div>
+        <div style="flex: 1; border: 1px solid #182620; border-radius: 3px; padding: 8px; text-align: center;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: #39FF8C;">2.4k</div>
+          <div style="font-size: 9px; color: #6C7A71; letter-spacing: 1px;">VISITS</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- widget: menu -->
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: 2px; color: #6C7A71;">WIDGET / MENU</div>
+    <div style="width: 226px; background: #050706; border: 1px solid #182620; border-radius: 3px; padding: 14px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <span style="width: 3px; height: 12px; background: #39FF8C; border-radius: 1px;"></span>
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: #6C7A71;">CATEGORY</span>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid #101a15; font-size: 12px; color: #EEF4EF;"><span>국내 종목 분석</span><span style="color: #39FF8C;">&#8594;</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid #101a15; font-size: 12px; color: #EEF4EF;"><span>미국 주식</span><span style="color: #39FF8C;">&#8594;</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid #101a15; font-size: 12px; color: #EEF4EF;"><span>테마 &middot; 이슈</span><span style="color: #39FF8C;">&#8594;</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid #101a15; font-size: 12px; color: #EEF4EF;"><span>공포탐욕 &middot; 시황</span><span style="color: #39FF8C;">&#8594;</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- widget: quote strip -->
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: 2px; color: #6C7A71;">WIDGET / QUOTE</div>
+    <div style="width: 226px; background: #050706; border: 1px solid #182620; border-radius: 3px; padding: 14px; font-family: 'JetBrains Mono', 'Courier New', monospace;">
+      <div style="font-size: 10px; letter-spacing: 1.5px; color: #6C7A71;">KOSPI</div>
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
+        <span style="font-size: 22px; font-weight: 700; color: #EEF4EF;">2,680.4</span>
+        <span style="font-size: 12px; color: #FF4550;">&#9650; 11.2 (0.42%)</span>
+      </div>
+      <div style="height: 1px; background: #182620; margin: 10px 0;"></div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6C7A71;"><span>USD/KRW</span><span style="color: #EEF4EF;">1,382 <span style="color:#FF4550;">&#9650;</span></span></div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6C7A71; margin-top: 6px;"><span>BTC</span><span style="color: #EEF4EF;">96,240 <span style="color:#FF4550;">&#9650;</span></span></div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
