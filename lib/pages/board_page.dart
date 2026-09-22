@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'board_detail_page.dart';
 import '../utils/admin.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class BoardPage extends StatefulWidget {
   const BoardPage({super.key});
@@ -14,6 +16,13 @@ class BoardPage extends StatefulWidget {
 
 class _BoardPageState extends State<BoardPage> {
   List<Map<String, dynamic>> _posts = [];
+
+  /// 글 몇 개마다 광고를 한 칸씩 끼워 넣을지.
+  /// 너무 촘촘하면 광고가 콘텐츠보다 많아져 AdSense 정책에 걸린다.
+  static const int _adEvery = 5;
+
+  /// 글 + 중간 광고를 합친 리스트 길이.
+  int get _feedLength => _posts.length + _posts.length ~/ _adEvery;
   bool _isLoading = true;
   String? _error;
   int _page = 1;
@@ -140,16 +149,20 @@ class _BoardPageState extends State<BoardPage> {
                       : ListView.builder(
                           controller: _scrollController,
                           padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                          itemCount: _posts.length + (_loadingMore ? 1 : 0),
+                          itemCount: _feedLength + (_loadingMore ? 1 : 0),
                           itemBuilder: (ctx, i) {
-                            if (i == _posts.length) {
+                            if (i == _feedLength) {
                               return const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 16),
                                 child:
                                     Center(child: CircularProgressIndicator()),
                               );
                             }
-                            final post = _posts[i];
+                            // 글 _adEvery 개마다 광고가 한 칸 들어간다.
+                            if (i % (_adEvery + 1) == _adEvery) {
+                              return const AdBanner(slot: AdSlots.feedInline);
+                            }
+                            final post = _posts[i - i ~/ (_adEvery + 1)];
                             return _PostCard(
                               post: post,
                               relTime:

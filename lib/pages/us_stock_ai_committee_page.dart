@@ -10,6 +10,8 @@ import 'dart:math';
 import 'us_stock_detail_page.dart';
 import '../models/committee_recommendation.dart';
 import '../utils/number_format_utils.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 
 class UsStockAiCommitteePage extends StatefulWidget {
   const UsStockAiCommitteePage({super.key});
@@ -647,8 +649,11 @@ class _UsStockAiCommitteePageState extends State<UsStockAiCommitteePage> {
       // 검색 결과 표시
       return ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _recommendations.length,
+        itemCount: _recommendations.length + 1,
         itemBuilder: (context, index) {
+          if (index == _recommendations.length) {
+            return const AdBanner(slot: AdSlots.recommendBottom);
+          }
           final rec = _recommendations[index];
           return _buildRecommendationCard(rec);
         },

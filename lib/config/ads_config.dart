@@ -23,4 +23,12 @@ class AdSlots {
 
   /// 테마·AI 추천 목록 페이지 하단.
   static const String recommendBottom = '5008504779';
+
+  /// 국내·미국 종목 검색 결과 하단.
+  /// 전용 광고 단위(sw-search-bottom)를 만들면 여기만 교체하면 된다.
+  static const String searchBottom = recommendBottom;
+
+  /// AI 매매일지 목록 중간에 글처럼 끼어드는 인피드 광고.
+  /// 전용 광고 단위(sw-feed-inline)를 만들면 여기만 교체하면 된다.
+  static const String feedInline = recommendBottom;
 }

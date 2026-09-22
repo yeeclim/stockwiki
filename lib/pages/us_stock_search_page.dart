@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/stock.dart';
 import '../utils/number_format_utils.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 import 'us_stock_detail_page.dart';
 
 class UsStockSearchPage extends StatefulWidget {
@@ -239,8 +241,11 @@ class _UsStockSearchPageState extends State<UsStockSearchPage> {
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: _results.length,
+                  itemCount: _results.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == _results.length) {
+                      return const AdBanner(slot: AdSlots.searchBottom);
+                    }
                     final stock = _results[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),

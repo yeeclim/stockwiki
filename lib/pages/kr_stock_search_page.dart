@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/stock.dart';
 import '../widgets/portfolio_add_sheet.dart';
+import '../config/ads_config.dart';
+import '../widgets/ad_banner.dart';
 import 'us_stock_detail_page.dart';
 
 class KrStockSearchPage extends StatefulWidget {
@@ -152,8 +154,10 @@ class _KrStockSearchPageState extends State<KrStockSearchPage> {
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (ctx, i) => _buildCard(theme, _results[i]),
+                  itemCount: _results.isEmpty ? 0 : _results.length + 1,
+                  itemBuilder: (ctx, i) => i == _results.length
+                      ? const AdBanner(slot: AdSlots.searchBottom)
+                      : _buildCard(theme, _results[i]),
                 ),
               ),
           ],
