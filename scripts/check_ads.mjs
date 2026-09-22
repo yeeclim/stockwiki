@@ -19,7 +19,7 @@
  * 주의: 자기 사이트를 여는 것은 정책상 문제없지만 광고 클릭은 금지다.
  *       이 스크립트는 클릭하지 않는다.
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,6 +28,7 @@ const URL_ARG = process.argv.find((a) => a.startsWith('http')) ?? 'https://stock
 const KEEP = process.argv.includes('--keep');
 const PORT = 9300 + Math.floor(Math.random() * 300);
 const WATCH_SECONDS = 25;
+const BOOT_SECONDS = 30;
 
 /** 우리 광고 단위. 중복 관리를 피하려고 ads_config.dart 에서 직접 읽는다. */
 const SLOTS = [
@@ -61,8 +62,21 @@ function launchChrome() {
     `--user-data-dir=${profile}`,
     '--window-size=1280,1600',
     'about:blank',
-  ], { stdio: 'ignore', detached: false });
+  ], { stdio: 'ignore', detached: process.platform !== 'win32' });
   return child;
+}
+
+/**
+ * 크롬은 렌더러·GPU 를 자식 프로세스로 띄운다. 부모만 kill 하면 자식이 남아
+ * 다음 실행 때 디버깅 포트를 못 잡는다. 트리째 정리한다.
+ */
+function killTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+  }
 }
 
 async function debuggerUrl() {
@@ -100,7 +114,16 @@ const SNAPSHOT = `(() => {
 })()`;
 
 const chrome = launchChrome();
-const ws = new WebSocket(await debuggerUrl());
+process.on('exit', () => { if (!KEEP) killTree(chrome); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(130));
+
+let ws;
+try {
+  ws = new WebSocket(await debuggerUrl());
+} catch (e) {
+  killTree(chrome);
+  throw e;
+}
 await new Promise((r) => ws.addEventListener('open', r, { once: true }));
 
 let seq = 0;
@@ -136,9 +159,30 @@ await send('Runtime.enable');
 await send('Network.enable');
 await send('Page.navigate', { url: URL_ARG });
 
-console.log(`점검 대상: ${URL_ARG}\n${WATCH_SECONDS}초 관찰 — DOM 이 바뀔 때만 출력한다.\n`);
+console.log(`점검 대상: ${URL_ARG}`);
+
+// Flutter 앱이 첫 프레임을 그리기 전에는 AdBanner 자체가 존재하지 않는다.
+// 부팅을 먼저 기다려야 "광고 요청이 없다" 는 오진을 안 한다.
+const BOOT = `(() => JSON.stringify({
+  flutter: !!document.querySelector('flt-glass-pane'),
+  adScript: !!document.querySelector('script[src*="adsbygoogle.js"]'),
+}))()`;
+let booted = false;
+for (let t = 1; t <= BOOT_SECONDS; t++) {
+  await sleep(1000);
+  const b = JSON.parse(await evaluate(BOOT));
+  if (b.flutter) {
+    booted = true;
+    console.log(`앱 부팅 확인 (+${t}s) · adsbygoogle.js ${b.adScript ? '로드됨' : '없음'}`);
+    break;
+  }
+}
+if (!booted) console.log(`경고: ${BOOT_SECONDS}초 안에 Flutter 앱이 안 떴다.`);
+console.log(`${WATCH_SECONDS}초 관찰 — DOM 이 바뀔 때만 출력한다.`);
+console.log('');
 
 let last = null;
+let sawOurIns = false;
 const statuses = new Set();
 for (let t = 1; t <= WATCH_SECONDS; t++) {
   await sleep(1000);
@@ -146,6 +190,7 @@ for (let t = 1; t <= WATCH_SECONDS; t++) {
   if (raw === last) continue;
   last = raw;
   for (const ins of JSON.parse(raw)) {
+    if (ins.slot && !ins.auto) sawOurIns = true;
     const who = ins.auto || !ins.slot ? '자동광고' : `슬롯 ${ins.slot}`;
     if (ins.status) statuses.add(`${who}=${ins.status}`);
     console.log(
@@ -162,13 +207,18 @@ console.log(`전체 ${adRequests.length}건 · 우리 슬롯 ${mine.length}건`)
 for (const u of mine) console.log('  ' + u.slice(0, 160));
 
 console.log('\n── 판정 ──────────────────────────────────');
-if (mine.length === 0) {
-  console.log('✗ 우리 슬롯으로 광고 요청이 안 나갔다. AdBanner 가 안 붙었거나 슬롯 ID 가 비었다.');
-} else if ([...statuses].some((s) => s.includes('filled') && !s.includes('unfilled'))) {
+const filled = [...statuses].some((s) => s.includes('=filled'));
+if (!booted) {
+  console.log('? 앱이 안 떠서 판정 불가. 네트워크가 느렸을 수 있다. 다시 돌려봐라.');
+} else if (!sawOurIns) {
+  console.log('✗ 우리 <ins> 가 DOM 에 안 붙었다. AdBanner 미배치이거나 슬롯 ID 가 비었다.');
+} else if (mine.length === 0) {
+  console.log('✗ <ins> 는 붙었는데 광고 요청이 안 나갔다. push 실패이거나 차단기에 막혔다.');
+} else if (filled) {
   console.log('✓ 광고가 채워졌다(filled).');
 } else {
   console.log('△ 요청은 정상, 구글이 아직 안 채운다(unfilled). 신규 슬롯이면 며칠 걸린다.');
 }
 
 ws.close();
-if (!KEEP) chrome.kill();
+if (!KEEP) killTree(chrome);
