@@ -121,6 +121,8 @@ const SNAPSHOT = `(() => {
       auto: i.hasAttribute('data-ad-hi'),
       w: i.offsetWidth,
       h: i.offsetHeight,
+      // 우리가 씌운 호스트 div. <ins> 보다 낮으면 광고가 잘린다.
+      hostH: i.parentElement ? i.parentElement.offsetHeight : null,
     })) });
 })()`;
 
@@ -220,7 +222,9 @@ for (let t = 1; t <= WATCH_SECONDS; t++) {
     if (ins.status) statuses.add(`${who}=${ins.status}`);
     console.log(
       `[+${String(t).padStart(2)}s] ${who.padEnd(14)} ` +
-        `크기=${ins.w}x${ins.h} push=${ins.pushed ?? '-'} 상태=${ins.status ?? '대기'}`,
+        `크기=${ins.w}x${ins.h} 호스트=${ins.hostH ?? '-'} ` +
+        `push=${ins.pushed ?? '-'} 상태=${ins.status ?? '대기'}` +
+        (ins.hostH && ins.h > ins.hostH + 1 ? `  ← ${ins.h - ins.hostH}px 잘림` : ''),
     );
   }
   if (snap.ins.length === 0) console.log(`[+${String(t).padStart(2)}s] ins 없음 (접힘)`);
