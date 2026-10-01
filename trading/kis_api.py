@@ -150,6 +150,7 @@ class KISApi(_BaseKISApi):
                 return None
             latest = rows[0]
             return {
+                'date':     latest.get('stck_bsop_date'),  # YYYYMMDD — 당일 누적인지 판별용
                 'frgn_net': int(latest.get('frgn_ntby_qty') or 0),
                 'orgn_net': int(latest.get('orgn_ntby_qty') or 0),
                 'prsn_net': int(latest.get('prsn_ntby_qty') or 0),

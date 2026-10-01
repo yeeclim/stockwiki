@@ -197,10 +197,12 @@ def _summarize_issues(headlines: list[str], index_rows: list[dict], sector_rows:
         return ''
 
 
-def get_brief(kis_api=None) -> dict:
+def get_brief(kis_api=None, with_summary: bool = True) -> dict:
     """반환: {'indices', 'sectors', 'summary', 'kr_indices', 'kr_open_interest'}
     개별 단계가 실패해도 예외를 전파하지 않고 빈 값으로 안전하게 대체한다.
     kis_api(인증된 KISApi 인스턴스)를 넘기면 코스피200 선물 미결제약정도 함께 조회한다.
+    with_summary=False 면 뉴스·Claude 요약/해설을 건너뛴다 — 신호만 필요한 장중
+    체크포인트(forecast_log.py checkpoint)용.
     """
     try:
         index_rows = _fetch_rows(_INDICES)
@@ -217,8 +219,10 @@ def get_brief(kis_api=None) -> dict:
     except Exception as e:
         print(f"⚠️  유가/금리 조회 실패: {e}")
         macro_rows = []
-    headlines = _get_market_headlines()
-    summary = _summarize_issues(headlines, index_rows, sector_rows, macro_rows)
+    summary = ''
+    if with_summary:
+        headlines = _get_market_headlines()
+        summary = _summarize_issues(headlines, index_rows, sector_rows, macro_rows)
 
     try:
         kr_quotes = kmd.get_quotes()
@@ -259,7 +263,7 @@ def get_brief(kis_api=None) -> dict:
         '%Y.%m.%d (%a) %H:%M KST')
     import blog_card_render
     brief['close_phase'] = blog_card_render.close_phase_now()
-    brief['kr_verdict'] = _kr_verdict(brief)
+    brief['kr_verdict'] = _kr_verdict(brief) if with_summary else ''
     return brief
 
 
@@ -414,7 +418,11 @@ def _compute_signals(brief: dict) -> list[dict]:
 
     for inv in brief.get('kr_investors') or []:
         net = inv['frgn_net'] + inv['orgn_net']
-        signals.append(_signal(f"{inv['label']} 수급(외국인+기관)", _dir(net)))
+        s = _signal(f"{inv['label']} 수급(외국인+기관)", _dir(net))
+        # 장전엔 전일분, 장중엔 당일 누적분이 나온다 — 적중률 로그에서 구분하려고 남긴다.
+        if inv.get('date'):
+            s['asof'] = inv['date']
+        signals.append(s)
 
     return signals
 

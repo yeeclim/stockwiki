@@ -16,12 +16,20 @@
 적중률이 60% 라면 그 모델은 아무 정보도 더하지 않은 것이다. 적중률 숫자만 보면
 이걸 놓친다.
 
+장중 체크포인트 (INTRADAY_SIGNAL_PLAN.md)
+-----------------------------------------
+장전 판정('pre')과 별도로, 장중(11시경)에 같은 신호 로직을 다시 돌린 판정('mid')을
+같은 거래일의 다른 행으로 남긴다. 장중 판정은 이미 오전 움직임을 보고 낸 것이라
+전일종가 대비 종가로 채점하면 공짜 적중이 섞인다. 그래서 판정 시점 지수 레벨을 같이
+남기고 '체크포인트 → 종가' 잔여 구간(rest)으로 따로 채점한다.
+
 사용법
 ------
-  python forecast_log.py record   # (screen.py 가 자동 호출) 오늘 장전 판정 기록
-                                  #  장 시작(09:00 KST) 후에는 건너뛴다. --force 로 강제 가능
-  python forecast_log.py fill     # 결과 미기입 행에 실제 시가/종가 채우기
-  python forecast_log.py report   # 적중률 집계 출력
+  python forecast_log.py record      # (screen.py 가 자동 호출) 오늘 장전 판정 기록
+                                     #  장 시작(09:00 KST) 후에는 건너뛴다. --force 로 강제 가능
+  python forecast_log.py checkpoint  # 장중 재판정 기록 (forecast_checkpoint.yml 이 11시경 호출)
+  python forecast_log.py fill        # 결과 미기입 행에 실제 시가/종가 채우기
+  python forecast_log.py report      # 적중률 집계 출력
 """
 import os
 import sys
@@ -64,18 +72,52 @@ def _configured() -> bool:
 # 그걸 같은 trade_date 에 덮어쓰면 적중률 로그 전체가 무의미해진다(결과를 보고
 # 찍은 판정을 채점하는 꼴). 그래서 장 시작 이후 호출은 기록하지 않는다.
 _MARKET_OPEN_HOUR = 9
+# 장중 체크포인트는 정규장(09:00~15:30) 안에서만 의미가 있다. 15시 이후면 남은 구간이
+# 너무 짧아 잔여 구간 채점이 잡음뿐이다 (Actions 지연이 길어진 날은 그냥 버린다).
+_CHECKPOINT_LAST_HOUR = 15
+
+CHECKPOINTS = ('pre', 'mid')
+
+
+def _today_index_levels(brief: dict) -> dict | None:
+    """장중 체크포인트 시점의 코스피/코스닥 현재가. 오늘 체결값이 아니면(휴장일 등) None."""
+    import us_market_brief
+    by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
+    out = {}
+    for name, label in (('kospi', '코스피'), ('kosdaq', '코스닥')):
+        row = by_label.get(label)
+        if not row or not us_market_brief._traded_today_kst(row.get('traded_at')):
+            return None
+        out[f'{name}_at_check'] = round(float(row['price']), 2)
+    return out
 
 
 def record(brief: dict | None, trade_date: str | None = None,
-           force: bool = False) -> bool:
-    """장전 신호 판정을 저장. 같은 날 장 시작 전에 재실행하면 덮어쓴다(upsert)."""
+           force: bool = False, checkpoint: str = 'pre') -> bool:
+    """신호 판정을 저장. 같은 날·같은 체크포인트 재실행은 덮어쓴다(upsert).
+
+    checkpoint='pre' : 장전 판정. 장 시작 후 호출은 건너뛴다.
+    checkpoint='mid' : 장중 재판정. 정규장 중에만, 그 시점 지수 레벨과 함께 남긴다."""
+    if checkpoint not in CHECKPOINTS:
+        raise ValueError(f'unknown checkpoint: {checkpoint}')
     if not _configured():
         return False
 
     now = datetime.now(_KST)
-    if not force and now.hour >= _MARKET_OPEN_HOUR:
-        print(f'⏭  적중률 로그 생략 — 장 시작 후 실행({now:%H:%M} KST)이라 예측이 아닙니다')
-        return False
+    extra: dict = {}
+    if checkpoint == 'pre':
+        if not force and now.hour >= _MARKET_OPEN_HOUR:
+            print(f'⏭  적중률 로그 생략 — 장 시작 후 실행({now:%H:%M} KST)이라 예측이 아닙니다')
+            return False
+    else:
+        if not force and not (_MARKET_OPEN_HOUR <= now.hour < _CHECKPOINT_LAST_HOUR):
+            print(f'⏭  장중 체크포인트 생략 — 정규장 시간대가 아닙니다({now:%H:%M} KST)')
+            return False
+        levels = _today_index_levels(brief or {})
+        if levels is None:
+            print('⏭  장중 체크포인트 생략 — 오늘 지수 체결값이 없습니다(휴장일?)')
+            return False
+        extra = levels
 
     signals = (brief or {}).get('signals') or []
     if not signals:
@@ -88,6 +130,8 @@ def record(brief: dict | None, trade_date: str | None = None,
 
     row = {
         'trade_date':   trade_date,
+        'checkpoint':   checkpoint,
+        'recorded_at':  datetime.now(timezone.utc).isoformat(),
         'verdict':      market_signals.verdict_from_counts(bull, bear),
         'bull':         bull,
         'bear':         bear,
@@ -96,15 +140,16 @@ def record(brief: dict | None, trade_date: str | None = None,
         'raw_bull':     raw_bull,
         'raw_bear':     raw_bear,
         'signals_json': signals,
+        **extra,
     }
     try:
         r = requests.post(
-            f'{_SUPABASE_URL}/rest/v1/{_TABLE}?on_conflict=trade_date',
+            f'{_SUPABASE_URL}/rest/v1/{_TABLE}?on_conflict=trade_date,checkpoint',
             headers=_headers({'Prefer': 'resolution=merge-duplicates'}),
             json=row, timeout=10,
         )
         if r.ok:
-            print(f"📈 적중률 로그 기록: {trade_date} {row['verdict']} "
+            print(f"📈 적중률 로그 기록: {trade_date} [{checkpoint}] {row['verdict']} "
                   f"(강세 {bull} · 약세 {bear} · 중립 {neutral})")
             return True
         print(f'⚠️  적중률 로그 기록 실패: {r.status_code} {r.text[:200]}')
@@ -186,11 +231,12 @@ def fill_outcomes(lookback_days: int = 180) -> int:
         r = requests.get(
             f'{_SUPABASE_URL}/rest/v1/{_TABLE}'
             f'?outcome_filled_at=is.null&trade_date=gte.{since}'
-            f'&select=trade_date&order=trade_date.asc',
+            f'&select=trade_date,checkpoint,kospi_at_check,kosdaq_at_check'
+            f'&order=trade_date.asc',
             headers=_headers(), timeout=15,
         )
         r.raise_for_status()
-        pending = [row['trade_date'] for row in r.json()]
+        pending = r.json()
     except Exception as e:
         print(f'⚠️  미기입 행 조회 실패: {e}')
         return 0
@@ -209,7 +255,8 @@ def fill_outcomes(lookback_days: int = 180) -> int:
     sorted_days = {name: sorted(b) for name, b in bars.items()}
 
     filled = 0
-    for day in pending:
+    for prow in pending:
+        day, checkpoint = prow['trade_date'], prow.get('checkpoint') or 'pre'
         patch: dict = {}
         ok = False
         for name in _INDEX_CODES:
@@ -226,6 +273,9 @@ def fill_outcomes(lookback_days: int = 180) -> int:
             patch[f'{name}_close']      = round(bar['close'], 2)
             patch[f'{name}_gap_pct']    = _pct(bar['open'], prev_close)
             patch[f'{name}_close_pct']  = _pct(bar['close'], prev_close)
+            at_check = prow.get(f'{name}_at_check')
+            if at_check is not None:
+                patch[f'{name}_rest_pct'] = _pct(bar['close'], float(at_check))
             ok = True
 
         if not ok:
@@ -233,17 +283,18 @@ def fill_outcomes(lookback_days: int = 180) -> int:
         patch['outcome_filled_at'] = datetime.now(timezone.utc).isoformat()
         try:
             u = requests.patch(
-                f'{_SUPABASE_URL}/rest/v1/{_TABLE}?trade_date=eq.{day}',
+                f'{_SUPABASE_URL}/rest/v1/{_TABLE}'
+                f'?trade_date=eq.{day}&checkpoint=eq.{checkpoint}',
                 headers=_headers(), json=patch, timeout=10,
             )
             if u.ok:
                 filled += 1
             else:
-                print(f'⚠️  {day} 결과 기입 실패: {u.status_code} {u.text[:150]}')
+                print(f'⚠️  {day} [{checkpoint}] 결과 기입 실패: {u.status_code} {u.text[:150]}')
         except Exception as e:
-            print(f'⚠️  {day} 결과 기입 오류: {e}')
+            print(f'⚠️  {day} [{checkpoint}] 결과 기입 오류: {e}')
 
-    print(f'✅ 결과 기입 완료: {filled}/{len(pending)}일'
+    print(f'✅ 결과 기입 완료: {filled}/{len(pending)}행'
           + ('' if filled == len(pending) else ' (나머지는 휴장일이거나 일봉 미반영)'))
     return filled
 
@@ -281,6 +332,61 @@ def _fmt(d: dict) -> str:
     return '표본 부족' if not d['n'] else f"{d['rate']:5.1f}%  ({d['hit']}/{d['n']})"
 
 
+def _print_horizon(rows: list[dict], pct_key: str, title: str) -> None:
+    """한 채점 구간에 대해 기준선 / 그룹 판정 / 개별 판정(대조군) 을 찍는다."""
+    base = _base_rate(rows, pct_key)
+    grouped = _score(rows, 'verdict', pct_key)
+    raw = _score(rows, 'raw_verdict', pct_key)
+    base_txt = ('표본 부족' if not base['n']
+                else f"{base['rate']:5.1f}%  ({base['up']}/{base['n']})")
+    print(f'  {title}')
+    print(f"    기준선(항상 강세) : {base_txt}")
+    print(f"    그룹 집계 판정    : {_fmt(grouped)}")
+    print(f"    개별 집계(대조군) : {_fmt(raw)}")
+    if grouped['n'] and base['rate'] is not None:
+        edge = grouped['rate'] - base['rate']
+        note = ('기준선 초과' if edge > 0 else
+                ('기준선 이하 — 정보값 없음' if edge < 0 else '기준선과 동일'))
+        print(f"    → 기준선 대비 {edge:+.1f}%p  ({note})")
+
+
+def _hit(verdict: str | None, pct) -> bool | None:
+    if verdict not in ('bull', 'bear') or pct is None or float(pct) == 0:
+        return None
+    return (verdict == 'bull') == (float(pct) > 0)
+
+
+def _print_paired(pre_rows: list[dict], mid_rows: list[dict], idx_name: str) -> None:
+    """장전·장중 판정이 둘 다 있는 날만 골라 같은 표본에서 비교한다.
+    표본이 다르면 적중률 차이가 판정 차이인지 날짜 차이인지 구분이 안 된다."""
+    pre_by_day = {r['trade_date']: r for r in pre_rows}
+    pairs = [(pre_by_day[m['trade_date']], m) for m in mid_rows if m['trade_date'] in pre_by_day]
+    if not pairs:
+        print('  같은 날 장전·장중 판정이 모두 있는 표본이 아직 없습니다')
+        return
+
+    close_key, rest_key = f'{idx_name}_close_pct', f'{idx_name}_rest_pct'
+    pre_hits = [h for h in (_hit(p['verdict'], p.get(close_key)) for p, _ in pairs) if h is not None]
+    mid_hits = [h for h in (_hit(m['verdict'], m.get(rest_key)) for _, m in pairs) if h is not None]
+
+    def _rate(hits: list[bool]) -> str:
+        return '표본 부족' if not hits else f'{sum(hits) / len(hits) * 100:5.1f}%  ({sum(hits)}/{len(hits)})'
+
+    print(f'  3단 비교 (같은 {len(pairs)}일)')
+    print(f'    장전 판정 → 종가          : {_rate(pre_hits)}')
+    print(f'    장중 재판정 → 잔여 구간   : {_rate(mid_hits)}')
+
+    # 장중에 판정이 뒤집힌 날 — 체크포인트의 존재 이유는 결국 여기서 드러난다.
+    flips = [(p, m) for p, m in pairs
+             if p['verdict'] in ('bull', 'bear') and m['verdict'] in ('bull', 'bear')
+             and p['verdict'] != m['verdict']]
+    if flips:
+        right = [h for h in (_hit(m['verdict'], m.get(rest_key)) for _, m in flips) if h is not None]
+        print(f'    판정 반전 {len(flips)}일 → 장중 쪽이 잔여 구간을 맞힌 날 {_rate(right).strip()}')
+    else:
+        print('    판정 반전: 없음')
+
+
 def report(days: int = 180) -> None:
     if not _configured():
         return
@@ -298,54 +404,68 @@ def report(days: int = 180) -> None:
         print(f'⚠️  집계 조회 실패: {e}')
         return
 
-    if not rows:
+    pre_rows = [r for r in rows if (r.get('checkpoint') or 'pre') == 'pre']
+    mid_rows = [r for r in rows if r.get('checkpoint') == 'mid']
+    if not pre_rows:
         print('집계할 데이터가 없습니다. 먼저 record / fill 을 돌리세요.')
         return
 
     bar = '=' * 64
     print(f'\n{bar}')
-    print(f"  시장 신호 적중률  ({rows[0]['trade_date']} ~ {rows[-1]['trade_date']}, {len(rows)}일)")
+    print(f"  시장 신호 적중률 — 장전 판정  "
+          f"({pre_rows[0]['trade_date']} ~ {pre_rows[-1]['trade_date']}, {len(pre_rows)}일)")
     print(bar)
-
     for idx_name, idx_label in (('kospi', '코스피'), ('kosdaq', '코스닥')):
         print(f'\n[{idx_label}]')
-        for pct_key, horizon in (
-            (f'{idx_name}_gap_pct',   '시가 갭 (모델이 실제로 예측하는 구간)'),
-            (f'{idx_name}_close_pct', '종가 (하루 전체)'),
-        ):
-            base = _base_rate(rows, pct_key)
-            grouped = _score(rows, 'verdict', pct_key)
-            raw = _score(rows, 'raw_verdict', pct_key)
-            base_txt = ('표본 부족' if not base['n']
-                        else f"{base['rate']:5.1f}%  ({base['up']}/{base['n']})")
-            print(f'  {horizon}')
-            print(f"    기준선(항상 강세) : {base_txt}")
-            print(f"    그룹 집계 판정    : {_fmt(grouped)}")
-            print(f"    개별 집계(대조군) : {_fmt(raw)}")
-            if grouped['n'] and base['rate'] is not None:
-                edge = grouped['rate'] - base['rate']
-                note = ('기준선 초과' if edge > 0 else
-                        ('기준선 이하 — 정보값 없음' if edge < 0 else '기준선과 동일'))
-                print(f"    → 기준선 대비 {edge:+.1f}%p  ({note})")
+        _print_horizon(pre_rows, f'{idx_name}_gap_pct', '시가 갭 (모델이 실제로 예측하는 구간)')
+        _print_horizon(pre_rows, f'{idx_name}_close_pct', '종가 (하루 전체)')
 
-    n_scored = _score(rows, 'verdict', 'kospi_gap_pct')['n']
-    if n_scored < 30:
-        print(f'\n⚠️  방향 판정이 나온 날이 {n_scored}일뿐입니다. 30일 미만에서는 적중률 차이가'
-              '\n    대부분 우연이니 숫자를 믿지 마세요 (참고용으로만).')
+    if mid_rows:
+        print(f'\n{bar}')
+        print(f"  장중 재판정  ({mid_rows[0]['trade_date']} ~ {mid_rows[-1]['trade_date']}, "
+              f"{len(mid_rows)}일)")
+        print(bar)
+        for idx_name, idx_label in (('kospi', '코스피'), ('kosdaq', '코스닥')):
+            print(f'\n[{idx_label}]')
+            # 잔여 구간이 정직한 채점이다. 전일종가 대비 종가는 오전 움직임을 이미 보고
+            # 낸 판정이라 공짜 적중이 섞인다 — 참고로만 같이 찍는다.
+            _print_horizon(mid_rows, f'{idx_name}_rest_pct', '체크포인트 → 종가 (장중 판정의 실제 성적)')
+            _print_horizon(mid_rows, f'{idx_name}_close_pct', '전일종가 → 종가 (오전 움직임 포함, 참고용)')
+            _print_paired(pre_rows, mid_rows, idx_name)
+
+    n_scored = _score(pre_rows, 'verdict', 'kospi_gap_pct')['n']
+    n_mid = _score(mid_rows, 'verdict', 'kospi_rest_pct')['n']
+    if n_scored < 30 or (mid_rows and n_mid < 30):
+        print(f'\n⚠️  방향 판정 표본: 장전 {n_scored}일 · 장중 {n_mid}일. 30일 미만에서는 적중률'
+              '\n    차이가 대부분 우연이니 숫자를 믿지 마세요 (참고용으로만).')
     print()
+
+
+def _brief_with_auth(with_summary: bool = True) -> dict:
+    import us_market_brief
+    from kis_api import KISApi
+    api = KISApi()
+    try:
+        api.auth()
+    except Exception as e:
+        # 인증이 안 돼도 미국·네이버 지표로 신호는 나온다 (KIS 지표만 빠짐)
+        print(f'⚠️  KIS 인증 실패 — KIS 지표 없이 진행: {e}')
+        api = None
+    return us_market_brief.get_brief(api, with_summary=with_summary)
 
 
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'report'
+    force = '--force' in sys.argv
     if cmd == 'fill':
         fill_outcomes()
     elif cmd == 'report':
         fill_outcomes()   # 집계 전에 항상 최신 결과부터 채운다
         report()
     elif cmd == 'record':
-        import us_market_brief
-        from kis_api import KISApi
-        record(us_market_brief.get_brief(KISApi()), force='--force' in sys.argv)
+        record(_brief_with_auth(), force=force)
+    elif cmd == 'checkpoint':
+        record(_brief_with_auth(with_summary=False), force=force, checkpoint='mid')
     else:
         print(__doc__)
 
