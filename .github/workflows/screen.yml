@@ -7,6 +7,12 @@ on:
     # 평일 KST 15:00 = UTC 06:00
     - cron: '0 6 * * 1-5'
   workflow_dispatch:  # 수동 실행
+    inputs:
+      audience:
+        description: '발송 대상 (admin = 나에게만, all = 동의한 사용자 전원 + 게시판 등록)'
+        type: choice
+        options: [admin, all]
+        default: admin
 
 concurrency:
   group: screening
@@ -49,6 +55,9 @@ jobs:
           KAKAO_CLIENT_SECRET:       ${{ secrets.KAKAO_CLIENT_SECRET }}
           DART_API_KEY:              ${{ secrets.DART_API_KEY }}
           ANTHROPIC_API_KEY:         ${{ secrets.ANTHROPIC_API_KEY }}
+          ADMIN_EMAIL:               ${{ secrets.ADMIN_EMAIL }}
+          # 스케줄 실행 = all, 수동 실행 = 입력값(기본 admin)
+          SCREEN_AUDIENCE:           ${{ github.event_name == 'workflow_dispatch' && inputs.audience || 'all' }}
         run: |
           cd trading
           python screen.py

@@ -21,6 +21,12 @@ from exclusions import get_excluded_codes
 _SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 _SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
 
+# 'admin' 이면 관리자(ADMIN_EMAIL·관리자 카카오)에게만 보낸다. GitHub 에서 수동 실행할 때의
+# 기본값이다 (screen.yml). 게시판 등록·메일 원본 보관(=블로그 원천)도 다른 사람에게
+# 노출되므로 같이 건너뛴다. 스케줄 실행은 'all' — 동의한 사용자 전원에게 발송.
+_ADMIN_ONLY = os.environ.get('SCREEN_AUDIENCE', 'all').strip().lower() == 'admin'
+_ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '').strip()
+
 
 BUY_THRESHOLD = 6
 
@@ -352,11 +358,15 @@ def screen():
         signals=(brief.get('signals') if brief else None),
         excluded=excluded,
     )
-    bp_id = board_post.post(bp_title, bp_content)
-    if bp_id:
-        print("📋 게시판 스크리닝 기록 등록 완료")
+    if _ADMIN_ONLY:
+        print("🔒 관리자 전용 실행 — 게시판 등록·메일 보관·사용자 발송을 건너뜁니다")
+        bp_id = None
     else:
-        print("⚠️  게시판 스크리닝 기록 등록 실패")
+        bp_id = board_post.post(bp_title, bp_content)
+        if bp_id:
+            print("📋 게시판 스크리닝 기록 등록 완료")
+        else:
+            print("⚠️  게시판 스크리닝 기록 등록 실패")
 
     # 카카오톡 "자세히 보기" 링크 — 게시글이 등록됐으면 해당 글로, 아니면 홈으로
     kakao_link = board_post.post_url(bp_id) if bp_id else None
@@ -401,11 +411,11 @@ def screen():
             print(f"⚠️  카카오 수신자 조회 실패: {e}")
             return []
 
-    kakao_tokens = _fetch_user_kakao_tokens()
+    kakao_tokens = [] if _ADMIN_ONLY else _fetch_user_kakao_tokens()
     if kakao_tokens:
         sent = kakao_notify.send_to_users(report, kakao_tokens, link_url=kakao_link)
         print(f"📱 카카오톡 발송 완료 → {sent}명 (시도 {len(kakao_tokens)}명)")
-    else:
+    elif not _ADMIN_ONLY:
         print("⚠️  카카오톡 수신자 없음")
 
     # 메일 본문 (간밤 미국시장 브리핑을 상단에 포함한 HTML)
@@ -415,11 +425,20 @@ def screen():
         plain = f"{brief_text}\n\n{report}" if brief_text else report
         # 블로그 등 다른 채널용 원본 — 수신자 수와 무관하게 보관한다
         # (동의자가 0명인 날에도 기록이 끊기지 않도록)
-        _archive_email(bp_title, html, plain, brief)
+        if not _ADMIN_ONLY:
+            _archive_email(bp_title, html, plain, brief)
     else:
         from html import escape
         html = f"<html><body><pre style='font-family:inherit;white-space:pre-wrap'>{escape(report)}</pre></body></html>"
         plain = report
+
+    if _ADMIN_ONLY:
+        if not _ADMIN_EMAIL:
+            print("⚠️  ADMIN_EMAIL 미설정 — 관리자 전용 메일 발송 생략")
+            return False
+        ok = email_notify.send_html_to(html, plain, [_ADMIN_EMAIL])
+        print(f"📧 관리자 전용 메일 {'발송 완료' if ok else '발송 실패'}")
+        return ok
 
     # 수신 동의한 사용자에게만 이메일 발송
     try:
