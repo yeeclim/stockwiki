@@ -468,10 +468,6 @@ def render_text(brief: dict) -> str:
         lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
         lines.append('   집계(그룹): ' + market_signals.votes_line(signals))
         lines.append('   ' + '  '.join(f"[{signal_chip_text(s)}]" for s in signals))
-        lines.append('   ※ ▲▼는 지표 자체의 방향, 강세/약세는 그 움직임의 시장 해석입니다'
-                     ' (예: VIX ▼ = 강세)')
-        lines.append('   ※ 서로 상관된 지표(미국증시·VIX·금리 등)는 한 그룹으로 묶어 1표만 셉니다')
-        lines.append('   ※ 통계적 확률이 아닌 단순 신호 조합입니다')
         lines.append('')
 
     lines.append('🌙 간밤 미국시장 브리핑')
@@ -703,11 +699,6 @@ def render_email_html(brief: dict, report_text: str) -> str:
         집계(그룹): {html_lib.escape(market_signals.votes_line(signals))}
       </div>
       <div style="margin-top:10px;">{chips}</div>
-      <div style="margin-top:8px;color:{_MUTED};font-size:10.5px;">
-        ※ ▲▼는 지표 자체의 방향, 옆의 강세/약세는 그 움직임의 시장 해석입니다 (예: VIX ▼ = 위험선호 = 강세).<br>
-        ※ 미국증시·VIX·미금리처럼 같은 재료를 다르게 본 지표는 한 그룹으로 묶어 1표만 셉니다 (중복 계산 방지).<br>
-        ※ 통계적으로 검증된 확률이 아니라, 이미 수집한 지표들을 방향(상승/하락)으로만 환산해 개수를 센 단순 신호 조합입니다.
-      </div>
     </td></tr>
   </table>
 </td></tr>"""
