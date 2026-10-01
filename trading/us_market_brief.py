@@ -48,6 +48,10 @@ _MACRO = [
     ('KORU',  '한국 3배 레버리지(KORU)'),
 ]
 
+# 메일에서 '미국장 한국물' 카드로 따로 빼서 국내 증시 카드 위에 보여주는 심볼.
+# 국내장 방향의 선행 지표라 유가·금리·환율과 섞어두면 눈에 덜 띈다.
+_KR_PROXY_SYMBOLS = ('EWY', 'SKHY', 'KORU')
+
 # 미국 시세가 이 시간보다 오래됐으면(장기 휴장 등) 신호로 쓰지 않는다.
 # 주말을 낀 월요일 아침엔 금요일 종가라 약 50시간까지 벌어진다.
 _STALE_HOURS = 60
@@ -478,13 +482,20 @@ def render_text(brief: dict) -> str:
     if sectors:
         lines.append('[섹터 ETF] ' + '  '.join(
             f"{r['label']} {r['pct']:+.2f}%" for r in sectors))
-    if macro:
+    macro_rest = [r for r in macro if r['symbol'] not in _KR_PROXY_SYMBOLS]
+    kr_proxy = [r for r in macro if r['symbol'] in _KR_PROXY_SYMBOLS]
+    if macro_rest:
         lines.append('[유가·금리·환율] ' + '  '.join(
             f"{r['label']} {r.get('price_text', r['price'])} ({r.get('delta_text', '')})"
-            for r in macro))
+            for r in macro_rest))
     if summary:
         lines.append('')
         lines.append(summary)
+    if kr_proxy:
+        lines.append('')
+        lines.append('[미국장 한국물] ' + '  '.join(
+            f"{r['label']} {r.get('price_text', r['price'])} ({r.get('delta_text', '')})"
+            for r in kr_proxy))
     if kr_indices or kr_oi:
         lines.append('')
         _krt = {'prev': '[전일 국내 증시 마감]', 'intraday': '[국내 증시 (장중)]',
@@ -705,7 +716,9 @@ def render_email_html(brief: dict, report_text: str) -> str:
 
     indices_html = _chip_grid_html('주요 지수', brief.get('indices') or [], cols=2)
     sectors_html = _chip_grid_html('섹터 ETF', brief.get('sectors') or [], cols=3)
-    macro_html = _chip_grid_html('유가 · 금리 · 환율 · 한국물', brief.get('macro') or [], cols=2)
+    macro_rows = [r for r in (brief.get('macro') or []) if r['symbol'] not in _KR_PROXY_SYMBOLS]
+    kr_proxy_rows = [r for r in (brief.get('macro') or []) if r['symbol'] in _KR_PROXY_SYMBOLS]
+    macro_html = _chip_grid_html('유가 · 금리 · 환율', macro_rows, cols=3)
     summary = (brief.get('summary') or '').strip()
     summary_html = ''
     if summary:
@@ -731,6 +744,24 @@ def render_email_html(brief: dict, report_text: str) -> str:
       {sectors_html}
       {macro_html}
       {summary_html}
+    </td></tr>
+  </table>
+</td></tr>"""
+
+    kr_proxy_section = ''
+    kr_proxy_html = _chip_grid_html('간밤 미국장 마감 기준 · 달러 표시', kr_proxy_rows, cols=3)
+    if kr_proxy_html:
+        kr_proxy_section = f"""
+<tr><td style="padding-bottom:16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
+    <tr><td style="padding:18px 20px;">
+      <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
+            background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
+      <span style="color:{_INK};font-weight:700;font-size:16px;vertical-align:middle;margin-left:8px;">
+        🌏 미국장 한국물
+      </span>
+      {kr_proxy_html}
     </td></tr>
   </table>
 </td></tr>"""
@@ -854,6 +885,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
     </div>
   </td></tr>
   {signal_html}
+  {kr_proxy_section}
   {kr_section}
   {brief_section}
   {report_html}
