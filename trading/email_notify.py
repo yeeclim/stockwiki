@@ -106,7 +106,7 @@ def _with_footer_html(html: str, unsubscribe_url: str) -> str:
     from html import escape
     footer = (
         '<hr style="border:none;border-top:1px solid #ddd;margin:24px 0 12px">'
-        '<p style="font-size:12px;color:#888;line-height:1.6">'
+        '<p style="font-size:14px;color:#888;line-height:1.6">'
         '본 메일은 StockWiki 스크리닝 메일 수신에 동의하신 분께 발송됩니다.<br>'
         f'전송자: StockWiki ({escape(_SENDER)})<br>'
         f'<a href="{escape(unsubscribe_url)}" style="color:#888">수신거부</a>'

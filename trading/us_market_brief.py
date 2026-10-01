@@ -563,15 +563,15 @@ def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
             vol_html = ''
             vol = _fmt_index_volume(r.get('volume'))
             if vol:
-                vol_html = (f'<div style="color:{_MUTED};font-size:10px;margin-top:2px;">'
+                vol_html = (f'<div style="color:{_MUTED};font-size:12px;margin-top:2px;">'
                             f'거래량 {vol}</div>')
             cells.append(
                 f'<td width="{cell_w}" style="padding:5px;">'
                 f'<div style="background:{_SURFACE_SOFT};border:1px solid {_LINE};'
                 f'border-radius:10px;padding:10px 6px;text-align:center;">'
-                f'<div style="color:{_MUTED};font-size:11px;letter-spacing:.2px;">{html_lib.escape(r["label"])}</div>'
-                f'<div style="color:{_INK};font-size:14px;font-weight:700;margin-top:3px;font-family:Consolas,Menlo,monospace;">{price_text}</div>'
-                f'<div style="color:{color};font-size:12px;font-weight:700;margin-top:2px;font-family:Consolas,Menlo,monospace;">{delta_text}</div>'
+                f'<div style="color:{_MUTED};font-size:13px;letter-spacing:.2px;">{html_lib.escape(r["label"])}</div>'
+                f'<div style="color:{_INK};font-size:16px;font-weight:700;margin-top:3px;font-family:Consolas,Menlo,monospace;">{price_text}</div>'
+                f'<div style="color:{color};font-size:14px;font-weight:700;margin-top:2px;font-family:Consolas,Menlo,monospace;">{delta_text}</div>'
                 f'{vol_html}'
                 '</div></td>'
             )
@@ -580,7 +580,7 @@ def _chip_grid_html(title: str, rows: list[dict], cols: int) -> str:
             cells.append(f'<td width="{cell_w}"></td>')
         body.append(f'<tr>{"".join(cells)}</tr>')
     return (
-        f'<div style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;'
+        f'<div style="color:{_MUTED};font-size:13px;font-weight:700;letter-spacing:.5px;'
         f'text-transform:uppercase;margin:14px 0 6px;">{html_lib.escape(title)}</div>'
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{"".join(body)}</table>'
     )
@@ -672,7 +672,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
         chips = ''.join(
             f'<span style="display:inline-block;margin:3px 6px 3px 0;padding:3px 9px;'
             f'border-radius:999px;background:{_SURFACE_SOFT};border:1px solid {_LINE};'
-            f'font-size:11px;color:{_INK};white-space:nowrap;">{html_lib.escape(s["label"])} '
+            f'font-size:13px;color:{_INK};white-space:nowrap;">{html_lib.escape(s["label"])} '
             f'<span style="color:{chip_color[signal_move(s)]};font-weight:700;">'
             f'{SIGNAL_ARROW[signal_move(s)]}</span> '
             f'<span style="color:{chip_color[s.get("direction", 0)]};font-weight:700;">'
@@ -684,18 +684,18 @@ def render_email_html(brief: dict, report_text: str) -> str:
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
          style="background:{_SURFACE};border:1px solid {_LINE};border-radius:12px;">
     <tr><td style="padding:16px 20px;">
-      <span style="color:{_ACCENT};font-size:16px;font-weight:800;letter-spacing:.3px;">
+      <span style="color:{_ACCENT};font-size:18px;font-weight:800;letter-spacing:.3px;">
         📊 오늘의 시장 신호 📍
       </span>
       <div style="margin-top:8px;">
-        <span style="color:{_INK};font-weight:800;font-size:20px;">강세 {bull}</span>
-        <span style="color:{_MUTED};font-size:15px;"> · </span>
-        <span style="color:{_INK};font-weight:800;font-size:20px;">약세 {bear}</span>
-        <span style="color:{_MUTED};font-size:15px;"> · </span>
-        <span style="color:{_INK};font-weight:800;font-size:20px;">중립 {neutral}</span>
-        <span style="color:{verdict_color};font-weight:800;font-size:14px;margin-left:8px;">({verdict})</span>
+        <span style="color:{_INK};font-weight:800;font-size:22px;">강세 {bull}</span>
+        <span style="color:{_MUTED};font-size:17px;"> · </span>
+        <span style="color:{_INK};font-weight:800;font-size:22px;">약세 {bear}</span>
+        <span style="color:{_MUTED};font-size:17px;"> · </span>
+        <span style="color:{_INK};font-weight:800;font-size:22px;">중립 {neutral}</span>
+        <span style="color:{verdict_color};font-weight:800;font-size:16px;margin-left:8px;">({verdict})</span>
       </div>
-      <div style="margin-top:6px;color:{_MUTED};font-size:11px;">
+      <div style="margin-top:6px;color:{_MUTED};font-size:13px;">
         집계(그룹): {html_lib.escape(market_signals.votes_line(signals))}
       </div>
       <div style="margin-top:10px;">{chips}</div>
@@ -712,7 +712,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
         summary_html = (
             f'<div style="margin-top:14px;padding:12px 14px;background:{_SURFACE_SOFT};'
             f'border-left:3px solid {_ACCENT};border-radius:6px;color:{_INK};'
-            f'font-size:13px;line-height:1.75;white-space:pre-wrap;">{html_lib.escape(summary)}</div>'
+            f'font-size:15px;line-height:1.75;white-space:pre-wrap;">{html_lib.escape(summary)}</div>'
         )
 
     brief_section = ''
@@ -724,7 +724,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
     <tr><td style="padding:18px 20px;">
       <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
-      <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
+      <span style="color:{_INK};font-weight:700;font-size:16px;vertical-align:middle;margin-left:8px;">
         🌙 간밤 미국시장 브리핑
       </span>
       {indices_html}
@@ -743,7 +743,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
         oi_color = _UP if chg > 0 else (_DOWN if chg < 0 else _MUTED)
         arrow = '▲' if chg > 0 else ('▼' if chg < 0 else '－')
         kr_oi_html = (
-            f'<div style="margin-top:10px;color:{_MUTED};font-size:12px;">'
+            f'<div style="margin-top:10px;color:{_MUTED};font-size:14px;">'
             f'코스피200 선물 미결제약정 '
             f'<span style="color:{_INK};font-weight:700;font-family:Consolas,Menlo,monospace;">{kr_oi["open_interest"]:,}</span>계약'
             f'&nbsp; <span style="color:{oi_color};font-weight:700;font-family:Consolas,Menlo,monospace;">{arrow}{abs(chg):,}</span>'
@@ -769,10 +769,10 @@ def render_email_html(brief: dict, report_text: str) -> str:
                 '</tr>'
             )
         kr_investors_html = (
-            f'<div style="color:{_MUTED};font-size:11px;font-weight:700;letter-spacing:.5px;'
+            f'<div style="color:{_MUTED};font-size:13px;font-weight:700;letter-spacing:.5px;'
             f'text-transform:uppercase;margin:14px 0 6px;">외국인·기관·개인 순매수(현물)</div>'
             '<table role="presentation" cellpadding="0" cellspacing="0" '
-            f'style="font-size:12px;font-family:Consolas,Menlo,monospace;color:{_INK};">'
+            f'style="font-size:14px;font-family:Consolas,Menlo,monospace;color:{_INK};">'
             + ''.join(inv_rows) + '</table>'
         )
 
@@ -787,7 +787,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
         kr_verdict_html = (
             f'<div style="margin-top:12px;padding:12px 14px;background:{_SURFACE_SOFT};'
             f'border-left:3px solid {_ACCENT};border-radius:6px;color:{_INK};'
-            f'font-size:13.5px;font-weight:600;line-height:1.7;">💬 {html_lib.escape(kr_verdict)}</div>'
+            f'font-size:15.5px;font-weight:600;line-height:1.7;">💬 {html_lib.escape(kr_verdict)}</div>'
         )
 
     kr_section = ''
@@ -799,7 +799,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
     <tr><td style="padding:18px 20px;">
       <span class="swk-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{_ACCENT};box-shadow:0 0 6px {_ACCENT};vertical-align:middle;"></span>
-      <span style="color:{_INK};font-weight:700;font-size:14px;vertical-align:middle;margin-left:8px;">
+      <span style="color:{_INK};font-weight:700;font-size:16px;vertical-align:middle;margin-left:8px;">
         {kr_section_title}
       </span>
       {kr_verdict_html}
@@ -819,11 +819,11 @@ def render_email_html(brief: dict, report_text: str) -> str:
       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF5F56;margin-right:5px;"></span>
       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FFBD2E;margin-right:5px;"></span>
       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#27C93F;margin-right:8px;"></span>
-      <span style="color:{_MUTED};font-size:11px;font-family:Consolas,Menlo,monospace;">screening_result.log</span>
+      <span style="color:{_MUTED};font-size:13px;font-family:Consolas,Menlo,monospace;">screening_result.log</span>
     </td></tr>
     <tr><td style="padding:16px;">
       <pre style="margin:0;white-space:pre-wrap;word-break:break-word;
-                  font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.6;
+                  font-family:Consolas,Menlo,monospace;font-size:14.5px;line-height:1.6;
                   color:{_INK};">{_highlight_report(report_text)}</pre>
     </td></tr>
   </table>
@@ -847,9 +847,9 @@ def render_email_html(brief: dict, report_text: str) -> str:
 <tr><td align="center" style="padding:28px 12px;">
 <table role="presentation" width="640" class="swk-container" cellpadding="0" cellspacing="0" style="width:640px;max-width:100%;">
   <tr><td style="text-align:center;padding-bottom:22px;">
-    <span class="swk-logo" style="font-family:Consolas,Menlo,monospace;font-size:22px;
+    <span class="swk-logo" style="font-family:Consolas,Menlo,monospace;font-size:24px;
           font-weight:800;color:{_ACCENT};letter-spacing:3px;">STOCKWIKI</span>
-    <div style="color:{_MUTED};font-size:12px;margin-top:6px;font-family:Consolas,Menlo,monospace;">
+    <div style="color:{_MUTED};font-size:14px;margin-top:6px;font-family:Consolas,Menlo,monospace;">
       {now_str} · 종목 스크리닝
     </div>
   </td></tr>
@@ -857,7 +857,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
   {kr_section}
   {brief_section}
   {report_html}
-  <tr><td style="text-align:center;padding-top:22px;color:{_MUTED};font-size:11px;">
+  <tr><td style="text-align:center;padding-top:22px;color:{_MUTED};font-size:13px;">
     이 메일은 StockWiki 자동 스크리닝 시스템이 발송했습니다.
   </td></tr>
 </table>
