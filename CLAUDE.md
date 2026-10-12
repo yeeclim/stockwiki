@@ -89,6 +89,35 @@ Readability:
 - Blank line between top-level declarations, around multiline bindings, before `return`/control flow, and after blocks.
 - Don't put `shape` in symbol names — name what the thing is.
 
+## 6. Verification Before Completion
+
+**No completion claims without fresh verification evidence.**
+
+Adapted from [obra/superpowers verification-before-completion](https://github.com/obra/superpowers/blob/main/skills/verification-before-completion/SKILL.md).
+
+Before saying done / fixed / passing — and before commit, push, or PR:
+1. Identify the command that proves the claim.
+2. Run it in full, now. A previous run doesn't count.
+3. Read the output: exit code, failure count.
+4. Report the actual state with the evidence. If it fails, say so with the output.
+
+| Claim | Requires | Not sufficient |
+|-------|----------|----------------|
+| Tests pass | Test output: 0 failures | "Should pass", earlier run |
+| Build succeeds | Build exit 0 | Lint passing |
+| Bug fixed | Original symptom reproduced, now passes | Code changed |
+| Regression test works | Red-green: fails without fix, passes with it | Passes once |
+| Subagent finished | `git diff` shows the changes | Agent's success report |
+| Requirements met | Line-by-line check against the request | Tests passing |
+
+Project commands:
+- Flutter: `flutter analyze`, `flutter test`
+- API: `npm run test:api`
+- Python (`trading/`, no test suite): `python -m py_compile <changed files>` at minimum; run the touched script's dry-run/import path when one exists.
+- GitHub Actions: changes must be committed **and pushed** before a workflow run can verify them. Test paths that send email or touch real accounts via an isolated `workflow_dispatch` workflow, not the production one.
+
+If no command can verify a claim, say "not verified" and why. Words like "should", "probably", "seems to" before a completion claim mean verification is missing.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
