@@ -2,14 +2,14 @@ name: 종목 스크리닝
 
 on:
   # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함.
-  # cron-job.org 가 평일 KST 06:30 / 15:00 에 GitHub API 로 workflow_dispatch(audience=all) 호출.
-  workflow_dispatch:  # cron-job.org(all) / 수동 실행(기본 admin)
+  # cron-job.org 가 평일 KST 06:30 / 15:00 에 GitHub API 로 workflow_dispatch 호출.
+  workflow_dispatch:  # cron-job.org / 수동 실행 — 기본 all
     inputs:
       audience:
         description: '발송 대상 (admin = 나에게만, all = 동의한 사용자 전원 + 게시판 등록)'
         type: choice
         options: [admin, all]
-        default: admin
+        default: all
 
 concurrency:
   group: screening
