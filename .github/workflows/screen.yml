@@ -1,12 +1,9 @@
 name: 종목 스크리닝
 
 on:
-  schedule:
-    # 평일 KST 06:30 = UTC 21:30 (전날) — GitHub Actions 최대 1시간 지연 감안, 08:00 프리장 전 완료 목표
-    - cron: '30 21 * * 0-4'
-    # 평일 KST 15:00 = UTC 06:00
-    - cron: '0 6 * * 1-5'
-  workflow_dispatch:  # 수동 실행
+  # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함.
+  # cron-job.org 가 평일 KST 06:30 / 15:00 에 GitHub API 로 workflow_dispatch(audience=all) 호출.
+  workflow_dispatch:  # cron-job.org(all) / 수동 실행(기본 admin)
     inputs:
       audience:
         description: '발송 대상 (admin = 나에게만, all = 동의한 사용자 전원 + 게시판 등록)'
@@ -56,8 +53,7 @@ jobs:
           DART_API_KEY:              ${{ secrets.DART_API_KEY }}
           ANTHROPIC_API_KEY:         ${{ secrets.ANTHROPIC_API_KEY }}
           ADMIN_EMAIL:               ${{ secrets.ADMIN_EMAIL }}
-          # 스케줄 실행 = all, 수동 실행 = 입력값(기본 admin)
-          SCREEN_AUDIENCE:           ${{ github.event_name == 'workflow_dispatch' && inputs.audience || 'all' }}
+          SCREEN_AUDIENCE:           ${{ inputs.audience }}
         run: |
           cd trading
           python screen.py
