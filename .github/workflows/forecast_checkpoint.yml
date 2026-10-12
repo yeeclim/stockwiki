@@ -3,10 +3,8 @@ name: 시장 신호 장중 체크포인트
 # 06:30 장전 판정과 같은 신호 로직을 장중에 다시 돌려 적중률 로그에 'mid' 행으로 남긴다.
 # 메일·게시판 발송 없음 — 기록만 한다. (trading/INTRADAY_SIGNAL_PLAN.md 3-1)
 on:
-  schedule:
-    # 평일 KST 11:00 = UTC 02:00. Actions 지연으로 늦어져도 실제 판정 시각(recorded_at)과
-    # 그 시점 지수 레벨을 같이 남기므로 채점은 정확하다. 15시 이후로 밀리면 기록을 건너뛴다.
-    - cron: '0 2 * * 1-5'
+  # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함 — cron-job.org 가 workflow_dispatch 호출.
+  # 호출: 평일 KST 11:00. 15시 이후 실행되면 기록을 건너뛴다.
   workflow_dispatch:
 
 concurrency:

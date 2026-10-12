@@ -10,11 +10,8 @@ name: KIS 야간선물 탐색
 #
 # 답이 나오면 이 워크플로우는 지울 것 (임시 탐색용).
 on:
-  schedule:
-    # 야간장 한복판: KST 21:00 = UTC 12:00 (평일)
-    - cron: '0 12 * * 1-5'
-    # 아침 메일(06:30) 직전: KST 06:20 = UTC 21:20 (전날)
-    - cron: '20 21 * * 0-4'
+  # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함 — cron-job.org 가 workflow_dispatch 호출.
+  # 호출: 평일 KST 21:00(야간장) / 평일 KST 06:20(아침 메일 직전)
   workflow_dispatch:
 
 jobs:

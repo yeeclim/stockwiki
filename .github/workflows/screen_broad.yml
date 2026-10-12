@@ -1,9 +1,8 @@
 name: 광역 종목 스캔 (전체 KOSPI/KOSDAQ)
 
 on:
-  schedule:
-    # 매일 KST 07:00 = UTC 전날 22:00
-    - cron: '0 22 * * *'
+  # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함 — cron-job.org 가 workflow_dispatch 호출.
+  # 호출: 매일 KST 06:00 — 06:30 스크리닝이 이 결과(screening_candidates)를 읽으므로 반드시 그 전에.
   workflow_dispatch:
 
 jobs:
