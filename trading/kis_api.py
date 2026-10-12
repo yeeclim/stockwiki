@@ -55,7 +55,9 @@ class KISApi(_BaseKISApi):
                     "appsecret":  self.app_secret,
                 },
             )
-            res.raise_for_status()
+            if not res.ok:
+                # 403 원인(EGW00133 1분 제한 / 앱키 만료 등)은 본문에만 있다
+                raise RuntimeError(f"KIS 토큰 발급 실패: HTTP {res.status_code} {res.text[:300]}")
             data = res.json()
             self.token = data.get('access_token')
             if not self.token:
