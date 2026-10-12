@@ -1,6 +1,6 @@
 """
 종목 스크리닝 — 진입 조건 사전 평가
-평일 06:30 / 15:00 KST — cron-job.org 가 workflow_dispatch 로 실행
+평일 08:00 / 15:00 KST — cron-job.org 가 workflow_dispatch 로 실행
 결과를 카카오톡(관리자) + 이메일(가입 유저 전체) 발송
 """
 import os

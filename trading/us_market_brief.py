@@ -33,10 +33,10 @@ _INDICES = [
 # EWY(iShares MSCI South Korea ETF)는 KRX 야간선물의 대용이다. KRX 야간
 # 파생상품시장 시세를 주는 무료 API가 없어서, 국내장이 닫힌 동안 글로벌 투자자가
 # 한국 주식을 어떻게 사고팔았는지를 보여주는 지표로 EWY를 쓴다. 미국 정규장
-# 마감(=05:00 KST 전후)에 확정되므로 06:30 발송 시점엔 1~2시간 된 신선한 값이다.
+# 마감(=05:00 KST 전후)에 확정되므로 08:00 발송 시점엔 2~3시간 된 신선한 값이다.
 #
 # SKHY(SK하이닉스 나스닥 ADR)·KORU(MSCI 한국 3배 레버리지 ETF)도 같은 이유로 넣는다.
-# 둘 다 미국장 마감에 확정돼 06:30 에 신선하다.
+# 둘 다 미국장 마감에 확정돼 08:00 에 신선하다.
 #   - SKHY : 시장 신호에도 쓴다 (_compute_signals, '국내 야간·선물' 그룹)
 #   - KORU : 표시 전용. EWY 와 같은 지수의 3배라 신호로 세면 같은 정보가 중복 집계된다
 _MACRO = [
@@ -404,7 +404,7 @@ def _compute_signals(brief: dict) -> list[dict]:
 
     kr_by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
     fut = kr_by_label.get('코스피200 선물')
-    # 정규장 선물은 06:30 발송 시점엔 전일 종가라 오버나이트 정보가 없다.
+    # 정규장 선물은 08:00 발송 시점엔 전일 종가라 오버나이트 정보가 없다.
     # 오늘 체결된 값일 때만 신호로 센다 (없으면 위의 EWY 보정치가 그 자리를 맡는다).
     if fut and not _traded_today_kst(fut.get('traded_at')):
         fut = None
