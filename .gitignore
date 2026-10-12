@@ -86,3 +86,6 @@ trading/_preview/
 trading/dart_accounts.txt
 # Supabase CLI 로컬 상태
 supabase/.temp/
+
+# Claude Code 개인 설정 (PC별)
+.claude/settings.local.json
