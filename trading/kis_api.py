@@ -43,29 +43,6 @@ class KISApi(_BaseKISApi):
         kw.setdefault('timeout', self._timeout)
         return self._session.post(f"{BASE_URL}{path}", **kw)
 
-    # ── 인증: 실패 원인을 RuntimeError 로 감싸고 빈 토큰 검증 ───────────────────
-    def auth(self):
-        try:
-            res = self._post(
-                "/oauth2/tokenP",
-                headers={"content-type": "application/json"},
-                json={
-                    "grant_type": "client_credentials",
-                    "appkey":     self.app_key,
-                    "appsecret":  self.app_secret,
-                },
-            )
-            if not res.ok:
-                # 403 원인(EGW00133 1분 제한 / 앱키 만료 등)은 본문에만 있다
-                raise RuntimeError(f"KIS 토큰 발급 실패: HTTP {res.status_code} {res.text[:300]}")
-            data = res.json()
-            self.token = data.get('access_token')
-            if not self.token:
-                raise RuntimeError('토큰 응답이 비어있습니다')
-            print("✅ KIS 토큰 발급 완료")
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"KIS 토큰 발급 실패: {e}") from e
-
     def get_financial_ratios(self, code: str) -> dict | None:
         """재무비율 4종 — DART API 우선, 실패 시 FnGuide 스크래핑 fallback"""
         import dart_api

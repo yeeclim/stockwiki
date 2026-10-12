@@ -1,17 +1,17 @@
 name: 자동매매
 
 on:
-  schedule:
-    # 평일 KST 09:00~15:00 — 30분 간격, 딜레이 감안해 UTC 0~6시 커버
-    - cron: '0,30 0,1,2,3,4,5,6 * * 1-5'
-  workflow_dispatch:  # 수동 실행 (테스트용)
+  # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함.
+  # cron-job.org 가 평일 KST 09:00~15:00 30분 간격으로 workflow_dispatch 호출.
+  # main.py 가 장 시간(09:00~15:20)을 직접 확인하므로 범위 밖 호출은 그냥 종료된다.
+  workflow_dispatch:  # cron-job.org / 수동 실행
     inputs:
       dry_run:
         description: 'Dry run - simulate orders without placing them (true/false)'
         required: false
         default: 'false'
 
-# 스케줄 지연으로 두 실행이 겹치면 같은 종목을 중복 매수할 수 있다 — 한 번에 하나만.
+# 실행이 겹치면 같은 종목을 중복 매수할 수 있다 — 한 번에 하나만.
 concurrency:
   group: auto-trading
   cancel-in-progress: false
@@ -19,10 +19,10 @@ concurrency:
 jobs:
   trade:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10  # KIS 토큰 재시도(최대 ~2분) 여유
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      DRY_RUN: ${{ github.event.inputs.dry_run }}
+      DRY_RUN: ${{ inputs.dry_run }}
 
     steps:
       - uses: actions/checkout@v4

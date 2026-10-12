@@ -12,6 +12,7 @@ trading/kis_api.py 가 이 클래스를 상속해 세션/재시도·시간외 �
 """
 import os
 import sys
+import time
 import requests
 from datetime import datetime, timedelta
 from .base_api import BaseBrokerApi
@@ -47,16 +48,30 @@ class KISApi(BaseBrokerApi):
             "custtype":      "P",
         }
 
-    def auth(self):
-        res = self._post(
-            "/oauth2/tokenP",
-            headers={"content-type": "application/json"},
-            json={"grant_type": "client_credentials",
-                  "appkey": self.app_key, "appsecret": self.app_secret},
-        )
-        res.raise_for_status()
-        self.token = res.json()['access_token']
-        print("✅ KIS 토큰 발급 완료")
+    def auth(self, attempts: int = 3):
+        """토큰 발급. KIS 가 간헐적으로 403 을 주므로 재시도한다.
+        EGW00133(키당 1분 1회 제한)은 61초, 그 외 실패는 10초 뒤 재시도."""
+        last = ''
+        for i in range(attempts):
+            try:
+                res = self._post(
+                    "/oauth2/tokenP",
+                    headers={"content-type": "application/json"},
+                    json={"grant_type": "client_credentials",
+                          "appkey": self.app_key, "appsecret": self.app_secret},
+                )
+                if res.ok and res.json().get('access_token'):
+                    self.token = res.json()['access_token']
+                    print("✅ KIS 토큰 발급 완료")
+                    return
+                last = f"HTTP {res.status_code} {res.text[:300]}"
+            except requests.exceptions.RequestException as e:
+                last = str(e)
+            if i < attempts - 1:
+                wait = 61 if 'EGW00133' in last else 10
+                print(f"⚠️ KIS 토큰 발급 실패({i + 1}/{attempts}) — {wait}초 후 재시도: {last}")
+                time.sleep(wait)
+        raise RuntimeError(f"KIS 토큰 발급 실패: {last}")
 
     # ── 시세 조회 (raw 헬퍼는 서브클래스와 공유) ────────────────────────────────
     def _inquire_price_output(self, code: str, err_label: str = '시세 오류') -> dict:
