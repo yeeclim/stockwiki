@@ -158,17 +158,16 @@ def verdict_reason(signals: list[dict]) -> str:
 
 
 def verdict_label(signals: list[dict]) -> str:
-    """화면 표시용 판정 문구. 예: '약세 우세' 또는 '약세 우세 · 코스피200 선물 -6.43% — …'"""
-    text = VERDICT_TEXT[verdict(signals)]
-    reason = verdict_reason(signals)
-
-    return f'{text} · {reason}' if reason else text
+    """화면 표시용 판정 문구 ('약세 우세' 등). 갭 우선 사유는 화면에 넣지 않고 로그에만 남긴다."""
+    return VERDICT_TEXT[verdict(signals)]
 
 
 def log_lines(signals: list[dict]) -> list[str]:
     """런 로그용 판정 근거. 사후에 '왜 이 판정인가'를 이 출력만으로 답할 수 있어야 한다."""
     bull, bear, neutral = signal_counts(signals)
-    lines = [f'📊 시장 신호 판정: {verdict_label(signals)} (그룹 강세 {bull} · 약세 {bear} · 중립 {neutral})',
+    reason = verdict_reason(signals)
+    reason_text = f' · {reason}' if reason else ''
+    lines = [f'📊 시장 신호 판정: {verdict_label(signals)}{reason_text} (그룹 강세 {bull} · 약세 {bear} · 중립 {neutral})',
              f'   집계(그룹): {votes_line(signals)}']
     for s in signals or []:
         value = s.get('value')
