@@ -89,3 +89,6 @@ supabase/.temp/
 
 # Claude Code 개인 설정 (PC별)
 .claude/settings.local.json
+
+# 로컬 전용 비밀값 (cron-job.org API 키, GitHub PAT)
+.secrets/

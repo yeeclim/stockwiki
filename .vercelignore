@@ -19,3 +19,4 @@ analysis_options.yaml
 .gitignore
 *.md
 !README.md
+.secrets/

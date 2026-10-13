@@ -47,6 +47,14 @@ _GROUP_DEFS = [
 
 VERDICT_TEXT = {'bull': '강세 우세', 'bear': '약세 우세', 'neutral': '팽팽'}
 
+# 큰 갭 우선 — 그룹당 1표는 크기를 보지 않아서, 코스피200 선물 −6% 인 날에도
+# 유가 1% 하락 같은 표 하나와 맞비겨 '팽팽'이 나왔다(2026-10-13).
+# 국내 갭을 직접 보여주는 지표가 이 이상 움직이면 그 방향으로 판정한다.
+# 위에서부터 가장 직접적인 관측치 하나만 본다. SK하이닉스 ADR 은 개별 종목이라
+# 하루 ±2% 가 흔해서 제외.
+GAP_PCT = 2.0
+_GAP_LABELS = ('코스피200 선물', '코스피200 야간선물', '야간 한국물(EWY·환율보정)')
+
 
 def group_of(label: str) -> tuple[str, str]:
     """라벨 → (그룹키, 표시명). 어디에도 안 걸리면 그 신호만의 단독 그룹으로 만든다
@@ -87,6 +95,28 @@ def group_votes(signals: list[dict]) -> list[dict]:
     return votes
 
 
+def group_direction(signals: list[dict], key: str) -> int:
+    """그룹 하나의 표(+1/-1/0). 그룹 신호가 없으면 0."""
+    for v in group_votes(signals):
+        if v['key'] == key:
+            return v['direction']
+
+    return 0
+
+
+def gap_signal(signals: list[dict]) -> dict | None:
+    """큰 갭 우선 규칙에 걸린 신호. 없으면 None. value 가 없는 옛 아카이브는 해당 없음."""
+    by_label = {s.get('label'): s for s in signals or []}
+    for label in _GAP_LABELS:
+        s = by_label.get(label)
+        if s is None or s.get('value') is None:
+            continue
+
+        return s if abs(s['value']) >= GAP_PCT else None
+
+    return None
+
+
 def signal_counts(signals: list[dict]) -> tuple[int, int, int]:
     """(강세, 약세, 중립) — 그룹 단위 집계. 표시·판정에 쓰는 공식 카운트."""
     votes = group_votes(signals)
@@ -104,9 +134,46 @@ def raw_counts(signals: list[dict]) -> tuple[int, int, int]:
 
 
 def verdict(signals: list[dict]) -> str:
-    """'bull' | 'bear' | 'neutral'"""
+    """'bull' | 'bear' | 'neutral' — 큰 갭이 있으면 그 방향, 아니면 그룹 투표."""
+    gap = gap_signal(signals)
+    if gap is not None:
+        return 'bull' if gap['value'] > 0 else 'bear'
+
     bull, bear, _ = signal_counts(signals)
-    return 'bull' if bull > bear else ('bear' if bear > bull else 'neutral')
+
+    return verdict_from_counts(bull, bear)
+
+
+def verdict_reason(signals: list[dict]) -> str:
+    """판정이 투표가 아니라 큰 갭으로 정해졌을 때 그 이유. 아니면 ''."""
+    gap = gap_signal(signals)
+    if gap is None:
+        return ''
+
+    return f"{gap['label']} {gap['value']:+.2f}% — 갭 ±{GAP_PCT:g}% 이상이라 표 수보다 우선"
+
+
+def verdict_label(signals: list[dict]) -> str:
+    """화면 표시용 판정 문구. 예: '약세 우세' 또는 '약세 우세 · 코스피200 선물 -6.43% — …'"""
+    text = VERDICT_TEXT[verdict(signals)]
+    reason = verdict_reason(signals)
+
+    return f'{text} · {reason}' if reason else text
+
+
+def log_lines(signals: list[dict]) -> list[str]:
+    """런 로그용 판정 근거. 사후에 '왜 이 판정인가'를 이 출력만으로 답할 수 있어야 한다."""
+    bull, bear, neutral = signal_counts(signals)
+    lines = [f'📊 시장 신호 판정: {verdict_label(signals)} (그룹 강세 {bull} · 약세 {bear} · 중립 {neutral})',
+             f'   집계(그룹): {votes_line(signals)}']
+    for s in signals or []:
+        value = s.get('value')
+        value_text = '-' if value is None else f'{value:+.2f}'
+        asof = f" asof={s['asof']}" if s.get('asof') else ''
+        lines.append(f"   - {s.get('label')}: value={value_text} move={s.get('move')} "
+                     f"direction={s.get('direction')}{asof}")
+
+    return lines
 
 
 def verdict_from_counts(bull: int, bear: int) -> str:

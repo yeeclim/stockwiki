@@ -137,10 +137,15 @@ def verdict_line(brief: dict) -> str:
 
     signals = brief.get('signals') or []
     if signals:
+        import market_signals
         bull, bear, _ = _signal_counts(signals)
-        if bull > bear:
+        v = market_signals.verdict(signals)
+        gap = market_signals.gap_signal(signals)
+        if gap is not None:
+            parts.append(f"{gap['label']} {gap['value']:+.2f}%로 오늘 {'강세' if v == 'bull' else '약세'} 우세")
+        elif v == 'bull':
             parts.append(f'오늘 강세 신호 우세({bull}:{bear})')
-        elif bear > bull:
+        elif v == 'bear':
             parts.append(f'오늘 약세 신호 우세({bear}:{bull})')
         else:
             parts.append('오늘 신호 팽팽')
@@ -197,13 +202,11 @@ def build_card_html(brief: dict) -> str:
     signals = brief.get('signals') or []
     signal_block = ''
     if signals:
+        import market_signals
         bull, bear, neutral = _signal_counts(signals)
-        if bull > bear:
-            verdict, vcolor = '강세 우세', _UP
-        elif bear > bull:
-            verdict, vcolor = '약세 우세', _DOWN
-        else:
-            verdict, vcolor = '팽팽', _AMBER
+        v = market_signals.verdict(signals)
+        verdict = market_signals.VERDICT_TEXT[v]
+        vcolor = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER}[v]
         signal_block = (
             f'<div style="margin-top:18px;padding:16px 18px;background:{_SURFACE_SOFT};'
             f'border:1px solid {_LINE};border-radius:14px;">'

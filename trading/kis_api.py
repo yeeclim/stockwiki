@@ -96,15 +96,30 @@ class KISApi(_BaseKISApi):
         return "01"  # 정규장 — 시장가
 
     # ── 투자자매매동향 ────────────────────────────────────────────────────────
+    @staticmethod
+    def parse_investor_row(row: dict) -> dict:
+        """순매수는 수량(*_qty)이 아니라 거래대금(*_tr_pbmn, 단위 백만원)으로 본다.
+        수량은 주가를 무시한다. 2026-10-13 코스피 실측: 외국인 −3,250 / 기관 +5,899(수량)
+        → 합계 순매수, 금액은 외국인 −1,968,528 / 기관 +639,923(백만원) → 합계 −1.33조.
+        수량으로 세서 외국인 −1.97조 순매도 날 수급이 ▲ 강세로 판정됐다."""
+        return {
+            'date':     row.get('stck_bsop_date'),  # YYYYMMDD — 당일 누적인지 판별용
+            'frgn_net': int(row.get('frgn_ntby_tr_pbmn') or 0),
+            'orgn_net': int(row.get('orgn_ntby_tr_pbmn') or 0),
+            'prsn_net': int(row.get('prsn_ntby_tr_pbmn') or 0),
+        }
+
     def get_investor_trend(self, index_code: str, market_code: str) -> dict | None:
-        """시장별 투자자매매동향(일별) — 외국인/기관/개인 순매수 수량(최신 영업일).
+        """시장별 투자자매매동향(일별) — 외국인/기관/개인 순매수 거래대금(최신 영업일).
         index_code: '0001'(코스피)/'1001'(코스닥), market_code: 'KSP'/'KSQ'.
         선물이 아닌 코스피/코스닥 현물시장 기준 투자자 동향이다(선물 투자자별
         매매동향은 KIS REST API에 없어 대체 지표로 사용). 실계좌로 검증됨
         (2026-08-20). 실패 시 예외를 전파하지 않고 None을 반환한다.
         """
         from datetime import datetime as _dt
-        today = _dt.now().strftime('%Y%m%d')
+        import pytz
+        # 러너는 UTC 라 그냥 now() 를 쓰면 KST 아침(전날 UTC)에 날짜가 하루 밀린다.
+        today = _dt.now(pytz.timezone('Asia/Seoul')).strftime('%Y%m%d')
         try:
             r = self._get(
                 "/uapi/domestic-stock/v1/quotations/inquire-investor-daily-by-market",
@@ -127,13 +142,7 @@ class KISApi(_BaseKISApi):
             rows = d.get('output') or []
             if not rows:
                 return None
-            latest = rows[0]
-            return {
-                'date':     latest.get('stck_bsop_date'),  # YYYYMMDD — 당일 누적인지 판별용
-                'frgn_net': int(latest.get('frgn_ntby_qty') or 0),
-                'orgn_net': int(latest.get('orgn_ntby_qty') or 0),
-                'prsn_net': int(latest.get('prsn_ntby_qty') or 0),
-            }
+            return self.parse_investor_row(rows[0])
         except Exception as e:
             print(f"⚠️  투자자매매동향 조회 실패 ({index_code}): {e}")
             return None

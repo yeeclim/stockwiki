@@ -263,6 +263,8 @@ def get_brief(kis_api=None, with_summary: bool = True) -> dict:
         'kr_investors': kr_investors,
     }
     brief['signals'] = _compute_signals(brief)
+    for line in market_signals.log_lines(brief['signals']):
+        print(line)
     brief['generated_at'] = datetime.now(pytz.timezone('Asia/Seoul')).strftime(
         '%Y.%m.%d (%a) %H:%M KST')
     import blog_card_render
@@ -328,7 +330,7 @@ def _dir_band(value: float, band: float) -> int:
     return 0
 
 
-def _signal(label: str, direction: int, move: int | None = None) -> dict:
+def _signal(label: str, direction: int, move: int | None = None, value: float | None = None) -> dict:
     """신호 하나. 두 값을 분리해 담는다.
 
     - move      : 지표 자체가 어느 쪽으로 움직였는가 (화면의 ▲/▼ 표시용)
@@ -337,9 +339,12 @@ def _signal(label: str, direction: int, move: int | None = None) -> dict:
     대부분은 둘이 같지만 VIX는 반대다(VIX 하락 = 위험선호 = 강세). 예전엔 화살표를
     direction으로 그려서 'VIX -11%'인 날에도 요약에 'VIX ▲'가 찍혀, 본문 시황과
     어긋나 보였다. 그래서 화살표는 move, 강세/약세 판정은 direction으로 분리한다.
+
+    value 는 판정에 쓴 원값(% 또는 bp). 로그로 근거를 남기고, market_signals 의
+    큰 갭 우선 규칙이 크기를 볼 때 쓴다.
     """
     return {'label': label, 'direction': direction,
-            'move': direction if move is None else move}
+            'move': direction if move is None else move, 'value': value}
 
 
 def _compute_signals(brief: dict) -> list[dict]:
@@ -348,11 +353,12 @@ def _compute_signals(brief: dict) -> list[dict]:
 
     us_core_pct = [us_by_symbol[s]['pct'] for s in ('^GSPC', '^IXIC', '^DJI') if s in us_by_symbol]
     if us_core_pct:
-        signals.append(_signal('미국 증시', _dir(sum(us_core_pct) / len(us_core_pct))))
+        us_avg = sum(us_core_pct) / len(us_core_pct)
+        signals.append(_signal('미국 증시', _dir(us_avg), value=us_avg))
     if '^VIX' in us_by_symbol:
         # VIX 상승 = 시장 불안 심화(약세 신호)이므로 부호를 반대로 해석한다.
         vix_move = _dir(us_by_symbol['^VIX']['pct'])
-        signals.append(_signal('VIX(변동성)', -vix_move, move=vix_move))
+        signals.append(_signal('VIX(변동성)', -vix_move, move=vix_move, value=us_by_symbol['^VIX']['pct']))
 
     macro_by_symbol = {r['symbol']: r for r in (brief.get('macro') or [])}
     krw = macro_by_symbol.get('KRW=X')
@@ -362,7 +368,7 @@ def _compute_signals(brief: dict) -> list[dict]:
     night = brief.get('kr_night_futures')
     if night:
         # 코스피200 야간선물 — 원화 표시라 보정이 필요 없는 직접 관측치다.
-        signals.append(_signal('코스피200 야간선물', _dir_band(night['pct'], 0.3)))
+        signals.append(_signal('코스피200 야간선물', _dir_band(night['pct'], 0.3), value=night['pct']))
     elif ewy and krw and _is_fresh(ewy):
         # 폴백. EWY 는 달러 표시라 원화 기준 코스피 등락률로 환산해야 갭 추정이 된다.
         #   EWY(USD) = 코스피(KRW) / 원달러  ⇒  %코스피 ≈ %EWY + %원달러
@@ -371,7 +377,7 @@ def _compute_signals(brief: dict) -> list[dict]:
         # 월요일 아침엔 금요일 미국장 값이라 주말 재료를 못 담는다. 야간선물도
         # 같은 한계가 있지만 EWY 는 이틀이 밀려서 더 심하다.
         implied = ewy['pct'] + krw['pct']
-        signals.append(_signal('야간 한국물(EWY·환율보정)', _dir_band(implied, 0.5)))
+        signals.append(_signal('야간 한국물(EWY·환율보정)', _dir_band(implied, 0.5), value=implied))
 
     # SK하이닉스 ADR(나스닥 SKHY) — 코스피 최상위 대형주의 밤사이 움직임.
     # 지수 추종인 야간선물/EWY 와 달리 반도체 업황이 따로 반영돼 새로운 정보가 있다.
@@ -383,24 +389,31 @@ def _compute_signals(brief: dict) -> list[dict]:
     skhy = macro_by_symbol.get('SKHY')
     if skhy and krw and _is_fresh(skhy):
         implied = skhy['pct'] + krw['pct']
-        signals.append(_signal('SK하이닉스 ADR 야간(환율보정)', _dir_band(implied, 1.0)))
+        signals.append(_signal('SK하이닉스 ADR 야간(환율보정)', _dir_band(implied, 1.0), value=implied))
     if krw:
         # 원화 약세(환율 상승)는 외국인 자금 유출 압력이라 약세 신호.
         krw_move = _dir_band(krw['pct'], 0.4)
-        signals.append(_signal('원/달러', -krw_move, move=krw_move))
+        signals.append(_signal('원/달러', -krw_move, move=krw_move, value=krw['pct']))
+
+    tnx = macro_by_symbol.get('^TNX')
+    if tnx:
+        # 금리 상승 = 할인율 상승 + 달러 강세 → 성장주 비중 큰 국내 증시엔 약세 신호.
+        # ^TNX 의 change 는 수익률 자체의 변화(%p)라 100을 곱해 bp 로 본다. ±3bp 완충.
+        tnx_bp = (tnx.get('change') or 0.0) * 100
+        tnx_move = _dir_band(tnx_bp, 3.0)
+        signals.append(_signal('미 국채 10년', -tnx_move, move=tnx_move, value=tnx_bp))
 
     oil = macro_by_symbol.get('CL=F')
     if oil:
         # 한국은 원유 전량 수입국이라 유가 상승은 교역조건 악화·원가 부담(약세 신호)이다.
         # 일간 ±1% 안쪽은 잡음으로 보고 중립 처리.
         oil_move = _dir_band(oil['pct'], 1.0)
-        signals.append(_signal('국제유가(WTI)', -oil_move, move=oil_move))
-    tnx = macro_by_symbol.get('^TNX')
-    if tnx:
-        # 금리 상승 = 할인율 상승 + 달러 강세 → 성장주 비중 큰 국내 증시엔 약세 신호.
-        # ^TNX 의 change 는 수익률 자체의 변화(%p)라 100을 곱해 bp 로 본다. ±3bp 완충.
-        tnx_move = _dir_band((tnx.get('change') or 0.0) * 100, 3.0)
-        signals.append(_signal('미 국채 10년', -tnx_move, move=tnx_move))
+        oil_dir = -oil_move
+        # 미국 위험선호가 꺾인 날의 유가 하락은 수요 둔화 우려(위험회피)의 결과라
+        # 국내 증시에 호재로 읽으면 거꾸로 된다 (2026-10-13 코스피 −6% 날 '강세' 1표).
+        if oil_move < 0 and market_signals.group_direction(signals, 'us_risk') < 0:
+            oil_dir = 0
+        signals.append(_signal('국제유가(WTI)', oil_dir, move=oil_move, value=oil['pct']))
 
     kr_by_label = {r['label']: r for r in (brief.get('kr_indices') or [])}
     fut = kr_by_label.get('코스피200 선물')
@@ -409,7 +422,7 @@ def _compute_signals(brief: dict) -> list[dict]:
     if fut and not _traded_today_kst(fut.get('traded_at')):
         fut = None
     if fut:
-        signals.append(_signal('코스피200 선물', _dir(fut['pct'])))
+        signals.append(_signal('코스피200 선물', _dir(fut['pct']), value=fut['pct']))
 
     kr_oi = brief.get('kr_open_interest')
     if fut and kr_oi:
@@ -418,11 +431,12 @@ def _compute_signals(brief: dict) -> list[dict]:
         # 가격↑+OI↑=신규매수 유입(강세), 가격↓+OI↑=신규매도 유입(약세),
         # OI가 줄었으면(청산 위주) 방향성이 약하므로 중립 처리.
         d = 1 if (price_up and oi_up) else (-1 if (not price_up and oi_up) else 0)
-        signals.append(_signal('선물 미결제약정', d, move=_dir(kr_oi['open_interest_change'])))
+        signals.append(_signal('선물 미결제약정', d, move=_dir(kr_oi['open_interest_change']),
+                               value=kr_oi['open_interest_change']))
 
     for inv in brief.get('kr_investors') or []:
         net = inv['frgn_net'] + inv['orgn_net']
-        s = _signal(f"{inv['label']} 수급(외국인+기관)", _dir(net))
+        s = _signal(f"{inv['label']} 수급(외국인+기관)", _dir(net), value=net)
         # 장전엔 전일분, 장중엔 당일 누적분이 나온다 — 적중률 로그에서 구분하려고 남긴다.
         if inv.get('date'):
             s['asof'] = inv['date']
@@ -443,6 +457,33 @@ def signal_move(s: dict) -> int:
 
 def signal_chip_text(s: dict) -> str:
     return f"{s['label']} {SIGNAL_ARROW[signal_move(s)]} {SIGNAL_WORD[s.get('direction', 0)]}"
+
+
+def _eok(million_won: int) -> str:
+    """KIS 순매수 거래대금(백만원) → '+6,399억' / '-1.97조'."""
+    if million_won == 0:
+        return '0'
+
+    eok = million_won / 100
+    if abs(eok) >= 10000:
+        return f'{eok / 10000:+,.2f}조'
+
+    return f'{eok:+,.0f}억'
+
+
+def _intraday_note(brief: dict) -> str:
+    """장이 열린 뒤 실행된 메일이면 실제 등락을 함께 밝힌다. 신호는 장전 추정용이라
+    장중엔 실제 결과가 이미 나와 있다(2026-10-13 코스피 −6% 장중 메일에 '팽팽')."""
+    if brief.get('close_phase', 'prev') == 'prev':
+        return ''
+
+    kospi = next((r for r in brief.get('kr_indices') or [] if r.get('label') == '코스피'), None)
+    if kospi is None or not _traded_today_kst(kospi.get('traded_at')):
+        return ''
+
+    phase = '장중' if brief['close_phase'] == 'intraday' else '장 마감 후'
+
+    return f"{phase} 실행 — 실제 코스피 {kospi['pct']:+.2f}%. 신호는 장전 추정용이라 참고만 하세요."
 
 
 def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
@@ -468,9 +509,12 @@ def render_text(brief: dict) -> str:
     lines = []
     if signals:
         bull, bear, neutral = _signal_counts(signals)
-        verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
+        verdict = market_signals.verdict_label(signals)
         lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
         lines.append('   집계(그룹): ' + market_signals.votes_line(signals))
+        note = _intraday_note(brief)
+        if note:
+            lines.append('   ⚠️ ' + note)
         lines.append('   ' + '  '.join(f"[{signal_chip_text(s)}]" for s in signals))
         lines.append('')
 
@@ -514,7 +558,7 @@ def render_text(brief: dict) -> str:
                           f" (전일대비 {arrow}{abs(chg):,})")
         for inv in kr_investors:
             def _s(v):
-                return f"{'+' if v > 0 else ''}{v:,}"
+                return _eok(v)
             lines.append(f"  {inv['label']} 외국인 {_s(inv['frgn_net'])}  "
                          f"기관 {_s(inv['orgn_net'])}  개인 {_s(inv['prsn_net'])}")
     lines.append('=' * 55)
@@ -677,8 +721,13 @@ def render_email_html(brief: dict, report_text: str) -> str:
     signal_html = ''
     if signals:
         bull, bear, neutral = _signal_counts(signals)
-        verdict = '강세 우세' if bull > bear else ('약세 우세' if bear > bull else '팽팽')
-        verdict_color = _UP if bull > bear else (_DOWN if bear > bull else _AMBER)
+        verdict = market_signals.verdict_label(signals)
+        verdict_color = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER}[market_signals.verdict(signals)]
+        note = _intraday_note(brief)
+        intraday_html = (
+            f'<div style="margin-top:6px;color:{_AMBER};font-size:13px;font-weight:700;">'
+            f'⚠️ {html_lib.escape(note)}</div>' if note else ''
+        )
         chip_color = {1: _UP, -1: _DOWN, 0: _MUTED}
         chips = ''.join(
             f'<span style="display:inline-block;margin:3px 6px 3px 0;padding:3px 9px;'
@@ -708,7 +757,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       </div>
       <div style="margin-top:6px;color:{_MUTED};font-size:13px;">
         집계(그룹): {html_lib.escape(market_signals.votes_line(signals))}
-      </div>
+      </div>{intraday_html}
       <div style="margin-top:10px;">{chips}</div>
     </td></tr>
   </table>
@@ -786,8 +835,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
     if kr_investors:
         def _inv_cell(v: int) -> str:
             color = _UP if v > 0 else (_DOWN if v < 0 else _MUTED)
-            sign = '+' if v > 0 else ''
-            return f'<span style="color:{color};font-weight:700;">{sign}{v:,}</span>'
+            return f'<span style="color:{color};font-weight:700;">{_eok(v)}</span>'
 
         inv_rows = []
         for inv in kr_investors:
