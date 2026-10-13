@@ -92,6 +92,14 @@ class ExtremeDayTest(unittest.TestCase):
 
         self.assertEqual(oil['direction'], 1)
 
+    def test_kospi_and_kosdaq_flows_vote_separately(self):
+        # 10-13 실측(백만원): 코스피 −1,328,605 ▼, 코스닥 +129,642 ▲ — 상쇄해 중립 1표로 만들지 않는다
+        signals = [{'label': '코스피 수급(외국인+기관)', 'direction': -1, 'value': -1328605},
+                   {'label': '코스닥 수급(외국인+기관)', 'direction': 1, 'value': 129642}]
+        votes = {v['name']: v['direction'] for v in market_signals.group_votes(signals)}
+
+        self.assertEqual(votes, {'코스피 수급': -1, '코스닥 수급': 1})
+
     def test_archived_signals_without_value_still_count(self):
         # value 필드가 없던 옛 brief_json
         signals = [{'label': '코스피200 선물', 'direction': -1}, {'label': '국제유가(WTI)', 'direction': 1}]

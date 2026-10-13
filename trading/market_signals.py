@@ -40,9 +40,13 @@ _GROUP_DEFS = [
      lambda l: ('야간' in l) or ('선물' in l)),
     ('commodity', '원자재',
      lambda l: l.startswith('국제유가')),
-    # 코스피 수급과 코스닥 수급은 같은 날 같은 주체의 매매라 방향이 거의 붙어 다닌다.
-    ('kr_flow', '국내 수급',
-     lambda l: '수급' in l),
+    # 코스피·코스닥 수급은 시장별로 따로 1표. 한 그룹으로 묶으면 방향이 갈리는 날
+    # 서로 상쇄돼 중립이 된다(2026-10-13 코스피 −1.33조 ▼ / 코스닥 +0.13조 ▲ → 중립).
+    # 같은 방향인 날엔 2표가 되는 점은 감수한다.
+    ('kr_flow_kospi', '코스피 수급',
+     lambda l: l.startswith('코스피 수급')),
+    ('kr_flow_kosdaq', '코스닥 수급',
+     lambda l: l.startswith('코스닥 수급')),
 ]
 
 VERDICT_TEXT = {'bull': '강세 우세', 'bear': '약세 우세', 'neutral': '팽팽'}
