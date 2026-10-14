@@ -109,6 +109,19 @@ class KISApi(_BaseKISApi):
             'prsn_net': int(row.get('prsn_ntby_tr_pbmn') or 0),
         }
 
+    @staticmethod
+    def pick_investor_row(rows: list[dict], today: str, before_open: bool) -> dict | None:
+        """최신 영업일 행. 장 시작(09:00) 전엔 당일 행이 빈 값(0)으로 먼저 내려오므로
+        건너뛰고 전일 행을 쓴다 (2026-10-14 08:05 실측: asof=당일, 순매수 0 → '중립' 오집계)."""
+        for row in rows:
+            if before_open and row.get('stck_bsop_date') == today:
+                print(f"   투자자매매동향: 장전이라 당일({today}) 행 제외")
+                continue
+
+            return row
+
+        return None
+
     def get_investor_trend(self, index_code: str, market_code: str) -> dict | None:
         """시장별 투자자매매동향(일별) — 외국인/기관/개인 순매수 거래대금(최신 영업일).
         index_code: '0001'(코스피)/'1001'(코스닥), market_code: 'KSP'/'KSQ'.
@@ -140,9 +153,12 @@ class KISApi(_BaseKISApi):
                       f"rt_cd={d.get('rt_cd')} msg1={d.get('msg1')}")
                 return None
             rows = d.get('output') or []
-            if not rows:
+            before_open = _dt.now(pytz.timezone('Asia/Seoul')).hour < 9
+            row = self.pick_investor_row(rows, today, before_open)
+            if row is None:
                 return None
-            return self.parse_investor_row(rows[0])
+
+            return self.parse_investor_row(row)
         except Exception as e:
             print(f"⚠️  투자자매매동향 조회 실패 ({index_code}): {e}")
             return None

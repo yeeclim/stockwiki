@@ -70,11 +70,27 @@ def group_of(label: str) -> tuple[str, str]:
     return f'etc:{label}', label
 
 
+# 야간선물이 있으면 SK하이닉스 ADR 은 집계에서 뺀다(칩·로그엔 남김). 지수를 직접 보는
+# 야간선물 +1.71% 가 종목 하나 −2.79% 와 1:1 로 상쇄돼 그룹이 중립이 됐다(2026-10-14).
+_NIGHT_FUTURES_LABEL = '코스피200 야간선물'
+_SKHY_PREFIX = 'SK하이닉스 ADR'
+
+
+def excluded_labels(signals: list[dict]) -> set[str]:
+    """칩엔 보이지만 그룹 집계에서 빠지는 신호 라벨."""
+    labels = [s.get('label', '') for s in signals or []]
+    if _NIGHT_FUTURES_LABEL not in labels:
+        return set()
+
+    return {l for l in labels if l.startswith(_SKHY_PREFIX)}
+
+
 def group_votes(signals: list[dict]) -> list[dict]:
     """신호 목록 → 그룹당 1표. [{'key','name','direction','members':[라벨...]}]
 
     그룹 표 = sign(그룹 내 direction 합). 합이 0이면 중립(서로 상쇄).
     """
+    excluded = excluded_labels(signals)
     order: list[str] = []
     buckets: dict[str, dict] = {}
     for s in signals or []:
@@ -83,7 +99,8 @@ def group_votes(signals: list[dict]) -> list[dict]:
             buckets[key] = {'key': key, 'name': name, 'net': 0, 'members': []}
             order.append(key)
         b = buckets[key]
-        b['net'] += int(s.get('direction', 0) or 0)
+        if s.get('label', '') not in excluded:
+            b['net'] += int(s.get('direction', 0) or 0)
         b['members'].append(s.get('label', ''))
 
     votes = []
@@ -169,12 +186,14 @@ def log_lines(signals: list[dict]) -> list[str]:
     reason_text = f' · {reason}' if reason else ''
     lines = [f'📊 시장 신호 판정: {verdict_label(signals)}{reason_text} (그룹 강세 {bull} · 약세 {bear} · 중립 {neutral})',
              f'   집계(그룹): {votes_line(signals)}']
+    excluded = excluded_labels(signals)
     for s in signals or []:
         value = s.get('value')
         value_text = '-' if value is None else f'{value:+.2f}'
         asof = f" asof={s['asof']}" if s.get('asof') else ''
+        note = ' (집계 제외: 야간선물 우선)' if s.get('label') in excluded else ''
         lines.append(f"   - {s.get('label')}: value={value_text} move={s.get('move')} "
-                     f"direction={s.get('direction')}{asof}")
+                     f"direction={s.get('direction')}{asof}{note}")
 
     return lines
 

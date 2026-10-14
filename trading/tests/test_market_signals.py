@@ -9,6 +9,7 @@ import pytz
 
 import market_signals
 import us_market_brief as umb
+from kis_api import KISApi
 
 
 def _now_kst_iso() -> str:
@@ -105,6 +106,84 @@ class ExtremeDayTest(unittest.TestCase):
         signals = [{'label': '코스피200 선물', 'direction': -1}, {'label': '국제유가(WTI)', 'direction': 1}]
 
         self.assertEqual(market_signals.verdict(signals), 'neutral')
+
+
+class PreopenEmptyDataTest(unittest.TestCase):
+    """2026-10-14 08:05 KST 아침 메일(런 38481504047) 로그 값 그대로.
+    선물·미결제약정·수급이 개장 전 빈 값(+0.00, asof=당일)인데 '중립'으로 집계됐다."""
+
+    NOW = pytz.timezone('Asia/Seoul').localize(datetime(2026, 10, 14, 8, 5))
+
+    def _brief(self, investors: list[dict]) -> dict:
+        return {
+            'indices': [
+                {'symbol': '^GSPC', 'pct': -0.17},
+                {'symbol': '^IXIC', 'pct': -0.17},
+                {'symbol': '^DJI', 'pct': -0.17},
+                {'symbol': '^VIX', 'pct': 0.39},
+            ],
+            'macro': [
+                {'symbol': 'CL=F', 'pct': 0.54},
+                {'symbol': '^TNX', 'pct': 0.0, 'change': -0.023},
+                {'symbol': 'KRW=X', 'pct': 0.39},
+                # SKHY 환율보정치 −2.79 = SKHY + 원/달러
+                {'symbol': 'SKHY', 'pct': -3.18},
+            ],
+            'kr_night_futures': {'pct': 1.71},
+            'kr_indices': [{'label': '코스피200 선물', 'pct': 0.0,
+                            'traded_at': '2026-10-14T08:00:00+09:00'}],
+            'kr_open_interest': {'open_interest': 0, 'open_interest_change': 0},
+            'kr_investors': investors,
+        }
+
+    def test_preopen_skips_today_investor_row(self):
+        rows = [{'stck_bsop_date': '20261014', 'frgn_ntby_tr_pbmn': '0', 'orgn_ntby_tr_pbmn': '0'},
+                {'stck_bsop_date': '20261013', 'frgn_ntby_tr_pbmn': '-1968528', 'orgn_ntby_tr_pbmn': '639923'}]
+
+        self.assertEqual(KISApi.pick_investor_row(rows, '20261014', before_open=True)['stck_bsop_date'], '20261013')
+        self.assertEqual(KISApi.pick_investor_row(rows, '20261014', before_open=False)['stck_bsop_date'], '20261014')
+
+    def test_preopen_zero_futures_excluded(self):
+        labels = [s['label'] for s in umb._compute_signals(self._brief([]), now=self.NOW)]
+
+        self.assertNotIn('코스피200 선물', labels)
+        self.assertNotIn('선물 미결제약정', labels)
+
+    def test_zero_futures_after_open_still_counts(self):
+        after_open = pytz.timezone('Asia/Seoul').localize(datetime(2026, 10, 14, 9, 30))
+        labels = [s['label'] for s in umb._compute_signals(self._brief([]), now=after_open)]
+
+        self.assertIn('코스피200 선물', labels)
+
+    def test_small_us_and_vix_moves_are_neutral(self):
+        by_label = {s['label']: s for s in umb._compute_signals(self._brief([]), now=self.NOW)}
+
+        self.assertEqual(by_label['미국 증시']['direction'], 0)
+        self.assertEqual(by_label['VIX(변동성)']['direction'], 0)
+
+    def test_night_futures_outranks_skhy(self):
+        signals = umb._compute_signals(self._brief([]), now=self.NOW)
+
+        self.assertEqual(market_signals.group_direction(signals, 'kr_overnight'), 1)
+        self.assertEqual(market_signals.excluded_labels(signals), {'SK하이닉스 ADR 야간(환율보정)'})
+
+    def test_skhy_counts_without_night_futures(self):
+        brief = self._brief([])
+        brief['kr_night_futures'] = None
+        signals = umb._compute_signals(brief, now=self.NOW)
+
+        self.assertEqual(market_signals.group_direction(signals, 'kr_overnight'), -1)
+
+    def test_2026_10_14_verdict_uses_prior_day_flows(self):
+        # 전일(10-13) 수급 — 10:45 KIS 원본 실측(백만원). 코스피 −1.33조 ▼, 코스닥 +0.13조 ▲
+        investors = [{'label': '코스피', 'frgn_net': -1968528, 'orgn_net': 639923, 'date': '20261013'},
+                     {'label': '코스닥', 'frgn_net': 101049, 'orgn_net': 28593, 'date': '20261013'}]
+        signals = umb._compute_signals(self._brief(investors), now=self.NOW)
+        votes = {v['key']: v['direction'] for v in market_signals.group_votes(signals)}
+
+        self.assertEqual(votes, {'us_risk': 0, 'kr_overnight': 1, 'fx': 0, 'commodity': 0,
+                                 'kr_flow_kospi': -1, 'kr_flow_kosdaq': 1})
+        self.assertEqual(market_signals.verdict(signals), 'bull')
 
 
 if __name__ == '__main__':

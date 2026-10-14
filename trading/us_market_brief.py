@@ -7,7 +7,7 @@ import os
 import re
 import time
 import html as html_lib
-from datetime import datetime
+from datetime import datetime, time as dtime
 from urllib.parse import quote
 from xml.etree import ElementTree
 
@@ -117,7 +117,7 @@ def _is_fresh(row: dict, hours: int = _STALE_HOURS) -> bool:
     return 0 <= age <= hours * 3600
 
 
-def _traded_today_kst(traded_at: str | None) -> bool:
+def _traded_today_kst(traded_at: str | None, now: datetime | None = None) -> bool:
     """네이버 체결 시각(ISO, +09:00)이 오늘(KST)인가.
 
     장 시작 전에는 전일 종가가 그대로 내려온다. 그 값을 '오늘 신호'로 세면
@@ -131,7 +131,8 @@ def _traded_today_kst(traded_at: str | None) -> bool:
     kst = pytz.timezone('Asia/Seoul')
     if ts.tzinfo is None:
         ts = kst.localize(ts)
-    return ts.astimezone(kst).date() == datetime.now(kst).date()
+    now = now or datetime.now(kst)
+    return ts.astimezone(kst).date() == now.astimezone(kst).date()
 
 
 def _get_market_headlines(limit: int = 6) -> list[str]:
@@ -347,17 +348,20 @@ def _signal(label: str, direction: int, move: int | None = None, value: float | 
             'move': direction if move is None else move, 'value': value}
 
 
-def _compute_signals(brief: dict) -> list[dict]:
+def _compute_signals(brief: dict, now: datetime | None = None) -> list[dict]:
+    now = now or datetime.now(pytz.timezone('Asia/Seoul'))
     signals = []
     us_by_symbol = {r['symbol']: r for r in (brief.get('indices') or [])}
 
     us_core_pct = [us_by_symbol[s]['pct'] for s in ('^GSPC', '^IXIC', '^DJI') if s in us_by_symbol]
     if us_core_pct:
         us_avg = sum(us_core_pct) / len(us_core_pct)
-        signals.append(_signal('미국 증시', _dir(us_avg), value=us_avg))
+        # ±0.3% 안쪽은 잡음. 부호만 보면 −0.17% 가 약세 1표가 돼 판정을 혼자 정했다(2026-10-14).
+        signals.append(_signal('미국 증시', _dir_band(us_avg, 0.3), value=us_avg))
     if '^VIX' in us_by_symbol:
         # VIX 상승 = 시장 불안 심화(약세 신호)이므로 부호를 반대로 해석한다.
-        vix_move = _dir(us_by_symbol['^VIX']['pct'])
+        # VIX 는 하루 ±3% 가 흔해서 그 안쪽은 중립.
+        vix_move = _dir_band(us_by_symbol['^VIX']['pct'], 3.0)
         signals.append(_signal('VIX(변동성)', -vix_move, move=vix_move, value=us_by_symbol['^VIX']['pct']))
 
     macro_by_symbol = {r['symbol']: r for r in (brief.get('macro') or [])}
@@ -419,7 +423,12 @@ def _compute_signals(brief: dict) -> list[dict]:
     fut = kr_by_label.get('코스피200 선물')
     # 정규장 선물은 08:00 발송 시점엔 전일 종가라 오버나이트 정보가 없다.
     # 오늘 체결된 값일 때만 신호로 센다 (없으면 위의 EWY 보정치가 그 자리를 맡는다).
-    if fut and not _traded_today_kst(fut.get('traded_at')):
+    if fut and not _traded_today_kst(fut.get('traded_at'), now):
+        fut = None
+    # 08:45 개장 전인데 오늘 날짜·등락 0.00 으로 내려오는 경우가 있다 — 체결 없는 빈 값이다
+    # (2026-10-14 08:05 실측). 중립으로 세지 않고 뺀다. 미결제약정 신호도 함께 빠진다.
+    if fut and fut['pct'] == 0 and now.astimezone(pytz.timezone('Asia/Seoul')).time() < dtime(8, 45):
+        print('   코스피200 선물: 개장 전 0.00% — 신호 제외')
         fut = None
     if fut:
         signals.append(_signal('코스피200 선물', _dir(fut['pct']), value=fut['pct']))
