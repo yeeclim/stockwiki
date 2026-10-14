@@ -43,19 +43,6 @@ def is_encrypted(value) -> bool:
     return isinstance(value, str) and value.startswith(_PREFIX)
 
 
-def encrypt(plain: str | None) -> str | None:
-    """평문 → 암호문. 기존 행 마이그레이션(encrypt_existing_configs.py)에서만 쓴다.
-    평상시 암호화는 Edge Function 쪽에서 일어난다."""
-    if not plain:
-        return None
-    if is_encrypted(plain):
-        return plain
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    iv = os.urandom(12)
-    ct = AESGCM(_key()).encrypt(iv, plain.encode('utf-8'), None)
-    return f"{_PREFIX}{base64.b64encode(iv).decode()}:{base64.b64encode(ct).decode()}"
-
-
 def decrypt(value: str | None) -> str | None:
     """암호문 → 평문. 접두사가 없으면 평문으로 보고 그대로 반환."""
     if not value:

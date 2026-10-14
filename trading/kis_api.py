@@ -172,7 +172,6 @@ class KISApi(_BaseKISApi):
     # 다만 KIS 공식 문서에 야간 시세용 FID_COND_MRKT_DIV_CODE 가 공개돼 있지 않다.
     # (ngt 계열 엔드포인트는 전부 /trading/ — 주문·잔고·증거금용이다.)
     # 그래서 후보 코드를 순서대로 시도하고, 처음 응답하는 조합을 쓴다.
-    # 되는 조합은 probe_night_futures.py 로 확인할 수 있다.
     NIGHT_MARKET_CODES = ('CM', 'CF', 'NF')
 
     def get_night_futures_quote(self, code: str) -> dict | None:

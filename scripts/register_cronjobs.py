@@ -24,8 +24,6 @@ POST = 1
 JOBS = [
     ('stockwiki 광역 스캔', 'screen_broad.yml', [6], [0], EVERY_DAY),
     ('stockwiki 미국 광역 스캔', 'screen_us_broad.yml', [7], [0], EVERY_DAY),
-    ('stockwiki 야간선물 아침', 'probe_night_futures.yml', [7], [50], WEEKDAYS),
-    ('stockwiki 야간선물 밤', 'probe_night_futures.yml', [21], [0], WEEKDAYS),
     ('stockwiki 스크리닝', 'screen.yml', [8], [35], WEEKDAYS),
     ('stockwiki AI 추천', 'ai_screening.yml', [8], [0], [1]),
     ('stockwiki 장중 체크포인트', 'forecast_checkpoint.yml', [11], [0], WEEKDAYS),
