@@ -8,6 +8,9 @@ import 'us_stock_detail_page.dart';
 import '../config/ads_config.dart';
 import '../widgets/ad_banner.dart';
 
+// 광역 스캔 후보는 sector 에 시장 구분(KOSPI/KOSDAQ)이 들어온다 — 탭엔 한글로 표시.
+const _marketLabels = {'KOSPI': '코스피', 'KOSDAQ': '코스닥'};
+
 class ThemeRecommendationsPage extends StatefulWidget {
   const ThemeRecommendationsPage({super.key});
 
@@ -44,10 +47,11 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
       // 스크리닝 후보를 섹터별로 _themeStocks에 주입 (사유는 분석 후 채움)
       final sectorMap = <String, List<Map<String, dynamic>>>{};
       for (final c in screeningCandidates) {
-        sectorMap.putIfAbsent(c.sector, () => []).add({
+        final sector = _marketLabels[c.sector] ?? c.sector;
+        sectorMap.putIfAbsent(sector, () => []).add({
           'symbol': c.stockCode,
           'name': c.stockName,
-          'sector': c.sector,
+          'sector': sector,
           'reason': '투자 포인트 분석 중…',
         });
       }
