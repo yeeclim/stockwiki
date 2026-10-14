@@ -57,7 +57,13 @@ VERDICT_TEXT = {'bull': '강세 우세', 'bear': '약세 우세', 'neutral': '�
 # 위에서부터 가장 직접적인 관측치 하나만 본다. SK하이닉스 ADR 은 개별 종목이라
 # 하루 ±2% 가 흔해서 제외.
 GAP_PCT = 2.0
-_GAP_LABELS = ('코스피200 선물', '코스피200 야간선물', '야간 한국물(EWY·환율보정)')
+_GAP_LABELS = ('코스피200 야간선물', '야간 한국물(EWY·환율보정)')
+
+# 장중 우선 — '코스피200 선물' 신호는 오늘 체결된 값일 때만 만들어진다(us_market_brief).
+# 장이 열려 실제 방향이 나와 있으면 유가·수급 같은 간접 지표로 투표하지 않는다.
+# 10-14 10:35: 선물 +1.04%·코스피 상승 중인데 유가 +1.15%·장중 수급 ▼ 3표에 밀려 '약세 우세'.
+INTRADAY_LABEL = '코스피200 선물'
+INTRADAY_BAND = 0.3
 
 
 def group_of(label: str) -> tuple[str, str]:
@@ -126,8 +132,13 @@ def group_direction(signals: list[dict], key: str) -> int:
 
 
 def gap_signal(signals: list[dict]) -> dict | None:
-    """큰 갭 우선 규칙에 걸린 신호. 없으면 None. value 가 없는 옛 아카이브는 해당 없음."""
+    """판정을 투표 대신 직접 정하는 신호. 장중엔 당일 코스피200 선물, 장전엔 ±GAP_PCT 이상
+    큰 갭. 없으면 None. value 가 없는 옛 아카이브는 해당 없음."""
     by_label = {s.get('label'): s for s in signals or []}
+    intraday = by_label.get(INTRADAY_LABEL)
+    if intraday is not None and intraday.get('value') is not None:
+        return intraday
+
     for label in _GAP_LABELS:
         s = by_label.get(label)
         if s is None or s.get('value') is None:
@@ -158,7 +169,11 @@ def verdict(signals: list[dict]) -> str:
     """'bull' | 'bear' | 'neutral' — 큰 갭이 있으면 그 방향, 아니면 그룹 투표."""
     gap = gap_signal(signals)
     if gap is not None:
-        return 'bull' if gap['value'] > 0 else 'bear'
+        band = INTRADAY_BAND if gap.get('label') == INTRADAY_LABEL else 0.0
+        if gap['value'] > band:
+            return 'bull'
+
+        return 'bear' if gap['value'] < -band else 'neutral'
 
     bull, bear, _ = signal_counts(signals)
 
@@ -170,6 +185,9 @@ def verdict_reason(signals: list[dict]) -> str:
     gap = gap_signal(signals)
     if gap is None:
         return ''
+
+    if gap.get('label') == INTRADAY_LABEL:
+        return f"{gap['label']} 당일 {gap['value']:+.2f}% — 장중엔 실제 방향 우선 (±{INTRADAY_BAND:g}% 이내 팽팽)"
 
     return f"{gap['label']} {gap['value']:+.2f}% — 갭 ±{GAP_PCT:g}% 이상이라 표 수보다 우선"
 

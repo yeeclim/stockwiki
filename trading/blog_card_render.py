@@ -142,7 +142,7 @@ def verdict_line(brief: dict) -> str:
         v = market_signals.verdict(signals)
         gap = market_signals.gap_signal(signals)
         if gap is not None:
-            parts.append(f"{gap['label']} {gap['value']:+.2f}%로 오늘 {'강세' if v == 'bull' else '약세'} 우세")
+            parts.append(f"{gap['label']} {gap['value']:+.2f}%로 오늘 {market_signals.VERDICT_TEXT[v]}")
         elif v == 'bull':
             parts.append(f'오늘 강세 신호 우세({bull}:{bear})')
         elif v == 'bear':

@@ -72,9 +72,9 @@ class ExtremeDayTest(unittest.TestCase):
         self.assertEqual(market_signals.verdict(signals), 'bull')
 
     def test_small_gap_keeps_vote_count(self):
-        # 갭이 ±2% 미만이면 기존 그룹 투표 그대로
+        # 장전(당일 선물 없음) 갭이 ±2% 미만이면 기존 그룹 투표 그대로
         brief = _brief(us_pct=0.5, vix_pct=-2.0, oil_pct=0.2, ewy_pct=-0.6, skhy_pct=-0.5,
-                       krw_pct=0.0, fut_pct=-0.8, flow_net=100)
+                       krw_pct=0.0, fut_pct=None, flow_net=100)
         signals = umb._compute_signals(brief)
         bull, bear, _ = market_signals.signal_counts(signals)
 
@@ -108,6 +108,36 @@ class ExtremeDayTest(unittest.TestCase):
         signals = [{'label': '코스피200 선물', 'direction': -1}, {'label': '국제유가(WTI)', 'direction': 1}]
 
         self.assertEqual(market_signals.verdict(signals), 'neutral')
+
+
+class IntradayVerdictTest(unittest.TestCase):
+    """장이 열리면 당일 코스피200 선물 방향이 판정 — 간접 지표 투표로 뒤집지 않는다."""
+
+    def test_2026_10_14_1035_is_bull(self):
+        # 실측(런 38496472489): 선물 +1.04%·야간 +1.71% 인데 WTI +1.15%·장중 수급 ▼▼ 로 '약세 우세'가 나왔다
+        signals = [
+            {'label': '코스피200 야간선물', 'direction': 1, 'value': 1.71},
+            {'label': '국제유가(WTI)', 'direction': -1, 'value': 1.15},
+            {'label': '코스피200 선물', 'direction': 1, 'value': 1.04},
+            {'label': '선물 미결제약정', 'direction': 1, 'value': 127},
+            {'label': '코스피 수급(외국인+기관)', 'direction': -1, 'value': -57451},
+            {'label': '코스닥 수급(외국인+기관)', 'direction': -1, 'value': -356518},
+        ]
+
+        self.assertEqual(market_signals.signal_counts(signals)[:2], (1, 3))
+        self.assertEqual(market_signals.verdict(signals), 'bull')
+
+    def test_small_intraday_move_is_neutral(self):
+        signals = [{'label': '코스피200 선물', 'direction': 1, 'value': 0.2},
+                   {'label': '국제유가(WTI)', 'direction': -1, 'value': 1.5}]
+
+        self.assertEqual(market_signals.verdict(signals), 'neutral')
+
+    def test_intraday_drop_is_bear(self):
+        signals = [{'label': '코스피200 선물', 'direction': -1, 'value': -0.9},
+                   {'label': '코스피200 야간선물', 'direction': 1, 'value': 1.2}]
+
+        self.assertEqual(market_signals.verdict(signals), 'bear')
 
 
 class PreopenEmptyDataTest(unittest.TestCase):
