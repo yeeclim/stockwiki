@@ -37,6 +37,8 @@ def _brief(us_pct: float, vix_pct: float, oil_pct: float, ewy_pct: float, skhy_p
             {'symbol': 'SKHY', 'pct': skhy_pct},
         ],
         'kr_indices': kr_indices,
+        # 합성 극단값 케이스 — EWY·SKHY 등락을 그대로 갭으로 보도록 전일 국내 등락 0
+        'kr_last_session': {'KOSPI': 0.0, '000660': 0.0},
         'kr_investors': [
             {'label': '코스피', 'frgn_net': flow_net, 'orgn_net': 0},
             {'label': '코스닥', 'frgn_net': flow_net, 'orgn_net': 0},
@@ -133,6 +135,8 @@ class PreopenEmptyDataTest(unittest.TestCase):
             'kr_indices': [{'label': '코스피200 선물', 'pct': 0.0,
                             'traded_at': '2026-10-14T08:00:00+09:00'}],
             'kr_open_interest': {'open_interest': 0, 'open_interest_change': 0},
+            # 10-13 국내 정규장: 코스피 −5.46%, SK하이닉스 −9.28% (네이버 일별 시세)
+            'kr_last_session': {'KOSPI': -5.46, '000660': -9.28},
             'kr_investors': investors,
         }
 
@@ -168,11 +172,34 @@ class PreopenEmptyDataTest(unittest.TestCase):
         self.assertEqual(market_signals.excluded_labels(signals), {'SK하이닉스 ADR 야간(환율보정)'})
 
     def test_skhy_counts_without_night_futures(self):
+        # SKHY −3.18% 에서 전일 국내 −9.28% 를 빼면 밤사이 +6.49% ▲ — 실제 하이닉스 상승 출발
         brief = self._brief([])
         brief['kr_night_futures'] = None
         signals = umb._compute_signals(brief, now=self.NOW)
+        skhy = next(s for s in signals if s['label'].startswith('SK하이닉스'))
 
-        self.assertEqual(market_signals.group_direction(signals, 'kr_overnight'), -1)
+        self.assertAlmostEqual(skhy['value'], -3.18 + 0.39 + 9.28, places=2)
+        self.assertEqual(market_signals.group_direction(signals, 'kr_overnight'), 1)
+
+    def test_ewy_gap_excludes_prior_korean_session(self):
+        # 10-14 실측: EWY 정규장 −2.09%, 원/달러 +0.39%, 전일 코스피 −5.46% → +3.76% ▲
+        brief = self._brief([])
+        brief['kr_night_futures'] = None
+        brief['macro'].append({'symbol': 'EWY', 'pct': -2.09})
+        ewy = next(s for s in umb._compute_signals(brief, now=self.NOW) if s['label'].startswith('야간 한국물'))
+
+        self.assertAlmostEqual(ewy['value'], 3.76, places=2)
+        self.assertEqual(ewy['direction'], 1)
+
+    def test_ewy_skipped_without_prior_session(self):
+        brief = self._brief([])
+        brief['kr_night_futures'] = None
+        brief['kr_last_session'] = {}
+        brief['macro'].append({'symbol': 'EWY', 'pct': -2.09})
+        labels = [s['label'] for s in umb._compute_signals(brief, now=self.NOW)]
+
+        self.assertNotIn('야간 한국물(EWY·환율보정)', labels)
+        self.assertNotIn('SK하이닉스 ADR 야간(환율보정)', labels)
 
     def test_2026_10_14_verdict_uses_prior_day_flows(self):
         # 전일(10-13) 수급 — 10:45 KIS 원본 실측(백만원). 코스피 −1.33조 ▼, 코스닥 +0.13조 ▲
@@ -184,6 +211,37 @@ class PreopenEmptyDataTest(unittest.TestCase):
         self.assertEqual(votes, {'us_risk': 0, 'kr_overnight': 1, 'fx': 0, 'commodity': 0,
                                  'kr_flow_kospi': -1, 'kr_flow_kosdaq': 1})
         self.assertEqual(market_signals.verdict(signals), 'bull')
+
+
+class AfterHoursTest(unittest.TestCase):
+    """08:35 발송 — 미국 현물 마감(05:00 KST) 이후 정보: 지수선물·애프터마켓."""
+
+    def test_us_futures_vote_in_us_risk(self):
+        brief = {'indices': [{'symbol': '^GSPC', 'pct': 0.0}, {'symbol': 'ES=F', 'pct': -0.8},
+                             {'symbol': 'NQ=F', 'pct': -1.2}]}
+        signals = umb._compute_signals(brief)
+
+        self.assertEqual(market_signals.group_direction(signals, 'us_risk'), -1)
+
+    def test_small_us_futures_move_is_neutral(self):
+        brief = {'indices': [{'symbol': 'ES=F', 'pct': 0.03}, {'symbol': 'NQ=F', 'pct': 0.08}]}
+        fut = next(s for s in umb._compute_signals(brief) if s['label'] == '미국 지수선물(마감 후)')
+
+        self.assertEqual(fut['direction'], 0)
+
+    def test_skhy_includes_after_hours(self):
+        # 2026-10-14 원본: SKHY 정규장 −3.19%, 애프터 −0.73%
+        brief = {'macro': [{'symbol': 'SKHY', 'pct': -3.19, 'post_pct': -0.73},
+                           {'symbol': 'KRW=X', 'pct': 0.0}],
+                 'kr_last_session': {'000660': 0.0}}
+        skhy = next(s for s in umb._compute_signals(brief) if s['label'].startswith('SK하이닉스'))
+
+        self.assertAlmostEqual(skhy['value'], -3.897, places=2)
+
+    def test_after_hours_shown_in_mail_delta(self):
+        row = umb._macro_display({'symbol': 'EWY', 'price': 165.2, 'pct': -2.09, 'post_pct': -0.82})
+
+        self.assertEqual(row['delta_text'], '-2.09% · 애프터 -0.82%')
 
 
 if __name__ == '__main__':

@@ -82,7 +82,35 @@ def get_quotes() -> dict[str, dict]:
 # 마스터파일에는 소멸한 월물이 빠져 있어 첫 행이 곧 최근월물이다.
 #
 # KIS_KOSPI200_FUTURES_CODE 환경변수로 직접 덮어쓸 수 있다.
-_MASTER_BASE = 'https://new.real.download.dws.co.kr/common/master/'
+_DAILY_URL = 'https://m.stock.naver.com/api/{kind}/{code}/price'
+
+
+def get_last_session_pct(kind: str, code: str, today: str) -> float | None:
+    """오늘(YYYY-MM-DD) 이전 마지막 거래일의 등락률(%). kind: 'index'(KOSPI) / 'stock'(000660).
+
+    미국 상장 한국물(EWY·SKHY)의 하루 등락에는 그 사이 열린 국내 정규장 하루가 통째로
+    들어 있어, 갭 추정에서 빼 줘야 한다. 종목 일별 종가는 NXT 애프터마켓(20:00) 포함이라
+    미국장 직전 국내 가격과 시점이 맞는다. 실패하면 None — 신호에서 뺀다."""
+    try:
+        r = requests.get(_DAILY_URL.format(kind=kind, code=code),
+                         params={'pageSize': 5, 'page': 1},
+                         headers={'User-Agent': _UA}, timeout=8)
+        r.raise_for_status()
+        for row in r.json():
+            if (row.get('localTradedAt') or '')[:10] >= today:
+                continue
+
+            pct = abs(float(str(row['fluctuationsRatio']).replace(',', '')))
+            sign = (row.get('compareToPreviousPrice') or {}).get('code')
+
+            return -pct if sign in _FALL_CODES else (0.0 if sign == '3' else pct)
+    except Exception as e:
+        print(f"⚠️  전일 등락률 조회 실패 ({kind}/{code}): {e}")
+
+    return None
+
+
+_MASTER_BASE ='https://new.real.download.dws.co.kr/common/master/'
 # fo_cme_code(야간선물, 392B)가 fo_idx_code_mts(지수선물옵션 전체, 92KB)보다 훨씬
 # 가볍고 월물 구성이 같아 먼저 시도한다. 야간시장이 없어지면 두 번째가 받아준다.
 _MASTER_FILES = ('fo_cme_code.mst.zip', 'fo_idx_code_mts.mst.zip')

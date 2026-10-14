@@ -25,6 +25,10 @@ _INDICES = [
     ('^IXIC', '나스닥'),
     ('^DJI',  '다우'),
     ('^VIX',  'VIX'),
+    # 지수선물은 미국 현물 마감(05:00 KST) 뒤에도 거래돼 발송 직전까지의 움직임을 담는다.
+    # Yahoo 등락률은 전일 정산가 대비 = 마감 후 변화분 (2026-10-14 원본 확인).
+    ('ES=F',  'S&P500 선물'),
+    ('NQ=F',  '나스닥100 선물'),
 ]
 
 # 유가·금리·환율·한국물은 지수와 단위가 달라(달러/배럴, %, 원, 달러) 따로 모아
@@ -84,9 +88,15 @@ def _fetch_rows(items: list[tuple[str, str]]) -> list[dict]:
             continue
         # change(절대 변화량)는 국채금리를 bp로 표시/판정하는 데 쓴다.
         # market_time(마지막 체결 epoch)은 스테일 데이터를 신호에서 빼는 데 쓴다.
-        rows.append({'symbol': symbol, 'label': label, 'price': price, 'pct': pct,
-                     'change': q.get('regularMarketChange'),
-                     'market_time': q.get('regularMarketTime')})
+        row = {'symbol': symbol, 'label': label, 'price': price, 'pct': pct,
+               'change': q.get('regularMarketChange'),
+               'market_time': q.get('regularMarketTime')}
+        # 애프터마켓(정규장 종가 대비). 정규장 이후 체결일 때만 쓴다.
+        post_pct = q.get('postMarketChangePercent')
+        post_time = q.get('postMarketTime')
+        if post_pct is not None and post_time and post_time > (q.get('regularMarketTime') or 0):
+            row['post_pct'] = post_pct
+        rows.append(row)
     return rows
 
 
@@ -104,6 +114,8 @@ def _macro_display(row: dict) -> dict:
     else:
         out['price_text'] = f"${row['price']:,.2f}"
         out['delta_text'] = f"{row['pct']:+.2f}%"
+        if row.get('post_pct') is not None:
+            out['delta_text'] += f" · 애프터 {row['post_pct']:+.2f}%"
     return out
 
 
@@ -235,6 +247,9 @@ def get_brief(kis_api=None, with_summary: bool = True) -> dict:
         print(f"⚠️  국내 지수 조회 실패: {e}")
         kr_quotes = {}
     kr_indices = [kr_quotes[c] for c in ('KOSPI', 'KOSDAQ', 'FUT') if c in kr_quotes]
+    today = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d')
+    kr_last_session = {'KOSPI': kmd.get_last_session_pct('index', 'KOSPI', today),
+                       '000660': kmd.get_last_session_pct('stock', '000660', today)}
 
     kr_open_interest = None
     kr_night_futures = None
@@ -262,6 +277,7 @@ def get_brief(kis_api=None, with_summary: bool = True) -> dict:
         'kr_indices': kr_indices, 'kr_open_interest': kr_open_interest,
         'kr_night_futures': kr_night_futures,
         'kr_investors': kr_investors,
+        'kr_last_session': kr_last_session,
     }
     brief['signals'] = _compute_signals(brief)
     for line in market_signals.log_lines(brief['signals']):
@@ -321,6 +337,15 @@ def _dir(value: float) -> int:
     return 0
 
 
+def _with_post(row: dict) -> float:
+    """정규장 + 애프터마켓 누적 등락률(%). 애프터가 없으면 정규장 그대로."""
+    post = row.get('post_pct')
+    if post is None:
+        return row['pct']
+
+    return ((1 + row['pct'] / 100) * (1 + post / 100) - 1) * 100
+
+
 def _dir_band(value: float, band: float) -> int:
     """|value| 가 band 이하면 중립(0). 유가·금리처럼 하루 등락이 대부분 잡음인
     지표를 부호만으로 세면 신호 개수가 잡음에 따라 흔들려서 완충구간을 둔다."""
@@ -358,6 +383,10 @@ def _compute_signals(brief: dict, now: datetime | None = None) -> list[dict]:
         us_avg = sum(us_core_pct) / len(us_core_pct)
         # ±0.3% 안쪽은 잡음. 부호만 보면 −0.17% 가 약세 1표가 돼 판정을 혼자 정했다(2026-10-14).
         signals.append(_signal('미국 증시', _dir_band(us_avg, 0.3), value=us_avg))
+    us_fut = [us_by_symbol[s] for s in ('ES=F', 'NQ=F') if s in us_by_symbol and _is_fresh(us_by_symbol[s])]
+    if us_fut:
+        fut_avg = sum(r['pct'] for r in us_fut) / len(us_fut)
+        signals.append(_signal('미국 지수선물(마감 후)', _dir_band(fut_avg, 0.3), value=fut_avg))
     if '^VIX' in us_by_symbol:
         # VIX 상승 = 시장 불안 심화(약세 신호)이므로 부호를 반대로 해석한다.
         # VIX 는 하루 ±3% 가 흔해서 그 안쪽은 중립.
@@ -369,18 +398,24 @@ def _compute_signals(brief: dict, now: datetime | None = None) -> list[dict]:
     ewy = macro_by_symbol.get('EWY')
     # 야간 국내물은 '야간선물 → EWY' 순으로 하나만 센다. 둘 다 같은 것(국내장이
     # 닫힌 동안의 한국 주식 방향)을 재므로 함께 세면 중복 계산이 된다.
+    # EWY·SKHY 의 하루 등락(직전 미국 종가 대비)에는 그 사이 열린 국내 정규장 하루가 들어 있다.
+    # 그대로 쓰면 이미 반영된 전일 국내 등락을 갭으로 다시 센다 — 10-14: 코스피 −5.46% 다음 날
+    # EWY 보정치 −1.70% ▼ 였지만 빼면 +3.76% ▲, 실제 코스피 상승. 전일 등락을 모르면 신호를 뺀다.
+    last_session = brief.get('kr_last_session') or {}
+    kospi_prev = last_session.get('KOSPI')
+    hynix_prev = last_session.get('000660')
     night = brief.get('kr_night_futures')
     if night:
         # 코스피200 야간선물 — 원화 표시라 보정이 필요 없는 직접 관측치다.
         signals.append(_signal('코스피200 야간선물', _dir_band(night['pct'], 0.3), value=night['pct']))
-    elif ewy and krw and _is_fresh(ewy):
+    elif ewy and krw and _is_fresh(ewy) and kospi_prev is not None:
         # 폴백. EWY 는 달러 표시라 원화 기준 코스피 등락률로 환산해야 갭 추정이 된다.
         #   EWY(USD) = 코스피(KRW) / 원달러  ⇒  %코스피 ≈ %EWY + %원달러
         # 이렇게 보정해두면 아래 '원/달러' 신호와 환율 부분이 중복 계산되지 않는다.
         #
         # 월요일 아침엔 금요일 미국장 값이라 주말 재료를 못 담는다. 야간선물도
         # 같은 한계가 있지만 EWY 는 이틀이 밀려서 더 심하다.
-        implied = ewy['pct'] + krw['pct']
+        implied = _with_post(ewy) + krw['pct'] - kospi_prev
         signals.append(_signal('야간 한국물(EWY·환율보정)', _dir_band(implied, 0.5), value=implied))
 
     # SK하이닉스 ADR(나스닥 SKHY) — 코스피 최상위 대형주의 밤사이 움직임.
@@ -391,8 +426,8 @@ def _compute_signals(brief: dict, now: datetime | None = None) -> list[dict]:
     # 지수보다 하루 변동이 커서 ±1% 를 잡음으로 본다.
     # (KORU 는 EWY 와 같은 MSCI 한국 지수 3배라 새 정보가 없어 신호로 쓰지 않는다)
     skhy = macro_by_symbol.get('SKHY')
-    if skhy and krw and _is_fresh(skhy):
-        implied = skhy['pct'] + krw['pct']
+    if skhy and krw and _is_fresh(skhy) and hynix_prev is not None:
+        implied = _with_post(skhy) + krw['pct'] - hynix_prev
         signals.append(_signal('SK하이닉스 ADR 야간(환율보정)', _dir_band(implied, 1.0), value=implied))
     if krw:
         # 원화 약세(환율 상승)는 외국인 자금 유출 압력이라 약세 신호.

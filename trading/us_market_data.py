@@ -25,7 +25,8 @@ _EXCLUDE_NAME_PATTERNS = (
 
 _QUOTE_FIELDS = ('shortName,regularMarketPrice,regularMarketChange,'
                   'regularMarketChangePercent,regularMarketTime,'
-                  'regularMarketVolume,marketCap,trailingPE,priceToBook')
+                  'regularMarketVolume,marketCap,trailingPE,priceToBook,'
+                  'postMarketChangePercent,postMarketTime')
 _BATCH_SIZE = 100
 
 _session = requests.Session()
