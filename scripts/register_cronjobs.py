@@ -29,6 +29,7 @@ JOBS = [
     ('stockwiki 스크리닝', 'screen.yml', [8], [0], WEEKDAYS),
     ('stockwiki AI 추천', 'ai_screening.yml', [8], [0], [1]),
     ('stockwiki 장중 체크포인트', 'forecast_checkpoint.yml', [11], [0], WEEKDAYS),
+    ('stockwiki 장전 국내 시세 탐색', 'probe_preopen_kr.yml', [8], [10], WEEKDAYS),
 ]
 
 
