@@ -61,7 +61,8 @@ class KrxLoader {
   static Future<List<Map<String, dynamic>>> getScreeningPicks() async {
     try {
       final response = await http
-          .get(Uri.parse('$_baseUrl/api/theme-recommendations?action=screening'))
+          .get(
+              Uri.parse('$_baseUrl/api/theme-recommendations?action=screening'))
           .timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
