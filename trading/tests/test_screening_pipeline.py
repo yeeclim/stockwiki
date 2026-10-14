@@ -3,9 +3,11 @@
     cd trading && python -m unittest discover -s tests -t .
 """
 import unittest
+from datetime import datetime, timedelta, timezone
 
 import screen
 import screen_broad
+from brokers.kis_api import last_session_volume
 
 
 def _passed() -> dict:
@@ -82,16 +84,46 @@ class BroadScanStatusTest(unittest.TestCase):
 
     def test_above_ma60_records_gate(self):
         # 2026-10-14 HMM: 60일선 +10.5% — 필수 조건(현재가 < 60일선) 탈락 사유가 남아야 한다
-        screen_broad._api = _FakeApi(self.FUND, {'ma60': 22_600, 'ma5': 25_000, 'ma20': 24_000})
+        screen_broad._api = _FakeApi(self.FUND, {'ma60': 22_600, 'ma5': 25_000, 'ma20': 24_000,
+                                                 'last_session_volume': 3_000_000})
         result = screen_broad._score_stock(self.STOCK)
 
         self.assertEqual(result['status'], 'scored')
         self.assertIn('MA60', result['gate'])
 
-    def test_basic_filter(self):
-        screen_broad._api = _FakeApi({**self.FUND, 'volume': 10_000}, {})
+    def test_low_last_session_volume_is_filtered(self):
+        screen_broad._api = _FakeApi(self.FUND, {'last_session_volume': 10_000})
 
         self.assertEqual(screen_broad._score_stock(self.STOCK)['status'], 'filtered')
+
+    def test_preopen_zero_volume_not_filtered(self):
+        # 장전엔 당일 누적 거래량이 0 — 그걸로 거르면 전 종목이 탈락한다
+        screen_broad._api = _FakeApi({**self.FUND, 'volume': 0},
+                                     {'ma60': 30_000, 'ma5': 25_000, 'ma20': 24_000,
+                                      'last_session_volume': 3_000_000})
+
+        self.assertEqual(screen_broad._score_stock(self.STOCK)['status'], 'scored')
+
+
+class LastSessionVolumeTest(unittest.TestCase):
+    KST = timezone(timedelta(hours=9))
+    ROWS = [{'stck_bsop_date': '20261014', 'acml_vol': '21884'},
+            {'stck_bsop_date': '20261013', 'acml_vol': '412000'}]
+
+    def test_intraday_skips_today_partial(self):
+        now = datetime(2026, 10, 14, 10, 19, tzinfo=self.KST)
+
+        self.assertEqual(last_session_volume(self.ROWS, now), 412_000)
+
+    def test_after_close_uses_today(self):
+        now = datetime(2026, 10, 14, 15, 40, tzinfo=self.KST)
+
+        self.assertEqual(last_session_volume(self.ROWS, now), 21_884)
+
+    def test_preopen_without_today_row(self):
+        now = datetime(2026, 10, 15, 6, 0, tzinfo=self.KST)
+
+        self.assertEqual(last_session_volume(self.ROWS, now), 21_884)
 
 
 if __name__ == '__main__':

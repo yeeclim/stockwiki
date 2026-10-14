@@ -163,7 +163,9 @@ def _score_entry(fund: dict, ma_data: dict, ratios):
         log.append(f"  ❌ [+0] PBR {pbr:.2f} ≥ 1.5")
 
     # ❺ 거래량  [+1점] ─────────────────────────────────────────────────────────
-    volume = fund.get('volume', 0)
+    # 직전 완료 세션 거래량. 당일 누적(fund['volume'])은 장전 0·장중 일부분이라 쓰지 않는다.
+    # 일봉 기반 값을 못 주는 브로커는 당일 누적으로 대체.
+    volume = ma_data.get('last_session_volume', fund.get('volume', 0))
     if volume >= 100_000:
         score += 1
         log.append(f"  ✅ [+1] 거래량 {volume:,}주 (기준 ≥ 100,000)")

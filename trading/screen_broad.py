@@ -105,16 +105,19 @@ def _score_stock(stock: dict) -> dict:
         time.sleep(CALL_DELAY)
         fund = _api.get_fundamentals(code)
 
-        # 가격·거래량 기초 필터 (KIS 실데이터 기준)
+        # 가격·시총 기초 필터 (KIS 실데이터 기준)
         price      = fund.get("price", 0)
-        volume     = fund.get("volume", 0)
         market_cap = fund.get("market_cap", 0)
-        if price < 1_000 or price > 800_000 or volume < 50_000:
+        if price < 1_000 or price > 800_000:
             return {**stock, "status": "filtered"}
         if market_cap and market_cap < 4_000:
             return {**stock, "status": "filtered"}
 
+        # 거래량은 직전 완료 세션 기준 (당일 누적은 장전 0·장중 일부분)
         ma_data = _api.get_ma_data(code)
+        if ma_data.get("last_session_volume", 0) < 50_000:
+            return {**stock, "status": "filtered"}
+
         score, _, log = _score_entry(fund, ma_data, ratios=None)
         gate = next((line.strip() for line in log if '필수 조건 미달' in line or '⛔' in line), None)
 

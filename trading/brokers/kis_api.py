@@ -14,8 +14,29 @@ import os
 import sys
 import time
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from .base_api import BaseBrokerApi
+
+_KST = timezone(timedelta(hours=9))
+
+
+def last_session_volume(rows: list, now: datetime | None = None) -> int:
+    """마지막으로 '끝난' 정규장 거래량. rows 는 일봉(최신→과거).
+
+    현재가 API 의 acml_vol 은 당일 누적이라 장전엔 0, 장중엔 일부분이다. 그 값으로
+    유동성을 거르면 06:00 광역 스캔·08:35 스크리닝에서 멀쩡한 종목이 '거래량 부족'이 된다
+    (2026-10-14 장중 광역 스캔: 2,579종목 중 2,294개 기초 필터 탈락, 넥센타이어 21,884주).
+    15:30 전이면 오늘 행은 진행 중인 세션이라 건너뛴다."""
+    now = (now or datetime.now(_KST)).astimezone(_KST)
+    today = now.strftime('%Y%m%d')
+    session_done = (now.hour, now.minute) >= (15, 30)
+    for row in rows:
+        if row.get('stck_bsop_date') == today and not session_done:
+            continue
+
+        return int(row.get('acml_vol', 0) or 0)
+
+    return 0
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
 _TIMEOUT = 15  # seconds
@@ -154,6 +175,7 @@ class KISApi(BaseBrokerApi):
         rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes_asc)
 
         return {
+            'last_session_volume': last_session_volume(rows),
             'ma5': ma5, 'ma20': ma20, 'ma60': ma60, 'ma120': ma120,
             'golden_cross': bool(ma5 and ma20 and p5 and p20 and ma5 > ma20 and p5 <= p20),
             'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
