@@ -80,6 +80,31 @@ def _fetch_candidates() -> list[dict]:
         return []
 
 
+def _apply_sentiment(r: dict, sentiment: str | None, sentiment_line: str) -> None:
+    """뉴스 감성 게이트. 부정이면 탈락, 확인 못 했으면(시간 초과·분석 실패) 미분석 보류.
+    뉴스 자체가 없는 건 확인된 사실이라 통과 유지."""
+    r['sentiment'] = sentiment
+    r['sentiment_line'] = sentiment_line
+    if sentiment == '부정':
+        r['pass'] = False
+        r['sentiment_excluded'] = True
+    elif sentiment is None and sentiment_line != '뉴스 없음':
+        r['pass'] = False
+        r['sentiment_unanalyzed'] = True
+
+
+def _verdict(r: dict) -> str:
+    """최종 판정 — 앱이 탈락 사유를 구분해 보여줄 수 있게 저장한다."""
+    if r.get('pass'):
+        return 'pass'
+    if r.get('sentiment_excluded'):
+        return 'news_negative'
+    if r.get('sentiment_unanalyzed'):
+        return 'news_unanalyzed'
+
+    return 'below_score'
+
+
 def _save_results(results: list[dict]):
     """스크리닝 결과를 Supabase screening_results 테이블에 upsert"""
     if not (_SUPABASE_URL and _SUPABASE_KEY):
@@ -98,6 +123,9 @@ def _save_results(results: list[dict]):
             'price':       r.get('price'),
             'market_cap':  r.get('market_cap', 0),
             'pass':        r.get('pass', False),
+            'verdict':     _verdict(r),
+            'reasons':     r.get('reasons', []),
+            'sentiment_line': r.get('sentiment_line'),
             'screened_at': now,
         }
         for r in results if not r.get('error') and r.get('system')
@@ -201,7 +229,7 @@ def screen():
             ma20   = ma_data.get('ma20')
             prdy_ctrt = fund.get('prdy_ctrt', 0.0)
 
-            score, max_score, _ = _score_entry(fund, ma_data, ratios)
+            score, max_score, score_log = _score_entry(fund, ma_data, ratios)
 
             # MA60 대비 할인율
             discount = (ma60 - price) / ma60 * 100 if ma60 else None
@@ -224,6 +252,8 @@ def screen():
                 'max_score':  max_score,
                 'discount':   discount,
                 'ratios':     ratios or {},
+                # 항목별 채점 근거 — 앱 투자 포인트가 이걸 그대로 보여준다
+                'reasons':    [line.strip() for line in score_log],
                 'pass':       score >= BUY_THRESHOLD,
             })
         except Exception as e:
@@ -235,7 +265,8 @@ def screen():
 
     # ── 뉴스 감성 게이트 ──────────────────────────────────────────────────────
     # 점수 통과 종목이라도 최근 뉴스 감성이 "부정"이면 최종 탈락시킨다.
-    # (뉴스 없음/분석 실패는 배제 사유로 보지 않음)
+    # 시간 초과·분석 실패는 확인을 못 한 것이라 통과시키지 않고 '미분석 보류'로 뺀다.
+    # 뉴스 자체가 없는 건 확인된 사실이라 통과 유지.
     sentiment_start = time.monotonic()
     sentiment_budget_exceeded = False
     for r in results:
@@ -244,17 +275,12 @@ def screen():
                     time.monotonic() - sentiment_start > _SENTIMENT_BUDGET_SEC:
                 sentiment_budget_exceeded = True
                 print(f"⏱️  뉴스 감성 분석 시간 예산({_SENTIMENT_BUDGET_SEC}s) 초과 — "
-                      "나머지 종목은 감성 분석 없이 통과 처리")
+                      "나머지 종목은 미분석 보류")
             if sentiment_budget_exceeded:
-                r['sentiment'] = None
-                r['sentiment_line'] = '시간 초과로 미분석'
-                continue
-            sentiment, sentiment_line = get_sentiment(r['code'], r['name'])
-            r['sentiment'] = sentiment
-            r['sentiment_line'] = sentiment_line
-            if sentiment == '부정':
-                r['pass'] = False
-                r['sentiment_excluded'] = True
+                sentiment, sentiment_line = None, '시간 초과로 미분석'
+            else:
+                sentiment, sentiment_line = get_sentiment(r['code'], r['name'])
+            _apply_sentiment(r, sentiment, sentiment_line)
 
     # ── 결과 출력 ──────────────────────────────────────────────────────────────
     sep = "=" * 55
@@ -263,7 +289,9 @@ def screen():
     # 점수 높은 순 정렬
     ok       = [r for r in results if r.get('pass') and not r.get('error')]
     excluded = [r for r in results if r.get('sentiment_excluded')]
-    others   = [r for r in results if not r.get('pass') and not r.get('error') and not r.get('sentiment_excluded')]
+    unanalyzed = [r for r in results if r.get('sentiment_unanalyzed')]
+    others   = [r for r in results if not r.get('pass') and not r.get('error')
+                and not r.get('sentiment_excluded') and not r.get('sentiment_unanalyzed')]
     errors   = [r for r in results if r.get('error')]
 
     ok.sort(key=lambda x: x['score'], reverse=True)
@@ -302,6 +330,14 @@ def screen():
     if excluded:
         lines.append(f"\n🔴 뉴스 부정으로 제외 ({len(excluded)}개) — 진입 점수는 통과했으나 최근 뉴스가 부정적")
         for r in excluded:
+            lines.append(
+                f"  [{r['score']}/{r['max_score']}점] {r['name']}({r['code']})  {r['price']:,}원"
+                f"\n  📰 뉴스: {r['sentiment_line']}"
+            )
+
+    if unanalyzed:
+        lines.append(f"\n⏱ 뉴스 미분석으로 보류 ({len(unanalyzed)}개) — 진입 점수는 통과했으나 뉴스를 확인하지 못함")
+        for r in unanalyzed:
             lines.append(
                 f"  [{r['score']}/{r['max_score']}점] {r['name']}({r['code']})  {r['price']:,}원"
                 f"\n  📰 뉴스: {r['sentiment_line']}"

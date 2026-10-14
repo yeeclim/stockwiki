@@ -56,31 +56,25 @@ class KrxLoader {
     }
   }
 
-  // 관리 종목(스크리닝 후보)들의 개별 투자 포인트 조회.
-  // 반환: { 종목코드: { points: [...], recommendation, price, changePercent, ma20, ma60, high52w } }
-  static Future<Map<String, Map<String, dynamic>>> analyzeSymbols(
-      List<String> codes) async {
-    final valid = codes.where((c) => RegExp(r'^\d{6}$').hasMatch(c)).toList();
-    if (valid.isEmpty) return {};
+  // 최근 스크리닝 회차를 통과한 관리 종목과 채점 근거.
+  // 반환: [{ symbol, name, sector, score, reasons: [...], sentimentLine, screenedAt }]
+  static Future<List<Map<String, dynamic>>> getScreeningPicks() async {
     try {
       final response = await http
-          .get(Uri.parse(
-              '$_baseUrl/api/theme-recommendations?action=analyze&symbols=${valid.join(',')}'))
+          .get(Uri.parse('$_baseUrl/api/theme-recommendations?action=screening'))
           .timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          final list = (data['data'] as List<dynamic>? ?? []);
-          return {
-            for (final e in list.cast<Map<String, dynamic>>())
-              e['symbol'] as String: e,
-          };
+          return (data['data'] as List<dynamic>? ?? [])
+              .cast<Map<String, dynamic>>();
         }
       }
     } catch (e) {
-      debugPrint('관리 종목 분석 실패: $e');
+      debugPrint('스크리닝 통과 종목 조회 실패: $e');
     }
-    return {};
+
+    return [];
   }
 
   // 특정 테마의 추천 종목 가져오기 (비동기)

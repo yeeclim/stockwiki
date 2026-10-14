@@ -30,6 +30,9 @@ CALL_DELAY    = 0.15 # 스레드별 API 호출 간 최소 대기(초)
 PRE_THRESHOLD = 5    # 예비 점수 이상이면 재무비율 조회 (10점 만점 중 재무비율 4종(각 0.5점) 제외한 예비 최대 8점 기준)
 MIN_THRESHOLD = 6    # 최종 점수 이상이면 candidates에 등록 (strategy.BUY_THRESHOLD와 동일)
 TOP_N         = 60   # candidates에 저장할 최대 종목 수
+# 조회 실패가 이 비율을 넘으면 이번 회차를 '실패'로 보고 후보를 건드리지 않는다.
+# 결과 0개가 '조건에 맞는 종목이 정말 없음'인지 'API 가 막혀서'인지 구분하기 위해서다.
+MAX_FAIL_RATIO = 0.2
 
 
 # ── 전체 종목 수집 ──────────────────────────────────────────────────────────────
@@ -90,8 +93,12 @@ def _prefilter(stocks: list[dict]) -> list[dict]:
 
 # ── 종목 점수 계산 ──────────────────────────────────────────────────────────────
 
-def _score_stock(stock: dict) -> dict | None:
-    """예비 점수 계산: fundamentals 조회 → 가격/거래량 필터 → MA 조회 → 점수"""
+def _score_stock(stock: dict) -> dict:
+    """예비 점수 계산: fundamentals 조회 → 가격/거래량 필터 → MA 조회 → 점수
+
+    status: 'scored' | 'filtered'(기초 필터 탈락) | 'failed'(조회 실패).
+    gate: 필수 조건 탈락 사유 — 결과 0개일 때 왜 0개인지 로그로 남긴다.
+    """
     global _api
     code = stock["code"]
     try:
@@ -103,15 +110,17 @@ def _score_stock(stock: dict) -> dict | None:
         volume     = fund.get("volume", 0)
         market_cap = fund.get("market_cap", 0)
         if price < 1_000 or price > 800_000 or volume < 50_000:
-            return None
+            return {**stock, "status": "filtered"}
         if market_cap and market_cap < 4_000:
-            return None
+            return {**stock, "status": "filtered"}
 
         ma_data = _api.get_ma_data(code)
-        score, _, _ = _score_entry(fund, ma_data, ratios=None)
-        return {**stock, "score": score, "fund": fund, "ma": ma_data}
-    except Exception:
-        return None
+        score, _, log = _score_entry(fund, ma_data, ratios=None)
+        gate = next((line.strip() for line in log if '필수 조건 미달' in line or '⛔' in line), None)
+
+        return {**stock, "status": "scored", "score": score, "fund": fund, "ma": ma_data, "gate": gate}
+    except Exception as e:
+        return {**stock, "status": "failed", "error": f"{type(e).__name__}: {e}"}
 
 
 def _score_with_ratios(stock: dict) -> dict:
@@ -135,10 +144,6 @@ def _upsert_candidates(candidates: list[dict]):
     이제는 ① 새 종목 추가/재활성화가 성공한 뒤에만 ② 빠진 종목을 비활성화한다.
     기존 행을 지우지 않으므로 ai_reason 등 부가 정보도 유지된다.
     """
-    if not candidates:
-        print("⚠️  후보 종목 없음 — 기존 candidates 보존")
-        return
-
     if not (_SUPABASE_URL and _SUPABASE_KEY):
         print("⚠️  Supabase 환경변수 없음 — 저장 생략")
         return
@@ -151,8 +156,14 @@ def _upsert_candidates(candidates: list[dict]):
     }
     new_codes = [c["code"] for c in candidates]
     codes_param = ",".join(new_codes)
+    # 조회 실패가 아닌 진짜 0개면 시스템 후보를 전부 내린다. 기준을 벗어난 종목이
+    # 앱·메일에 계속 남지 않게 한다 (2026-10-14 HMM: 60일선 +10.5% 인데 후보 유지).
+    not_in_new = f"&stock_code=not.in.({codes_param})" if new_codes else ""
 
     try:
+        if not new_codes:
+            print("⚠️  조건을 만족한 종목 0개 — 시스템 후보 전부 비활성화")
+
         # 관리자 수동 추가(admin) 행도 "이미 있음"으로 본다 — 같은 종목을 system 으로 또 넣으면
         # 고유 인덱스(stock_code, user_id) 충돌로 갱신 전체가 실패한다.
         # 활성/비활성은 system 행만 건드린다 (수동 추가 종목은 광역 스캔 결과와 무관하게 유지).
@@ -164,12 +175,13 @@ def _upsert_candidates(candidates: list[dict]):
         existing = {row["stock_code"] for row in r.json()}
 
         # ① 기존에 있던 종목은 재활성화 — 관리자가 제외한(rejected) 종목은 되살리지 않는다
-        r = requests.patch(
-            f"{base}?source=eq.system&user_id=is.null&status=neq.rejected"
-            f"&stock_code=in.({codes_param})",
-            headers=headers, json={"is_active": True}, timeout=10,
-        )
-        r.raise_for_status()
+        if new_codes:
+            r = requests.patch(
+                f"{base}?source=eq.system&user_id=is.null&status=neq.rejected"
+                f"&stock_code=in.({codes_param})",
+                headers=headers, json={"is_active": True}, timeout=10,
+            )
+            r.raise_for_status()
 
         # ② 없던 종목은 삽입
         rows = [
@@ -189,11 +201,24 @@ def _upsert_candidates(candidates: list[dict]):
 
         # ③ 앞 단계가 모두 성공했을 때만, 이번 결과에서 빠진 종목을 비활성화
         r = requests.patch(
-            f"{base}?source=eq.system&user_id=is.null&stock_code=not.in.({codes_param})",
-            headers=headers, json={"is_active": False}, timeout=10,
+            f"{base}?source=eq.system&user_id=is.null&is_active=eq.true{not_in_new}",
+            headers={**headers, "Prefer": "return=representation"},
+            json={"is_active": False}, timeout=10,
         )
         r.raise_for_status()
-        print(f"✅ screening_candidates 갱신 완료 — 활성 {len(new_codes)}종목 (신규 {len(rows)})")
+        dropped = [row["stock_code"] for row in r.json()]
+
+        # 빠진 종목의 예전 통과 기록도 내린다 — 추천 목록(ai-recommend-list)이 최근 5일
+        # pass=true 를 읽어서, 다시 채점되지 않는 종목이 '통과'로 남는다.
+        if dropped:
+            r = requests.patch(
+                f"{_SUPABASE_URL}/rest/v1/screening_results?stock_code=in.({','.join(dropped)})",
+                headers=headers, json={"pass": False}, timeout=10,
+            )
+            r.raise_for_status()
+
+        print(f"✅ screening_candidates 갱신 완료 — 활성 {len(new_codes)}종목 (신규 {len(rows)}, "
+              f"비활성화 {len(dropped)}: {', '.join(dropped) or '없음'})")
     except requests.RequestException as e:
         detail = getattr(e.response, "text", "")[:200] if getattr(e, "response", None) is not None else ""
         print(f"⚠️  후보 갱신 실패 — 기존 후보는 비활성화하지 않음: {e} {detail}")
@@ -227,6 +252,9 @@ def main():
 
     # 3. 병렬 예비 점수 계산 (fundamentals + 가격/거래량 필터 + MA)
     pre_results = []
+    status_counts = {"scored": 0, "filtered": 0, "failed": 0}
+    gate_counts: dict[str, int] = {}
+    first_error = None
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         futures = {ex.submit(_score_stock, s): s for s in candidates}
         done = 0
@@ -235,8 +263,31 @@ def main():
             if done % 200 == 0:
                 print(f"  진행: {done}/{len(candidates)}")
             result = fut.result()
-            if result and result["score"] >= PRE_THRESHOLD:
+            status_counts[result["status"]] += 1
+            if result["status"] == "failed":
+                first_error = first_error or f"{result['code']} {result['error']}"
+                continue
+
+            if result["status"] != "scored":
+                continue
+
+            if result["gate"]:
+                key = 'MA60 이상' if 'MA60' in result["gate"] else ('MA5≤MA20' if 'MA5' in result["gate"] else '기타 필수 조건')
+                gate_counts[key] = gate_counts.get(key, 0) + 1
+            if result["score"] >= PRE_THRESHOLD:
                 pre_results.append(result)
+
+    print(f"📊 예비 채점 {status_counts['scored']} · 기초 필터 탈락 {status_counts['filtered']} · "
+          f"조회 실패 {status_counts['failed']}")
+    if gate_counts:
+        print("   필수 조건 탈락: " + ", ".join(f"{k} {v}" for k, v in gate_counts.items()))
+    if first_error:
+        print(f"   첫 조회 실패: {first_error}")
+
+    fail_ratio = status_counts["failed"] / max(len(candidates), 1)
+    if fail_ratio > MAX_FAIL_RATIO:
+        print(f"❌ 조회 실패 {fail_ratio:.0%} > {MAX_FAIL_RATIO:.0%} — 이번 회차는 실패로 보고 후보를 갱신하지 않음")
+        return
 
     pre_results.sort(key=lambda x: x["score"], reverse=True)
     print(f"📊 예비 통과 ({PRE_THRESHOLD}점 이상): {len(pre_results)}개")

@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/stock.dart';
 import '../services/krx_loader.dart';
-import '../services/screening_service.dart';
 import '../widgets/app_drawer.dart';
 import 'us_stock_detail_page.dart';
 import '../config/ads_config.dart';
 import '../widgets/ad_banner.dart';
 
-// 광역 스캔 후보는 sector 에 시장 구분(KOSPI/KOSDAQ)이 들어온다 — 탭엔 한글로 표시.
+// 스크리닝 종목은 sector 에 시장 구분(KOSPI/KOSDAQ)이 들어온다 — 탭엔 한글로 표시.
 const _marketLabels = {'KOSPI': '코스피', 'KOSDAQ': '코스닥'};
 
 class ThemeRecommendationsPage extends StatefulWidget {
@@ -35,32 +34,38 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
   Future<void> _initThemesAndController() async {
     setState(() => _isLoading = true);
     try {
-      // 스크리닝 후보 (Supabase) + KRX 테마 병렬 로드
+      // 최근 스크리닝 통과 종목 + KRX 테마 병렬 로드
       final results = await Future.wait([
-        ScreeningService.loadAll(),
+        KrxLoader.getScreeningPicks(),
         KrxLoader.getThemes(),
       ]);
 
-      final screeningCandidates = results[0] as List<ScreeningCandidate>;
+      final picks = results[0] as List<Map<String, dynamic>>;
       final krxThemes = results[1] as List<String>;
 
-      // 스크리닝 후보를 섹터별로 _themeStocks에 주입 (사유는 분석 후 채움)
+      // 통과 종목을 시장별 탭으로. 투자 포인트는 screen.py 채점 근거(통과 항목)와 뉴스 한 줄.
       final sectorMap = <String, List<Map<String, dynamic>>>{};
-      for (final c in screeningCandidates) {
-        final sector = _marketLabels[c.sector] ?? c.sector;
+      for (final p in picks) {
+        final rawSector = p['sector'] as String? ?? '';
+        final sector = _marketLabels[rawSector] ?? rawSector;
+        final reasons = (p['reasons'] as List<dynamic>? ?? []).cast<String>();
+        final points = [
+          for (final r in reasons)
+            if (r.startsWith('✅')) r.substring(1).trim(),
+          if (p['sentimentLine'] != null) '뉴스: ${p['sentimentLine']}',
+        ];
         sectorMap.putIfAbsent(sector, () => []).add({
-          'symbol': c.stockCode,
-          'name': c.stockName,
+          'symbol': p['symbol'],
+          'name': p['name'],
           'sector': sector,
-          'reason': '투자 포인트 분석 중…',
+          'reason': points.join('\n'),
+          'points': points,
+          'recommendation': '${p['score']}/10점',
         });
       }
       for (final entry in sectorMap.entries) {
         _themeStocks[entry.key] = entry.value;
       }
-
-      // 관리 종목별 투자 포인트 분석 (백그라운드 — 탭은 먼저 노출)
-      _analyzeScreeningCandidates(screeningCandidates);
 
       // 스크리닝 섹터는 이미 종목이 확정돼 있으므로 바로 탭으로 노출
       final screeningSectors = sectorMap.keys.toList();
@@ -89,32 +94,6 @@ class _ThemeRecommendationsPageState extends State<ThemeRecommendationsPage>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _analyzeScreeningCandidates(
-      List<ScreeningCandidate> candidates) async {
-    final codes = candidates.map((c) => c.stockCode).toSet().toList();
-    final analysis = await KrxLoader.analyzeSymbols(codes);
-    if (analysis.isEmpty || !mounted) return;
-
-    for (final list in _themeStocks.values) {
-      for (final stock in list) {
-        final a = analysis[stock['symbol']];
-        if (a == null) continue;
-        final points = (a['points'] as List<dynamic>? ?? []).cast<String>();
-        stock['reason'] = points.isNotEmpty
-            ? points.join('\n')
-            : (a['recommendation']?.toString() ?? '관망');
-        stock['points'] = points;
-        stock['recommendation'] = a['recommendation'];
-        stock['price'] = a['price'];
-        stock['changePercent'] = a['changePercent'];
-        stock['ma20'] = a['ma20'];
-        stock['ma60'] = a['ma60'];
-        stock['high52w'] = a['high52w'];
-      }
-    }
-    if (mounted) setState(() {});
   }
 
   Future<void> _loadExtraThemes(List<String> themes) async {
