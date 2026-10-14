@@ -480,21 +480,6 @@ def _eok(million_won: int) -> str:
     return f'{eok:+,.0f}억'
 
 
-def _intraday_note(brief: dict) -> str:
-    """장이 열린 뒤 실행된 메일이면 실제 등락을 함께 밝힌다. 신호는 장전 추정용이라
-    장중엔 실제 결과가 이미 나와 있다(2026-10-13 코스피 −6% 장중 메일에 '팽팽')."""
-    if brief.get('close_phase', 'prev') == 'prev':
-        return ''
-
-    kospi = next((r for r in brief.get('kr_indices') or [] if r.get('label') == '코스피'), None)
-    if kospi is None or not _traded_today_kst(kospi.get('traded_at')):
-        return ''
-
-    phase = '장중' if brief['close_phase'] == 'intraday' else '장 마감 후'
-
-    return f"{phase} 실행 — 실제 코스피 {kospi['pct']:+.2f}%. 신호는 장전 추정용이라 참고만 하세요."
-
-
 def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
     """상관 그룹 단위 집계 (market_signals 참조). 지표 하나당 1표로 세면
     같은 재료가 여러 지표에 중복 반영돼 표차가 부풀려지기 때문이다."""
@@ -521,9 +506,6 @@ def render_text(brief: dict) -> str:
         verdict = market_signals.verdict_label(signals)
         lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
         lines.append('   집계(그룹): ' + market_signals.votes_line(signals))
-        note = _intraday_note(brief)
-        if note:
-            lines.append('   ⚠️ ' + note)
         lines.append('   ' + '  '.join(f"[{signal_chip_text(s)}]" for s in signals))
         lines.append('')
 
@@ -732,11 +714,6 @@ def render_email_html(brief: dict, report_text: str) -> str:
         bull, bear, neutral = _signal_counts(signals)
         verdict = market_signals.verdict_label(signals)
         verdict_color = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER}[market_signals.verdict(signals)]
-        note = _intraday_note(brief)
-        intraday_html = (
-            f'<div style="margin-top:6px;color:{_AMBER};font-size:13px;font-weight:700;">'
-            f'⚠️ {html_lib.escape(note)}</div>' if note else ''
-        )
         chip_color = {1: _UP, -1: _DOWN, 0: _MUTED}
         chips = ''.join(
             f'<span style="display:inline-block;margin:3px 6px 3px 0;padding:3px 9px;'
@@ -766,7 +743,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
       </div>
       <div style="margin-top:6px;color:{_MUTED};font-size:13px;">
         집계(그룹): {html_lib.escape(market_signals.votes_line(signals))}
-      </div>{intraday_html}
+      </div>
       <div style="margin-top:10px;">{chips}</div>
     </td></tr>
   </table>
