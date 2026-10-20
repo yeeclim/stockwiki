@@ -22,13 +22,20 @@ _compute_signals 는 지표 하나당 신호 하나(±1)를 만들고, 예전엔
 
 화면에 찍히는 개별 칩(라벨 ▲ 강세)은 그대로 둔다. 근거는 다 보여주되
 집계만 그룹 단위로 한다.
+
+판정은 투표가 아니라 예상 시가 갭으로 한다 (2026-10-20)
+------------------------------------------------------
+같은 203거래일(2025-12-11~2026-10-16) 백테스트에서 코스피200 야간선물 하나가 상관 0.81,
+갭 방향 84%였고 SOX(0.59)·EWY보정(0.52)을 더해도 검증 구간 성적이 나아지지 않았다.
+유가·금리·환율은 3년 표본에서 방향 49~53% — 동전 던지기인데 투표에선 1표씩이었다.
+그래서 판정 = 회귀식으로 낸 예상 갭의 부호, 투표 집계는 적중률 로그 비교용으로만 남긴다.
 """
 
 # 그룹 정의 — (키, 표시명, 라벨 매칭 함수)
 # 순서가 곧 표시 순서다.
 _GROUP_DEFS = [
     ('us_risk', '미국 위험선호',
-     lambda l: l in ('미국 증시', '미국 지수선물(마감 후)', 'VIX(변동성)', '미 국채 10년')),
+     lambda l: l in ('미국 증시', '미국 지수선물(마감 후)', 'VIX(변동성)', '미 국채 10년', '미국 반도체(SOX)')),
     # 원/달러는 달러인덱스를 타고 us_risk 와 상관되지만, 외국인 자금 유출입이라는
     # 국내 고유 정보도 담고 있어 별도 그룹으로 둔다. 완전히 독립은 아니라는 점은
     # 알고 쓰는 타협이다.
@@ -49,15 +56,17 @@ _GROUP_DEFS = [
      lambda l: l.startswith('코스닥 수급')),
 ]
 
-VERDICT_TEXT = {'bull': '강세 우세', 'bear': '약세 우세', 'neutral': '팽팽'}
+VERDICT_TEXT = {'bull': '강세 출발', 'bear': '약세 출발', 'neutral': '보합 출발', 'unknown': '판정 보류'}
 
-# 큰 갭 우선 — 그룹당 1표는 크기를 보지 않아서, 코스피200 선물 −6% 인 날에도
-# 유가 1% 하락 같은 표 하나와 맞비겨 '팽팽'이 나왔다(2026-10-13).
-# 국내 갭을 직접 보여주는 지표가 이 이상 움직이면 그 방향으로 판정한다.
-# 위에서부터 가장 직접적인 관측치 하나만 본다. SK하이닉스 ADR 은 개별 종목이라
-# 하루 ±2% 가 흔해서 제외.
-GAP_PCT = 2.0
-_GAP_LABELS = ('코스피200 야간선물', '야간 한국물(EWY·환율보정)')
+# 예상 시가 갭(%) 회귀 계수 — 2026-10-20 백테스트, 전체 표본으로 적합.
+#   야간선물: 203일, 뒤 30% 검증 방향 87%·R² 0.63
+#   SOX·EWY보정: 야간선물이 없을 때만. 723일(3년), 검증 방향 72%·R² 0.38
+NIGHT_LABEL = '코스피200 야간선물'
+EWY_LABEL = '야간 한국물(EWY·환율보정)'
+SOX_LABEL = '미국 반도체(SOX)'
+NIGHT_GAP = (0.042, 0.703)            # 갭 ≈ a + b × 야간선물
+FALLBACK_GAP = (0.136, 0.165, 0.218)  # 갭 ≈ a + b × EWY보정 + c × SOX
+GAP_BAND = 0.3                         # 예상 갭이 이 안쪽이면 보합
 
 # 장중 우선 — '코스피200 선물' 신호는 오늘 체결된 값일 때만 만들어진다(us_market_brief).
 # 장이 열려 실제 방향이 나와 있으면 유가·수급 같은 간접 지표로 투표하지 않는다.
@@ -131,20 +140,35 @@ def group_direction(signals: list[dict], key: str) -> int:
     return 0
 
 
-def gap_signal(signals: list[dict]) -> dict | None:
-    """판정을 투표 대신 직접 정하는 신호. 장중엔 당일 코스피200 선물, 장전엔 ±GAP_PCT 이상
-    큰 갭. 없으면 None. value 가 없는 옛 아카이브는 해당 없음."""
-    by_label = {s.get('label'): s for s in signals or []}
-    intraday = by_label.get(INTRADAY_LABEL)
-    if intraday is not None and intraday.get('value') is not None:
-        return intraday
+def _values(signals: list[dict]) -> dict[str, float]:
+    """라벨 → value. value 가 없는 신호(옛 아카이브)는 뺀다."""
+    return {s['label']: s['value'] for s in signals or [] if s.get('label') and s.get('value') is not None}
 
-    for label in _GAP_LABELS:
-        s = by_label.get(label)
-        if s is None or s.get('value') is None:
-            continue
 
-        return s if abs(s['value']) >= GAP_PCT else None
+def intraday_signal(signals: list[dict]) -> dict | None:
+    """장중이면 당일 코스피200 선물 신호, 아니면 None."""
+    for s in signals or []:
+        if s.get('label') == INTRADAY_LABEL and s.get('value') is not None:
+            return s
+
+    return None
+
+
+def expected_gap(signals: list[dict]) -> dict | None:
+    """{'value': 예상 시가 갭 %, 'basis': 근거 문구} — 야간선물, 없으면 EWY보정+SOX.
+    둘 다 없으면 None (중립으로 세지 않는다)."""
+    values = _values(signals)
+    if NIGHT_LABEL in values:
+        a, b = NIGHT_GAP
+        night = values[NIGHT_LABEL]
+
+        return {'value': a + b * night, 'basis': f'{NIGHT_LABEL} {night:+.2f}%'}
+
+    if EWY_LABEL in values and SOX_LABEL in values:
+        a, b, c = FALLBACK_GAP
+        ewy, sox = values[EWY_LABEL], values[SOX_LABEL]
+
+        return {'value': a + b * ewy + c * sox, 'basis': f'EWY보정 {ewy:+.2f}% · SOX {sox:+.2f}%'}
 
     return None
 
@@ -165,44 +189,73 @@ def raw_counts(signals: list[dict]) -> tuple[int, int, int]:
     return bull, bear, len(signals or []) - bull - bear
 
 
+def _sign_with_band(value: float, band: float) -> str:
+    if value > band:
+        return 'bull'
+
+    return 'bear' if value < -band else 'neutral'
+
+
 def verdict(signals: list[dict]) -> str:
-    """'bull' | 'bear' | 'neutral' — 큰 갭이 있으면 그 방향, 아니면 그룹 투표."""
-    gap = gap_signal(signals)
-    if gap is not None:
-        band = INTRADAY_BAND if gap.get('label') == INTRADAY_LABEL else 0.0
-        if gap['value'] > band:
-            return 'bull'
+    """'bull' | 'bear' | 'neutral' | 'unknown' — 장중엔 당일 선물, 장전엔 예상 시가 갭."""
+    intraday = intraday_signal(signals)
+    if intraday is not None:
+        return _sign_with_band(intraday['value'], INTRADAY_BAND)
 
-        return 'bear' if gap['value'] < -band else 'neutral'
+    gap = expected_gap(signals)
+    if gap is None:
+        return 'unknown'
 
-    bull, bear, _ = signal_counts(signals)
-
-    return verdict_from_counts(bull, bear)
+    return _sign_with_band(gap['value'], GAP_BAND)
 
 
 def verdict_reason(signals: list[dict]) -> str:
-    """판정이 투표가 아니라 큰 갭으로 정해졌을 때 그 이유. 아니면 ''."""
-    gap = gap_signal(signals)
+    """판정 근거 한 줄. 근거 지표가 없으면 그 사실을 적는다."""
+    intraday = intraday_signal(signals)
+    if intraday is not None:
+        return f"{INTRADAY_LABEL} 당일 {intraday['value']:+.2f}% (±{INTRADAY_BAND:g}% 이내 보합)"
+
+    gap = expected_gap(signals)
     if gap is None:
-        return ''
+        return '야간선물·SOX·EWY 모두 없음'
 
-    if gap.get('label') == INTRADAY_LABEL:
-        return f"{gap['label']} 당일 {gap['value']:+.2f}% — 장중엔 실제 방향 우선 (±{INTRADAY_BAND:g}% 이내 팽팽)"
+    return f"예상 시가 갭 {gap['value']:+.2f}% ({gap['basis']})"
 
-    return f"{gap['label']} {gap['value']:+.2f}% — 갭 ±{GAP_PCT:g}% 이상이라 표 수보다 우선"
+
+def basis(signals: list[dict]) -> str:
+    """화면용 근거 — 판정에 실제로 들어간 입력값만."""
+    intraday = intraday_signal(signals)
+    if intraday is not None:
+        return f"장중 — 당일 선물 방향 우선 (±{INTRADAY_BAND:g}% 이내 보합)"
+
+    gap = expected_gap(signals)
+
+    return '야간선물·SOX·EWY 모두 없음' if gap is None else gap['basis']
 
 
 def verdict_label(signals: list[dict]) -> str:
-    """화면 표시용 판정 문구 ('약세 우세' 등). 갭 우선 사유는 화면에 넣지 않고 로그에만 남긴다."""
+    """화면 표시용 판정 문구 ('약세 출발' 등)."""
     return VERDICT_TEXT[verdict(signals)]
+
+
+def headline(signals: list[dict]) -> str:
+    """메일·게시판 머리줄 — '예상 시가 갭 −2.42% (약세 출발)' 등."""
+    intraday = intraday_signal(signals)
+    if intraday is not None:
+        return f"코스피200 선물 당일 {intraday['value']:+.2f}% ({verdict_label(signals)})"
+
+    gap = expected_gap(signals)
+    if gap is None:
+        return VERDICT_TEXT['unknown']
+
+    return f"예상 시가 갭 {gap['value']:+.2f}% ({verdict_label(signals)})"
 
 
 def log_lines(signals: list[dict]) -> list[str]:
     """런 로그용 판정 근거. 사후에 '왜 이 판정인가'를 이 출력만으로 답할 수 있어야 한다."""
     bull, bear, neutral = signal_counts(signals)
-    reason = verdict_reason(signals)
-    reason_text = f' · {reason}' if reason else ''
-    lines = [f'📊 시장 신호 판정: {verdict_label(signals)}{reason_text} (그룹 강세 {bull} · 약세 {bear} · 중립 {neutral})',
+    lines = [f'📊 시장 신호 판정: {verdict_label(signals)} · {verdict_reason(signals)}',
+             f'   (참고: 그룹 투표 강세 {bull} · 약세 {bear} · 중립 {neutral} — 판정엔 미사용)',
              f'   집계(그룹): {votes_line(signals)}']
     excluded = excluded_labels(signals)
     for s in signals or []:

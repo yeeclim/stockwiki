@@ -60,11 +60,9 @@ def screening_content(
     if signals:
         from us_market_brief import signal_chip_text
         import market_signals
-        bull, bear, neutral = market_signals.signal_counts(signals)
-        verdict = market_signals.verdict_label(signals)
         chips = ' '.join(f"[{signal_chip_text(s)}]" for s in signals)
         signal_html = (
-            f"<p><b>📍 당시 시장 신호:</b> 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})<br>"
+            f"<p><b>📍 당시 시장 신호:</b> {market_signals.headline(signals)}<br>"
             f"<span style='font-size:0.9em'>{chips}</span></p>"
         )
 

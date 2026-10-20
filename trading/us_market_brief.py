@@ -25,6 +25,8 @@ _INDICES = [
     ('^IXIC', '나스닥'),
     ('^DJI',  '다우'),
     ('^VIX',  'VIX'),
+    # 필라델피아 반도체 — 코스피 갭과 상관 0.57(3년). 야간선물이 없을 때 예상 갭 계산에 쓴다.
+    ('^SOX',  '필라델피아 반도체'),
     # 지수선물은 미국 현물 마감(05:00 KST) 뒤에도 거래돼 발송 직전까지의 움직임을 담는다.
     # Yahoo 등락률은 전일 정산가 대비 = 마감 후 변화분 (2026-10-14 원본 확인).
     ('ES=F',  'S&P500 선물'),
@@ -392,6 +394,9 @@ def _compute_signals(brief: dict, now: datetime | None = None) -> list[dict]:
         # VIX 는 하루 ±3% 가 흔해서 그 안쪽은 중립.
         vix_move = _dir_band(us_by_symbol['^VIX']['pct'], 3.0)
         signals.append(_signal('VIX(변동성)', -vix_move, move=vix_move, value=us_by_symbol['^VIX']['pct']))
+    if '^SOX' in us_by_symbol:
+        sox = us_by_symbol['^SOX']['pct']
+        signals.append(_signal(market_signals.SOX_LABEL, _dir_band(sox, 1.0), value=sox))
 
     macro_by_symbol = {r['symbol']: r for r in (brief.get('macro') or [])}
     krw = macro_by_symbol.get('KRW=X')
@@ -515,12 +520,6 @@ def _eok(million_won: int) -> str:
     return f'{eok:+,.0f}억'
 
 
-def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
-    """상관 그룹 단위 집계 (market_signals 참조). 지표 하나당 1표로 세면
-    같은 재료가 여러 지표에 중복 반영돼 표차가 부풀려지기 때문이다."""
-    return market_signals.signal_counts(signals)
-
-
 def render_text(brief: dict) -> str:
     """브리핑의 텍스트(plain) 버전. HTML을 못 받는 메일 클라이언트를 위한
     multipart/alternative 의 text/plain 파트에도 동일한 내용을 담기 위해 사용한다."""
@@ -537,10 +536,8 @@ def render_text(brief: dict) -> str:
 
     lines = []
     if signals:
-        bull, bear, neutral = _signal_counts(signals)
-        verdict = market_signals.verdict_label(signals)
-        lines.append(f"📊 오늘의 시장 신호: 강세 {bull} · 약세 {bear} · 중립 {neutral} ({verdict})")
-        lines.append('   집계(그룹): ' + market_signals.votes_line(signals))
+        lines.append(f"📊 오늘의 시장 신호: {market_signals.headline(signals)}")
+        lines.append('   근거: ' + market_signals.basis(signals))
         lines.append('   ' + '  '.join(f"[{signal_chip_text(s)}]" for s in signals))
         lines.append('')
 
@@ -746,9 +743,7 @@ def render_email_html(brief: dict, report_text: str) -> str:
     signals = brief.get('signals') or []
     signal_html = ''
     if signals:
-        bull, bear, neutral = _signal_counts(signals)
-        verdict = market_signals.verdict_label(signals)
-        verdict_color = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER}[market_signals.verdict(signals)]
+        verdict_color = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER, 'unknown': _MUTED}[market_signals.verdict(signals)]
         chip_color = {1: _UP, -1: _DOWN, 0: _MUTED}
         chips = ''.join(
             f'<span style="display:inline-block;margin:3px 6px 3px 0;padding:3px 9px;'
@@ -768,16 +763,11 @@ def render_email_html(brief: dict, report_text: str) -> str:
       <span style="color:{_ACCENT};font-size:18px;font-weight:800;letter-spacing:.3px;">
         📊 오늘의 시장 신호 📍
       </span>
-      <div style="margin-top:8px;">
-        <span style="color:{_INK};font-weight:800;font-size:22px;">강세 {bull}</span>
-        <span style="color:{_MUTED};font-size:17px;"> · </span>
-        <span style="color:{_INK};font-weight:800;font-size:22px;">약세 {bear}</span>
-        <span style="color:{_MUTED};font-size:17px;"> · </span>
-        <span style="color:{_INK};font-weight:800;font-size:22px;">중립 {neutral}</span>
-        <span style="color:{verdict_color};font-weight:800;font-size:16px;margin-left:8px;">({verdict})</span>
+      <div style="margin-top:8px;color:{verdict_color};font-weight:800;font-size:22px;">
+        {html_lib.escape(market_signals.headline(signals))}
       </div>
       <div style="margin-top:6px;color:{_MUTED};font-size:13px;">
-        집계(그룹): {html_lib.escape(market_signals.votes_line(signals))}
+        근거: {html_lib.escape(market_signals.basis(signals))}
       </div>
       <div style="margin-top:10px;">{chips}</div>
     </td></tr>

@@ -17,7 +17,7 @@ def _now_kst_iso() -> str:
 
 
 def _brief(us_pct: float, vix_pct: float, oil_pct: float, ewy_pct: float, skhy_pct: float,
-           krw_pct: float, fut_pct: float | None, flow_net: int) -> dict:
+           krw_pct: float, fut_pct: float | None, flow_net: int, sox_pct: float = 0.0) -> dict:
     kr_indices = []
     if fut_pct is not None:
         kr_indices.append({'label': '코스피200 선물', 'pct': fut_pct, 'traded_at': _now_kst_iso()})
@@ -28,6 +28,7 @@ def _brief(us_pct: float, vix_pct: float, oil_pct: float, ewy_pct: float, skhy_p
             {'symbol': '^IXIC', 'pct': us_pct},
             {'symbol': '^DJI', 'pct': us_pct},
             {'symbol': '^VIX', 'pct': vix_pct},
+            {'symbol': '^SOX', 'pct': sox_pct},
         ],
         'macro': [
             {'symbol': 'CL=F', 'pct': oil_pct},
@@ -56,9 +57,9 @@ class ExtremeDayTest(unittest.TestCase):
         self.assertEqual(market_signals.verdict(signals), 'bear')
 
     def test_premarket_crash_without_futures_is_bear(self):
-        # 장전(정규 선물 체결 전) — EWY 환율보정 −3.7% 갭만 있는 경우
+        # 장전·야간선물 없음 — EWY 환율보정 −3.7%, SOX −3% 로 예상 갭 계산
         brief = _brief(us_pct=-0.04, vix_pct=2.49, oil_pct=-1.06, ewy_pct=-4.02, skhy_pct=-4.02,
-                       krw_pct=0.30, fut_pct=None, flow_net=100)
+                       krw_pct=0.30, fut_pct=None, flow_net=100, sox_pct=-3.0)
         signals = umb._compute_signals(brief)
 
         self.assertEqual(market_signals.verdict(signals), 'bear')
@@ -66,20 +67,20 @@ class ExtremeDayTest(unittest.TestCase):
     def test_big_rally_is_bull(self):
         # 대칭 케이스 — 큰 갭 상승인데 유가 급등·수급 매도가 표를 상쇄하는 날
         brief = _brief(us_pct=0.2, vix_pct=-1.0, oil_pct=2.5, ewy_pct=3.5, skhy_pct=3.0,
-                       krw_pct=0.5, fut_pct=4.0, flow_net=-100)
+                       krw_pct=0.5, fut_pct=4.0, flow_net=-100, sox_pct=2.0)
         signals = umb._compute_signals(brief)
 
         self.assertEqual(market_signals.verdict(signals), 'bull')
 
-    def test_small_gap_keeps_vote_count(self):
-        # 장전(당일 선물 없음) 갭이 ±2% 미만이면 기존 그룹 투표 그대로
-        brief = _brief(us_pct=0.5, vix_pct=-2.0, oil_pct=0.2, ewy_pct=-0.6, skhy_pct=-0.5,
-                       krw_pct=0.0, fut_pct=None, flow_net=100)
+    def test_small_expected_gap_is_neutral_despite_votes(self):
+        # 미국·VIX·수급이 전부 강세 표여도 예상 갭이 ±0.3% 안쪽이면 보합
+        brief = _brief(us_pct=0.5, vix_pct=-5.0, oil_pct=-2.0, ewy_pct=-0.6, skhy_pct=-0.5,
+                       krw_pct=0.0, fut_pct=None, flow_net=100, sox_pct=0.0)
         signals = umb._compute_signals(brief)
-        bull, bear, _ = market_signals.signal_counts(signals)
 
-        self.assertEqual(market_signals.verdict(signals), market_signals.verdict_from_counts(bull, bear))
-        self.assertEqual(market_signals.verdict_reason(signals), '')
+        self.assertGreater(market_signals.signal_counts(signals)[0], 2)
+        self.assertEqual(market_signals.verdict(signals), 'neutral')
+        self.assertTrue(market_signals.verdict_reason(signals).startswith('예상 시가 갭'))
 
     def test_oil_drop_on_risk_off_day_is_neutral(self):
         brief = _brief(us_pct=-1.5, vix_pct=8.0, oil_pct=-3.0, ewy_pct=0.0, skhy_pct=0.0,
@@ -103,11 +104,65 @@ class ExtremeDayTest(unittest.TestCase):
 
         self.assertEqual(votes, {'코스피 수급': -1, '코스닥 수급': 1})
 
-    def test_archived_signals_without_value_still_count(self):
-        # value 필드가 없던 옛 brief_json
+    def test_archived_signals_without_value_are_unknown(self):
+        # value 필드가 없던 옛 brief_json — 예상 갭을 못 내면 중립이 아니라 보류
         signals = [{'label': '코스피200 선물', 'direction': -1}, {'label': '국제유가(WTI)', 'direction': 1}]
 
+        self.assertEqual(market_signals.verdict(signals), 'unknown')
+
+
+class ExpectedGapTest(unittest.TestCase):
+    """예상 시가 갭 = 0.042 + 0.703 × 야간선물 (2026-10-20 백테스트). 다른 지표 표는 무시한다."""
+
+    def _signals(self, night: float | None, **others: float) -> list[dict]:
+        signals = [{'label': label, 'direction': 1 if v > 0 else -1, 'value': v} for label, v in others.items()]
+        if night is not None:
+            signals.append({'label': '코스피200 야간선물', 'direction': 0, 'value': night})
+
+        return signals
+
+    def test_2026_10_19_night_crash_overrides_bullish_votes(self):
+        # 실측 야간 −3.50%. 미국·수급이 전부 강세여도 약세 출발
+        signals = self._signals(-3.50, **{'미국 증시': 1.2, 'VIX(변동성)': -8.0, '코스피 수급(외국인+기관)': 900000})
+
+        self.assertEqual(market_signals.verdict(signals), 'bear')
+        self.assertAlmostEqual(market_signals.expected_gap(signals)['value'], 0.042 - 0.703 * 3.50, places=3)
+
+    def test_extreme_night_rally_is_bull(self):
+        signals = self._signals(6.0, **{'미국 증시': -1.5, '국제유가(WTI)': 4.0})
+
+        self.assertEqual(market_signals.verdict(signals), 'bull')
+
+    def test_2026_10_20_small_night_move_is_neutral(self):
+        # 실측 야간 −0.13% → 예상 −0.05% 보합 (실제 시가 −0.60%)
+        signals = self._signals(-0.13, **{'미국 증시': 0.48})
+
         self.assertEqual(market_signals.verdict(signals), 'neutral')
+        self.assertEqual(market_signals.headline(signals), '예상 시가 갭 -0.05% (보합 출발)')
+
+    def test_fallback_uses_ewy_and_sox(self):
+        signals = self._signals(None, **{'야간 한국물(EWY·환율보정)': -3.0, '미국 반도체(SOX)': -4.0})
+        gap = market_signals.expected_gap(signals)
+
+        self.assertAlmostEqual(gap['value'], 0.136 - 0.165 * 3.0 - 0.218 * 4.0, places=3)
+        self.assertEqual(market_signals.verdict(signals), 'bear')
+
+    def test_night_futures_outranks_fallback(self):
+        signals = self._signals(1.0, **{'야간 한국물(EWY·환율보정)': -3.0, '미국 반도체(SOX)': -4.0})
+
+        self.assertEqual(market_signals.verdict(signals), 'bull')
+
+    def test_no_gap_inputs_is_unknown_not_neutral(self):
+        signals = self._signals(None, **{'미국 증시': 1.5, '국제유가(WTI)': -2.0})
+
+        self.assertEqual(market_signals.verdict(signals), 'unknown')
+        self.assertEqual(market_signals.verdict_label(signals), '판정 보류')
+
+    def test_sox_signal_from_brief(self):
+        brief = {'indices': [{'symbol': '^SOX', 'pct': -4.2}]}
+        sox = next(s for s in umb._compute_signals(brief) if s['label'] == '미국 반도체(SOX)')
+
+        self.assertEqual((sox['direction'], sox['value']), (-1, -4.2))
 
 
 class IntradayVerdictTest(unittest.TestCase):

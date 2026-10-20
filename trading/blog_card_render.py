@@ -69,12 +69,6 @@ def close_phase_now(now=None) -> str:
     return 'today'
 
 
-def _signal_counts(signals: list[dict]) -> tuple[int, int, int]:
-    """메일·게시판과 같은 기준(상관 그룹당 1표)으로 센다. market_signals 참조."""
-    import market_signals
-    return market_signals.signal_counts(signals)
-
-
 def verdict_line(brief: dict) -> str:
     """'그래서 오늘 결과가 뭔데' 한 줄 해설 — 규칙 기반 조립.
 
@@ -138,17 +132,8 @@ def verdict_line(brief: dict) -> str:
     signals = brief.get('signals') or []
     if signals:
         import market_signals
-        bull, bear, _ = _signal_counts(signals)
-        v = market_signals.verdict(signals)
-        gap = market_signals.gap_signal(signals)
-        if gap is not None:
-            parts.append(f"{gap['label']} {gap['value']:+.2f}%로 오늘 {market_signals.VERDICT_TEXT[v]}")
-        elif v == 'bull':
-            parts.append(f'오늘 강세 신호 우세({bull}:{bear})')
-        elif v == 'bear':
-            parts.append(f'오늘 약세 신호 우세({bear}:{bull})')
-        else:
-            parts.append('오늘 신호 팽팽')
+        if market_signals.verdict(signals) != 'unknown':
+            parts.append(f'오늘 {market_signals.headline(signals)}')
 
     if not parts:
         return ''
@@ -203,25 +188,18 @@ def build_card_html(brief: dict) -> str:
     signal_block = ''
     if signals:
         import market_signals
-        bull, bear, neutral = _signal_counts(signals)
         v = market_signals.verdict(signals)
-        verdict = market_signals.VERDICT_TEXT[v]
-        vcolor = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER}[v]
+        vcolor = {'bull': _UP, 'bear': _DOWN, 'neutral': _AMBER, 'unknown': _MUTED}[v]
         signal_block = (
             f'<div style="margin-top:18px;padding:16px 18px;background:{_SURFACE_SOFT};'
             f'border:1px solid {_LINE};border-radius:14px;">'
             f'<span style="color:{_ACCENT};font-size:15px;font-weight:800;letter-spacing:.3px;">'
             f'📊 오늘의 시장 신호 📍</span>'
-            f'<div style="margin-top:8px;">'
-            f'<span style="color:{_INK};font-size:22px;font-weight:800;">강세 {bull}</span>'
-            f'<span style="color:{_MUTED};font-size:16px;"> · </span>'
-            f'<span style="color:{_INK};font-size:22px;font-weight:800;">약세 {bear}</span>'
-            f'<span style="color:{_MUTED};font-size:16px;"> · </span>'
-            f'<span style="color:{_INK};font-size:22px;font-weight:800;">중립 {neutral}</span>'
-            f'<span style="display:inline-block;margin-left:10px;padding:3px 12px;border-radius:999px;'
-            f'background:{vcolor};color:{_BG};font-size:13px;font-weight:800;vertical-align:middle;">'
-            f'{verdict}</span>'
-            f'</div></div>'
+            f'<div style="margin-top:8px;color:{vcolor};font-size:22px;font-weight:800;">'
+            f'{html_lib.escape(market_signals.headline(signals))}</div>'
+            f'<div style="margin-top:6px;color:{_MUTED};font-size:13px;">'
+            f'근거: {html_lib.escape(market_signals.basis(signals))}</div>'
+            f'</div>'
         )
 
     verdict_txt = verdict_line(brief)
