@@ -244,7 +244,7 @@ class PreopenEmptyDataTest(unittest.TestCase):
 
 
 class AfterHoursTest(unittest.TestCase):
-    """08:35 발송 — 미국 현물 마감(05:00 KST) 이후 정보: 지수선물·애프터마켓."""
+    """08:00 발송 — 미국 현물 마감(05:00 KST) 이후 정보: 지수선물·애프터마켓."""
 
     def test_us_futures_vote_in_us_risk(self):
         brief = {'indices': [{'symbol': '^GSPC', 'pct': 0.0}, {'symbol': 'ES=F', 'pct': -0.8},

@@ -2,8 +2,8 @@ name: 종목 스크리닝
 
 on:
   # GitHub schedule 은 2~4시간 지연·누락이 잦아 사용 안 함.
-  # 아침 회차는 08:35 — 21~08시는 야간 수신 동의자에게만 보낼 수 있고(정보통신망법 제50조), 미국 마감 후 지수선물·애프터마켓 움직임까지 반영하려고.
-  # cron-job.org 가 평일 KST 08:35 에 GitHub API 로 workflow_dispatch 호출.
+  # 아침 회차는 08:00 — 21~08시는 야간 수신 동의자에게만 보낼 수 있어(정보통신망법 제50조) 그 직후 첫 시각. NXT 프리마켓(08:00~)은 아직 반영 못 함.
+  # cron-job.org 가 평일 KST 08:00 에 GitHub API 로 workflow_dispatch 호출.
   workflow_dispatch:  # cron-job.org / 수동 실행 — 기본 all
     inputs:
       audience:
