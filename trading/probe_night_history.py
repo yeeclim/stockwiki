@@ -1,44 +1,41 @@
-"""야간선물 일봉 과거치 조회 가능 여부 확인 — 수동 실행 전용(probe_night_history.yml).
+"""야간선물 일봉 과거치 덤프 — 수동 실행 전용(probe_night_history.yml).
 
-코스피200 야간선물이 시가 갭을 얼마나 맞히는지 검증하려면 수년치 일봉이 필요하다.
-KIS 선물옵션 기간별시세(FHKIF03020100)에 야간 시장 코드를 넣으면 과거 일봉이 오는지,
-소멸한 월물도 조회되는지 본다. 정규장('F')을 대조군으로 함께 찍는다.
+코스피200 야간선물이 시가 갭을 얼마나 맞히는지 검증하려고, KIS 선물옵션 기간별시세
+(FHKIF03020100)로 월물별 정규장('F')·야간('CM') 일봉을 받아 CSV 줄로 찍는다.
+2026-10-20 실측: 'CM' 이 야간 일봉을 주고, 소멸 월물은 A01603 까지만 조회된다.
 
 조회만 한다 — 주문·메일·DB 쓰기 없음.
 """
-import json
+from datetime import date, timedelta
 
 from kis_api import KISApi
 
 _PATH = '/uapi/domestic-futureoption/v1/quotations/inquire-daily-fuopchartprice'
-_MARKETS = ('F', 'CM', 'CF', 'NF')
-_CONTRACTS = ('A01612', 'A01609', 'A01603', 'A01512', 'A01412')
+_CONTRACTS = ('A01603', 'A01606', 'A01609', 'A01612')
 
 
 def main() -> int:
     api = KISApi()
     api.auth()
-    for mrkt in _MARKETS:
+    print('CSV,market,contract,date,open,close,volume')
+    for mrkt in ('F', 'CM'):
         for code in _CONTRACTS:
-            params = {
-                'FID_COND_MRKT_DIV_CODE': mrkt, 'FID_INPUT_ISCD': code,
-                'FID_INPUT_DATE_1': '20200101', 'FID_INPUT_DATE_2': '20261020',
-                'FID_PERIOD_DIV_CODE': 'D',
-            }
-            try:
+            seen = set()
+            end = date(2026, 10, 20)
+            while end > date(2025, 6, 1):
+                start = end - timedelta(days=60)
+                params = {
+                    'FID_COND_MRKT_DIV_CODE': mrkt, 'FID_INPUT_ISCD': code,
+                    'FID_INPUT_DATE_1': start.strftime('%Y%m%d'), 'FID_INPUT_DATE_2': end.strftime('%Y%m%d'),
+                    'FID_PERIOD_DIV_CODE': 'D',
+                }
                 body = api._get(_PATH, headers=api._h('FHKIF03020100'), params=params).json()
-            except Exception as e:
-                print(f'[{mrkt} {code}] 실패: {e}')
-                continue
-
-            if body.get('rt_cd') != '0':
-                print(f"[{mrkt} {code}] rt_cd={body.get('rt_cd')} {body.get('msg1')}")
-                continue
-
-            rows = [r for r in (body.get('output2') or []) if any(v not in ('', '0', None) for v in r.values())]
-            print(f'[{mrkt} {code}] 행 {len(rows)}  output1={json.dumps(body.get("output1"), ensure_ascii=False)[:300]}')
-            for r in rows[:3] + rows[-2:]:
-                print(f'    {json.dumps(r, ensure_ascii=False)}')
+                for r in body.get('output2') or []:
+                    d = r.get('stck_bsop_date')
+                    if d and d not in seen and r.get('futs_prpr') not in ('', None):
+                        seen.add(d)
+                        print(f"CSV,{mrkt},{code},{d},{r['futs_oprc']},{r['futs_prpr']},{r['acml_vol']}")
+                end = start - timedelta(days=1)
 
     return 0
 
