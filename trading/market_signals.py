@@ -56,7 +56,7 @@ _GROUP_DEFS = [
      lambda l: l.startswith('코스닥 수급')),
 ]
 
-VERDICT_TEXT = {'bull': '강세 출발', 'bear': '약세 출발', 'neutral': '보합 출발', 'unknown': '판정 보류'}
+VERDICT_TEXT = {'bull': '강세', 'bear': '약세', 'neutral': '보합', 'unknown': '판정 보류'}
 
 # 예상 시가 갭(%) 회귀 계수 — 2026-10-20 백테스트, 전체 표본으로 적합.
 #   야간선물: 203일, 뒤 30% 검증 방향 87%·R² 0.63
@@ -234,12 +234,12 @@ def basis(signals: list[dict]) -> str:
 
 
 def verdict_label(signals: list[dict]) -> str:
-    """화면 표시용 판정 문구 ('약세 출발' 등)."""
+    """화면 표시용 판정 문구 ('약세' 등)."""
     return VERDICT_TEXT[verdict(signals)]
 
 
 def headline(signals: list[dict]) -> str:
-    """메일·게시판 머리줄 — '예상 시가 갭 −2.42% (약세 출발)' 등."""
+    """메일·게시판 머리줄 — '예상 시가 갭 −2.42% (약세)' 등."""
     intraday = intraday_signal(signals)
     if intraday is not None:
         return f"코스피200 선물 당일 {intraday['value']:+.2f}% ({verdict_label(signals)})"

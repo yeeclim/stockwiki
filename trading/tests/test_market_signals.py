@@ -122,7 +122,7 @@ class ExpectedGapTest(unittest.TestCase):
         return signals
 
     def test_2026_10_19_night_crash_overrides_bullish_votes(self):
-        # 실측 야간 −3.50%. 미국·수급이 전부 강세여도 약세 출발
+        # 실측 야간 −3.50%. 미국·수급이 전부 강세여도 약세
         signals = self._signals(-3.50, **{'미국 증시': 1.2, 'VIX(변동성)': -8.0, '코스피 수급(외국인+기관)': 900000})
 
         self.assertEqual(market_signals.verdict(signals), 'bear')
@@ -138,7 +138,7 @@ class ExpectedGapTest(unittest.TestCase):
         signals = self._signals(-0.13, **{'미국 증시': 0.48})
 
         self.assertEqual(market_signals.verdict(signals), 'neutral')
-        self.assertEqual(market_signals.headline(signals), '예상 시가 갭 -0.05% (보합 출발)')
+        self.assertEqual(market_signals.headline(signals), '예상 시가 갭 -0.05% (보합)')
 
     def test_fallback_uses_ewy_and_sox(self):
         signals = self._signals(None, **{'야간 한국물(EWY·환율보정)': -3.0, '미국 반도체(SOX)': -4.0})
