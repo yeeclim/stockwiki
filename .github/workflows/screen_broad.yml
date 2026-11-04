@@ -34,3 +34,12 @@ jobs:
         run: |
           cd trading
           python screen_broad.py
+
+      # 모멘텀 상위 20 게시판 기록 (전진 검증용 — 메일·앱 미노출). 위 스캔 결과와 무관한 별도 단계.
+      - name: 모멘텀 상위 종목 기록
+        env:
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cd trading
+          python momentum_rank.py
