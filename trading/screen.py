@@ -353,6 +353,13 @@ def screen():
     report = "\n".join(lines)
     print(report)
 
+    # 항목별 채점 근거 — 로그 전용 (메일 본문엔 넣지 않는다). 사후에 "왜 이 점수인가"를 확인하는 용도.
+    print("\n🧾 채점 근거")
+    for r in ok + excluded + unanalyzed + others:
+        print(f"  {r['name']}({r['code']}) {r['score']}/{r['max_score']}점")
+        for reason in r.get('reasons', []):
+            print(f"    {reason}")
+
     # 스크리닝 결과 Supabase 저장 (main.py watchlist 자동 연동용)
     _save_results(results)
 

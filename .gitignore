@@ -82,6 +82,8 @@ app.*.map.json
 trading/run_naver_blog.ps1
 # 블로그 미리보기 산출물 (로컬에서만 생성)
 trading/_preview/
+# 백테스트 일봉 캐시 (로컬에서만 생성)
+trading/_backtest_cache.pkl
 # 로컬 전용 — DART 계정/조회 산출물 (커밋 금지)
 trading/dart_accounts.txt
 # Supabase CLI 로컬 상태
