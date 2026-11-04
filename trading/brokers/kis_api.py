@@ -181,7 +181,6 @@ class KISApi(BaseBrokerApi):
             'above_ma20':   bool(ma5 and ma20 and ma5 > ma20),
             'rsi':              rsi_now,
             'rsi_rebound':      rsi_rebound,
-            'basing':           ti.basing_near_low(closes_asc),
             'volume_declining': ti.volume_declining(volumes_asc),
         }
 

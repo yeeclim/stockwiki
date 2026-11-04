@@ -3,7 +3,8 @@
 
 재현 범위: strategy._score_entry 중 일봉으로 과거 재계산이 가능한 기술적 7점
   필수: 현재가<MA60(+1), MA5>MA20(+1) / 골든크로스(+1) / 거래량≥10만(+1)
-        RSI 과매도 반등(+1) / 바닥 다지기(+1) / 거래량 감소(+1)
+        RSI 과매도 반등(+2) / 거래량 감소(+1)
+  바닥 다지기(basing)는 2026-11-04 채점에서 제거됐다 — 항목별 효과 비교용으로만 계산한다.
 재현 불가(과거 시점 값 없음): PER·PBR(각 0.5) · 재무비율 4종(각 0.5) — 3점
 
 진입: 신호일(t) 종가로 채점 → 다음 거래일(t+1) 시가 매수 (08:00 스크리닝과 동일 시점)
@@ -88,11 +89,13 @@ def signals(df: pd.DataFrame) -> pd.DataFrame:
     out['golden_cross'] = (ma5 > ma20) & (ma5.shift(1) <= ma20.shift(1))
     out['volume_100k'] = v >= 100_000
     out['rsi_rebound'] = (rsi_prev_min < 30) & (rsi >= 30) & (rsi <= 50)
+    # 옛 technical_indicators.basing_near_low (60일 저점 8% 이내 + 최근 10일 신저가 없음)
     out['basing'] = (c <= low60 * 1.08) & (c.rolling(10).min() >= prior_low)
     out['volume_declining'] = (recent_vol < prior_vol) & (prior_vol > 0)
     out['gate'] = out['below_ma60'] & out['ma5_gt_ma20']
-    out['score'] = out[['below_ma60', 'ma5_gt_ma20', 'golden_cross', 'volume_100k',
-                        'rsi_rebound', 'basing', 'volume_declining']].sum(axis=1).where(out['gate'], 0)
+    out['score'] = (out[['below_ma60', 'ma5_gt_ma20', 'golden_cross', 'volume_100k',
+                         'volume_declining']].sum(axis=1)
+                    + 2 * out['rsi_rebound']).where(out['gate'], 0)
     # screen_broad 기초 필터: 가격 1천~80만, 직전 세션 거래량 5만 이상, MA60 계산 가능
     out['eligible'] = c.between(1_000, 800_000) & (v >= 50_000) & ma60.notna()
 

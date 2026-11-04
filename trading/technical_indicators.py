@@ -42,27 +42,6 @@ def rsi_oversold_rebound(closes: list[float], period: int = 14, lookback: int = 
     return bool(recent_min < 30 and 30 <= now <= rebound_ceiling), now
 
 
-def basing_near_low(closes: list[float], window: int = 60, near_pct: float = 8.0,
-                     no_new_low_days: int = 10) -> bool:
-    """최근 window거래일 저점 대비 near_pct% 이내이고, 최근 no_new_low_days일간
-    신저가 갱신이 없으면 '바닥을 다지는 중'으로 판단한다.
-    """
-    if len(closes) < window:
-        return False
-    recent_low = min(closes[-window:])
-    price = closes[-1]
-    near_low = price <= recent_low * (1 + near_pct / 100)
-    if not near_low:
-        return False
-
-    if len(closes) < window + no_new_low_days:
-        return True  # 저점 구간 이전 데이터가 부족하면 근접 여부만으로 판단
-
-    last_low = min(closes[-no_new_low_days:])
-    prior_low = min(closes[-window - no_new_low_days:-no_new_low_days])
-    return bool(last_low >= prior_low)
-
-
 def volume_declining(volumes: list[float], recent: int = 5, prior: int = 20) -> bool:
     """최근 recent거래일 평균 거래량이 직전 prior거래일 평균보다 낮으면 매도세 소진으로 본다."""
     if len(volumes) < recent + prior:

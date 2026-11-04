@@ -180,7 +180,6 @@ def get_ma_data(symbol: str) -> dict:
 
         # closes/volumes는 이미 과거→최신(오름차순) 순서 (Yahoo 차트 API 기본 응답 순서)
         rsi_rebound, rsi_now = ti.rsi_oversold_rebound(closes)
-        basing = ti.basing_near_low(closes)
         vol_declining = ti.volume_declining(volumes)
 
         return {
@@ -189,7 +188,6 @@ def get_ma_data(symbol: str) -> dict:
             'above_ma20': bool(ma5 and ma20 and ma5 > ma20),
             'rsi': rsi_now,
             'rsi_rebound': rsi_rebound,
-            'basing': basing,
             'volume_declining': vol_declining,
         }
     except Exception:

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import screen
 import screen_broad
 from brokers.kis_api import last_session_volume
+from strategy import _score_entry
 
 
 def _passed() -> dict:
@@ -124,6 +125,46 @@ class LastSessionVolumeTest(unittest.TestCase):
         now = datetime(2026, 10, 15, 6, 0, tzinfo=self.KST)
 
         self.assertEqual(last_session_volume(self.ROWS, now), 21_884)
+
+
+class ScoreEntryTest(unittest.TestCase):
+    """채점 극단 케이스 — 전 항목 충족 = 정확히 10점, 바닥 다지기는 점수에 없음."""
+    FUND = {'price': 9_000, 'market_cap': 10_000, 'per': 5.0, 'pbr': 0.5}
+    MA_ALL = {'ma60': 10_000, 'ma5': 9_100, 'ma20': 9_000, 'golden_cross': True,
+              'last_session_volume': 500_000, 'rsi': 35, 'rsi_rebound': True,
+              'volume_declining': True}
+    RATIOS_ALL = {'부채비율': 50, '유동비율': 200, '현금비율': 50, '이자보상배율': 1000}
+
+    def test_every_item_met_is_exactly_ten(self):
+        score, max_score, _ = _score_entry(self.FUND, self.MA_ALL, self.RATIOS_ALL)
+
+        self.assertEqual((score, max_score), (10, 10))
+
+    def test_basing_flag_no_longer_scores(self):
+        # 백테스트상 역신호라 2026-11-04 제거 — 키가 남아 들어와도 점수에 영향 없어야 한다
+        base, _, _ = _score_entry(self.FUND, self.MA_ALL, self.RATIOS_ALL)
+        with_basing, _, _ = _score_entry(self.FUND, {**self.MA_ALL, 'basing': True}, self.RATIOS_ALL)
+
+        self.assertEqual(base, with_basing)
+
+    def test_rsi_rebound_is_two_points(self):
+        on, _, _ = _score_entry(self.FUND, self.MA_ALL, self.RATIOS_ALL)
+        off, _, _ = _score_entry(self.FUND, {**self.MA_ALL, 'rsi_rebound': False}, self.RATIOS_ALL)
+
+        self.assertEqual(on - off, 2)
+
+    def test_gate_fail_stops_at_ma60(self):
+        # 극단 상승 종목(현재가 ≥ MA60)은 나머지 항목이 다 좋아도 1점도 못 받는다
+        score, _, _ = _score_entry({**self.FUND, 'price': 20_000}, self.MA_ALL, self.RATIOS_ALL)
+
+        self.assertEqual(score, 0)
+
+    def test_nothing_met_but_gates_is_two(self):
+        # 극단 약세 반등 직전: 필수 2개만 충족, 나머지 결측/미달 → 2점 (결측을 점수로 세지 않음)
+        ma = {'ma60': 10_000, 'ma5': 9_100, 'ma20': 9_000, 'last_session_volume': 0}
+        score, _, _ = _score_entry({'price': 9_000, 'market_cap': 10_000}, ma, None)
+
+        self.assertEqual(score, 2)
 
 
 if __name__ == '__main__':
