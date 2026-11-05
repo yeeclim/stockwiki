@@ -9,7 +9,7 @@ idna==3.18
 lxml==6.1.1
 numpy==2.3.4
 openpyxl==3.1.5
-packaging==26.2
+packaging==26.3
 pandas==2.3.3
 pip-tools==7.5.3
 pyproject_hooks==1.2.0
